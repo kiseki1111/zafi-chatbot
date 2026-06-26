@@ -1,0 +1,86 @@
+TAHAP 1: Login & Mendapatkan Token Akses (Super Admin)
+Sistem ini menggunakan JWT (JSON Web Token). Anda harus login sebagai penguasa sistem tertinggi untuk mendapatkan kunci pas (Access Token).
+
+Buka Postman, buat request baru.
+Atur Method menjadi POST.
+Masukkan URL: http://localhost:3000/api/v1/auth/login
+Masuk ke tab Body -> pilih raw -> pilih JSON.
+Masukkan kredensial berikut:
+json
+{
+    "email": "superadmin@gmail.com",
+    "passwordPlain": "rahasia123"
+}
+Klik Send.
+Pada bagian bawah (Respons), cari atribut accessToken. Salin (copy) teks panjang acak yang ada di dalamnya (tanpa tanda kutip).
+TAHAP 2: Menggunakan Token & Membaca Data (Uji Akses Sukses)
+Sekarang, kita akan mencoba mengakses rute yang dilindungi. Super Admin memiliki izin role:read, sehingga operasi ini harus berhasil.
+
+Buat request baru di Postman.
+Atur Method menjadi GET.
+Masukkan URL: http://localhost:3000/api/v1/roles
+Buka tab Authorization -> pilih Type: Bearer Token.
+Tempel (paste) token yang baru Anda salin dari Tahap 1 ke kolom Token.
+Klik Send.
+Hasil yang Diharapkan: Anda akan mendapatkan respons 200 OK berisi daftar semua jabatan peran (roles) di sistem. Sistem mengenali Anda sebagai Super Admin.
+TAHAP 3: Membuat Akun Baru (Uji Penambahan Data)
+Masih menggunakan token Super Admin di tab Authorization, kita akan menguji pembuatan akun staf baru. Super Admin memiliki izin user:create.
+
+Buat request baru.
+Atur Method menjadi POST.
+Masukkan URL: http://localhost:3000/api/v1/users
+Pastikan tab Authorization masih memakai Bearer Token dari Tahap 1.
+Buka tab Body -> raw -> JSON, lalu masukkan:
+json
+{
+    "email": "staff_baru@example.com",
+    "name": "Staff Pengetesan",
+    "passwordPlain": "StaffAman123!"
+}
+Klik Send.
+Hasil yang Diharapkan: Respons 201 Created berisi data pengguna baru tersebut. Catat atribut ID pengguna baru ini jika Anda ingin menguji fungsi Delete nanti.
+TAHAP 4: UJI COBA PENETRASI RBAC (Paling Penting!) 🛡️
+Di tahap ini, kita akan login sebagai staf baru yang barusan dibuat. Staf ini belum diberi jabatan/peran apa-apa, sehingga sama sekali tidak punya izin. Kita akan mencoba meretas sistem dengan mengakses daftar roles.
+
+Login sebagai staf:
+
+Buat request POST ke http://localhost:3000/api/v1/auth/login
+Body JSON:
+json
+{
+    "email": "staff_baru@example.com",
+    "passwordPlain": "StaffAman123!"
+}
+Klik Send. Salin accessToken milik staf baru ini.
+Coba akses rute terlarang:
+
+Buat request GET ke http://localhost:3000/api/v1/roles
+Buka tab Authorization -> pilih Bearer Token.
+Ganti/Tempel token dengan token staf baru yang baru saja disalin.
+Klik Send.
+Hasil yang Diharapkan (SUKSES BLOKIR): Sistem RBAC dan PermissionsGuard akan mendeteksi bahwa staf ini tidak punya izin role:read. Anda harus mendapatkan respons 403 Forbidden dengan struktur berikut:
+
+json
+{
+    "statusCode": 403,
+    "error": "Forbidden",
+    "message": [
+        "Anda tidak memiliki hak akses yang cukup untuk mengeksekusi aksi ini."
+    ]
+}
+(Penolakan ini sekaligus dicatat secara diam-diam oleh sistem ke dalam tabel forensik audit_logs di database).
+
+TAHAP 5: Uji Pertahanan Form (Mass Assignment Injection)
+Kita akan menguji apakah sistem bisa membuang parameter hacker secara otomatis.
+
+Lakukan request POST ke http://localhost:3000/api/v1/auth/login (Tidak perlu token).
+Isi Body JSON dengan variabel yang tidak seharusnya ada (misal: isAdmin):
+json
+{
+    "email": "superadmin@gmail.com",
+    "passwordPlain": "rahasia123",
+    "isAdmin": true,
+    "roles": ["HACKER"]
+}
+Klik Send.
+Hasil yang Diharapkan: Server akan membuang input ilegal dan memblokir request dengan status 400 Bad Request yang berisi informasi "property isAdmin should not exist".
