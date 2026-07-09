@@ -115,16 +115,3 @@ Periksa tabel `audit_logs` di database, pastikan rekor log percobaan peretasan t
 
 ---
 
-### Singkatan Teknis Terdaftar dalam Obrolan Ini
-* **RBAC**: Role-Based Access Control
-* **ORM**: Object-Relational Mapping
-* **CRUD**: Create, Read, Update, Delete
-* **DTO**: Data Transfer Object
-* **JWT**: JSON Web Token
-* **JSON**: JavaScript Object Notation
-* **URL**: Uniform Resource Locator
-* **API**: Application Programming Interface
-* **HTTP**: Hypertext Transfer Protocol
-* **XSS**: Cross-Site Scripting
-* **CUID**: Collision-Resistant Unique Identifier
-* **UUID**: Universally Unique Identifier

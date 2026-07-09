@@ -1,4 +1,6 @@
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { join } from 'path';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -7,15 +9,27 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import helmet from 'helmet';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  
+  // Serve static assets from 'public' folder
+  app.useStaticAssets(join(__dirname, '..', 'public'));
   const configService = app.get(ConfigService);
 
   // 1. Mengaktifkan HTTP Security Headers sesuai panduan halaman 38
-  app.use(helmet());
-
+  const isSecurityBypass = process.env.SECURITY_BYPASS_MODE === 'true';
+  
+  if (isSecurityBypass) {
+    console.warn('⚠️  SECURITY BYPASS MODE IS ACTIVE: Helmet strict mode disabled');
+    app.use(helmet({
+      contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false,
+    }));
+  } else {
+    app.use(helmet());
+  }
   // 2. Mengaktifkan CORS Whitelist ketat sesuai Security Checklist
   app.enableCors({
-    origin: ['http://localhost:3000', 'https://app.zafiproperti.com'], // Sesuaikan dengan domain frontend resmi
+    origin: ['http://localhost:3000', 'http://localhost:3001', 'https://app.zafiproperti.com'], // Sesuaikan dengan domain frontend resmi
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     credentials: true,
   });

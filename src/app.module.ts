@@ -8,7 +8,12 @@ import { AuthModule } from './modules/auth/auth.module';
 import { PrismaModule } from './infrastructure/prisma/prisma.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { AssignmentsModule } from './modules/assignments/assignments.module';
+import { ChannelAccountsModule } from './modules/channel-accounts/channel-accounts.module';
+import { WahaModule } from './modules/waha/waha.module';
+import { ChatsModule } from './modules/chats/chats.module';
 import jwtConfig from './config/jwt.config'; // Pastikan file konfigurasi JWT terdaftar
+
+import { AiModule } from './modules/ai/ai.module';
 
 @Module({
   imports: [
@@ -19,7 +24,7 @@ import jwtConfig from './config/jwt.config'; // Pastikan file konfigurasi JWT te
     }),
     ThrottlerModule.forRoot([{
       ttl: 900000, // 15 menit dalam satuan milidetik (15 * 60 * 1000)
-      limit: 100,  // maksimal 100 request
+      limit: 3000,  // maksimal 3000 request
     }]),
     PrismaModule,
     UsersModule,
@@ -27,6 +32,10 @@ import jwtConfig from './config/jwt.config'; // Pastikan file konfigurasi JWT te
     AuthModule,
     PermissionsModule,
     AssignmentsModule,
+    ChannelAccountsModule,
+    WahaModule,
+    ChatsModule,
+    AiModule,
   ],
   providers: [
     {

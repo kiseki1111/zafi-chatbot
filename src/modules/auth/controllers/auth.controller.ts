@@ -16,6 +16,15 @@ export class AuthController {
     ) {
         return this.authService.login(loginDto, ip, userAgent);
     }
+    @Post('google')
+    @HttpCode(HttpStatus.OK)
+    async googleLogin(
+        @Body() body: { idToken: string },
+        @Ip() ip: string,
+        @Headers('user-agent') userAgent: string
+    ) {
+        return this.authService.googleLogin(body.idToken, ip, userAgent);
+    }
 
     @Post('logout')
     @UseGuards(JwtAuthGuard)

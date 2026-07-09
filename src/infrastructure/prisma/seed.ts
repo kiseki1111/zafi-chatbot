@@ -93,21 +93,43 @@ async function main() {
 
     await prisma.user.upsert({ // membuat akun super admin
         where: { email: 'superadmin@gmail.com' },
-        update: {
-            password: hashedPassword // Memastikan data lama ikut ter-update menjadi versi hash jika seeder dijalankan ulang
-        },
+        update: { password: hashedPassword },
         create: {
             email: 'superadmin@gmail.com',
             name: 'Super Admin',
-            password: hashedPassword, // Menggunakan password yang sudah aman
+            password: hashedPassword,
             userRoles: {
-                create: {
-                    roleId: superAdminRole.id,
-                },
+                create: { roleId: superAdminRole.id },
             },
         },
     });
-    console.log('Akun super admin berhasil dibuat');
+
+    const adminRole = await prisma.role.findUnique({ where: { name: 'ADMIN' } });
+    if (adminRole) {
+        await prisma.user.upsert({ // membuat akun admin
+            where: { email: 'admin@gmail.com' },
+            update: { password: hashedPassword },
+            create: {
+                email: 'admin@gmail.com',
+                name: 'Admin User',
+                password: hashedPassword,
+                userRoles: {
+                    create: { roleId: adminRole.id },
+                },
+            },
+        });
+    }
+
+    await prisma.user.upsert({ // membuat akun biasa
+        where: { email: 'user@gmail.com' },
+        update: { password: hashedPassword },
+        create: {
+            email: 'user@gmail.com',
+            name: 'Regular User',
+            password: hashedPassword,
+        },
+    });
+    console.log('Akun super admin, admin, dan user berhasil dibuat');
 }
 
 main()

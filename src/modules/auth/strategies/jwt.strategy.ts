@@ -10,8 +10,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
             // Ekstraksi Bearer token dari header HTTP Authorization secara stateless
             jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
             ignoreExpiration: false,
-            // Perbaikan Kritis: Membaca kunci rahasia dari panel kendali terpusat 'jwt'
-            secretOrKey: configService.get<string>('jwt.accessSecret') || 'fallback_secret_key_sementara',
+            // Perbaikan Kritis: Membaca kunci rahasia dari env
+            secretOrKey: configService.get<string>('JWT_ACCESS_SECRET') || 'fallback_secret_key_sementara',
         });
     }
 

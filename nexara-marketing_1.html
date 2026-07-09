@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nexara — Marketing</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.7.0/tabler-icons.min.css" rel="stylesheet">
+<style>
+  :root{--accent:#2DD9F0;--accent-2:#6EEBFF;--accent-dim:rgba(45,217,240,.13);--glow:rgba(45,217,240,.30);
+    --page:#090C12;--card:#11161F;--text:#EAEEF4;--text-2:#98A2B3;--muted:#5C6573;
+    --border:rgba(255,255,255,.07);--border-2:rgba(255,255,255,.13);
+    --ok:#34E0B0;--ok-bg:rgba(52,224,176,.12);--warn:#FBBF45;--warn-bg:rgba(251,191,69,.13);--danger:#FF6B6B;--r:10px;--rc:14px;}
+  *{box-sizing:border-box;}html,body{margin:0;height:100%;}
+  body{font-family:'Inter',system-ui,sans-serif;color:var(--text);font-size:14px;-webkit-font-smoothing:antialiased;
+    background:radial-gradient(1100px 600px at 78% -8%,rgba(45,217,240,.10),transparent 60%),var(--page);background-attachment:fixed;}
+  button{font-family:inherit;cursor:pointer;color:inherit;}
+  .disp{font-family:'Space Grotesk',sans-serif;}
+  .shell{display:flex;min-height:100vh;}
+  .side{width:230px;flex-shrink:0;background:rgba(13,17,25,.75);border-right:0.5px solid var(--border);padding:20px 12px;display:flex;flex-direction:column;gap:3px;position:sticky;top:0;height:100vh;overflow-y:auto;backdrop-filter:blur(10px);}
+  .brand{display:flex;align-items:center;gap:11px;padding:4px 8px 22px;}
+  .brand .m{width:36px;height:36px;border-radius:10px;background:linear-gradient(140deg,#1a2230,#0e1219);border:0.5px solid var(--border-2);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:19px;box-shadow:0 0 16px -6px var(--glow);}
+  .brand .n{font-weight:600;font-size:19px;letter-spacing:.4px;font-family:'Space Grotesk',sans-serif;line-height:1;}
+  .brand .s{font-size:9px;letter-spacing:1.5px;color:var(--muted);margin-top:3px;}
+  .nav{position:relative;display:flex;align-items:center;gap:13px;width:100%;border:none;background:transparent;padding:11px 13px;border-radius:var(--r);font-size:13.5px;color:var(--text-2);text-align:left;transition:.12s;}
+  .nav i{font-size:19px;}.nav:hover{background:rgba(255,255,255,.035);color:var(--text);}
+  .nav.active{background:var(--accent-dim);color:var(--accent-2);font-weight:500;}
+  .nav.active::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:18px;border-radius:2px;background:var(--accent);box-shadow:0 0 10px var(--glow);}
+  .foot{margin-top:auto;border-top:0.5px solid var(--border);padding-top:14px;display:flex;align-items:center;gap:10px;padding-left:6px;}
+  .av{width:34px;height:34px;border-radius:50%;background:var(--accent-dim);color:var(--accent-2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;}
+  .main{flex:1;min-width:0;}
+  .top{display:flex;align-items:center;gap:12px;padding:20px 28px;border-bottom:0.5px solid var(--border);position:sticky;top:0;background:rgba(9,12,18,.7);backdrop-filter:blur(10px);z-index:5;}
+  .top h1{font-size:24px;font-weight:600;font-family:'Space Grotesk',sans-serif;margin:0;}
+  .top .r{margin-left:auto;display:flex;align-items:center;gap:16px;}
+  .ic{color:var(--text-2);font-size:20px;}
+  .me{display:flex;align-items:center;gap:10px;}.me .av2{width:38px;height:38px;border-radius:9px;background:var(--accent-dim);color:var(--accent-2);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;}
+  .me .nm{font-size:13px;font-weight:600;}.me .rl{font-size:10px;letter-spacing:1px;color:var(--muted);}
+  .content{padding:24px 28px;max-width:1180px;}
+  .btn{font-size:13px;font-weight:600;color:#04222a;background:var(--accent);border:none;border-radius:var(--r);padding:11px 18px;display:inline-flex;align-items:center;gap:8px;box-shadow:0 0 18px -6px var(--glow);}
+  .btn-o{font-size:13px;font-weight:600;color:var(--text);background:var(--card);border:0.5px solid var(--border-2);border-radius:var(--r);padding:11px 16px;display:inline-flex;align-items:center;gap:8px;}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:22px;}
+  .kpi{background:var(--card);border:0.5px solid var(--border);border-radius:var(--rc);padding:16px 18px;}
+  .kpi .l{font-size:12px;color:var(--text-2);margin-bottom:9px;}.kpi .v{font-size:25px;font-weight:600;font-family:'Space Grotesk',sans-serif;}.kpi .n{font-size:11.5px;color:var(--muted);margin-top:3px;}
+  .card{background:var(--card);border:0.5px solid var(--border);border-radius:var(--rc);padding:20px;}
+  .sect{font-size:12.5px;font-weight:600;margin:2px 0 14px;letter-spacing:.3px;text-transform:uppercase;color:var(--text-2);}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  /* tabs */
+  .tabs{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap;}
+  .tab{border:0.5px solid var(--border-2);background:transparent;color:var(--text-2);padding:9px 16px;font-size:13px;border-radius:20px;}
+  .tab:hover{color:var(--text);}.tab.active{background:var(--accent);color:#04222a;border-color:var(--accent);font-weight:600;}
+  .pane{display:none;}.pane.active{display:block;}
+  /* table */
+  .tbl-wrap{overflow-x:auto;border:0.5px solid var(--border);border-radius:var(--rc);background:var(--card);}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  thead th{text-align:left;font-weight:500;color:var(--text-2);font-size:11px;padding:12px 14px;background:rgba(255,255,255,.025);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap;}
+  tbody td{padding:12px 14px;border-top:0.5px solid var(--border);white-space:nowrap;}tbody tr:hover{background:rgba(255,255,255,.018);}
+  .tag{font-size:11px;padding:3px 10px;border-radius:6px;font-weight:500;}
+  .t-ok{color:var(--ok);background:var(--ok-bg);}.t-warm{color:var(--accent-2);background:var(--accent-dim);}.t-hot{color:var(--warn);background:var(--warn-bg);}
+  .num{text-align:right;font-variant-numeric:tabular-nums;}.neg{color:var(--danger);}.pos{color:var(--ok);}
+  .mini{width:28px;height:28px;border-radius:50%;background:var(--accent-dim);color:var(--accent-2);display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;margin-right:9px;vertical-align:middle;}
+  .in{width:100%;height:44px;padding:0 14px;border:0.5px solid var(--border-2);border-radius:var(--r);background:#0C1119;color:var(--text);font-family:inherit;font-size:13px;color-scheme:dark;}
+  .fld{margin-bottom:14px;}.fld label{display:block;font-size:12px;color:var(--text-2);margin-bottom:7px;}
+  .bar{height:8px;background:rgba(255,255,255,.06);border-radius:5px;overflow:hidden;margin-top:7px;}.bar>div{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:5px;}
+  .note{font-size:12.5px;color:var(--text-2);}
+  section[hidden]{display:none;}
+  /* chatbot */
+  .agentbar{display:flex;align-items:center;gap:12px;background:var(--card);border:0.5px solid var(--border);border-radius:var(--rc);padding:16px 20px;margin-bottom:20px;}
+  .live{width:12px;height:12px;border-radius:50%;background:var(--ok);box-shadow:0 0 12px var(--ok);}
+  .chatgrid{display:grid;grid-template-columns:400px 1fr;gap:16px;}
+  .loglist{background:var(--card);border:0.5px solid var(--border);border-radius:var(--rc);overflow:hidden;}
+  .loghead{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:0.5px solid var(--border);font-weight:600;font-size:15px;}
+  .logitem{padding:14px 18px;border-bottom:0.5px solid var(--border);cursor:pointer;transition:.1s;}
+  .logitem:hover,.logitem.sel{background:rgba(255,255,255,.03);}.logitem.sel{border-left:2px solid var(--accent);}
+  .li-top{display:flex;justify-content:space-between;font-size:13.5px;}.li-top .nm{font-weight:600;}.li-top .tm{font-size:11px;color:var(--muted);}
+  .li-msg{font-size:12.5px;color:var(--text-2);margin:5px 0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .li-bot{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted);}
+  .conv{background:var(--card);border:0.5px solid var(--border);border-radius:var(--rc);display:flex;flex-direction:column;min-height:520px;}
+  .convhead{padding:16px 20px;border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;}
+  .convhead .nm{font-weight:600;font-size:16px;}.convhead .ph{font-size:12px;color:var(--text-2);margin-top:2px;}
+  .convbody{flex:1;padding:20px;display:flex;flex-direction:column;gap:16px;}
+  .bubwrap .who{font-size:11.5px;color:var(--text-2);display:flex;align-items:center;gap:6px;margin-bottom:6px;}
+  .bub{padding:13px 16px;border-radius:12px;font-size:13.5px;line-height:1.5;}
+  .bub.cust{background:rgba(255,255,255,.04);border:0.5px solid var(--border);}
+  .bub.ai{background:var(--accent-dim);border:0.5px solid rgba(45,217,240,.25);}
+  .bubwrap.ai .who{color:var(--accent-2);}
+  .convinput{padding:16px 20px;border-top:0.5px solid var(--border);display:flex;gap:10px;}
+  .convinput input{flex:1;height:48px;background:#0C1119;border:0.5px solid var(--border-2);border-radius:var(--r);padding:0 16px;color:var(--text);font-family:inherit;font-size:13px;}
+  .send{width:48px;height:48px;border-radius:var(--r);background:var(--accent);color:#04222a;border:none;display:flex;align-items:center;justify-content:center;font-size:19px;}
+  /* properti cards */
+  .propgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;}
+  .prop{background:var(--card);border:0.5px solid var(--border);border-radius:var(--rc);overflow:hidden;}
+  .prop-img{height:200px;position:relative;background:linear-gradient(135deg,#1c2733,#0c1119);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.12);font-size:52px;}
+  .prop-st{position:absolute;top:14px;left:14px;background:rgba(0,0,0,.55);padding:5px 12px;border-radius:20px;font-size:12px;display:flex;align-items:center;gap:7px;}
+  .prop-b{padding:18px 20px;}
+  .prop-nm{font-size:17px;font-weight:600;display:flex;justify-content:space-between;align-items:center;}
+  .prop-loc{font-size:12.5px;color:var(--text-2);display:flex;align-items:center;gap:6px;margin-top:6px;}
+  .prop-stat{display:flex;gap:40px;margin:18px 0;}
+  .prop-stat .k{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+  .prop-stat .val{font-size:19px;font-weight:600;font-family:'Space Grotesk',sans-serif;margin-top:4px;}
+  .prop-stat .val.cy{color:var(--accent-2);}
+  .prop-link{border-top:0.5px solid var(--border);padding-top:14px;text-align:center;color:var(--accent-2);font-size:13px;font-weight:500;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;}
+  .search{display:flex;align-items:center;gap:8px;background:var(--card);border:0.5px solid var(--border-2);border-radius:var(--r);padding:11px 15px;color:var(--muted);font-size:13px;flex:1;max-width:360px;}
+  .toolbar{display:flex;align-items:center;gap:12px;margin-bottom:22px;flex-wrap:wrap;}
+  .agenda{display:flex;gap:12px;padding:11px 0;border-top:0.5px solid var(--border);}.agenda .tm{font-size:11.5px;color:var(--accent-2);width:52px;flex-shrink:0;}.agenda .tx{font-size:13px;}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand"><div class="m"><i class="ti ti-shield-check"></i></div><div><div class="n">Nexara</div><div class="s">INTELLIGENT SYS</div></div></div>
+    <button class="nav active" onclick="go('dash',this)"><i class="ti ti-layout-dashboard"></i>Dashboard</button>
+    <button class="nav" onclick="go('chat',this)"><i class="ti ti-message-2"></i>Chatbot WhatsApp</button>
+    <button class="nav" onclick="go('kontak',this)"><i class="ti ti-users"></i>Kontak &amp; Leads</button>
+    <button class="nav" onclick="go('booking',this)"><i class="ti ti-bookmark"></i>Data Booking</button>
+    <button class="nav" onclick="go('sales',this)"><i class="ti ti-users-group"></i>Manajemen Tim Sales</button>
+    <button class="nav" onclick="go('kpr',this)"><i class="ti ti-calculator"></i>Simulasi KPR</button>
+    <button class="nav" onclick="go('listing',this)"><i class="ti ti-stack-2"></i>Listing Proyek &amp; Produk</button>
+    <button class="nav" onclick="go('sos',this)"><i class="ti ti-device-mobile"></i>Media Sosial</button>
+    <button class="nav" onclick="go('lap',this)"><i class="ti ti-chart-bar"></i>Laporan &amp; Analytics</button>
+    <div class="foot"><div class="av">RM</div><div><div style="font-size:13px;font-weight:600;">Rina Marlina</div><div style="font-size:11px;color:var(--warn);">User · Marketing</div></div></div>
+  </aside>
+
+  <div class="main">
+    <div class="top"><h1 id="crumb">Dashboard</h1><div class="r"><i class="ti ti-bell ic"></i><div class="me"><div class="av2">RM</div><div><div class="nm">Rina Marlina</div><div class="rl">USER · MARKETING</div></div></div></div></div>
+    <div class="content">
+
+      <section id="s-dash">
+        <div class="kpis">
+          <div class="kpi"><div class="l">Leads baru</div><div class="v">23</div><div class="n">bulan ini</div></div>
+          <div class="kpi"><div class="l">Booking</div><div class="v">19</div><div class="n">+20%</div></div>
+          <div class="kpi"><div class="l">Target unit</div><div class="v">25</div><div class="n">76% tercapai</div></div>
+          <div class="kpi"><div class="l">Follow-up hari ini</div><div class="v" style="color:var(--warn)">6</div></div>
+        </div>
+        <div class="grid2">
+          <div class="card"><div class="sect">Target &amp; KPI</div>
+            <div style="font-size:13px;">Unit terjual <b style="float:right;">19 / 25</b></div><div class="bar"><div style="width:76%"></div></div>
+            <div style="font-size:13px;margin-top:16px;">Konversi leads <b style="float:right;">22%</b></div><div class="bar"><div style="width:22%"></div></div>
+            <div style="font-size:13px;margin-top:16px;">DP terkumpul <b style="float:right;">Rp 412 jt</b></div><div class="bar"><div style="width:64%"></div></div>
+          </div>
+          <div class="card"><div class="sect">Kalender &amp; aktivitas</div>
+            <div class="agenda" style="border-top:none;"><span class="tm">09:00</span><span class="tx">Follow-up Budi Santoso (DP)</span></div>
+            <div class="agenda"><span class="tm">11:00</span><span class="tx">Survey Perumahan 1 — Siti A.</span></div>
+            <div class="agenda"><span class="tm">14:00</span><span class="tx">Akad Dewi Lestari (A-15)</span></div>
+            <div class="agenda"><span class="tm">16:00</span><span class="tx">Broadcast promo unit subsidi</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="s-chat" hidden>
+        <div class="agentbar"><span class="live"></span><b style="font-size:15px;">AI Agent: Aktif</b><div style="margin-left:auto;display:flex;gap:12px;"><button class="btn-o"><i class="ti ti-square-rounded" style="color:var(--danger)"></i>Hentikan Agent</button><button class="btn"><i class="ti ti-adjustments"></i>Konfigurasi Prompt AI</button></div></div>
+        <div class="chatgrid">
+          <div class="loglist">
+            <div class="loghead">Log Pesan Terbaru <i class="ti ti-filter" style="font-size:16px;color:var(--text-2)"></i></div>
+            <div class="logitem sel"><div class="li-top"><span class="nm">Budi Santoso</span><span class="tm">Baru saja</span></div><div class="li-msg">Apakah ada unit rumah tersedia di cluster baru?</div><div class="li-bot"><span>+62 812-3456-7890</span><span class="t-ok" style="color:var(--ok)"><i class="ti ti-brand-whatsapp"></i> Terjawab</span></div></div>
+            <div class="logitem"><div class="li-top"><span class="nm">Sari Wijaya</span><span class="tm">2 mnt lalu</span></div><div class="li-msg">Saya mau komplain soal bocor di atap blok C-12.</div><div class="li-bot"><span>+62 856-1122-3344</span><span style="color:var(--warn)"><i class="ti ti-shield"></i> Review Admin</span></div></div>
+            <div class="logitem"><div class="li-top"><span class="nm">Andi Pratama</span><span class="tm">15 mnt lalu</span></div><div class="li-msg">Bisa minta pricelist untuk ruko?</div><div class="li-bot"><span>+62 899-7777-8888</span><span style="color:var(--ok)"><i class="ti ti-brand-whatsapp"></i> Terjawab</span></div></div>
+          </div>
+          <div class="conv">
+            <div class="convhead"><div><div class="nm">Budi Santoso</div><div class="ph">+62 812-3456-7890</div></div><span style="font-size:12px;color:var(--text-2)"><i class="ti ti-clock"></i> Baru saja</span></div>
+            <div class="convbody">
+              <div class="bubwrap cust"><div class="who"><i class="ti ti-user"></i> Pelanggan</div><div class="bub cust">Apakah ada unit rumah yang tersedia di cluster baru?</div></div>
+              <div class="bubwrap ai"><div class="who"><i class="ti ti-robot"></i> AI Agent Respon</div><div class="bub ai">Tentu, di Cluster Emerald saat ini tersedia 5 unit tipe 45/90. Apakah Bapak/Ibu ingin brosurnya?</div></div>
+            </div>
+            <div class="convinput"><input placeholder="Kirim tanggapan langsung ke Budi Santoso…"><button class="send"><i class="ti ti-send"></i></button></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="s-kontak" hidden>
+        <div class="tabs"><button class="tab active" onclick="tab(this,'k-crm')">CRM</button><button class="tab" onclick="tab(this,'k-bcast')">Broadcast</button></div>
+        <div class="pane active" id="k-crm">
+          <div class="toolbar"><div class="search"><i class="ti ti-search"></i>Cari nama, telepon, atau properti…</div><button class="btn" style="margin-left:auto;"><i class="ti ti-user-plus"></i>Tambah kontak</button></div>
+          <div class="tbl-wrap"><table><thead><tr><th>Nama</th><th>Sumber</th><th>Status</th><th>Properti</th><th>PIC</th></tr></thead><tbody>
+            <tr><td><span class="mini">RM</span>Rina Marlina</td><td>Instagram</td><td><span class="tag t-hot">Prospek</span></td><td>Perumahan 1</td><td>Rina</td></tr>
+            <tr><td><span class="mini">JS</span>Joko Susilo</td><td>Referral</td><td><span class="tag t-warm">Negosiasi</span></td><td>Perumahan 2</td><td>Dimas</td></tr>
+            <tr><td><span class="mini">SA</span>Siti Aminah</td><td>WhatsApp</td><td><span class="tag t-warm">Lead</span></td><td>Ruko Setiabudi</td><td>Rina</td></tr>
+          </tbody></table></div>
+        </div>
+        <div class="pane" id="k-bcast">
+          <div class="card" style="max-width:520px;"><div class="sect">Broadcast WhatsApp</div>
+            <div class="fld"><label>Segmen penerima</label><input class="in" value="Semua Lead — Perumahan 1 (42 kontak)"></div>
+            <div class="fld"><label>Isi pesan</label><input class="in" value="Promo DP ringan unit subsidi 🏡"></div>
+            <button class="btn"><i class="ti ti-send"></i>Jadwalkan broadcast</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="s-booking" hidden>
+        <div class="kpis"><div class="kpi"><div class="l">Total booking</div><div class="v">19</div></div><div class="kpi"><div class="l">DP masuk</div><div class="v">Rp 412 jt</div></div><div class="kpi"><div class="l">Sisa DP</div><div class="v neg">Rp 320 jt</div></div><div class="kpi"><div class="l">Akad selesai</div><div class="v pos">8</div></div></div>
+        <div class="tbl-wrap"><table><thead><tr><th>Konsumen</th><th>No. WA</th><th>Proyek/Unit</th><th>Tgl</th><th class="num">Total</th><th class="num">DP masuk</th><th class="num">Sisa DP</th><th>PIC</th></tr></thead><tbody>
+          <tr><td>Budi Santoso</td><td>0812-3456-7890</td><td>Perumahan 1 · A-12</td><td>02/06</td><td class="num">50 jt</td><td class="num">20 jt</td><td class="num neg">30 jt</td><td>Rina</td></tr>
+          <tr><td>Siti Aminah</td><td>0813-5555-1212</td><td>Perumahan 1 · B-04</td><td>05/06</td><td class="num">75 jt</td><td class="num">75 jt</td><td class="num pos">0</td><td>Dimas</td></tr>
+          <tr><td>Agus Pratama</td><td>0852-7788-9900</td><td>Perumahan 2 · C-09</td><td>10/06</td><td class="num">60 jt</td><td class="num">15 jt</td><td class="num neg">45 jt</td><td>Rina</td></tr>
+        </tbody></table></div>
+      </section>
+
+      <section id="s-sales" hidden>
+        <div class="tbl-wrap"><table><thead><tr><th>Sales</th><th class="num">Leads</th><th class="num">Closing</th><th class="num">Nilai</th></tr></thead><tbody>
+          <tr><td><span class="mini">RN</span>Rina</td><td class="num">42</td><td class="num">11</td><td class="num">Rp 640 jt</td></tr>
+          <tr><td><span class="mini">DM</span>Dimas</td><td class="num">33</td><td class="num">8</td><td class="num">Rp 480 jt</td></tr>
+        </tbody></table></div>
+      </section>
+
+      <section id="s-kpr" hidden>
+        <div class="grid2"><div class="card"><div class="sect">Simulasi Pengajuan KPR</div>
+          <div class="fld"><label>Harga properti</label><input class="in" value="Rp 500.000.000"></div>
+          <div class="fld"><label>Uang muka (DP)</label><input class="in" value="Rp 50.000.000"></div>
+          <div class="fld"><label>Tenor</label><input class="in" value="15 tahun"></div>
+          <div class="fld"><label>Bunga / tahun</label><input class="in" value="7,5%"></div>
+          <button class="btn"><i class="ti ti-calculator"></i>Hitung cicilan</button></div>
+          <div class="card" style="display:flex;flex-direction:column;justify-content:center;text-align:center;"><div style="font-size:13px;color:var(--text-2);">Estimasi cicilan / bulan</div><div class="disp" style="font-size:38px;font-weight:600;text-shadow:0 0 26px var(--glow);">Rp 4,17 jt</div><div style="font-size:12px;color:var(--muted);margin-top:6px;">180 bulan · pokok + bunga</div></div></div>
+      </section>
+
+      <section id="s-listing" hidden>
+        <div class="tabs"><button class="tab active" onclick="tab(this,'l-prop')">Properti</button><button class="tab" onclick="tab(this,'l-konst')">Konstruksi</button><button class="tab" onclick="tab(this,'l-acad')">Academy</button></div>
+        <div class="pane active" id="l-prop">
+          <div class="toolbar"><div class="search"><i class="ti ti-search"></i>Cari properti…</div><button class="btn-o"><i class="ti ti-map-pin"></i>Semua Lokasi</button><button class="btn-o"><i class="ti ti-tag"></i>Semua Harga</button><button class="btn" style="margin-left:auto;"><i class="ti ti-plus"></i>Tambah Properti</button></div>
+          <div class="propgrid">
+            <div class="prop"><div class="prop-img"><i class="ti ti-building-estate"></i><span class="prop-st"><span class="live" style="width:9px;height:9px;"></span>Tersedia</span></div><div class="prop-b"><div class="prop-nm">Menteng Residence Cluster A <i class="ti ti-dots-vertical" style="font-size:18px;color:var(--muted)"></i></div><div class="prop-loc"><i class="ti ti-map-pin"></i>Jakarta Pusat</div><div class="prop-stat"><div><div class="k">Stok Unit</div><div class="val">51 <span style="font-size:12px;color:var(--text-2)">Unit</span></div></div><div><div class="k">Harga Mulai</div><div class="val cy">Rp 2.5M</div></div></div><div class="prop-link" onclick="alert('Membuka siteplan interaktif (demo)')"><i class="ti ti-layout-grid"></i>Buka Siteplan Interaktif</div></div></div>
+            <div class="prop"><div class="prop-img"><i class="ti ti-building-skyscraper"></i><span class="prop-st"><span style="width:9px;height:9px;border-radius:50%;background:var(--warn);"></span>Hampir Habis</span></div><div class="prop-b"><div class="prop-nm">Apartemen Sudirman Tower B <i class="ti ti-dots-vertical" style="font-size:18px;color:var(--muted)"></i></div><div class="prop-loc"><i class="ti ti-map-pin"></i>Jakarta Selatan</div><div class="prop-stat"><div><div class="k">Stok Unit</div><div class="val">12 <span style="font-size:12px;color:var(--text-2)">Unit</span></div></div><div><div class="k">Harga Mulai</div><div class="val cy">Rp 1.2M</div></div></div><div class="prop-link" onclick="alert('Membuka siteplan interaktif (demo)')"><i class="ti ti-layout-grid"></i>Buka Siteplan Interaktif</div></div></div>
+          </div>
+        </div>
+        <div class="pane" id="l-konst"><div class="card"><div class="sect">Proyek Konstruksi</div><div style="font-size:13px;">Progres fisik Proyek A <b style="float:right;">64%</b></div><div class="bar"><div style="width:64%"></div></div><div class="note" style="margin-top:16px;display:block;">Milestone, dokumentasi & jadwal konstruksi tampil di sini.</div></div></div>
+        <div class="pane" id="l-acad"><div class="card"><div class="sect">Academy</div><div style="font-size:13.5px;">📘 Ebook A — Teknik closing &nbsp;·&nbsp; 🎓 Pelatihan A — Product knowledge</div><div class="note" style="margin-top:14px;display:block;">Materi belajar untuk tim; bisa dibuka & diunduh.</div></div></div>
+      </section>
+
+      <section id="s-sos" hidden>
+        <div class="tabs"><button class="tab active" onclick="tab(this,'so-ide')">Riset Ide</button><button class="tab" onclick="tab(this,'so-des')">Graphic Design</button><button class="tab" onclick="tab(this,'so-post')">Auto Posting</button><button class="tab" onclick="tab(this,'so-ads')">ADS</button></div>
+        <div class="pane active" id="so-ide"><div class="card"><div class="note">Riset ide konten & tren untuk kampanye marketing.</div></div></div>
+        <div class="pane" id="so-des"><div class="card"><div class="note">Buat & simpan aset desain grafis untuk postingan.</div></div></div>
+        <div class="pane" id="so-post"><div class="card"><div class="note">Jadwalkan auto-posting ke Instagram, Facebook, dll. — 12 postingan terjadwal.</div></div></div>
+        <div class="pane" id="so-ads"><div class="card"><div class="kpis" style="margin:0;"><div class="kpi"><div class="l">Iklan aktif</div><div class="v">3</div></div><div class="kpi"><div class="l">Jangkauan</div><div class="v">48 rb</div></div><div class="kpi"><div class="l">Biaya</div><div class="v">Rp 18 jt</div></div></div></div></div>
+      </section>
+
+      <section id="s-lap" hidden>
+        <div class="kpis"><div class="kpi"><div class="l">Penjualan</div><div class="v">Rp 1,12 M</div></div><div class="kpi"><div class="l">Unit terjual</div><div class="v">19</div></div><div class="kpi"><div class="l">Konversi</div><div class="v">22%</div></div><div class="kpi"><div class="l">Biaya iklan</div><div class="v">Rp 18 jt</div></div></div>
+        <div class="card"><div class="note">Grafik tren penjualan, sumber leads & ROI iklan tampil di sini.</div></div>
+      </section>
+
+    </div>
+  </div>
+</div>
+<script>
+  var TITLES={dash:'Dashboard',chat:'Chatbot WhatsApp',kontak:'Kontak & Leads',booking:'Data Booking',sales:'Manajemen Tim Sales',kpr:'Simulasi KPR',listing:'Listing Proyek & Produk',sos:'Media Sosial',lap:'Laporan & Analytics'};
+  var IDS=Object.keys(TITLES);
+  function go(id,btn){IDS.forEach(function(k){document.getElementById('s-'+k).hidden=(k!==id);});document.querySelectorAll('.nav').forEach(function(n){n.classList.remove('active');});btn.classList.add('active');document.getElementById('crumb').textContent=TITLES[id];window.scrollTo(0,0);}
+  function tab(btn,pid){var wrap=btn.closest('section');wrap.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});btn.classList.add('active');wrap.querySelectorAll('.pane').forEach(function(p){p.classList.remove('active');});document.getElementById(pid).classList.add('active');}
+</script>
+</body>
+</html>
