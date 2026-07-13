@@ -33,6 +33,50 @@ export class WahaService {
     return new Promise(resolve => setTimeout(resolve, delay));
   }
 
+  // Adaptive delay based on WPM (Words Per Minute)
+  private async adaptiveWpmDelay(text: string, wpm: number = 70): Promise<void> {
+    const words = Math.max(1, text.length / 5);
+    const readingDelay = 1500; // 1.5s simulated reading time
+    const typingDelay = Math.floor((words / wpm) * 60000);
+    
+    let totalDelay = readingDelay + typingDelay;
+    const jitter = Math.floor(totalDelay * 0.15 * (Math.random() > 0.5 ? 1 : -1));
+    totalDelay += jitter;
+    
+    // Cap delay to 25 seconds to avoid extreme waits for very long messages
+    const finalDelay = Math.min(totalDelay, 25000);
+
+    this.logger.log(`Adaptive delay (WPM: ${wpm}, Chars: ${text.length}): sleeping for ${finalDelay}ms...`);
+    return new Promise(resolve => setTimeout(resolve, finalDelay));
+  }
+
+  // Sends the 'typing...' status to WA
+  async sendTypingPresence(sessionName: string, chatId: string): Promise<void> {
+    try {
+      // Try older API pattern where session is passed in the body
+      await firstValueFrom(
+        this.httpService.post(
+          `${this.baseUrl}/api/startTyping`,
+          { session: sessionName, chatId: chatId },
+          { headers: this.getHeaders() }
+        )
+      );
+    } catch (error) {
+      try {
+        // Fallback to newer API pattern
+        await firstValueFrom(
+          this.httpService.post(
+            `${this.baseUrl}/api/sessions/${sessionName}/presence`,
+            { chatId: chatId, presence: 'typing' },
+            { headers: this.getHeaders() }
+          )
+        );
+      } catch (innerError) {
+        this.logger.debug(`Could not send typing presence for ${sessionName}. Error: ${innerError.message}`);
+      }
+    }
+  }
+
   async startSession(sessionName: string, webhookUrl?: string, channelAccountId?: string): Promise<any> {
     try {
       if (channelAccountId) {
@@ -69,7 +113,7 @@ export class WahaService {
       // Add NOWEB specific configuration to ensure messages are captured
       payload.config = payload.config || {};
       payload.config.noweb = {
-        markOnline: true,
+        markOnline: false,
         store: {
           enabled: true,
           fullSync: false // Disable fullSync because personal WA history is too large
@@ -154,8 +198,11 @@ export class WahaService {
 
   async sendMessage(sessionName: string, chatId: string, text: string): Promise<any> {
     try {
-      // Apply Random Delay (3 to 7 seconds) before sending message to prevent bans
-      await this.randomDelay(3000, 7000);
+      // Simulate human typing presence
+      await this.sendTypingPresence(sessionName, chatId);
+      
+      // Apply Adaptive WPM Delay (around 70 WPM)
+      await this.adaptiveWpmDelay(text, 70);
 
       const response = await firstValueFrom(
         this.httpService.post(
@@ -176,6 +223,60 @@ export class WahaService {
       this.logger.error(`Failed to send message: ${error.message}`);
       
       // Increment messagesFailed
+      await this.prisma.whatsappInstance.update({
+         where: { instanceName: sessionName },
+         data: { messagesFailed: { increment: 1 } }
+      }).catch(e => this.logger.warn(`Failed to increment messagesFailed for ${sessionName}`));
+      
+      throw error;
+    }
+  }
+
+  async sendImage(sessionName: string, chatId: string, imageUrl: string, caption?: string): Promise<any> {
+    try {
+      // Simulate human typing presence
+      await this.sendTypingPresence(sessionName, chatId);
+      
+      // Download the image first to avoid WAHA redirect/HTML issues
+      const imageResponse = await firstValueFrom(
+        this.httpService.get(imageUrl, { responseType: 'arraybuffer' })
+      );
+      
+      const base64Data = Buffer.from(imageResponse.data).toString('base64');
+      const mimeType = String(imageResponse.headers['content-type'] || 'image/jpeg');
+      
+      const payload: any = {
+        session: sessionName,
+        chatId: chatId,
+        file: { 
+          mimetype: mimeType.includes('text/html') ? 'image/jpeg' : mimeType,
+          filename: 'property-image.jpg',
+          data: base64Data
+        }
+      };
+
+      if (caption) {
+        payload.caption = caption;
+      }
+
+      const response = await firstValueFrom(
+        this.httpService.post(
+          `${this.baseUrl}/api/sendImage`,
+          payload,
+          { headers: this.getHeaders() }
+        ),
+      );
+      
+      await this.prisma.whatsappInstance.update({
+         where: { instanceName: sessionName },
+         data: { messagesSent: { increment: 1 } }
+      }).catch(e => this.logger.warn(`Failed to increment messagesSent for ${sessionName}`));
+
+      return response.data;
+    } catch (error) {
+      const errorDetail = error.response?.data ? JSON.stringify(error.response.data) : error.message;
+      this.logger.error(`Failed to send image: ${errorDetail}`);
+      
       await this.prisma.whatsappInstance.update({
          where: { instanceName: sessionName },
          data: { messagesFailed: { increment: 1 } }

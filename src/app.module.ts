@@ -14,6 +14,7 @@ import { ChatsModule } from './modules/chats/chats.module';
 import jwtConfig from './config/jwt.config'; // Pastikan file konfigurasi JWT terdaftar
 
 import { AiModule } from './modules/ai/ai.module';
+import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { AiModule } from './modules/ai/ai.module';
     WahaModule,
     ChatsModule,
     AiModule,
+    KnowledgeModule,
   ],
   providers: [
     {

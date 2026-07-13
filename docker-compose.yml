@@ -3,7 +3,7 @@ version: '3.8'
 services:
   #konfigurasi layanan database untuk proyek ini
   rbac-db: #
-    image: postgres:15-alpine #gambar
+    image: pgvector/pgvector:pg15 #gambar dengan support pgvector
     container_name: rbac-service-postgres #nama container
 
     restart: always #container otomatis berjalan kembali ketikan crash atau device restart

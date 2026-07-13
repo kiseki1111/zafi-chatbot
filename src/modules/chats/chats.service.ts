@@ -7,19 +7,26 @@ export class ChatsService {
 
   async getConversations(instanceName?: string) {
     const where = instanceName ? { instanceName } : {};
-    return this.prisma.conversation.findMany({
+    const conversations = await this.prisma.conversation.findMany({
       where,
       orderBy: { lastMessageAt: 'desc' },
       include: {
         assignedTo: {
           select: { id: true, name: true, email: true },
         },
+        contact: true,
         messages: {
           orderBy: { createdAt: 'desc' },
           take: 1,
         },
       },
     });
+
+    return conversations.map(c => ({
+      ...c,
+      contactName: c.contact?.name,
+      contactNumber: c.contact?.phone
+    }));
   }
 
   async getMessages(conversationId: string, skip: number = 0, take: number = 20) {

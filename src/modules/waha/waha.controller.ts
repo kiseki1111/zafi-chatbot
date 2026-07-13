@@ -2,6 +2,7 @@ import { Controller, Get, Post, Delete, Body, Param, Req, Res, Logger, Streamabl
 import { SkipThrottle } from '@nestjs/throttler';
 import { WahaService } from './waha.service';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
+import { AiService } from '../ai/ai.service';
 
 @Controller('api/v1/waha')
 export class WahaController {
@@ -9,6 +10,7 @@ export class WahaController {
   constructor(
     private readonly wahaService: WahaService,
     private readonly prisma: PrismaService,
+    private readonly aiService: AiService,
   ) {}
 
   @Post('instances')
@@ -69,11 +71,17 @@ export class WahaController {
 
   @Post('instances/:id/send')
   async sendMessage(@Param('id') id: string, @Body() body: { chatId: string, text: string }) {
+    const contact = await this.prisma.contact.upsert({
+      where: { phone: body.chatId },
+      update: {},
+      create: { name: body.chatId, phone: body.chatId }
+    });
+
     // 1. Create Conversation if not exists
     const conversation = await this.prisma.conversation.upsert({
-      where: { instanceName_contactNumber: { instanceName: id, contactNumber: body.chatId } },
+      where: { instanceName_contactId: { instanceName: id, contactId: contact.id } },
       update: { lastMessageAt: new Date() },
-      create: { instanceName: id, contactNumber: body.chatId, unreadCount: 0 }
+      create: { instanceName: id, contactId: contact.id, unreadCount: 0 }
     });
 
     // 2. Create Message as PENDING
@@ -119,8 +127,15 @@ export class WahaController {
 
   @Post('webhook')
   async handleWebhook(@Body() payload: any) {
-    this.logger.log(`Received WAHA webhook event: ${payload?.event}`);
-    console.log(JSON.stringify(payload, null, 2));
+    if (payload?.event === 'message') {
+      const message = payload.payload;
+      const sender = message?.from;
+      const text = message?.body;
+      const timestamp = message?.timestamp ? new Date(message.timestamp * 1000).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
+      this.logger.log(`\n[WAHA PESAN BARU] Waktu: ${timestamp} | Dari: ${sender} | Isi: "${text}"\n`);
+    } else {
+      this.logger.log(`Received WAHA webhook event: ${payload?.event}`);
+    }
     
     // Log every event into webhook_logs
     if (payload?.session && payload?.event) {
@@ -139,24 +154,35 @@ export class WahaController {
       const sessionName = payload.session;
       
       if (sessionName && message.from && !message.from.includes('@g.us')) {
-        const contactNumber = message.fromMe ? message.to : message.from;
+        const contactNumber = message.fromMe 
+          ? (message.to || message._data?.key?.remoteJid || message.from)
+          : message.from;
         const contactName = message._data?.notifyName || message.sender?.pushname || null;
         const msgId = message.id?._serialized || message.id || 'unknown';
 
         try {
+          const contact = await this.prisma.contact.upsert({
+            where: { phone: contactNumber },
+            update: {
+              name: contactName || undefined,
+            },
+            create: {
+              phone: contactNumber,
+              name: contactName || contactNumber,
+            }
+          });
+
           const conversation = await this.prisma.conversation.upsert({
             where: {
-              instanceName_contactNumber: { instanceName: sessionName, contactNumber }
+              instanceName_contactId: { instanceName: sessionName, contactId: contact.id }
             },
             update: {
-              contactName: contactName || undefined,
               lastMessageAt: new Date(message.timestamp ? message.timestamp * 1000 : Date.now()),
               unreadCount: message.fromMe ? undefined : { increment: 1 }
             },
             create: {
               instanceName: sessionName,
-              contactNumber,
-              contactName,
+              contactId: contact.id,
               unreadCount: message.fromMe ? 0 : 1,
             }
           });
@@ -181,37 +207,71 @@ export class WahaController {
         }
       }
       
-      // Auto-reply logic can remain for 'message' only
+      // Auto-reply logic
       if (payload.event === 'message' && !message.fromMe) {
         const text = message.body?.toLowerCase();
         const sender = message.from;
-        if (text === 'ping') {
+
+        if (sessionName === 'marketing-1' && message.body) {
+          // AI Luna Reply Logic
+          try {
+            const contact = await this.prisma.contact.findUnique({ where: { phone: sender } });
+            const conversation = contact ? await this.prisma.conversation.findUnique({
+              where: { instanceName_contactId: { instanceName: sessionName, contactId: contact.id } }
+            }) : null;
+            
+            let chatHistory: any[] = [];
+            if (conversation) {
+              chatHistory = await this.prisma.message.findMany({
+                where: { conversationId: conversation.id },
+                orderBy: { createdAt: 'desc' },
+                take: 10
+              });
+              chatHistory.reverse(); // Order from oldest to newest for context
+            }
+
+            const aiResponse = await this.aiService.generateLunaResponse(message.body, sender, chatHistory);
+            
+            // Check for Google Drive links or generic Image Host links (ImgBB, etc.)
+            const gdriveRegex = /https:\/\/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)(?:\/[^\s]*)?/gi;
+            const genericHostRegex = /https?:\/\/(?:[a-zA-Z0-9-]+\.)*(?:ibb\.co\.com|ibb\.co|postimg\.cc|postimages\.org)[^\s]*/gi;
+            const extensionRegex = /https?:\/\/[^\s]+\.(?:jpg|jpeg|png|webp|gif)/gi;
+            
+            const gdriveMatch = gdriveRegex.exec(aiResponse);
+            const genericMatch = genericHostRegex.exec(aiResponse);
+            const extensionMatch = extensionRegex.exec(aiResponse);
+
+            let imageUrl: string | null = null;
+            let matchedText: string | null = null;
+
+            if (gdriveMatch && gdriveMatch[1]) {
+              imageUrl = `https://drive.google.com/uc?export=download&id=${gdriveMatch[1]}`;
+              matchedText = gdriveMatch[0];
+            } else if (extensionMatch) {
+              imageUrl = extensionMatch[0];
+              matchedText = extensionMatch[0];
+            } else if (genericMatch) {
+              imageUrl = genericMatch[0];
+              matchedText = genericMatch[0];
+            }
+
+            if (imageUrl && matchedText) {
+              // Remove the messy link and the label from the text so the rest becomes a clean caption
+              const cleanCaption = aiResponse.replace(matchedText, '').replace(/Link Gambar:\s*\[?\]?/gi, '').trim();
+              
+              // Send AI Response as Image + Caption
+              await this.wahaService.sendImage(sessionName, sender, imageUrl, cleanCaption);
+            } else {
+              // Send AI Response as normal text
+              await this.wahaService.sendMessage(sessionName, sender, aiResponse);
+            }
+          } catch (error) {
+            this.logger.error(`Failed to generate Luna response: ${error.message}`);
+          }
+        } else if (text === 'ping') {
            const replyText = 'Pong! Bot is active 🚀';
-           // Save bot reply to DB
-           const conversation = await this.prisma.conversation.findUnique({
-             where: { instanceName_contactNumber: { instanceName: payload.session, contactNumber: sender } }
-           });
-           if (conversation) {
-             const dbMsg = await this.prisma.message.create({
-               data: {
-                 conversationId: conversation.id,
-                 senderType: 'bot',
-                 messageType: 'text',
-                 content: replyText,
-                 status: 'PENDING',
-               }
-             });
-             this.wahaService.sendMessage(payload.session, sender, replyText).then(async (res) => {
-               if (res && res.id) {
-                 await this.prisma.message.update({
-                   where: { id: dbMsg.id },
-                   data: { wahaMessageId: res.id, status: 'SENT' }
-                 }).catch(() => null);
-               }
-             }).catch(() => null);
-           } else {
-             await this.wahaService.sendMessage(payload.session, sender, replyText);
-           }
+           // Send ping response
+           await this.wahaService.sendMessage(payload.session, sender, replyText);
         }
       }
     } else if (payload?.event === 'message.ack') {

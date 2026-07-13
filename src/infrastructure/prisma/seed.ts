@@ -1,10 +1,10 @@
 import { PrismaClient } from '@prisma/client';
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
-import * as dotenv from 'dotenv';
+
 import * as bcrypt from 'bcrypt'; // Baris Kritis: Mengimpor modul enkripsi untuk mengamankan data rahasia
 
-dotenv.config();
+
 console.log("DEBUG DATABASE_URL:", process.env.DATABASE_URL);
 
 // Membuat kolam koneksi (pool) native ke PostgreSQL menggunakan URL dari .env
