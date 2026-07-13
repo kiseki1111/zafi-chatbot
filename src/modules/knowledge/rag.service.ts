@@ -85,7 +85,9 @@ ${p.facilities}
 Informasi Cicilan & Detail DP:
 ${p.installmentInfo}
 
-Link Gambar: ${p.imageUrl || '-'}
+Link Gambar:
+${p.imageUrl || ''}
+Layout Denah: ${p.layoutDenah || ''}
 `;
       }).join('\n\n=========================================\n\n');
       

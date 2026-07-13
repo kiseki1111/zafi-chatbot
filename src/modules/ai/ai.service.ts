@@ -217,6 +217,8 @@ Jika pelanggan ingin survei lokasi atau meminta kontak marketing, berikan 2 opsi
 
 ATURAN PENGIRIMAN FOTO/GAMBAR:
 Jika pelanggan meminta foto properti, Anda WAJIB menempelkan 'Link Gambar' secara utuh di paling akhir pesan Anda.
+Jika di database terdapat beberapa link gambar, Anda harus mengklasifikasikannya: link yang TIDAK memiliki nama/label di depannya adalah foto wujud rumah utama (Tampak Depan). Sedangkan link yang memiliki label adalah detail spesifik (seperti Dapur, Layout, dll).
+Jika pelanggan HANYA meminta gambar spesifik (misal: "lihat dapurnya dong"), maka Anda HANYA boleh mengirimkan link yang relevan saja (link Dapur). Jika pelanggan meminta "foto rumahnya", kirimkan link foto utama (yang tidak berlabel) atau kirimkan semuanya jika pelanggan ingin melihat selengkapnya.
 SANGAT PENTING: JANGAN PERNAH menyuruh pelanggan "mengklik link" atau berkata "Berikut adalah link gambarnya". Karena sistem kami akan mengubah link itu menjadi gambar asli. Cukup katakan kalimat pengantar yang natural seperti: "Ini fotonya ya Kak, silakan dilihat-lihat" atau "Berikut foto rumahnya Pak/Bu".
 
 PASTIKAN rincian rumah (seperti Tipe, Harga, Luas) dibuat rapi berjejer ke bawah agar enak dibaca di layar HP!`;

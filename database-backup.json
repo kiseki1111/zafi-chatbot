@@ -1,0 +1,345 @@
+{
+  "users": [
+    {
+      "id": "7a27e6e0-41ce-4b62-8166-dcf728c8edb0",
+      "name": "Super Admin",
+      "email": "superadmin@gmail.com",
+      "password": "$2b$12$7bnXfxdOomndkGSUGfcPQOXY/bQaPrGvZRSgSJVoQrK3BgiPkOHJ.",
+      "isActive": true,
+      "lastLogin": null,
+      "divisionId": null,
+      "createdAt": "2026-07-09T13:11:38.118Z",
+      "updatedAt": "2026-07-09T13:11:38.118Z",
+      "deletedAt": null
+    },
+    {
+      "id": "fe7da0d7-710b-4b04-a48a-2db801667ce6",
+      "name": "Admin User",
+      "email": "admin@gmail.com",
+      "password": "$2b$12$7bnXfxdOomndkGSUGfcPQOXY/bQaPrGvZRSgSJVoQrK3BgiPkOHJ.",
+      "isActive": true,
+      "lastLogin": null,
+      "divisionId": null,
+      "createdAt": "2026-07-09T13:11:38.135Z",
+      "updatedAt": "2026-07-09T13:11:38.135Z",
+      "deletedAt": null
+    },
+    {
+      "id": "6dac783d-d54c-40bd-83f1-abc4e6cb5c87",
+      "name": "Regular User",
+      "email": "user@gmail.com",
+      "password": "$2b$12$7bnXfxdOomndkGSUGfcPQOXY/bQaPrGvZRSgSJVoQrK3BgiPkOHJ.",
+      "isActive": true,
+      "lastLogin": null,
+      "divisionId": null,
+      "createdAt": "2026-07-09T13:11:38.146Z",
+      "updatedAt": "2026-07-09T13:11:38.146Z",
+      "deletedAt": null
+    },
+    {
+      "id": "f514644d-5bc2-4747-89d7-88806939e445",
+      "name": "Agent Dimas",
+      "email": "dimas@agent.com",
+      "password": "hashedpassword",
+      "isActive": true,
+      "lastLogin": null,
+      "divisionId": null,
+      "createdAt": "2026-07-09T13:43:56.080Z",
+      "updatedAt": "2026-07-09T13:43:56.080Z",
+      "deletedAt": null
+    }
+  ],
+  "properties": [
+    {
+      "id": "99f4c7bc-4f3c-4a1f-8298-084ae5234efa",
+      "name": "Zafi Residence - Tipe 36 Subsidi",
+      "location": "Jl. Ayani - Jl. Parit Sembin, Kabupaten Kuburaya",
+      "type": "Subsidi",
+      "cashPrice": 195000000,
+      "adminFee": 1000000,
+      "dp": null,
+      "landArea": "Bervariasi (7x22m - 10x24m)",
+      "electricity": "1300 Watt",
+      "bedrooms": 2,
+      "bathrooms": 1,
+      "specifications": "Tanah Blok A 7 x 22 m, Tanah Blok B 7 x 24 m. Teras Depan, Pondasi Setinggi 50 cm, Keramik Ukuran 40x40 cm, Kusen & Daun Pintu Kayu, Kusen & Daun Jendela Kayu, Rangka Atap Kayu, Atap Genteng Metal.",
+      "facilities": "Carport, Fasilitas Umum, Sistem Drainase Baik, Jalan Kompleks Lebar 6 Meter.",
+      "installmentInfo": "DP + Akad bervariasi:\nBLOK A:\n- A1 - A3 (7x22m) = Rp. 14.000.000\n- A4 - A26 (7x22m) = Rp. 10.000.000\n- A15 (8x23m) = Rp. 27.000.000\n- A27 (8x22m) = Rp. 18.000.000\n\nBLOK B:\n- B1 - B3 (7x24m) = Rp. 22.000.000\n- B4 - B30 (7x24m) = Rp. 18.000.000\n- B31 (10x24m) = Rp. 14.000.000\n\nEstimasi Cicilan:\n- 10 Tahun = Rp. 1.901.400 / bulan\n- 15 Tahun = Rp. 1.414.500 / bulan\n- 20 Tahun = Rp. 1.178.800 / bulan",
+      "imageUrl": "https://drive.google.com/file/d/1s6vzJ3rxRF8mZYN52VF20DGRQZkJq3yZ/view?usp=drive_link",
+      "layoutDenah": "https://drive.google.com/file/d/1dNhU_kNSiqTVY7sKCvsev3K05IubKM0u/view?usp=sharing",
+      "embeddingText": null,
+      "createdAt": "2026-07-13T04:01:16.053Z",
+      "updatedAt": "2026-07-13T04:01:16.053Z"
+    },
+    {
+      "id": "e42dac23-90c6-4130-9afc-1a767724e781",
+      "name": "Griya Amanah 2 - Tipe 40",
+      "location": "Jl. Berdikari - Jl. Bukit Batu 2, Pal V, Pontianak Barat",
+      "type": "Komersil",
+      "cashPrice": 295000000,
+      "adminFee": 5000000,
+      "dp": 40000000,
+      "landArea": "8 x 16 m",
+      "electricity": "1300 Watt",
+      "bedrooms": 2,
+      "bathrooms": 1,
+      "specifications": "Teras Depan, Pondasi Setinggi 50 cm, Keramik Ukuran 40x40 cm, Kusen & Daun Pintu Kayu, Kusen & Daun Jendela Kayu, Rangka Atap Baja Ringan, Atap Genteng Metal.",
+      "facilities": "Carport, Fasilitas Umum, Sistem Drainase Baik, Jalan Kompleks Lebar 7 Meter.",
+      "installmentInfo": "Estimasi BSN:\n15 Tahun (Plafon 250 Juta):\n- Tahun 1: Rp 2,108,292\n- Tahun 2: Rp 2,316,110\n- Tahun 3: Rp 2,684,984\n- Tahun 4: Rp 3,079,678\n- Tahun 5 - Lunas: Rp 3,161,461\n\n20 Tahun (Plafon 250 Juta):\n- Tahun 1: Rp 1,789,636\n- Tahun 2: Rp 2,012,455\n- Tahun 3: Rp 2,410,898\n- Tahun 4: Rp 2,838,589\n- Tahun 5 - Lunas: Rp 2,927,158\n\nEstimasi BSI (Tenor 15 Tahun):\nRp 2,671,239 / Bulan Flat",
+      "imageUrl": "https://drive.google.com/file/d/13zaZhgBgWUBtwXyzuGu1iLo5Q2jZaS2c/view?usp=sharing",
+      "layoutDenah": "",
+      "embeddingText": null,
+      "createdAt": "2026-07-13T04:01:16.065Z",
+      "updatedAt": "2026-07-13T04:01:16.065Z"
+    },
+    {
+      "id": "55243486-1dee-4ada-9c69-851019bb28bb",
+      "name": "Griya Amanah 2 - Tipe 45",
+      "location": "Jl. Berdikari - Jl. Bukit Batu 2, Pal V, Pontianak Barat",
+      "type": "Komersil",
+      "cashPrice": 330000000,
+      "adminFee": 5000000,
+      "dp": 45000000,
+      "landArea": "9 x 16 m",
+      "electricity": "1300 Watt Up To 2200 Watt",
+      "bedrooms": 2,
+      "bathrooms": 1,
+      "specifications": "Teras Depan, Pondasi Setinggi 50 cm, Keramik Ukuran 60x60 cm, Kusen & Daun Pintu Kayu, Kusen & Daun Jendela Kayu, Rangka Atap Baja Ringan, Atap Genteng Metal.",
+      "facilities": "Carport, Fasilitas Umum, Sistem Drainase Baik, Jalan Kompleks Lebar 7 Meter.",
+      "installmentInfo": "Estimasi BSN:\n15 Tahun (Plafon 280 Juta):\n- Tahun 1: Rp 2,361,287\n- Tahun 2: Rp 2,594,044\n- Tahun 3: Rp 3,007,182\n- Tahun 4: Rp 3,449,240\n- Tahun 5 - Lunas: Rp 3,540,836\n\n20 Tahun (Plafon 280 Juta):\n- Tahun 1: Rp 2,004,392\n- Tahun 2: Rp 2,253,949\n- Tahun 3: Rp 2,700,206\n- Tahun 4: Rp 3,179,220\n- Tahun 5 - Lunas: Rp 3,278,417\n\nEstimasi BSI (Tenor 15 Tahun):\nRp 2,991,788 / Bulan Flat",
+      "imageUrl": "https://drive.google.com/file/d/13zaZhgBgWUBtwXyzuGu1iLo5Q2jZaS2c/view?usp=sharing",
+      "layoutDenah": "",
+      "embeddingText": null,
+      "createdAt": "2026-07-13T04:01:16.069Z",
+      "updatedAt": "2026-07-13T04:01:16.069Z"
+    },
+    {
+      "id": "3dfc19f8-8355-4987-a22d-cebe9e156e4d",
+      "name": "Seven Residence - Tipe 45",
+      "location": "Jl. Parit Haji Muhsin II, Gg. Abdul Karim",
+      "type": "Komersil",
+      "cashPrice": 375000000,
+      "adminFee": 6000000,
+      "dp": 50000000,
+      "landArea": "8 x 20 m",
+      "electricity": "1300 Watt",
+      "bedrooms": 2,
+      "bathrooms": 1,
+      "specifications": "Air PDAM. Teras Depan, Pondasi Setinggi 50 cm, Keramik Ukuran 40x40 cm, Kusen & Daun Pintu Kayu Bengkirai, Kusen & Daun Jendela Kayu Bengkirai, Rangka Atap Baja Ringan, Atap Genteng Metal.",
+      "facilities": "Carport, Sistem Drainase Baik, Jalan Kompleks Lebar 6 Meter.",
+      "installmentInfo": "Estimasi BSN:\n15 Tahun (Plafon 319 juta):\n- Tahun 1: Rp 2.690.179\n- Tahun 2: Rp 2.955.357\n- Tahun 3: Rp 3.426.039\n- Tahun 4: Rp 3.929.670\n- Tahun 5 – Lunas: Rp 4.034.024\n\n20 Tahun (Plafon 319 juta):\n- Tahun 1: Rp 2.283.576\n- Tahun 2: Rp 2.567.892\n- Tahun 3: Rp 3.076.304\n- Tahun 4: Rp 3.622.040\n- Tahun 5 – Lunas: Rp 3.735.055\n\nEstimasi BSI (Tenor 15 tahun, flat):\nRp 3.408.460 / bulan",
+      "imageUrl": "https://drive.google.com/file/d/16RV4mxwYr6smcmaobKR9-6vWMoBEZmWq/view?usp=drive_link",
+      "layoutDenah": "",
+      "embeddingText": null,
+      "createdAt": "2026-07-13T04:01:16.073Z",
+      "updatedAt": "2026-07-13T04:01:16.073Z"
+    },
+    {
+      "id": "1f1345cd-e88a-48a6-b3cc-6049f41a67c7",
+      "name": "Kahyana Residence - Tipe 36 Subsidi",
+      "location": "Jl. Usaha Baru - Parit langgar, Kabupaten Kuburaya",
+      "type": "Subsidi",
+      "cashPrice": 195000000,
+      "adminFee": null,
+      "dp": 1000000,
+      "landArea": "7 x 22 - 24 m",
+      "electricity": "1300 Watt",
+      "bedrooms": 2,
+      "bathrooms": 1,
+      "specifications": "Teras Depan, Pondasi Setinggi 50 cm, Keramik Ukuran 40x40 cm, Kusen & Daun Pintu Kayu, Kusen & Daun Jendela Kayu, Rangka Atap Kayu, Atap Genteng.",
+      "facilities": "Carport, Fasilitas Umum, Sistem Drainase Baik, Jalan Kompleks Lebar 6 Meter.",
+      "installmentInfo": "Harga Cash: Rp 195 Juta (Cash Keras), Rp 205 Juta (Cash Tempo).\nDP + Akad: 1 Juta (Di Luar angsuran mengendap).\n\nEstimasi Cicilan:\n- 10 Tahun = Rp. 1.901.400 / bulan\n- 15 Tahun = Rp. 1.414.500 / bulan\n- 20 Tahun = Rp. 1.178.800 / bulan",
+      "imageUrl": "https://drive.google.com/file/d/1dMdAQ0bw5A-XpSFQncpCwjX2BODsuT1E/view?usp=drive_link",
+      "layoutDenah": "",
+      "embeddingText": null,
+      "createdAt": "2026-07-13T04:01:16.078Z",
+      "updatedAt": "2026-07-13T04:01:16.078Z"
+    }
+  ],
+  "knowledgeBase": [
+    {
+      "id": "3dd3a67e-a90f-4e72-be05-ec0eabae3f99",
+      "content": "[Kategori: CUSTOMER] Waktu Masuk: 10/7/2026, 14.34.53, Nama Konsumen: Alip, No. Telepon: 6262112710705, Tahap Pipeline: Lead, Tags: Cash, Proyek / Unit Diminati: Pesona Asri, Tgl Booking: Belum ada, Progress DP: -, Status Pembayaran DP: -, PIC / Ditugaskan Ke: -, Riwayat & Catatan: Rencana Survey: Ya",
+      "metadata": null,
+      "createdAt": "2026-07-10T08:15:36.194Z",
+      "updatedAt": "2026-07-10T08:15:36.194Z"
+    },
+    {
+      "id": "b46be1a9-812c-4787-9023-a88204c24b30",
+      "content": "[Kategori: PRODUK] Nama Produk: Cluster Magnolia Blok A1, Tipe: Tipe 45/60, Harga: Rp 650.000.000, Luas Bangunan: 45 m2, Luas Tanah: 60 m2, Fasilitas: 2 Kamar Tidur, 1 Kamar Mandi, Carport, Taman Depan, Status Ketersediaan: Sold Out, Lokasi: Jakarta Selatan",
+      "metadata": null,
+      "createdAt": "2026-07-10T08:15:36.875Z",
+      "updatedAt": "2026-07-10T08:15:36.875Z"
+    },
+    {
+      "id": "7f74c0b5-dd5c-4c7d-8bdd-dc7dc2c85240",
+      "content": "[Kategori: PRODUK] Nama Produk: Cluster Magnolia Blok A2, Tipe: Tipe 45/60, Harga: Rp 650.000.000, Luas Bangunan: 45 m2, Luas Tanah: 60 m2, Fasilitas: 2 Kamar Tidur, 1 Kamar Mandi, Carport, Taman Depan, Status Ketersediaan: Tersedia (Ready Stock), Lokasi: Jakarta Selatan",
+      "metadata": null,
+      "createdAt": "2026-07-10T08:15:37.152Z",
+      "updatedAt": "2026-07-10T08:15:37.152Z"
+    },
+    {
+      "id": "fa488839-d644-4663-8f2b-1e9647654c32",
+      "content": "[Kategori: PRODUK] Nama Produk: Grand Estate Blok B5, Tipe: Tipe 70/100, Harga: Rp 1.200.000.000, Luas Bangunan: 70 m2, Luas Tanah: 100 m2, Fasilitas: 3 Kamar Tidur, 2 Kamar Mandi, 2 Carport, Smart Home, Status Ketersediaan: Inden 6 Bulan, Lokasi: Tangerang Selatan",
+      "metadata": null,
+      "createdAt": "2026-07-10T08:15:37.459Z",
+      "updatedAt": "2026-07-10T08:15:37.459Z"
+    },
+    {
+      "id": "5a41bec7-1e9d-472b-92a7-bd7d7190fa08",
+      "content": "[Kategori: PRODUK] Nama Produk: Pesona Asri Tipe Subsidi, Tipe: Tipe 36/60, Harga: Rp 185.000.000, Luas Bangunan: 36 m2, Luas Tanah: 60 m2, Fasilitas: 2 Kamar Tidur, 1 Kamar Mandi, Status Ketersediaan: Tersedia 5 Unit Terakhir, Lokasi: Bogor",
+      "metadata": null,
+      "createdAt": "2026-07-10T08:15:37.914Z",
+      "updatedAt": "2026-07-10T08:15:37.914Z"
+    },
+    {
+      "id": "9a40b08d-7208-4e36-8818-e45cf35a2821",
+      "content": "[Kategori: PRODUK] Nama Produk: Ruko Emerald Kav 1, Tipe: Komersial 2 Lantai, Harga: Rp 2.500.000.000, Luas Bangunan: 120 m2, Luas Tanah: 60 m2, Fasilitas: 2 Kamar Mandi, Area Parkir Luas, Status Ketersediaan: Tersedia, Lokasi: Depok",
+      "metadata": null,
+      "createdAt": "2026-07-10T08:15:38.254Z",
+      "updatedAt": "2026-07-10T08:15:38.254Z"
+    },
+    {
+      "id": "65942489-0802-4119-a364-5ebb553b1456",
+      "content": "[Kategori: DOKUMEN] Tahapan: Booking Fee, Pihak: Customer, Dokumen yang Diperlukan: KTP, NPWP, Keterangan: Fotokopi KTP suami istri (jika sudah menikah) dan NPWP pemohon, Syarat Tambahan: Wajib dibawa saat survei atau ditransfer",
+      "metadata": null,
+      "createdAt": "2026-07-10T08:15:39.424Z",
+      "updatedAt": "2026-07-10T08:15:39.424Z"
+    },
+    {
+      "id": "181fb377-1e3d-40ac-addf-c3bb3e4daf43",
+      "content": "[Kategori: DOKUMEN] Tahapan: Pengajuan KPR (Karyawan), Pihak: Customer, Dokumen yang Diperlukan: KTP, Kartu Keluarga, NPWP, Surat Nikah, Slip Gaji 3 bulan terakhir, Rekening Koran 3 bulan, Surat Keterangan Kerja, Keterangan: Kumpulkan dalam map merah muda maksimal 7 hari setelah booking fee, Syarat Tambahan: Masa kerja minimal 1 tahun di perusahaan tetap",
+      "metadata": null,
+      "createdAt": "2026-07-10T08:15:39.707Z",
+      "updatedAt": "2026-07-10T08:15:39.707Z"
+    },
+    {
+      "id": "b529dded-c6e3-41ba-a8b3-5fe1eb2efe6b",
+      "content": "[Kategori: DOKUMEN] Tahapan: Pengajuan KPR (Wirausaha), Pihak: Customer, Dokumen yang Diperlukan: KTP, KK, NPWP, SIUP/TDP, Laporan Keuangan 6 bulan terakhir, Rekening Koran 6 bulan terakhir, Keterangan: Kumpulkan dalam map biru maksimal 7 hari setelah booking fee, Syarat Tambahan: Usaha sudah berjalan minimal 2 tahun",
+      "metadata": null,
+      "createdAt": "2026-07-10T08:15:40.032Z",
+      "updatedAt": "2026-07-10T08:15:40.032Z"
+    },
+    {
+      "id": "5cd440c9-534b-4c26-95c1-ef293b4c7cff",
+      "content": "[Kategori: DOKUMEN] Tahapan: Akad Kredit, Pihak: Customer, Dokumen yang Diperlukan: Materai 10.000 (10 lembar), KTP Asli, Keterangan: Wajib hadir berdua jika suami istri, Syarat Tambahan: Tidak boleh diwakilkan",
+      "metadata": null,
+      "createdAt": "2026-07-10T08:15:40.333Z",
+      "updatedAt": "2026-07-10T08:15:40.333Z"
+    },
+    {
+      "id": "ba138f2a-e366-4f31-8888-ea4d642af969",
+      "content": "[Kategori: DOKUMEN] Tahapan: Serah Terima Kunci, Pihak: Developer (Perusahaan), Dokumen yang Diperlukan: Berita Acara Serah Terima (BAST), Kunci Rumah, Buku Panduan Penghuni, Keterangan: BAST ditandatangani kedua belah pihak setelah cek fisik bangunan, Syarat Tambahan: Jika ada cacat (defect), komplain maksimal 14 hari",
+      "metadata": null,
+      "createdAt": "2026-07-10T08:15:40.614Z",
+      "updatedAt": "2026-07-10T08:15:40.614Z"
+    },
+    {
+      "id": "79f4d519-db6a-4ac8-84ee-4848bc6cfb9d",
+      "content": "SYARAT PEMBELIAN (TUNAI & KPR)\n\n1. Persyaratan Berkas Umum (Cash / KPR):\n- KTP (Suami & Istri jika sudah menikah)\n- Kartu Keluarga (KK)\n- NPWP Pribadi\n- Buku Nikah (jika sudah menikah) atau Akta Cerai\n\n2. Tambahan Persyaratan KPR (Karyawan):\n- Slip Gaji 3 bulan terakhir\n- Rekening Koran (Buku Tabungan) 3-6 bulan terakhir\n- Surat Keterangan Kerja (Karyawan Tetap)\n- Pas Foto Pemohon & Pasangan (3x4 / 4x6)\n\n3. Tambahan Persyaratan KPR (Wirausaha):\n- Rekening Koran 3-6 bulan terakhir\n- Legalitas Usaha (NIB / SIUP / TDP)\n- Laporan Keuangan / Catatan pembukuan usaha\n- Pas Foto Pemohon & Pasangan\n\n4. Tahapan Transaksi (Sekadar Info untuk Customer):\n- SPR (Surat Pemesanan Rumah): Diterbitkan saat customer membayar Booking Fee/Tanda Jadi.\n- PPJB: Perjanjian awal yang mengikat harga dan cara bayar.\n- AJB (Akta Jual Beli): Bukti sah pemindahan hak di hadapan Notaris.\n\nCATATAN LEGALITAS:\nSemua proyek perumahan kami memiliki legalitas yang aman, terjamin, dan lengkap (SHM & IMB sudah di-split/pecah).",
+      "metadata": null,
+      "createdAt": "2026-07-11T14:43:43.521Z",
+      "updatedAt": "2026-07-11T14:43:43.521Z"
+    },
+    {
+      "id": "eae355f6-ee67-40fe-8b2a-cb25493cb606",
+      "content": "[Kategori: KPR BSN] Jenis Produk KPR Bank BSN",
+      "metadata": null,
+      "createdAt": "2026-07-13T05:32:21.618Z",
+      "updatedAt": "2026-07-13T05:32:21.618Z"
+    },
+    {
+      "id": "6ec3492b-d1a6-47cd-830d-70b41f2b1b81",
+      "content": "[Kategori: KPR BSN] BSN KPR Sejahtera\r\nFasilitas ini adalah pembiayaan kepemilikan rumah bersubsidi melalui skema FLPP (Fasilitas Likuiditas Pembiayaan Perumahan) yang ditujukan bagi MBR (Masyarakat Berpenghasilan Rendah). Nasabah bisa mendapatkan subsidi bantuan uang muka sebesar Rp4.000.000 khusus untuk pembelian rumah tapak.",
+      "metadata": null,
+      "createdAt": "2026-07-13T05:32:22.403Z",
+      "updatedAt": "2026-07-13T05:32:22.403Z"
+    },
+    {
+      "id": "8a251a49-0eee-4b05-a8d1-ca7c7f0be2c5",
+      "content": "[Kategori: KPR BSN] KPR Rumah Syariah BSN\r\nFasilitas pembiayaan ini dirancang untuk kepemilikan berbagai jenis properti seperti rumah tinggal baru atau bekas, ruko, rukan, apartemen, serta properti beserta tanah. Plafon pembiayaan yang diberikan mulai dari Rp50.000.001 hingga Rp5.000.000.000 dengan pilihan jangka waktu pembiayaan antara 1 hingga 10 tahun.",
+      "metadata": null,
+      "createdAt": "2026-07-13T05:32:22.754Z",
+      "updatedAt": "2026-07-13T05:32:22.754Z"
+    },
+    {
+      "id": "1b7b9290-3ad5-48e6-96d1-c5bb05cb39aa",
+      "content": "[Kategori: KPR BSN] Keunggulan KPR Rumah Syariah BSN",
+      "metadata": null,
+      "createdAt": "2026-07-13T05:32:23.207Z",
+      "updatedAt": "2026-07-13T05:32:23.207Z"
+    },
+    {
+      "id": "fcf6aca0-649b-4ef1-a44c-13fab94f7b7a",
+      "content": "[Kategori: KPR BSN] Pilihan Akad Syariah\r\nNasabah dapat memilih akad sesuai kebutuhan, seperti Murabahah untuk rumah siap huni, Musyarakah Mutanaqisah untuk kepemilikan bertahap, dan Istishna untuk rumah inden yang masih dibangun.",
+      "metadata": null,
+      "createdAt": "2026-07-13T05:32:23.535Z",
+      "updatedAt": "2026-07-13T05:32:23.535Z"
+    },
+    {
+      "id": "a6868c5c-ba4b-46d1-b712-5c66d7f50308",
+      "content": "[Kategori: KPR BSN] Angsuran Tetap\r\nCicilan pada KPR syariah ini bersifat tetap dan tidak berubah hingga lunas karena tidak menggunakan sistem bunga konvensional.",
+      "metadata": null,
+      "createdAt": "2026-07-13T05:32:23.869Z",
+      "updatedAt": "2026-07-13T05:32:23.869Z"
+    },
+    {
+      "id": "df355437-ac40-4e77-93ba-6cd922714334",
+      "content": "[Kategori: KPR BSN] Terjamin dan Diawasi\r\nBank BSN berizin dan diawasi oleh OJK (Otoritas Jasa Keuangan) serta Bank Indonesia, dan merupakan peserta penjaminan LPS (Lembaga Penjamin Simpanan).",
+      "metadata": null,
+      "createdAt": "2026-07-13T05:32:24.207Z",
+      "updatedAt": "2026-07-13T05:32:24.207Z"
+    },
+    {
+      "id": "a7c17aa8-3586-4e8c-99ea-cf9fa2c1f3c8",
+      "content": "[Kategori: KPR BSN] Syarat Umum Pengajuan Pembiayaan",
+      "metadata": null,
+      "createdAt": "2026-07-13T05:32:24.544Z",
+      "updatedAt": "2026-07-13T05:32:24.544Z"
+    },
+    {
+      "id": "a803e652-7315-425d-8cc7-dbb15b4f6e90",
+      "content": "[Kategori: KPR BSN] Status Kewarganegaraan\r\nPemohon harus berstatus sebagai WNI (Warga Negara Indonesia).",
+      "metadata": null,
+      "createdAt": "2026-07-13T05:32:24.902Z",
+      "updatedAt": "2026-07-13T05:32:24.902Z"
+    },
+    {
+      "id": "742fb436-8a49-455b-8277-4bad0c935334",
+      "content": "[Kategori: KPR BSN] Batasan Usia\r\nPemohon minimal berusia 21 tahun atau sudah menikah, dengan ketentuan usia maksimal tidak lebih dari 65 tahun pada saat pembiayaan lunas.",
+      "metadata": null,
+      "createdAt": "2026-07-13T05:32:25.350Z",
+      "updatedAt": "2026-07-13T05:32:25.350Z"
+    },
+    {
+      "id": "65fd0e0d-01c8-4d62-be9e-8bfcd9f442d6",
+      "content": "[Kategori: KPR BSN] Riwayat Kredit Bersih\r\nPemohon tidak boleh memiliki riwayat kredit bermasalah yang tercatat di SLIK (Sistem Layanan Informasi Keuangan).",
+      "metadata": null,
+      "createdAt": "2026-07-13T05:32:25.716Z",
+      "updatedAt": "2026-07-13T05:32:25.716Z"
+    },
+    {
+      "id": "5e0a0365-c27e-48cd-aeca-8da911c54a7d",
+      "content": "[Kategori: KPR BSN] Stabilitas Pekerjaan dan Pendapatan\r\nBagi karyawan diwajibkan memiliki masa kerja minimum 1 tahun. Bagi wirausaha atau profesional, minimum lama usaha adalah 2 hingga 3 tahun. Dokumen pembuktian penghasilan tetap atau stabil akan dibutuhkan pada saat pendaftaran.",
+      "metadata": null,
+      "createdAt": "2026-07-13T05:32:26.144Z",
+      "updatedAt": "2026-07-13T05:32:26.144Z"
+    }
+  ],
+  "roles": [
+    {
+      "id": "17c20f7d-335e-4e91-8995-e593c0d26693",
+      "name": "SUPER_ADMIN",
+      "description": "Administrator dengan akses penuh ke seluruh sistem",
+      "createdAt": "2026-07-09T13:11:37.784Z",
+      "updatedAt": "2026-07-09T13:11:37.784Z"
+    },
+    {
+      "id": "05115a10-a08f-42ca-bc8c-0d452dc0a705",
+      "name": "ADMIN",
+      "description": "Administrator dengan akses terbatas",
+      "createdAt": "2026-07-09T13:11:37.881Z",
+      "updatedAt": "2026-07-09T13:11:37.881Z"
+    }
+  ]
+}

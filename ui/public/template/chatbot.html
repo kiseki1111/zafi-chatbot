@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="id" class="">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Chatbot WhatsApp — PropertiKu Agent</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="assets/tailwind-config.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/shared.css" />
+<script>(function(){var t=localStorage.getItem('propertiku-theme')||'light';if(t==='dark')document.documentElement.classList.add('dark');})();</script>
+</head>
+<body>
+<div id="app"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/rbac.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/ui-helpers.js"></script>
+<script src="assets/layout.js"></script>
+
+<script>
+(function(){
+  const user = requireAuth();
+  if(!user) return;
+  if(!requireAccess("chatbot")) return;
+
+  const AI_REPLIES = [
+    "Baik, saya catat permintaannya. Tim kami akan segera menindaklanjuti 🙏",
+    "Terima kasih informasinya. Apakah Bap/Ibu ingin dijadwalkan survey properti minggu ini?",
+    "Untuk harga terbaik, saya bisa bantu negosiasi dengan pemilik. Mau saya buatkan penawaran formal?",
+    "Saya kirimkan brosur lengkap & form KPR-nya ya. Silakan dicek 📎",
+    "Boleh kami tahu budget perkiraan Bap/Ibu? Agar kami bisa rekomendasikan unit yang paling sesuai.",
+    "Properti ini SHM lengkap, bebas sengketa. Untuk survey, kami bisa jadwalkan besok atau lusa.",
+  ];
+  const AI_SUGGESTIONS = [
+    "Mau dijadwalkan survey properti minggu ini?",
+    "Berapa budget perkiraan Bap/Ibu?",
+    "Saya kirimkan simulasi KPR-nya ya 📎",
+    "Apakah ada pertanyaan lain seputar properti ini?",
+  ];
+
+  const state = {
+    chatContacts: JSON.parse(JSON.stringify(CONTACTS)),
+    chatMessages: JSON.parse(JSON.stringify(CHAT_MESSAGES)),
+    chatSessionId: "s1",
+    chatAIAuto: true,
+    chatAISuggest: true,
+    chatFilter: "all",
+    chatSearch: "",
+    chatMobileShowList: true,
+    activeContactId: null,
+    chatContactNotes: {},
+    chatNextMsgId: 100,
+  };
+
+  function msgBubble(m, contact){
+    const out = m.direction==="out";
+    const ticks = out ? (m.status==="read"?`<span class="text-sky-400">✓✓</span>`:m.status==="delivered"?`<span class="text-white/70">✓✓</span>`:m.status==="sent"?`<span class="text-white/70">✓</span>`:`<span class="text-rose-300">✕</span>`) : "";
+    return `<div class="flex ${out?'justify-end':'justify-start'} items-end gap-2">
+      ${!out?`<div class="w-6 h-6 rounded-full grid place-items-center text-[10px] font-bold ${STAGE_META[contact.stage].bg} ${STAGE_META[contact.stage].color} shrink-0">${initials(contact.name)}</div>`:''}
+      <div class="max-w-[75%]">
+        ${m.isAI?`<span class="badge bg-violet-100 text-violet-700 dark:bg-violet-950/50 mb-1"><i data-lucide="Bot" class="w-3 h-3"></i>AI</span>`:''}
+        <div class="rounded-2xl px-3.5 py-2 text-sm whitespace-pre-wrap ${out?'bubble-out':'bubble-in'}">${escapeHtml(m.text)}</div>
+        <div class="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1 ${out?'justify-end':''}">${escapeHtml(m.timestamp)} ${ticks}</div>
+      </div>
+    </div>`;
+  }
+
+  function contactInfoPanel(active){
+    return `
+      <div class="p-4 border-b border-border text-center">
+        <div class="w-16 h-16 mx-auto rounded-full grid place-items-center text-xl font-bold ${STAGE_META[active.stage].bg} ${STAGE_META[active.stage].color}">${initials(active.name)}</div>
+        <p class="font-semibold mt-2">${escapeHtml(active.name)}</p>
+        <p class="text-xs text-muted-foreground">${active.phone}</p>
+        <div class="mt-2">${stageBadge(active.stage)}</div>
+      </div>
+      <div class="flex-1 overflow-y-auto scroll-thin p-4 space-y-4 text-sm">
+        <div>
+          <p class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Tahap Pipeline</p>
+          <select onchange="updateContactStage('${active.id}', this.value)" class="w-full h-9 rounded-md border border-input bg-background px-2 text-sm">
+            ${[["lead","Lead"],["prospect","Prospek"],["negotiation","Negosiasi"],["customer","Customer"]].map(([k,l])=>`<option value="${k}" ${active.stage===k?'selected':''}>${l}</option>`).join("")}
+          </select>
+        </div>
+        <div>
+          <p class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Tag</p>
+          <div class="flex flex-wrap gap-1.5">${active.tags.length?active.tags.map(t=>`<span class="badge ${(TAG_META[t]||{color:'text-zinc-700',bg:'bg-zinc-100 dark:bg-zinc-800'}).color} ${(TAG_META[t]||{bg:'bg-zinc-100 dark:bg-zinc-800'}).bg}">${escapeHtml(t)} <button onclick="removeTag('${active.id}','${t}')" class="ml-1 hover:text-rose-600">×</button></span>`).join(""):'<span class="text-xs text-muted-foreground">Tidak ada tag</span>'}</div>
+          <input placeholder="+ Tambah tag…" class="mt-2 w-full h-8 rounded-md border border-input bg-background px-2 text-xs" onkeydown="if(event.key==='Enter'){addTag('${active.id}',this.value);this.value='';}" />
+        </div>
+        <div>
+          <p class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Properti Diminati</p>
+          <p class="text-sm font-medium flex items-center gap-2"><i data-lucide="Building2" class="w-4 h-4 text-emerald-600"></i>${escapeHtml(active.propertyInterest||"-")}</p>
+        </div>
+        <div>
+          <p class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Ditugaskan ke</p>
+          <p class="text-sm font-medium flex items-center gap-2"><i data-lucide="UserCheck" class="w-4 h-4 text-violet-600"></i>${escapeHtml(active.assignedTo||"-")}</p>
+        </div>
+        <div class="space-y-1.5">
+          <p class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Aksi Cepat</p>
+          <a href="orders.html" class="btn w-full h-9 text-sm border border-border hover:bg-accent"><i data-lucide="ShoppingBag" class="w-4 h-4"></i>Buat Order</a>
+          <button onclick="toast('Detail properti dikirim','success')" class="btn w-full h-9 text-sm border border-border hover:bg-accent"><i data-lucide="Send" class="w-4 h-4"></i>Kirim Detail Properti</button>
+          <button onclick="addTag('${active.id}','VIP');toast('${escapeHtml(active.name)} ditandai VIP','success')" class="btn w-full h-9 text-sm border border-border hover:bg-accent"><i data-lucide="Star" class="w-4 h-4"></i>Tandai VIP</button>
+        </div>
+        <div>
+          <p class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Catatan</p>
+          <textarea rows="3" placeholder="Tulis catatan…" class="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs" oninput="saveNote('${active.id}',this.value)">${escapeHtml(state.chatContactNotes[active.id]||"")}</textarea>
+        </div>
+      </div>`;
+  }
+
+  function content(){
+    const sessions = WA_SESSIONS;
+    const sess = sessions.find(s=>s.id===state.chatSessionId) || sessions[0];
+    const t = state.chatSearch.toLowerCase();
+    let list = state.chatContacts.filter(c=>{
+      if(state.chatFilter==="unread" && c.unread===0) return false;
+      if(state.chatFilter==="mine" && c.assignedTo!==user.name) return false;
+      if(t && !(c.name.toLowerCase().includes(t) || (c.lastMessage||"").toLowerCase().includes(t))) return false;
+      return true;
+    });
+    const active = state.chatContacts.find(c=>c.id===state.activeContactId) || list[0] || state.chatContacts[0];
+    if(active && state.activeContactId!==active.id){ state.activeContactId=active.id; }
+    const msgs = state.chatMessages.filter(m=>m.contactId===active?.id);
+
+    return `
+      <div class="card overflow-hidden flex" style="height:calc(100vh - 7rem);">
+        <!-- Left: sessions + contacts -->
+        <div class="w-72 shrink-0 border-r border-border flex flex-col ${state.chatMobileShowList?'':'hidden'} lg:flex">
+          <div class="p-3 border-b border-border">
+            <label class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Sesi WhatsApp (Waha)</label>
+            <select id="sessSelect" class="mt-1 w-full h-9 rounded-md border border-input bg-background px-2 text-sm">
+              ${sessions.map(s=>`<option value="${s.id}" ${s.id===state.chatSessionId?'selected':''}>${escapeHtml(s.name)} · ${s.status==="connected"?"🟢":"🔴"}</option>`).join("")}
+            </select>
+            <div class="flex items-center gap-2 mt-2 text-[10px] flex-wrap">
+              <span class="badge ${sess.status==="connected"?'text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40':'text-zinc-600 bg-zinc-100 dark:bg-zinc-800'}"><span class="w-1.5 h-1.5 rounded-full ${sess.status==="connected"?'bg-emerald-500 animate-pulse-dot':'bg-zinc-400'}"></span>${sess.status==="connected"?'Online':'Offline'}${sess.status==="connected" && sess.battery?` · ${sess.battery}%`:''}</span>
+              <span class="badge bg-secondary text-secondary-foreground">${state.chatContacts.reduce((a,b)=>a+b.unread,0)} belum dibaca</span>
+            </div>
+          </div>
+          <div class="p-3 border-b border-border">
+            <div class="relative"><i data-lucide="Search" class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"></i><input id="chatSearch" placeholder="Cari kontak…" value="${escapeHtml(state.chatSearch)}" class="w-full h-9 pl-8 pr-3 rounded-md border border-input bg-background text-sm" /></div>
+            <div class="flex gap-1 mt-2">
+              ${[["all","Semua"],["unread","Belum dibaca"],["mine","Saya"]].map(([k,l])=>`<button onclick="setChatFilter('${k}')" class="flex-1 h-7 rounded-md text-xs font-medium ${state.chatFilter===k?'bg-emerald-600 text-white':'bg-muted text-muted-foreground hover:bg-accent'}">${l}</button>`).join("")}
+            </div>
+          </div>
+          <div class="flex-1 overflow-y-auto scroll-thin">
+            ${list.length?list.map(ct=>{
+              const st = STAGE_META[ct.stage];
+              const isActive = active && ct.id===active.id;
+              return `<button onclick="selectContact('${ct.id}')" class="w-full flex items-start gap-3 p-3 border-b border-border/60 text-left ${isActive?'bg-emerald-50 dark:bg-emerald-950/30 ring-1 ring-inset ring-emerald-200 dark:ring-emerald-900':'hover:bg-accent'}">
+                <div class="relative shrink-0"><div class="w-10 h-10 rounded-full grid place-items-center text-sm font-bold ${st.bg} ${st.color}">${initials(ct.name)}</div><span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-card ${st.dot}"></span></div>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center justify-between gap-2"><p class="text-sm font-semibold truncate">${escapeHtml(ct.name)}</p><span class="text-[10px] text-muted-foreground shrink-0">${ct.lastMessageAt||""}</span></div>
+                  <p class="text-xs text-muted-foreground truncate mt-0.5">${escapeHtml(ct.lastMessage||"")}</p>
+                  <div class="flex items-center gap-1 mt-1">${ct.unread>0?`<span class="badge bg-rose-500 text-white ml-auto">${ct.unread}</span>`:''}</div>
+                </div>
+              </button>`;
+            }).join(""):`<p class="text-sm text-muted-foreground p-6 text-center">Tidak ada kontak ditemukan.</p>`}
+          </div>
+        </div>
+
+        <!-- Middle: conversation -->
+        <div class="flex-1 flex flex-col min-w-0 ${state.chatMobileShowList?'hidden':'flex'} lg:flex">
+          ${active?`
+          <div class="flex items-center gap-3 px-4 h-16 border-b border-border bg-card/50 shrink-0">
+            <button class="btn lg:hidden h-8 w-8 p-0 text-muted-foreground" onclick="setChatMobileList(true)" aria-label="Kembali"><i data-lucide="ArrowLeft" class="w-4 h-4"></i></button>
+            <div class="relative"><div class="w-10 h-10 rounded-full grid place-items-center text-sm font-bold ${STAGE_META[active.stage].bg} ${STAGE_META[active.stage].color}">${initials(active.name)}</div><span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-card ${STAGE_META[active.stage].dot}"></span></div>
+            <div class="min-w-0 flex-1"><p class="font-semibold text-sm truncate">${escapeHtml(active.name)}</p><p class="text-xs text-muted-foreground">${active.phone} · ${stageBadge(active.stage)}</p></div>
+            <button class="btn h-9 w-9 p-0 text-muted-foreground hover:bg-accent" onclick="toast('Memanggil ${escapeHtml(active.name)}…','info')" aria-label="Telepon"><i data-lucide="Phone" class="w-4 h-4"></i></button>
+          </div>
+          <div id="msgScroll" class="flex-1 overflow-y-auto scroll-thin chat-bg p-4 space-y-2">
+            ${msgs.length?msgs.map(m=>msgBubble(m,active)).join(""):`<div class="h-full grid place-items-center text-center text-muted-foreground"><div><div class="w-16 h-16 mx-auto rounded-full bg-emerald-600/10 grid place-items-center text-emerald-600 mb-3"><i data-lucide="MessageCircle" class="w-8 h-8"></i></div><p class="text-sm">Mulai percakapan dengan ${escapeHtml(active.name)}</p></div></div>`}
+          </div>
+          ${state.chatAISuggest?`<div class="px-4 py-2 border-t border-border bg-muted/30"><button onclick="useAISuggestion()" class="text-xs flex items-center gap-2 text-emerald-700 dark:text-emerald-400 hover:underline"><i data-lucide="Sparkles" class="w-3.5 h-3.5"></i>Saran AI: "${AI_SUGGESTIONS[Math.floor(Math.random()*AI_SUGGESTIONS.length)]}"</button></div>`:''}
+          <div class="p-3 border-t border-border bg-card shrink-0">
+            <div class="flex items-center gap-2 mb-2">
+              <select id="tplSelect" class="h-8 rounded-md border border-input bg-background px-2 text-xs">
+                <option value="">📋 Template…</option>
+                ${MESSAGE_TEMPLATES.map(t=>`<option value="${t.id}">${escapeHtml(t.name)} (${t.category})</option>`).join("")}
+              </select>
+              <label class="flex items-center gap-1.5 text-xs cursor-pointer ml-auto"><input type="checkbox" id="aiAutoToggle" ${state.chatAIAuto?'checked':''} class="rounded" onchange="state.chatAIAuto=this.checked;toast('AI auto-reply '+(this.checked?'aktif':'nonaktif'),'info')" /> AI Auto</label>
+              <label class="flex items-center gap-1.5 text-xs cursor-pointer"><input type="checkbox" id="aiSugToggle" ${state.chatAISuggest?'checked':''} class="rounded" onchange="state.chatAISuggest=this.checked;rerender()" /> Saran</label>
+            </div>
+            <div class="flex items-end gap-2">
+              <button class="btn h-9 w-9 p-0 text-muted-foreground hover:bg-accent" onclick="toast('Lampiran (demo)','info')" tabindex="-1" aria-label="Lampir"><i data-lucide="Paperclip" class="w-4 h-4"></i></button>
+              <button class="btn h-9 w-9 p-0 text-muted-foreground hover:bg-accent" onclick="toast('Emoji (demo)','info')" tabindex="-1" aria-label="Emoji"><i data-lucide="Smile" class="w-4 h-4"></i></button>
+              <textarea id="msgInput" rows="1" placeholder="Ketik pesan… (Enter untuk kirim)" class="flex-1 min-h-[36px] max-h-32 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm"></textarea>
+              <button onclick="sendChatMessage()" class="btn h-9 w-9 p-0 bg-emerald-600 hover:bg-emerald-700 text-white" aria-label="Kirim"><i data-lucide="Send" class="w-4 h-4"></i></button>
+            </div>
+          </div>`:`
+          <div class="flex-1 grid place-items-center text-center text-muted-foreground"><div><div class="w-16 h-16 mx-auto rounded-full bg-emerald-600/10 grid place-items-center text-emerald-600 mb-3"><i data-lucide="MessageCircle" class="w-8 h-8"></i></div><p class="text-sm">Pilih kontak untuk mulai chat</p></div></div>`}
+        </div>
+
+        <!-- Right: contact info (desktop) -->
+        <div class="hidden xl:flex w-72 shrink-0 border-l border-border flex-col">
+          ${active?contactInfoPanel(active):''}
+        </div>
+      </div>`;
+  }
+
+  function rerender(){
+    const c = document.getElementById("content");
+    if(!c) return;
+    c.innerHTML = content();
+    initLayout();
+    wireUp();
+  }
+
+  function wireUp(){
+    const sessSel = document.getElementById("sessSelect");
+    if(sessSel) sessSel.onchange = e=>{ state.chatSessionId=e.target.value; rerender(); };
+    const cs = document.getElementById("chatSearch");
+    if(cs){ cs.oninput = e=>{ state.chatSearch=e.target.value; rerender(); const n=document.getElementById("chatSearch"); if(n){ n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }; }
+    const ti = document.getElementById("tplSelect");
+    const active = state.chatContacts.find(c=>c.id===state.activeContactId);
+    if(ti) ti.onchange = e=>{
+      if(e.target.value && active){
+        const tpl = MESSAGE_TEMPLATES.find(t=>t.id===e.target.value);
+        if(tpl){
+          const inp = document.getElementById("msgInput");
+          inp.value = tpl.body.replace(/\{nama\}/g, active.name).replace(/\{nama_properti\}/g, active.propertyInterest||"properti");
+          inp.focus();
+        }
+        e.target.value="";
+      }
+    };
+    const mi = document.getElementById("msgInput");
+    if(mi){
+      mi.addEventListener("keydown", e=>{ if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); sendChatMessage(); } });
+      mi.addEventListener("input", ()=>{ mi.style.height="auto"; mi.style.height=Math.min(mi.scrollHeight,128)+"px"; });
+    }
+    const ms = document.getElementById("msgScroll");
+    if(ms) ms.scrollTop = ms.scrollHeight;
+  }
+
+  function refreshChatMessages(){
+    const ms = document.getElementById("msgScroll");
+    const active = state.chatContacts.find(c=>c.id===state.activeContactId);
+    if(!ms || !active) return;
+    const msgs = state.chatMessages.filter(m=>m.contactId===active.id);
+    ms.innerHTML = msgs.length ? msgs.map(m=>msgBubble(m,active)).join("") : "";
+    refreshIcons();
+    ms.scrollTop = ms.scrollHeight;
+  }
+
+  // ---- Exposed actions ----
+  window.setChatFilter = f=>{ state.chatFilter=f; rerender(); };
+  window.setChatMobileList = v=>{ state.chatMobileShowList=v; rerender(); };
+  window.selectContact = id=>{ state.activeContactId=id; state.chatMobileShowList=false; const ct=state.chatContacts.find(c=>c.id===id); if(ct) ct.unread=0; rerender(); };
+  window.updateContactStage = (id, stage)=>{ const c=state.chatContacts.find(c=>c.id===id); if(c){ c.stage=stage; toast("Tahap diubah ke "+STAGE_META[stage].label,"success"); rerender(); } };
+  window.addTag = (id, t)=>{ t=t.trim(); if(!t) return; const c=state.chatContacts.find(c=>c.id===id); if(c && !c.tags.includes(t)){ c.tags.push(t); toast("Tag ditambahkan","success"); rerender(); } };
+  window.removeTag = (id, t)=>{ const c=state.chatContacts.find(c=>c.id===id); if(c){ c.tags=c.tags.filter(x=>x!==t); rerender(); } };
+  window.saveNote = (id, v)=>{ state.chatContactNotes[id]=v; };
+  window.useAISuggestion = ()=>{ const inp=document.getElementById("msgInput"); if(inp){ inp.value = AI_SUGGESTIONS[Math.floor(Math.random()*AI_SUGGESTIONS.length)]; inp.focus(); } };
+  window.rerender = rerender;
+  window.sendChatMessage = function(){
+    const inp = document.getElementById("msgInput");
+    if(!inp) return;
+    const text = inp.value.trim();
+    if(!text){ toast("Tulis pesan dulu","warning"); return; }
+    if(!state.activeContactId){ toast("Pilih kontak dulu","warning"); return; }
+    const id = "m"+(state.chatNextMsgId++);
+    state.chatMessages.push({ id, contactId:state.activeContactId, direction:"out", text, status:"sent", timestamp:nowTime(), isAI:false });
+    const ct = state.chatContacts.find(c=>c.id===state.activeContactId);
+    if(ct){ ct.lastMessage=text; ct.lastMessageAt=nowTime(); }
+    inp.value=""; inp.style.height="auto";
+    rerender();
+    // status progression
+    setTimeout(()=>{ const m=state.chatMessages.find(x=>x.id===id); if(m){ m.status="delivered"; refreshChatMessages(); } }, 800);
+    setTimeout(()=>{ const m=state.chatMessages.find(x=>x.id===id); if(m){ m.status="read"; refreshChatMessages(); } }, 1500);
+    // AI auto-reply
+    if(state.chatAIAuto){
+      setTimeout(()=>{
+        const replyId = "m"+(state.chatNextMsgId++);
+        const replyText = AI_REPLIES[Math.floor(Math.random()*AI_REPLIES.length)];
+        state.chatMessages.push({ id:replyId, contactId:state.activeContactId, direction:"in", text:replyText, status:"read", timestamp:nowTime(), isAI:true });
+        const c = state.chatContacts.find(x=>x.id===state.activeContactId);
+        if(c){ c.lastMessage=replyText; c.lastMessageAt=nowTime(); }
+        refreshChatMessages();
+      }, 1200);
+    }
+  };
+
+  document.getElementById("app").innerHTML = renderLayoutShell("chatbot", content());
+  initLayout();
+  wireUp();
+})();
+</script>
+</body>
+</html>

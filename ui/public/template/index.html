@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="id" class="">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>PropertiKu Agent — Template UI Gallery</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="assets/tailwind-config.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/shared.css" />
+<script>(function(){var t=localStorage.getItem('propertiku-theme')||'light';if(t==='dark')document.documentElement.classList.add('dark');})();</script>
+</head>
+<body class="min-h-screen flex flex-col">
+<div id="app" class="flex-1"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/rbac.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/layout.js"></script>
+
+<script>
+(function(){
+  const PAGES = [
+    { file:"login.html",         icon:"LogIn",        name:"Login",                 desc:"Halaman masuk dengan email/password + 6 tombol quick-login per role.", tone:"emerald" },
+    { file:"register.html",      icon:"UserPlus",     name:"Daftar Akun",           desc:"Form pendaftaran akun baru operator (validasi + syarat).",            tone:"emerald" },
+    { file:"forgot-password.html",icon:"KeyRound",    name:"Lupa Password",         desc:"Form reset password dengan state sukses kirim email.",                tone:"emerald" },
+    { file:"dashboard.html",     icon:"LayoutDashboard",name:"Dashboard",           desc:"Ringkasan KPI role-aware, grafik pendapatan, funnel, WA sessions.",   tone:"emerald" },
+    { file:"chatbot.html",       icon:"MessageCircle",name:"Chatbot WhatsApp",      desc:"3-kolom chat Waha: kontak, percakapan, info panel + AI auto-reply.",  tone:"emerald" },
+    { file:"contacts.html",      icon:"Users",        name:"Kontak & Leads",        desc:"CRM pipeline lead/prospek/negosiasi/customer + kartu & tabel.",       tone:"emerald" },
+    { file:"properties.html",    icon:"Building2",    name:"Properti",              desc:"Grid listing properti dengan foto, harga, spesifikasi & status.",     tone:"emerald" },
+    { file:"orders.html",        icon:"ShoppingBag",  name:"Order",                 desc:"Manajemen transaksi: tabel & kanban 5 kolom + detail timeline.",      tone:"emerald" },
+    { file:"marketing.html",     icon:"Megaphone",    name:"Marketing",             desc:"3 tab: Kampanye, Template Pesan, Broadcast + preview WA.",            tone:"emerald" },
+    { file:"finance.html",       icon:"Wallet",       name:"Keuangan",              desc:"Grafik pendapatan, status invoice, tabel faktur + PPN 11%.",          tone:"emerald" },
+    { file:"users.html",         icon:"ShieldCheck",  name:"Manajemen Pengguna",    desc:"Tabel pengguna + matriks RBAC 6 role × 9 menu.",                       tone:"emerald" },
+    { file:"settings.html",      icon:"Settings",     name:"Pengaturan",            desc:"4 tab: Profil, Integrasi WA, RBAC, Preferensi.",                       tone:"emerald" },
+  ];
+  const TONE_BG = {
+    emerald:"bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600",
+    rose:"bg-rose-50 dark:bg-rose-950/40 text-rose-600",
+    amber:"bg-amber-50 dark:bg-amber-950/40 text-amber-600",
+    violet:"bg-violet-50 dark:bg-violet-950/40 text-violet-600",
+    pink:"bg-pink-50 dark:bg-pink-950/40 text-pink-600",
+    teal:"bg-teal-50 dark:bg-teal-950/40 text-teal-600",
+  };
+
+  function render(){
+    const user = getCurrentUser();
+    document.getElementById("app").innerHTML = `
+      <header class="relative overflow-hidden text-white" style="background:linear-gradient(135deg,#047857,#0f766e 45%,#064e3b);">
+        <div class="absolute inset-0 opacity-20" style="background-image:radial-gradient(circle at 20% 30%, white 1px, transparent 1px),radial-gradient(circle at 70% 60%, white 1px, transparent 1px);background-size:48px 48px;"></div>
+        <div class="relative max-w-6xl mx-auto px-6 pt-12 pb-10">
+          <div class="flex items-center gap-3 mb-5">
+            <div class="grid place-items-center h-11 w-11 rounded-xl bg-white/15 backdrop-blur ring-1 ring-white/25"><i data-lucide="Building2" class="w-6 h-6"></i></div>
+            <div>
+              <p class="text-lg font-bold leading-tight">PropertiKu Agent</p>
+              <p class="text-xs text-emerald-100/80">Template UI · Multi-page HTML · WhatsApp Waha</p>
+            </div>
+          </div>
+          <h1 class="text-3xl md:text-4xl font-extrabold leading-tight">Template UI PropertiKu Agent</h1>
+          <p class="mt-3 text-emerald-50/90 max-w-2xl text-sm md:text-base leading-relaxed">
+            Kumpulan 12 halaman HTML siap pakai — auth, dashboard, chatbot WhatsApp, CRM, properti, order, marketing, keuangan, manajemen pengguna, dan pengaturan. Dibangun dengan Tailwind, Lucide, Chart.js, dan Vanilla JS. Tanpa build, tanpa npm.
+          </p>
+          <div class="mt-5 flex flex-wrap gap-2">
+            ${["Tailwind CSS","Lucide Icons","Chart.js","Vanilla JS","Inter Font"].map(b=>`<span class="badge bg-white/15 text-white ring-1 ring-white/20">${b}</span>`).join("")}
+          </div>
+          ${user ? `
+          <div class="mt-5 inline-flex items-center gap-3 rounded-lg bg-white/10 backdrop-blur ring-1 ring-white/20 px-4 py-2.5">
+            <div class="w-8 h-8 rounded-full grid place-items-center text-xs font-bold ${ROLE_THEME[user.role].bg} ${ROLE_THEME[user.role].color}">${initials(user.name)}</div>
+            <div class="text-left">
+              <p class="text-xs text-emerald-100/80">Sedang login sebagai</p>
+              <p class="text-sm font-semibold">${escapeHtml(user.name)} · ${ROLE_LABELS[user.role]}</p>
+            </div>
+            <a href="dashboard.html" class="btn h-8 px-3 ml-2 bg-white text-emerald-700 hover:bg-emerald-50 text-xs font-semibold">Buka Dashboard</a>
+            <button onclick="logout()" class="btn h-8 px-3 ml-1 bg-white/10 text-white hover:bg-white/20 text-xs font-medium">Keluar</button>
+          </div>` : `
+          <div class="mt-5 flex flex-wrap gap-2">
+            <a href="login.html" class="btn h-9 px-4 bg-white text-emerald-700 hover:bg-emerald-50 text-sm font-semibold"><i data-lucide="LogIn" class="w-4 h-4"></i>Masuk</a>
+            <a href="register.html" class="btn h-9 px-4 bg-white/10 text-white ring-1 ring-white/25 hover:bg-white/20 text-sm font-medium">Daftar</a>
+          </div>`}
+        </div>
+      </header>
+
+      <main class="max-w-6xl mx-auto w-full px-6 py-8 space-y-8">
+        <!-- Role selector -->
+        <section class="card p-6">
+          <div class="flex items-center gap-2 mb-1">
+            <i data-lucide="ShieldCheck" class="w-5 h-5 text-emerald-600"></i>
+            <h2 class="font-semibold text-lg">Pilih Role untuk Login Cepat</h2>
+          </div>
+          <p class="text-sm text-muted-foreground mb-4">Klik salah satu role untuk masuk langsung sebagai role tersebut. Kemudian buka halaman dashboard mana saja untuk melihat RBAC bekerja.</p>
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            ${ROLES.map(r=>{
+              const t = ROLE_THEME[r.value];
+              return `<button onclick="quickLoginRole('${r.value}')" class="btn h-auto py-3 flex-col gap-2 border ${t.bg} ${t.color} ring-1 ${t.ring} hover:scale-[1.02] transition-transform">
+                <span class="w-9 h-9 rounded-full grid place-items-center text-sm font-bold bg-white/70 dark:bg-white/10">${r.label.charAt(0)}</span>
+                <span class="text-xs font-bold">${r.label}</span>
+                <span class="text-[10px] opacity-70 px-2 text-center leading-tight">${r.description}</span>
+              </button>`;
+            }).join("")}
+          </div>
+        </section>
+
+        <!-- Pages grid -->
+        <section>
+          <div class="flex items-center gap-2 mb-4">
+            <i data-lucide="LayoutGrid" class="w-5 h-5 text-emerald-600"></i>
+            <h2 class="font-semibold text-lg">Halaman Template (12)</h2>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            ${PAGES.map((p,i)=>{
+              return `<a href="${p.file}" class="card p-5 hover:shadow-md hover:border-emerald-300 transition-all group flex flex-col">
+                <div class="flex items-start justify-between">
+                  <div class="w-10 h-10 rounded-lg grid place-items-center ${TONE_BG[p.tone]}"><i data-lucide="${p.icon}" class="w-5 h-5"></i></div>
+                  <span class="badge bg-secondary text-secondary-foreground">${String(i+1).padStart(2,'0')}</span>
+                </div>
+                <p class="font-semibold mt-3 group-hover:text-emerald-600 transition-colors">${p.name}</p>
+                <p class="text-xs text-muted-foreground mt-1 leading-relaxed flex-1">${p.desc}</p>
+                <div class="flex items-center justify-between mt-4 pt-3 border-t border-border">
+                  <code class="text-[10px] text-muted-foreground">${p.file}</code>
+                  <span class="btn h-7 px-3 text-xs bg-emerald-600 text-white group-hover:bg-emerald-700">Buka <i data-lucide="ArrowRight" class="w-3 h-3"></i></span>
+                </div>
+              </a>`;
+            }).join("")}
+          </div>
+        </section>
+
+        <!-- Download note -->
+        <section class="card p-5 border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20">
+          <div class="flex items-start gap-3">
+            <div class="w-9 h-9 rounded-lg grid place-items-center bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400 shrink-0"><i data-lucide="Download" class="w-4 h-4"></i></div>
+            <div class="text-sm">
+              <p class="font-semibold text-amber-800 dark:text-amber-300">Unduh Source</p>
+              <p class="text-amber-700 dark:text-amber-400/90 mt-1">Klik kanan pada setiap halaman → <strong>Save Page As</strong> untuk menyimpan HTML+assets, atau unduh seluruh folder <code class="px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50">public/template/</code> untuk mendapatkan paket lengkap.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Demo accounts -->
+        <section class="card p-6">
+          <div class="flex items-center gap-2 mb-3">
+            <i data-lucide="KeyRound" class="w-5 h-5 text-emerald-600"></i>
+            <h2 class="font-semibold text-lg">Akun Demo</h2>
+          </div>
+          <p class="text-sm text-muted-foreground mb-4">Email/password berikut dapat digunakan di halaman login (password sama untuk semua: <code class="px-1 py-0.5 rounded bg-muted text-foreground">demo1234</code>).</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            ${DEMO_ACCOUNTS.map(a=>{
+              const t = ROLE_THEME[a.role];
+              return `<div class="p-3 rounded-lg border border-border bg-muted/30 flex items-center gap-3">
+                <span class="w-8 h-8 rounded-full grid place-items-center text-xs font-bold ${t.bg} ${t.color} ring-1 ${t.ring}">${a.name.charAt(0)}</span>
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-medium truncate">${a.name}</p>
+                  <p class="text-[11px] text-muted-foreground truncate font-mono">${a.email}</p>
+                </div>
+                <span class="badge ${t.color} ${t.bg}">${ROLE_LABELS[a.role]}</span>
+              </div>`;
+            }).join("")}
+          </div>
+        </section>
+      </main>
+
+      <footer class="mt-auto border-t border-border bg-sidebar/50">
+        <div class="max-w-6xl mx-auto px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
+          <p>© 2025 PropertiKu Agent — Template UI. Ditenagai oleh Waha WhatsApp API.</p>
+          <div class="flex flex-wrap gap-2">
+            ${["Tailwind","Lucide","Chart.js","Vanilla JS"].map(b=>`<span class="badge bg-secondary text-secondary-foreground">${b}</span>`).join("")}
+          </div>
+        </div>
+      </footer>
+    `;
+    refreshIcons();
+  }
+
+  function quickLoginRole(role){
+    loginAs(role);
+    render();
+  }
+
+  window.quickLoginRole = quickLoginRole;
+  render();
+})();
+</script>
+</body>
+</html>

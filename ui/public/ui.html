@@ -1,0 +1,2027 @@
+<!DOCTYPE html>
+<html lang="id" class="">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>PropertiKu Agent — AI Asisten Properti (WhatsApp Waha)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: {
+      extend: {
+        colors: {
+          border: 'hsl(var(--border))',
+          input: 'hsl(var(--input))',
+          ring: 'hsl(var(--ring))',
+          background: 'hsl(var(--background))',
+          foreground: 'hsl(var(--foreground))',
+          primary: { DEFAULT: 'hsl(var(--primary))', foreground: 'hsl(var(--primary-foreground))' },
+          secondary: { DEFAULT: 'hsl(var(--secondary))', foreground: 'hsl(var(--secondary-foreground))' },
+          destructive: { DEFAULT: 'hsl(var(--destructive))', foreground: 'hsl(var(--destructive-foreground))' },
+          muted: { DEFAULT: 'hsl(var(--muted))', foreground: 'hsl(var(--muted-foreground))' },
+          accent: { DEFAULT: 'hsl(var(--accent))', foreground: 'hsl(var(--accent-foreground))' },
+          popover: { DEFAULT: 'hsl(var(--popover))', foreground: 'hsl(var(--popover-foreground))' },
+          card: { DEFAULT: 'hsl(var(--card))', foreground: 'hsl(var(--card-foreground))' },
+          sidebar: { DEFAULT: 'hsl(var(--sidebar))', foreground: 'hsl(var(--sidebar-foreground))', accent: 'hsl(var(--sidebar-accent))', border: 'hsl(var(--sidebar-border))' },
+        },
+        borderRadius: {
+          lg: 'var(--radius)',
+          md: 'calc(var(--radius) - 2px)',
+          sm: 'calc(var(--radius) - 4px)',
+        },
+        fontFamily: { sans: ['Inter','ui-sans-serif','system-ui','sans-serif'] },
+        keyframes: {
+          'fade-in': { from: { opacity: 0, transform: 'translateY(4px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
+          'slide-in': { from: { transform: 'translateX(-100%)' }, to: { transform: 'translateX(0)' } },
+          'pulse-dot': { '0%,100%': { opacity: 1 }, '50%': { opacity: .4 } },
+        },
+        animation: {
+          'fade-in': 'fade-in .2s ease-out',
+          'slide-in': 'slide-in .25s ease-out',
+          'pulse-dot': 'pulse-dot 1.6s ease-in-out infinite',
+        }
+      }
+    }
+  }
+</script>
+<style>
+  :root {
+    --background: 0 0% 100%; --foreground: 222 22% 12%;
+    --card: 0 0% 100%; --card-foreground: 222 22% 12%;
+    --popover: 0 0% 100%; --popover-foreground: 222 22% 12%;
+    --primary: 158 64% 40%; --primary-foreground: 0 0% 100%;
+    --secondary: 160 20% 96%; --secondary-foreground: 222 22% 18%;
+    --muted: 160 16% 95%; --muted-foreground: 215 14% 45%;
+    --accent: 160 20% 95%; --accent-foreground: 222 22% 18%;
+    --destructive: 0 84% 60%; --destructive-foreground: 0 0% 100%;
+    --border: 214 20% 90%; --input: 214 20% 90%; --ring: 158 64% 40%;
+    --sidebar: 152 30% 97%; --sidebar-foreground: 222 22% 18%; --sidebar-accent: 152 30% 92%; --sidebar-border: 214 20% 88%;
+    --radius: 0.6rem;
+  }
+  .dark {
+    --background: 222 24% 8%; --foreground: 210 20% 92%;
+    --card: 222 22% 11%; --card-foreground: 210 20% 92%;
+    --popover: 222 22% 11%; --popover-foreground: 210 20% 92%;
+    --primary: 158 64% 42%; --primary-foreground: 0 0% 100%;
+    --secondary: 222 18% 16%; --secondary-foreground: 210 20% 92%;
+    --muted: 222 18% 16%; --muted-foreground: 215 14% 60%;
+    --accent: 222 18% 18%; --accent-foreground: 210 20% 92%;
+    --destructive: 0 72% 52%; --destructive-foreground: 0 0% 98%;
+    --border: 222 14% 20%; --input: 222 14% 22%; --ring: 158 64% 45%;
+    --sidebar: 222 26% 7%; --sidebar-foreground: 210 20% 88%; --sidebar-accent: 222 18% 14%; --sidebar-border: 222 14% 18%;
+  }
+  * { -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body { background: hsl(var(--background)); color: hsl(var(--foreground)); font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 8px; }
+  ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / .5); }
+  .scroll-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scroll-thin::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / .35); border-radius: 6px; }
+  .lucide { stroke-width: 2; }
+  [data-lucide] { display: inline-block; vertical-align: middle; }
+  .chat-bg { background-image: radial-gradient(hsl(var(--muted-foreground) / .12) 1px, transparent 1px); background-size: 22px 22px; }
+  input, textarea, select, button { font: inherit; }
+  input:focus, textarea:focus, select:focus { outline: none; box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring) / .5); }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; font-weight: 500; border-radius: var(--radius); transition: all .15s; cursor: pointer; white-space: nowrap; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .card { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: var(--radius); }
+  .badge { display: inline-flex; align-items: center; gap: .25rem; padding: .125rem .5rem; border-radius: 9999px; font-size: 11px; font-weight: 600; line-height: 1.2; }
+  .modal-backdrop { background: rgba(0,0,0,.55); backdrop-filter: blur(2px); }
+  .toast-in { animation: toastIn .25s ease-out; }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(12px) scale(.97);} to { opacity:1; transform: translateY(0) scale(1);} }
+  .truncate-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  details > summary { list-style: none; }
+  details > summary::-webkit-details-marker { display: none; }
+</style>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast-container" class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 max-w-sm"></div>
+<div id="modal-root"></div>
+
+<script>
+/* =========================================================================
+   PropertiKu Agent — Self-contained HTML build (Task H1)
+   Mirrors the Next.js app: RBAC, 9 modules, auth, dark mode, charts.
+   ========================================================================= */
+
+/* ============================ MOCK DATA ============================ */
+const DEMO_ACCOUNTS = [
+  { email: "superadmin@propertiku.id", password: "demo1234", role: "superadmin", name: "Andi Pratama" },
+  { email: "admin@propertiku.id",      password: "demo1234", role: "admin",      name: "Budi Santoso" },
+  { email: "operator@propertiku.id",   password: "demo1234", role: "operator",   name: "Citra Lestari" },
+  { email: "manager@propertiku.id",    password: "demo1234", role: "manager",    name: "Dewi Anggraini" },
+  { email: "marketing@propertiku.id",  password: "demo1234", role: "marketing",  name: "Eka Wijaya" },
+  { email: "keuangan@propertiku.id",   password: "demo1234", role: "keuangan",   name: "Fajar Nugroho" },
+];
+
+const ALL_USERS = [
+  { id:"u1", name:"Andi Pratama",  email:"superadmin@propertiku.id", phone:"0812-1111-0001", role:"superadmin", status:"active",    createdAt:"2024-01-05", lastLogin:"2025-01-15 08:30" },
+  { id:"u2", name:"Budi Santoso",  email:"admin@propertiku.id",      phone:"0812-1111-0002", role:"admin",     status:"active",    createdAt:"2024-02-10", lastLogin:"2025-01-15 07:45" },
+  { id:"u3", name:"Citra Lestari", email:"operator@propertiku.id",   phone:"0812-1111-0003", role:"operator",  status:"active",    createdAt:"2024-03-12", lastLogin:"2025-01-14 16:20" },
+  { id:"u4", name:"Dewi Anggraini",email:"manager@propertiku.id",    phone:"0812-1111-0004", role:"manager",   status:"active",    createdAt:"2024-01-20", lastLogin:"2025-01-15 09:10" },
+  { id:"u5", name:"Eka Wijaya",    email:"marketing@propertiku.id",  phone:"0812-1111-0005", role:"marketing", status:"active",    createdAt:"2024-04-01", lastLogin:"2025-01-14 18:00" },
+  { id:"u6", name:"Fajar Nugroho", email:"keuangan@propertiku.id",   phone:"0812-1111-0006", role:"keuangan",  status:"active",    createdAt:"2024-02-15", lastLogin:"2025-01-15 06:30" },
+  { id:"u7", name:"Gita Permata",  email:"gita@propertiku.id",       phone:"0812-1111-0007", role:"operator",  status:"active",    createdAt:"2024-05-08", lastLogin:"2025-01-13 14:00" },
+  { id:"u8", name:"Hadi Kusuma",   email:"hadi@propertiku.id",       phone:"0812-1111-0008", role:"marketing", status:"suspended", createdAt:"2024-06-01", lastLogin:"2025-01-02 11:25" },
+  { id:"u9", name:"Indah Sari",    email:"indah@propertiku.id",      phone:"0812-1111-0009", role:"operator",  status:"active",    createdAt:"2024-07-19", lastLogin:"2025-01-14 20:15" },
+];
+
+const WA_SESSIONS = [
+  { id:"s1", name:"Agent Sales 1",  phone:"6281234567001", status:"connected",    battery:82, lastSeen:"online" },
+  { id:"s2", name:"Agent CS",       phone:"6281234567002", status:"connected",    battery:64, lastSeen:"online" },
+  { id:"s3", name:"Broadcast Resmi",phone:"6281234567003", status:"disconnected", battery:0,  lastSeen:"2 jam lalu" },
+];
+
+const CONTACTS = [
+  { id:"c1", name:"Rina Marlina",   phone:"6285212345001", tags:["VIP","Cash"],     lastMessage:"Bisa kirim detail rumah di Bandung?", lastMessageAt:"10:24",        unread:2, stage:"prospect",    assignedTo:"Citra Lestari", propertyInterest:"Rumah Cibaduyut" },
+  { id:"c2", name:"Joko Susilo",    phone:"6285212345002", tags:["KPR"],            lastMessage:"Terima kasih infonya",                lastMessageAt:"09:50",        unread:0, stage:"negotiation",  assignedTo:"Gita Permata",  propertyInterest:"Apartemen Dago" },
+  { id:"c3", name:"Siti Aminah",    phone:"6285212345003", tags:["Investor"],       lastMessage:"Berapa DP ruko ini?",                 lastMessageAt:"Kemarin",      unread:5, stage:"lead",         assignedTo:"Citra Lestari", propertyInterest:"Ruko Setiabudi" },
+  { id:"c4", name:"Agus Setiawan",  phone:"6285212345004", tags:["Cash"],           lastMessage:"Saya minat tanahnya",                 lastMessageAt:"Kemarin",      unread:0, stage:"customer",     assignedTo:"Gita Permata",  propertyInterest:"Tanah Padalarang" },
+  { id:"c5", name:"Maya Putri",     phone:"6285212345005", tags:["KPR","VIP"],      lastMessage:"Jadwal survey kapan?",                lastMessageAt:"2 hari lalu",  unread:0, stage:"prospect",     assignedTo:"Indah Sari",    propertyInterest:"Rumah Lembang" },
+  { id:"c6", name:"Bayu Prakoso",   phone:"6285212345006", tags:["Sewa"],           lastMessage:"Apakah bisa nego harga sewa?",        lastMessageAt:"2 hari lalu",  unread:1, stage:"negotiation",  assignedTo:"Indah Sari",    propertyInterest:"Apartemen Ciumbuleuit" },
+  { id:"c7", name:"Lia Ramadhani",  phone:"6285212345007", tags:["Investor"],       lastMessage:"Ada listing gudang baru?",            lastMessageAt:"3 hari lalu",  unread:0, stage:"lead",         assignedTo:"Citra Lestari", propertyInterest:"Gudang Cimahi" },
+  { id:"c8", name:"Tono Wibowo",    phone:"6285212345008", tags:["KPR"],            lastMessage:"Sudah saya kirim berkas KPR",         lastMessageAt:"4 hari lalu",  unread:0, stage:"customer",     assignedTo:"Gita Permata",  propertyInterest:"Rumah Cibaduyut" },
+  { id:"c9", name:"Dewi Saraswati", phone:"6285212345009", tags:["Cash","VIP"],     lastMessage:"Mau kunjungi besok sore",             lastMessageAt:"5 hari lalu",  unread:0, stage:"prospect",     assignedTo:"Indah Sari",    propertyInterest:"Rumah Lembang" },
+  { id:"c10",name:"Rudi Hartono",   phone:"6285212345010", tags:["Sewa"],           lastMessage:"Boleh lihat foto rukonya?",           lastMessageAt:"1 minggu lalu",unread:0, stage:"lead",         assignedTo:"Citra Lestari", propertyInterest:"Ruko Setiabudi" },
+];
+
+const CHAT_MESSAGES = [
+  { id:"m1",  contactId:"c1", direction:"in",  text:"Halo, saya lihat iklan rumah di Cibaduyut. Masih tersedia?", status:"read",      timestamp:"10:20",          isAI:false },
+  { id:"m2",  contactId:"c1", direction:"out", text:"Halo Bu Rina! Ya, rumah Cibaduyut masih tersedia. Luas tanah 120m², luas bangunan 90m², harga Rp 850 juta. Saya kirimkan detail & fotonya ya 🏡", status:"read", timestamp:"10:21", isAI:true },
+  { id:"m3",  contactId:"c1", direction:"in",  text:"Bisa kirim detail rumah di Bandung?", status:"read",      timestamp:"10:24",          isAI:false },
+  { id:"m4",  contactId:"c1", direction:"in",  text:"Dan foto-fotonya juga dong",          status:"delivered", timestamp:"10:24",          isAI:false },
+  { id:"m5",  contactId:"c3", direction:"in",  text:"Berapa DP ruko ini?",                 status:"read",      timestamp:"Kemarin 14:10",  isAI:false },
+  { id:"m6",  contactId:"c3", direction:"out", text:"Untuk ruko Setiabudi, DP 20% dari harga Rp 2,5 M. Bisa dicicil DP 3x. Mau saya buatkan simulasi cicilannya, Bu Siti?", status:"read", timestamp:"Kemarin 14:12", isAI:true },
+  { id:"m7",  contactId:"c3", direction:"in",  text:"Boleh, kirim simulasinya",            status:"read",      timestamp:"Kemarin 14:15",  isAI:false },
+  { id:"m8",  contactId:"c3", direction:"in",  text:"Dan info lokasi pastinya",            status:"delivered", timestamp:"Kemarin 14:15",  isAI:false },
+  { id:"m9",  contactId:"c3", direction:"in",  text:"Saya juga mau tanya kelengkapan surat",status:"delivered",timestamp:"Kemarin 14:16",  isAI:false },
+  { id:"m10", contactId:"c3", direction:"in",  text:"Apakah SHM sudah lengkap?",           status:"delivered", timestamp:"Kemarin 14:16",  isAI:false },
+  { id:"m11", contactId:"c3", direction:"in",  text:"Berapa estimasi waktu closing?",      status:"delivered", timestamp:"Kemarin 14:17",  isAI:false },
+];
+
+const PROPERTIES = [
+  { id:"p1", title:"Rumah Modern Cibaduyut",        type:"rumah",     price:850000000,  location:"Cibaduyut, Bandung",      bedrooms:3, bathrooms:2, area:120, status:"tersedia", agent:"Citra Lestari", createdAt:"2024-12-01", image:"https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800" },
+  { id:"p2", title:"Apartemen Mewah Dago",          type:"apartemen", price:1200000000, location:"Dago, Bandung",           bedrooms:2, bathrooms:2, area:75,  status:"tersedia", agent:"Gita Permata",  createdAt:"2024-12-05", image:"https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800" },
+  { id:"p3", title:"Ruko Strategis Setiabudi",      type:"ruko",      price:2500000000, location:"Setiabudi, Bandung",      area:200, status:"tersedia", agent:"Citra Lestari", createdAt:"2024-11-20", image:"https://images.unsplash.com/photo-1582407947304-fd86f028f716?w=800" },
+  { id:"p4", title:"Tanah Kavling Padalarang",      type:"tanah",     price:450000000,  location:"Padalarang, Bandung Barat",area:300, status:"terjual",  agent:"Gita Permata",  createdAt:"2024-10-15", image:"https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=800" },
+  { id:"p5", title:"Rumah Nyaman Lembang",          type:"rumah",     price:1500000000, location:"Lembang, Bandung",        bedrooms:4, bathrooms:3, area:180, status:"tersedia", agent:"Indah Sari",    createdAt:"2024-12-10", image:"https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800" },
+  { id:"p6", title:"Gudang Industri Cimahi",        type:"gudang",    price:1800000000, location:"Cimahi",                  area:500, status:"tersewa",  agent:"Citra Lestari", createdAt:"2024-09-30", image:"https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800" },
+  { id:"p7", title:"Apartemen City View Ciumbuleuit",type:"apartemen",price:950000000,  location:"Ciumbuleuit, Bandung",    bedrooms:1, bathrooms:1, area:45,  status:"tersedia", agent:"Indah Sari",    createdAt:"2024-12-18", image:"https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800" },
+  { id:"p8", title:"Rumah Minimalis Cibaduyut 2",   type:"rumah",     price:720000000,  location:"Cibaduyut, Bandung",      bedrooms:2, bathrooms:1, area:90,  status:"tersedia", agent:"Gita Permata",  createdAt:"2024-12-22", image:"https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=800" },
+];
+
+const ORDERS = [
+  { id:"o1", code:"ORD-2025-0001", contactId:"c4", contactName:"Agus Setiawan", propertyId:"p4", propertyTitle:"Tanah Kavling Padalarang",        type:"jual", amount:450000000,  status:"deal",       agent:"Gita Permata",  createdAt:"2024-12-20", updatedAt:"2025-01-05" },
+  { id:"o2", code:"ORD-2025-0002", contactId:"c2", contactName:"Joko Susilo",   propertyId:"p2", propertyTitle:"Apartemen Mewah Dago",            type:"jual", amount:1200000000, status:"negosiasi",  agent:"Gita Permata",  createdAt:"2025-01-02", updatedAt:"2025-01-12" },
+  { id:"o3", code:"ORD-2025-0003", contactId:"c8", contactName:"Tono Wibowo",   propertyId:"p1", propertyTitle:"Rumah Modern Cibaduyut",          type:"jual", amount:850000000,  status:"diproses",   agent:"Gita Permata",  createdAt:"2025-01-08", updatedAt:"2025-01-13" },
+  { id:"o4", code:"ORD-2025-0004", contactId:"c6", contactName:"Bayu Prakoso",  propertyId:"p7", propertyTitle:"Apartemen City View Ciumbuleuit", type:"sewa", amount:36000000,   status:"negosiasi",  agent:"Indah Sari",    createdAt:"2025-01-10", updatedAt:"2025-01-14" },
+  { id:"o5", code:"ORD-2025-0005", contactId:"c3", contactName:"Siti Aminah",   propertyId:"p3", propertyTitle:"Ruko Strategis Setiabudi",        type:"jual", amount:2500000000, status:"baru",       agent:"Citra Lestari", createdAt:"2025-01-13", updatedAt:"2025-01-14" },
+  { id:"o6", code:"ORD-2025-0006", contactId:"c5", contactName:"Maya Putri",    propertyId:"p5", propertyTitle:"Rumah Nyaman Lembang",            type:"jual", amount:1500000000, status:"diproses",   agent:"Indah Sari",    createdAt:"2025-01-11", updatedAt:"2025-01-14" },
+  { id:"o7", code:"ORD-2024-0098", contactId:"c1", contactName:"Rina Marlina",  propertyId:"p8", propertyTitle:"Rumah Minimalis Cibaduyut 2",     type:"jual", amount:720000000,  status:"gagal",      agent:"Citra Lestari", createdAt:"2024-11-15", updatedAt:"2024-12-01" },
+  { id:"o8", code:"ORD-2024-0095", contactId:"c4", contactName:"Agus Setiawan", propertyId:"p6", propertyTitle:"Gudang Industri Cimahi",          type:"sewa", amount:120000000,  status:"deal",       agent:"Citra Lestari", createdAt:"2024-10-20", updatedAt:"2024-11-10" },
+];
+
+const CAMPAIGNS = [
+  { id:"cmp1", name:"Promo Rumah Cibaduyut Januari",    channel:"whatsapp", status:"aktif",       audience:320,  sent:320,  delivered:305, read:248, replied:42, createdAt:"2025-01-10", message:"🏠 Promo Awal Tahun! Rumah Cibaduyut 3KT hanya Rp 850jt. DP ringan, KPR approval cepat. Reply INFO untuk detail." },
+  { id:"cmp2", name:"Broadcast Listing Baru Lembang",   channel:"whatsapp", status:"selesai",     audience:180,  sent:180,  delivered:178, read:156, replied:28, createdAt:"2025-01-05", message:"✨ Listing Baru! Rumah Nyaman Lembang 4KT, view pegunungan. Rp 1,5 M. Hubungi kami untuk survey." },
+  { id:"cmp3", name:"Reminder DP Apartemen Dago",       channel:"whatsapp", status:"dijadwalkan", audience:45,   sent:0,    delivered:0,   read:0,   replied:0,  scheduledAt:"2025-01-18 09:00", createdAt:"2025-01-14", message:"Pengingat: Pembayaran DP Apartemen Dago jatuh tempo 20 Januari. Mohon segera dilunasi ya 🙏" },
+  { id:"cmp4", name:"Investasi Ruko Setiabudi",         channel:"whatsapp", status:"draft",       audience:95,   sent:0,    delivered:0,   read:0,   replied:0,  createdAt:"2025-01-13", message:"🏪 Peluang Investasi Ruko Setiabudi. Lokasi strategis, harga Rp 2,5 M. ROI tinggi. Konsultasi gratis!" },
+  { id:"cmp5", name:"Newsletter Properti Q4",           channel:"email",    status:"selesai",     audience:1240, sent:1240, delivered:1198, read:642, replied:18, createdAt:"2024-12-28", message:"Ringkasan properti terbaik Q4 2024. Lihat penawaran eksklusif untuk pelanggan setia." },
+  { id:"cmp6", name:"Flash Sale Tanah Padalarang",      channel:"whatsapp", status:"gagal",       audience:210,  sent:0,    delivered:0,   read:0,   replied:0,  createdAt:"2025-01-08", message:"Flash Sale! Tanah Padalarang 300m². Harga spesial terbatas." },
+];
+
+const MESSAGE_TEMPLATES = [
+  { id:"t1", name:"Sapaan Awal",          category:"Opening",   body:"Halo {nama}, terima kasih sudah menghubungi PropertiKu. Ada yang bisa saya bantu terkait kebutuhan properti Anda? 🏡", createdAt:"2024-12-01" },
+  { id:"t2", name:"Kirim Detail Properti",category:"Listing",   body:"Berikut detail properti yang Bap/Ibu tanyakan:\n\n🏠 {nama_properti}\n📍 Lokasi: {lokasi}\n💰 Harga: {harga}\n📐 Luas: {luas}\n\nMau dijadwalkan survey?", createdAt:"2024-12-02" },
+  { id:"t3", name:"Simulasi KPR",         category:"Financing", body:"Simulasi KPR {nama_properti}:\n- DP 20%: {dp}\n- Tenor 15 thn: cicilan ± {cicilan}/bln\n- Tenor 20 thn: cicilan ± {cicilan2}/bln\n\nBerminat lanjutkan prosesnya?", createdAt:"2024-12-03" },
+  { id:"t4", name:"Follow Up Negosiasi",  category:"Follow Up", body:"Halo {nama}, menindaklanjuti obrolan kita soal {nama_properti}. Apakah ada keputusan yang sudah diambil? Saya siap membantu negosiasi terbaik 🙏", createdAt:"2024-12-04" },
+  { id:"t5", name:"Reminder DP",          category:"Financing", body:"Pengingat: Pembayaran DP {nama_properti} akan jatuh tempo pada {tanggal}. Mohon segera dilunasi ya 🙏", createdAt:"2024-12-05" },
+  { id:"t6", name:"Terima Kasih Closing", category:"Closing",   body:"Selamat dan terima kasih {nama} telah mempercayakan transaksi properti Anda kepada kami. Semoga {nama_properti} membawa keberkahan 🎉", createdAt:"2024-12-06" },
+];
+
+const INVOICES = [
+  { id:"inv1", number:"INV-2025-0001", orderId:"o1", contactName:"Agus Setiawan", amount:450000000, status:"lunas",       method:"transfer", issuedAt:"2024-12-20", dueAt:"2025-01-05", paidAt:"2025-01-04" },
+  { id:"inv2", number:"INV-2025-0002", orderId:"o3", contactName:"Tono Wibowo",   amount:85000000,  status:"belum-bayar", method:"cicilan",  issuedAt:"2025-01-08", dueAt:"2025-01-23" },
+  { id:"inv3", number:"INV-2025-0003", orderId:"o4", contactName:"Bayu Prakoso",  amount:36000000,  status:"belum-bayar", method:"transfer", issuedAt:"2025-01-10", dueAt:"2025-01-25" },
+  { id:"inv4", number:"INV-2025-0004", orderId:"o6", contactName:"Maya Putri",    amount:150000000, status:"belum-bayar", method:"cicilan",  issuedAt:"2025-01-11", dueAt:"2025-01-26" },
+  { id:"inv5", number:"INV-2024-0098", orderId:"o8", contactName:"Agus Setiawan", amount:120000000, status:"lunas",       method:"transfer", issuedAt:"2024-10-20", dueAt:"2024-11-10", paidAt:"2024-11-08" },
+  { id:"inv6", number:"INV-2025-0005", orderId:"o2", contactName:"Joko Susilo",   amount:120000000, status:"jatuh-tempo", method:"transfer", issuedAt:"2025-01-02", dueAt:"2025-01-12" },
+  { id:"inv7", number:"INV-2025-0006", orderId:"o5", contactName:"Siti Aminah",   amount:250000000, status:"belum-bayar", method:"transfer", issuedAt:"2025-01-13", dueAt:"2025-01-28" },
+];
+
+const REVENUE_TREND = [
+  { label:"Jul", value:420, value2:280 },
+  { label:"Agu", value:510, value2:320 },
+  { label:"Sep", value:480, value2:360 },
+  { label:"Okt", value:620, value2:410 },
+  { label:"Nov", value:580, value2:390 },
+  { label:"Des", value:720, value2:480 },
+  { label:"Jan", value:645, value2:430 },
+];
+
+const LEAD_SOURCE = [
+  { label:"WhatsApp", value:42 },
+  { label:"Website",  value:23 },
+  { label:"Referensi",value:18 },
+  { label:"Iklan",    value:12 },
+  { label:"Lainnya",  value:5 },
+];
+
+const FUNNEL_DATA = [
+  { label:"Lead Masuk", value:420 },
+  { label:"Prospek",    value:240 },
+  { label:"Negosiasi",  value:110 },
+  { label:"Deal",       value:48 },
+];
+
+function formatCurrency(n){
+  if(n>=1e9) return "Rp "+(n/1e9).toFixed(1).replace(".",",")+" M";
+  if(n>=1e6) return "Rp "+(n/1e6).toFixed(0)+" jt";
+  if(n>=1e3) return "Rp "+(n/1e3).toFixed(0)+" rb";
+  return "Rp "+n;
+}
+function formatFullCurrency(n){ return "Rp "+n.toLocaleString("id-ID"); }
+
+/* ============================ RBAC ============================ */
+const ROLES = [
+  { value:"superadmin", label:"Superadmin", description:"Akses penuh seluruh sistem & pengaturan" },
+  { value:"admin",      label:"Admin",      description:"Manajemen operasional & pengguna" },
+  { value:"operator",   label:"Operator",   description:"Chatbot, kontak, dan order harian" },
+  { value:"manager",    label:"Manager",    description:"Pantau laporan & performa tim" },
+  { value:"marketing",  label:"Marketing",  description:"Kampanye, broadcast, dan konten" },
+  { value:"keuangan",   label:"Keuangan",   description:"Faktur, pembayaran, dan pendapatan" },
+];
+const ROLE_LABELS = { superadmin:"Superadmin", admin:"Admin", operator:"Operator", manager:"Manager", marketing:"Marketing", keuangan:"Keuangan" };
+const MENU_ITEMS = [
+  { key:"overview",  label:"Dashboard",         icon:"LayoutDashboard", roles:["superadmin","admin","operator","manager","marketing","keuangan"] },
+  { key:"chatbot",   label:"Chatbot WhatsApp",  icon:"MessageCircle",   roles:["superadmin","admin","operator","marketing"] },
+  { key:"contacts",  label:"Kontak & Leads",    icon:"Users",           roles:["superadmin","admin","operator","manager","marketing"] },
+  { key:"properties",label:"Properti",          icon:"Building2",       roles:["superadmin","admin","operator","manager","marketing"] },
+  { key:"orders",    label:"Order",             icon:"ShoppingBag",     roles:["superadmin","admin","operator","manager","keuangan"] },
+  { key:"marketing", label:"Marketing",         icon:"Megaphone",       roles:["superadmin","admin","manager","marketing"] },
+  { key:"finance",   label:"Keuangan",          icon:"Wallet",          roles:["superadmin","admin","manager","keuangan"] },
+  { key:"users",     label:"Manajemen Pengguna",icon:"ShieldCheck",     roles:["superadmin","admin"] },
+  { key:"settings",  label:"Pengaturan",        icon:"Settings",        roles:["superadmin","admin","operator","manager","marketing","keuangan"] },
+];
+const ROLE_THEME = {
+  superadmin:{ color:"text-rose-600",    bg:"bg-rose-50 dark:bg-rose-950/40",    ring:"ring-rose-200 dark:ring-rose-900",    dot:"bg-rose-500"    },
+  admin:     { color:"text-emerald-600", bg:"bg-emerald-50 dark:bg-emerald-950/40",ring:"ring-emerald-200 dark:ring-emerald-900",dot:"bg-emerald-500" },
+  operator:  { color:"text-amber-600",   bg:"bg-amber-50 dark:bg-amber-950/40",  ring:"ring-amber-200 dark:ring-amber-900",  dot:"bg-amber-500"   },
+  manager:   { color:"text-violet-600",  bg:"bg-violet-50 dark:bg-violet-950/40",ring:"ring-violet-200 dark:ring-violet-900",dot:"bg-violet-500"  },
+  marketing: { color:"text-pink-600",    bg:"bg-pink-50 dark:bg-pink-950/40",    ring:"ring-pink-200 dark:ring-pink-900",    dot:"bg-pink-500"    },
+  keuangan:  { color:"text-teal-600",    bg:"bg-teal-50 dark:bg-teal-950/40",    ring:"ring-teal-200 dark:ring-teal-900",    dot:"bg-teal-500"    },
+};
+const VIEW_TITLES = {
+  overview:  { title:"Dashboard",          desc:"Ringkasan performa penjualan & chatbot" },
+  chatbot:   { title:"Chatbot WhatsApp",   desc:"Kelola percakapan & sesi Waha" },
+  contacts:  { title:"Kontak & Leads",     desc:"CRM pipeline calon pembeli" },
+  properties:{ title:"Daftar Properti",    desc:"Katalog listing properti" },
+  orders:    { title:"Manajemen Order",    desc:"Transaksi jual & sewa properti" },
+  marketing: { title:"Marketing",          desc:"Kampanye, template & broadcast WhatsApp" },
+  finance:   { title:"Keuangan",           desc:"Faktur, pembayaran & pendapatan" },
+  users:     { title:"Manajemen Pengguna", desc:"Kelola akun & hak akses (RBAC)" },
+  settings:  { title:"Pengaturan",         desc:"Profil, integrasi & preferensi" },
+};
+function menuForRole(role){ return MENU_ITEMS.filter(m=>m.roles.includes(role)); }
+function canAccess(role,view){ const m = MENU_ITEMS.find(x=>x.key===view); return m ? m.roles.includes(role) : false; }
+
+/* ============================ STATE ============================ */
+const STORAGE_KEY = "propertiku-agent-ui-html";
+const state = {
+  user: null,
+  authView: "login",          // login | register | forgot
+  forgotSent: false,
+  activeView: "overview",
+  activeContactId: null,
+  activeOrderId: null,
+  sidebarOpen: false,
+  theme: "light",
+  // chatbot local mutable copies
+  chatContacts: JSON.parse(JSON.stringify(CONTACTS)),
+  chatMessages: JSON.parse(JSON.stringify(CHAT_MESSAGES)),
+  chatSessionId: "s1",
+  chatAIAuto: true,
+  chatAISuggest: true,
+  chatFilter: "all",          // all | unread | mine
+  chatSearch: "",
+  chatMobileShowList: true,
+  chatContactNotes: {},
+  chatNextMsgId: 100,
+  // orders / invoices / users / contacts mutable copies
+  orders: JSON.parse(JSON.stringify(ORDERS)),
+  invoices: JSON.parse(JSON.stringify(INVOICES)),
+  users: JSON.parse(JSON.stringify(ALL_USERS)),
+  contactsList: JSON.parse(JSON.stringify(CONTACTS)),
+  properties: JSON.parse(JSON.stringify(PROPERTIES)),
+  campaigns: JSON.parse(JSON.stringify(CAMPAIGNS)),
+  templates: JSON.parse(JSON.stringify(MESSAGE_TEMPLATES)),
+  // module filter state
+  ordersView: "table",
+  ordersSearch: "",
+  ordersStatus: "all",
+  ordersType: "all",
+  contactsView: "card",
+  contactsSearch: "",
+  contactsStage: "all",
+  contactsTag: "all",
+  propsSearch: "",
+  propsType: "all",
+  propsStatus: "all",
+  financePeriod: "bulan-ini",
+  financeStatus: "all",
+  financeSearch: "",
+  marketingTab: "kampanye",
+  usersSearch: "",
+  usersRole: "all",
+  settingsTab: "profil",
+  prefs: { notifEmail:true, notifPush:true, aiAutoreply:true, sound:true, language:"id" },
+};
+
+/* ============================ HELPERS ============================ */
+function $(sel,root=document){ return root.querySelector(sel); }
+function $$(sel,root=document){ return Array.from(root.querySelectorAll(sel)); }
+function el(html){ const t=document.createElement("template"); t.innerHTML=html.trim(); return t.content.firstElementChild; }
+function refreshIcons(){ if(window.lucide) lucide.createIcons(); }
+function initials(name){ return (name||"?").trim().charAt(0).toUpperCase(); }
+function escapeHtml(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function nowTime(){ const d=new Date(); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); }
+function persist(){
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      user: state.user, activeView: state.activeView, theme: state.theme,
+      activeContactId: state.activeContactId, activeOrderId: state.activeOrderId,
+    }));
+  } catch(e){}
+}
+function loadPersisted(){
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return;
+    const d = JSON.parse(raw);
+    if(d.user) state.user = d.user;
+    if(d.activeView) state.activeView = d.activeView;
+    if(d.theme){ state.theme = d.theme; }
+    if(d.activeContactId) state.activeContactId = d.activeContactId;
+    if(d.activeOrderId) state.activeOrderId = d.activeOrderId;
+  } catch(e){}
+}
+function applyTheme(){
+  if(state.theme==="dark"){ document.documentElement.classList.add("dark"); }
+  else { document.documentElement.classList.remove("dark"); }
+}
+function toggleTheme(){
+  state.theme = state.theme==="dark" ? "light" : "dark";
+  applyTheme(); persist(); render();
+}
+
+function toast(msg, type="default"){
+  const colors = {
+    default:  "border-border bg-card text-foreground",
+    success:  "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200",
+    error:    "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200",
+    warning:  "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200",
+    info:     "border-teal-200 bg-teal-50 text-teal-800 dark:border-teal-900 dark:bg-teal-950 dark:text-teal-200",
+  };
+  const icons = { default:"Info", success:"CheckCircle2", error:"XCircle", warning:"AlertTriangle", info:"Bell" };
+  const node = el(`<div class="toast-in flex items-start gap-3 rounded-lg border px-4 py-3 shadow-lg ${colors[type]||colors.default}">
+    <i data-lucide="${icons[type]||icons.default}" class="w-4 h-4 mt-0.5 shrink-0"></i>
+    <p class="text-sm font-medium leading-snug">${escapeHtml(msg)}</p>
+  </div>`);
+  $("#toast-container").appendChild(node);
+  refreshIcons();
+  setTimeout(()=>{ node.style.transition="all .3s"; node.style.opacity="0"; node.style.transform="translateY(8px)"; setTimeout(()=>node.remove(),300); }, 3200);
+}
+
+/* Badge helpers */
+const STAGE_META = {
+  lead:        { label:"Lead",       color:"text-sky-700",     bg:"bg-sky-50 dark:bg-sky-950/40",     dot:"bg-sky-500"     },
+  prospect:    { label:"Prospek",    color:"text-amber-700",   bg:"bg-amber-50 dark:bg-amber-950/40", dot:"bg-amber-500"   },
+  negotiation: { label:"Negosiasi",  color:"text-violet-700",  bg:"bg-violet-50 dark:bg-violet-950/40",dot:"bg-violet-500" },
+  customer:    { label:"Customer",   color:"text-emerald-700", bg:"bg-emerald-50 dark:bg-emerald-950/40",dot:"bg-emerald-500"},
+};
+const TAG_META = {
+  VIP:      { color:"text-amber-700",   bg:"bg-amber-100 dark:bg-amber-950/50"   },
+  Cash:     { color:"text-emerald-700", bg:"bg-emerald-100 dark:bg-emerald-950/50" },
+  KPR:      { color:"text-teal-700",    bg:"bg-teal-100 dark:bg-teal-950/50"     },
+  Investor: { color:"text-violet-700",  bg:"bg-violet-100 dark:bg-violet-950/50" },
+  Sewa:     { color:"text-rose-700",    bg:"bg-rose-100 dark:bg-rose-950/50"     },
+};
+const ORDER_STATUS_META = {
+  baru:        { label:"Baru",        color:"text-sky-700",     bg:"bg-sky-50 dark:bg-sky-950/40",     dot:"bg-sky-500"     },
+  diproses:    { label:"Diproses",    color:"text-amber-700",   bg:"bg-amber-50 dark:bg-amber-950/40", dot:"bg-amber-500"   },
+  negosiasi:   { label:"Negosiasi",   color:"text-violet-700",  bg:"bg-violet-50 dark:bg-violet-950/40",dot:"bg-violet-500" },
+  deal:        { label:"Deal",        color:"text-emerald-700", bg:"bg-emerald-50 dark:bg-emerald-950/40",dot:"bg-emerald-500"},
+  gagal:       { label:"Gagal",       color:"text-rose-700",    bg:"bg-rose-50 dark:bg-rose-950/40",   dot:"bg-rose-500"    },
+  dibatalkan:  { label:"Dibatalkan",  color:"text-zinc-700",    bg:"bg-zinc-100 dark:bg-zinc-800/60",  dot:"bg-zinc-500"    },
+};
+const PROP_STATUS_META = {
+  tersedia: { label:"Tersedia", color:"text-emerald-700", bg:"bg-emerald-50 dark:bg-emerald-950/40", dot:"bg-emerald-500" },
+  terjual:  { label:"Terjual",  color:"text-rose-700",    bg:"bg-rose-50 dark:bg-rose-950/40",       dot:"bg-rose-500"    },
+  tersewa:  { label:"Tersewa",  color:"text-amber-700",   bg:"bg-amber-50 dark:bg-amber-950/40",     dot:"bg-amber-500"   },
+  draft:    { label:"Draft",    color:"text-zinc-700",    bg:"bg-zinc-100 dark:bg-zinc-800/60",      dot:"bg-zinc-500"    },
+};
+const PROP_TYPE_META = {
+  rumah:     { label:"Rumah",     icon:"Home"     },
+  apartemen: { label:"Apartemen", icon:"Building" },
+  ruko:      { label:"Ruko",      icon:"Store"    },
+  tanah:     { label:"Tanah",     icon:"Trees"    },
+  gudang:    { label:"Gudang",    icon:"Warehouse"},
+};
+const INVOICE_STATUS_META = {
+  lunas:        { label:"Lunas",        color:"text-emerald-700", bg:"bg-emerald-50 dark:bg-emerald-950/40", dot:"bg-emerald-500" },
+  "belum-bayar":{ label:"Belum Bayar",  color:"text-amber-700",   bg:"bg-amber-50 dark:bg-amber-950/40",     dot:"bg-amber-500"   },
+  "jatuh-tempo":{ label:"Jatuh Tempo",  color:"text-rose-700",    bg:"bg-rose-50 dark:bg-rose-950/40",       dot:"bg-rose-500"    },
+  dibatalkan:   { label:"Dibatalkan",   color:"text-zinc-700",    bg:"bg-zinc-100 dark:bg-zinc-800/60",      dot:"bg-zinc-500"    },
+};
+const PAYMENT_META = {
+  transfer:{ label:"Transfer", color:"text-teal-700",    bg:"bg-teal-50 dark:bg-teal-950/40",    icon:"ArrowLeftRight" },
+  cash:    { label:"Cash",     color:"text-emerald-700", bg:"bg-emerald-50 dark:bg-emerald-950/40",icon:"Banknote"       },
+  cicilan: { label:"Cicilan",  color:"text-amber-700",   bg:"bg-amber-50 dark:bg-amber-950/40",  icon:"CalendarClock"  },
+  qris:    { label:"QRIS",     color:"text-violet-700",  bg:"bg-violet-50 dark:bg-violet-950/40",icon:"QrCode"         },
+};
+const CAMPAIGN_STATUS_META = {
+  draft:       { label:"Draft",        color:"text-zinc-700",    bg:"bg-zinc-100 dark:bg-zinc-800/60"      },
+  dijadwalkan: { label:"Dijadwalkan",  color:"text-sky-700",     bg:"bg-sky-50 dark:bg-sky-950/40"         },
+  aktif:       { label:"Aktif",        color:"text-emerald-700", bg:"bg-emerald-50 dark:bg-emerald-950/40" },
+  selesai:     { label:"Selesai",      color:"text-violet-700",  bg:"bg-violet-50 dark:bg-violet-950/40"   },
+  gagal:       { label:"Gagal",        color:"text-rose-700",    bg:"bg-rose-50 dark:bg-rose-950/40"       },
+};
+
+function stageBadge(stage){ const m=STAGE_META[stage]; return `<span class="badge ${m.color} ${m.bg}"><span class="w-1.5 h-1.5 rounded-full ${m.dot}"></span>${m.label}</span>`; }
+function tagChips(tags){ return (tags||[]).map(t=>{ const m=TAG_META[t]||{color:"text-zinc-700",bg:"bg-zinc-100 dark:bg-zinc-800"}; return `<span class="badge ${m.color} ${m.bg}">${escapeHtml(t)}</span>`; }).join(""); }
+function orderStatusBadge(s){ const m=ORDER_STATUS_META[s]; return `<span class="badge ${m.color} ${m.bg}"><span class="w-1.5 h-1.5 rounded-full ${m.dot}"></span>${m.label}</span>`; }
+function propStatusBadge(s){ const m=PROP_STATUS_META[s]; return `<span class="badge ${m.color} ${m.bg}"><span class="w-1.5 h-1.5 rounded-full ${m.dot}"></span>${m.label}</span>`; }
+function invoiceStatusBadge(s){ const m=INVOICE_STATUS_META[s]; return `<span class="badge ${m.color} ${m.bg}"><span class="w-1.5 h-1.5 rounded-full ${m.dot}"></span>${m.label}</span>`; }
+function campaignStatusBadge(s){ const m=CAMPAIGN_STATUS_META[s]; return `<span class="badge ${m.color} ${m.bg}">${m.label}</span>`; }
+function roleBadge(role){ const t=ROLE_THEME[role]; return `<span class="badge ${t.color} ${t.bg} ring-1 ${t.ring}">${ROLE_LABELS[role]}</span>`; }
+
+/* ============================ AUTH ============================ */
+function doLogin(email, password){
+  if(!email || !password){ toast("Email & password wajib diisi","error"); return false; }
+  if(password.length < 4){ toast("Password minimal 4 karakter","error"); return false; }
+  const acc = DEMO_ACCOUNTS.find(a=>a.email.toLowerCase()===email.toLowerCase() && a.password===password);
+  let user;
+  if(acc){
+    user = { id:"demo-"+acc.role, name:acc.name, email:acc.email, phone:"0812-0000-"+acc.role.slice(0,3), role:acc.role, status:"active", createdAt:"2024-01-01", lastLogin: nowTime() };
+  } else {
+    // fallback: any email + password >= 4 → operator
+    user = { id:"u-"+Date.now(), name: email.split("@")[0].replace(/[._-]/g," ").replace(/\b\w/g,c=>c.toUpperCase())||"Pengguna", email, phone:"0812-0000-0000", role:"operator", status:"active", createdAt:"2024-01-01", lastLogin: nowTime() };
+  }
+  state.user = user;
+  state.activeView = "overview";
+  state.sidebarOpen = false;
+  persist();
+  toast("Berhasil masuk sebagai "+ROLE_LABELS[user.role],"success");
+  render();
+  return true;
+}
+function doRegister(form){
+  const name=form.name.value.trim(), email=form.email.value.trim(), wa=form.wa.value.trim(), pw=form.password.value, cpw=form.confirm.value;
+  if(!name||!email||!wa||!pw){ toast("Lengkapi semua field","error"); return; }
+  if(pw.length<6){ toast("Password minimal 6 karakter","error"); return; }
+  if(pw!==cpw){ toast("Konfirmasi password tidak cocok","error"); return; }
+  if(!form.terms.checked){ toast("Anda harus menyetujui syarat & ketentuan","error"); return; }
+  state.user = { id:"u-"+Date.now(), name, email, phone:wa, role:"operator", status:"active", createdAt:"2025-01-15", lastLogin: nowTime() };
+  state.activeView = "overview";
+  persist();
+  toast("Pendaftaran berhasil! Selamat datang "+name,"success");
+  render();
+}
+function doLogout(){
+  state.user = null;
+  state.authView = "login";
+  state.sidebarOpen = false;
+  persist();
+  toast("Anda telah keluar","info");
+  render();
+}
+function quickLogin(role){
+  const acc = DEMO_ACCOUNTS.find(a=>a.role===role);
+  if(acc) doLogin(acc.email, acc.password);
+}
+
+function renderAuth(){
+  const app = $("#app");
+  app.innerHTML = `
+    <div class="min-h-screen w-full grid lg:grid-cols-2 bg-background">
+      <aside class="relative hidden lg:flex flex-col justify-between overflow-hidden p-12 text-white" style="background:linear-gradient(135deg,#047857,#0f766e 45%,#064e3b);">
+        <div class="absolute inset-0 opacity-20" style="background-image:radial-gradient(circle at 20% 30%, white 1px, transparent 1px),radial-gradient(circle at 70% 60%, white 1px, transparent 1px);background-size:48px 48px;"></div>
+        <div class="relative z-10 flex items-center gap-3">
+          <div class="grid place-items-center h-11 w-11 rounded-xl bg-white/15 backdrop-blur ring-1 ring-white/25">
+            <i data-lucide="Building2" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <p class="text-lg font-bold leading-tight">PropertiKu Agent</p>
+            <p class="text-xs text-emerald-100/80">AI Assistant · WhatsApp Waha</p>
+          </div>
+        </div>
+        <div class="relative z-10 space-y-6 max-w-md">
+          <h2 class="text-3xl font-bold leading-tight">Otomatiskan penjualan properti Anda lewat WhatsApp</h2>
+          <p class="text-emerald-50/90 text-sm leading-relaxed">Chatbot cerdas yang membalas calon pembeli 24/7, mengelola leads, kampanye marketing, hingga closing — semua dalam satu dasbor.</p>
+          <div class="grid grid-cols-2 gap-3 pt-2">
+            ${[["MessageCircle","Chatbot AI","Auto-reply 24/7"],["Users","CRM Leads","Kelola prospek"],["TrendingUp","Marketing","Broadcast WA"],["ShieldCheck","RBAC","6 level akses"]].map(([i,t,d])=>`
+              <div class="rounded-lg bg-white/10 backdrop-blur ring-1 ring-white/15 p-3">
+                <div class="h-8 w-8 rounded-md bg-white/15 grid place-items-center mb-2"><i data-lucide="${i}" class="w-4 h-4"></i></div>
+                <p class="text-sm font-semibold">${t}</p>
+                <p class="text-xs text-emerald-100/70">${d}</p>
+              </div>`).join("")}
+          </div>
+        </div>
+        <p class="relative z-10 text-xs text-emerald-100/70">© 2025 PropertiKu Agent. Ditenagai oleh Waha WhatsApp API.</p>
+      </aside>
+      <div class="flex flex-col min-h-screen">
+        <div class="lg:hidden flex items-center gap-2 p-6 border-b border-border">
+          <div class="grid place-items-center h-9 w-9 rounded-lg bg-emerald-600 text-white"><i data-lucide="Building2" class="w-5 h-5"></i></div>
+          <p class="font-bold">PropertiKu Agent</p>
+        </div>
+        <div class="flex-1 flex items-center justify-center p-6 sm:p-10">
+          <div class="w-full max-w-md" id="auth-form-area"></div>
+        </div>
+      </div>
+    </div>`;
+  renderAuthForm();
+  refreshIcons();
+}
+
+function renderAuthForm(){
+  const area = $("#auth-form-area");
+  if(state.authView==="login"){
+    area.innerHTML = `
+      <div class="mb-7">
+        <h1 class="text-2xl font-bold tracking-tight">Selamat Datang Kembali</h1>
+        <p class="text-sm text-muted-foreground mt-1.5">Masuk untuk mengelola chatbot & properti Anda</p>
+      </div>
+      <form id="loginForm" class="space-y-4" autocomplete="on">
+        <div class="space-y-1.5">
+          <label class="text-sm font-medium" for="lemail">Email</label>
+          <input id="lemail" name="email" type="email" required placeholder="anda@propertiku.id" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value="superadmin@propertiku.id" />
+        </div>
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between">
+            <label class="text-sm font-medium" for="lpass">Password</label>
+            <button type="button" id="toForgot" class="text-xs font-medium text-emerald-600 hover:underline">Lupa password?</button>
+          </div>
+          <div class="relative">
+            <input id="lpass" name="password" type="password" required placeholder="••••••••" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 pr-10 text-sm" value="demo1234" />
+            <button type="button" id="togglePass" class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" tabindex="-1">👁️</button>
+          </div>
+        </div>
+        <label class="flex items-center gap-2 text-sm select-none cursor-pointer">
+          <input type="checkbox" id="remember" checked class="rounded border-input" />
+          <span>Ingat saya</span>
+        </label>
+        <button type="submit" class="btn w-full h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-medium">Masuk</button>
+      </form>
+      <div class="mt-6">
+        <div class="relative text-center">
+          <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-border"></div></div>
+          <span class="relative bg-background px-3 text-xs text-muted-foreground">atau login cepat sebagai</span>
+        </div>
+        <div class="grid grid-cols-3 gap-2 mt-4">
+          ${ROLES.map(r=>{
+            const t=ROLE_THEME[r.value];
+            return `<button type="button" class="btn h-auto py-2.5 flex-col gap-1 border border-border bg-card hover:bg-accent text-foreground" onclick="quickLogin('${r.value}')">
+              <span class="w-7 h-7 rounded-full grid place-items-center text-xs font-bold ring-1 ${t.bg} ${t.color} ${t.ring}">${r.label.charAt(0)}</span>
+              <span class="text-xs font-semibold">${r.label}</span>
+            </button>`;
+          }).join("")}
+        </div>
+      </div>
+      <p class="mt-6 text-center text-sm text-muted-foreground">Belum punya akun? <button id="toRegister" class="font-semibold text-emerald-600 hover:underline">Daftar gratis</button></p>
+    `;
+    $("#loginForm").addEventListener("submit", e=>{ e.preventDefault(); doLogin($("#lemail").value.trim(), $("#lpass").value); });
+    $("#toRegister").onclick = ()=>{ state.authView="register"; renderAuthForm(); };
+    $("#toForgot").onclick = ()=>{ state.authView="forgot"; state.forgotSent=false; renderAuthForm(); };
+    $("#togglePass").onclick = ()=>{ const i=$("#lpass"); i.type = i.type==="password"?"text":"password"; };
+  } else if(state.authView==="register"){
+    area.innerHTML = `
+      <div class="mb-7">
+        <h1 class="text-2xl font-bold tracking-tight">Buat Akun Baru</h1>
+        <p class="text-sm text-muted-foreground mt-1.5">Mulai otomatisasi penjualan properti Anda hari ini</p>
+      </div>
+      <form id="registerForm" class="space-y-4">
+        <div class="space-y-1.5"><label class="text-sm font-medium">Nama Lengkap</label><input name="name" required placeholder="Nama Anda" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" /></div>
+        <div class="space-y-1.5"><label class="text-sm font-medium">Email</label><input name="email" type="email" required placeholder="anda@email.com" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" /></div>
+        <div class="space-y-1.5"><label class="text-sm font-medium">No. WhatsApp</label><input name="wa" required placeholder="62812xxxxxxx" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" /></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="space-y-1.5"><label class="text-sm font-medium">Password</label><input name="password" type="password" required placeholder="min. 6 karakter" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" /></div>
+          <div class="space-y-1.5"><label class="text-sm font-medium">Konfirmasi</label><input name="confirm" type="password" required placeholder="ulangi password" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" /></div>
+        </div>
+        <label class="flex items-start gap-2 text-sm select-none cursor-pointer">
+          <input type="checkbox" name="terms" class="rounded border-input mt-0.5" />
+          <span>Saya menyetujui <a class="text-emerald-600 hover:underline">Syarat & Ketentuan</a> dan <a class="text-emerald-600 hover:underline">Kebijakan Privasi</a></span>
+        </label>
+        <button type="submit" class="btn w-full h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-medium">Daftar Sekarang</button>
+      </form>
+      <p class="mt-6 text-center text-sm text-muted-foreground">Sudah punya akun? <button id="toLogin" class="font-semibold text-emerald-600 hover:underline">Masuk</button></p>`;
+    $("#registerForm").addEventListener("submit", e=>{ e.preventDefault(); doRegister(e.target); });
+    $("#toLogin").onclick = ()=>{ state.authView="login"; renderAuthForm(); };
+  } else if(state.authView==="forgot"){
+    area.innerHTML = state.forgotSent ? `
+      <div class="text-center space-y-4">
+        <div class="mx-auto w-14 h-14 rounded-full bg-emerald-50 dark:bg-emerald-950/40 grid place-items-center text-emerald-600"><i data-lucide="MailCheck" class="w-7 h-7"></i></div>
+        <h1 class="text-2xl font-bold">Cek Email Anda</h1>
+        <p class="text-sm text-muted-foreground">Tautan reset password telah dikirim ke email Anda. Ikuti instruksi untuk mengatur ulang password.</p>
+        <button id="backLogin" class="btn w-full h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-medium">Kembali ke Login</button>
+      </div>` : `
+      <div class="mb-7">
+        <h1 class="text-2xl font-bold tracking-tight">Lupa Password?</h1>
+        <p class="text-sm text-muted-foreground mt-1.5">Masukkan email Anda, kami akan mengirim tautan reset password</p>
+      </div>
+      <form id="forgotForm" class="space-y-4">
+        <div class="space-y-1.5"><label class="text-sm font-medium">Email</label><input name="email" type="email" required placeholder="anda@propertiku.id" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" /></div>
+        <button type="submit" class="btn w-full h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-medium">Kirim Tautan Reset</button>
+      </form>
+      <p class="mt-6 text-center text-sm text-muted-foreground">Ingat password? <button id="toLogin" class="font-semibold text-emerald-600 hover:underline">Masuk</button></p>`;
+    if(state.forgotSent){ $("#backLogin").onclick = ()=>{ state.authView="login"; renderAuthForm(); }; }
+    else { $("#forgotForm").addEventListener("submit", e=>{ e.preventDefault(); state.forgotSent=true; renderAuthForm(); toast("Tautan reset telah dikirim","success"); }); $("#toLogin").onclick = ()=>{ state.authView="login"; renderAuthForm(); }; }
+  }
+  refreshIcons();
+}
+
+/* ============================ DASHBOARD SHELL ============================ */
+function renderDashboard(){
+  const app = $("#app");
+  app.innerHTML = `
+    <div class="min-h-screen flex flex-col bg-background">
+      <div class="flex flex-1 overflow-hidden">
+        <!-- Sidebar desktop -->
+        <aside class="hidden lg:flex w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground" id="sidebar-desktop"></aside>
+        <!-- Sidebar mobile overlay -->
+        <div id="sidebar-mobile-wrap" class="fixed inset-0 z-50 lg:hidden ${state.sidebarOpen?'':'hidden'}">
+          <div class="absolute inset-0 modal-backdrop" onclick="closeSidebar()"></div>
+          <aside class="absolute left-0 top-0 bottom-0 w-72 max-w-[85vw] flex flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground animate-slide-in" id="sidebar-mobile"></aside>
+        </div>
+        <!-- Main -->
+        <div class="flex-1 flex flex-col min-w-0">
+          <header id="topbar" class="sticky top-0 z-30 h-16 border-b border-border bg-background/95 backdrop-blur"></header>
+          <main id="content" class="flex-1 overflow-x-hidden p-4 lg:p-6"></main>
+        </div>
+      </div>
+    </div>`;
+  renderSidebarInto($("#sidebar-desktop"));
+  renderSidebarInto($("#sidebar-mobile"));
+  renderTopbar();
+  renderModule();
+}
+function closeSidebar(){ state.sidebarOpen=false; const w=$("#sidebar-mobile-wrap"); if(w) w.classList.add("hidden"); }
+
+function renderSidebarInto(host){
+  if(!state.user) return;
+  const items = menuForRole(state.user.role);
+  const t = ROLE_THEME[state.user.role];
+  host.innerHTML = `
+    <div class="flex items-center gap-2.5 px-5 h-16 border-b border-sidebar-border shrink-0">
+      <div class="grid place-items-center h-9 w-9 rounded-lg bg-emerald-600 text-white shadow-sm"><i data-lucide="Building2" class="w-5 h-5"></i></div>
+      <div class="min-w-0">
+        <p class="font-bold text-sm leading-tight truncate">PropertiKu Agent</p>
+        <p class="text-[10px] text-muted-foreground truncate">AI · WhatsApp Waha</p>
+      </div>
+      <button class="ml-auto lg:hidden btn h-8 w-8 p-0 text-muted-foreground hover:bg-sidebar-accent" onclick="closeSidebar()"><i data-lucide="X" class="w-4 h-4"></i></button>
+    </div>
+    <nav class="flex-1 overflow-y-auto scroll-thin px-3 py-4">
+      <p class="px-3 pb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Menu Utama</p>
+      <div class="space-y-1">
+        ${items.map(item=>{
+          const active = state.activeView===item.key;
+          return `<button onclick="navigate('${item.key}')" class="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all group ${active?'bg-emerald-600 text-white shadow-sm':'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'}">
+            <i data-lucide="${item.icon}" class="w-4 h-4 shrink-0 ${active?'text-white':'text-muted-foreground group-hover:text-foreground'}"></i>
+            <span class="truncate">${item.label}</span>
+            ${item.key==='chatbot'?'<span class="ml-auto text-[10px] font-bold rounded-full px-1.5 py-0.5 bg-rose-500 text-white">8</span>':''}
+          </button>`;
+        }).join("")}
+      </div>
+    </nav>
+    <div class="border-t border-sidebar-border p-3 shrink-0">
+      <div class="rounded-lg bg-sidebar-accent/60 p-3 flex items-center gap-3">
+        <div class="h-9 w-9 rounded-full grid place-items-center text-sm font-bold ring-1 ${t.bg} ${t.color} ${t.ring}">${initials(state.user.name)}</div>
+        <div class="min-w-0 flex-1">
+          <p class="text-sm font-semibold truncate leading-tight">${escapeHtml(state.user.name)}</p>
+          <p class="text-[10px] font-medium ${t.color}">${ROLE_LABELS[state.user.role]}</p>
+        </div>
+        <button class="btn h-8 w-8 p-0 text-muted-foreground hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40" onclick="doLogout()" title="Keluar"><i data-lucide="LogOut" class="w-4 h-4"></i></button>
+      </div>
+    </div>`;
+  refreshIcons();
+}
+
+function renderTopbar(){
+  const t = $("#topbar");
+  const meta = VIEW_TITLES[state.activeView] || { title:"PropertiKu", desc:"" };
+  const roleT = ROLE_THEME[state.user.role];
+  const notifications = [
+    { id:1, title:"5 pesan baru dari Siti Aminah", time:"2 mnt lalu", type:"chat",     icon:"MessageCircle", color:"text-emerald-600" },
+    { id:2, title:"Order ORD-2025-0005 butuh tindak lanjut", time:"15 mnt lalu", type:"order", icon:"ShoppingBag", color:"text-amber-600" },
+    { id:3, title:"Kampanye 'Promo Rumah Cibaduyut' aktif", time:"1 jam lalu", type:"marketing", icon:"Megaphone", color:"text-pink-600" },
+    { id:4, title:"Invoice INV-2025-0006 jatuh tempo", time:"3 jam lalu", type:"finance", icon:"Wallet", color:"text-teal-600" },
+  ];
+  t.innerHTML = `
+    <div class="flex items-center gap-3 h-full px-4 lg:px-6">
+      <button class="btn lg:hidden h-9 w-9 p-0 text-muted-foreground hover:bg-accent" onclick="openSidebar()"><i data-lucide="Menu" class="w-5 h-5"></i></button>
+      <div class="min-w-0 hidden sm:block">
+        <h1 class="text-base font-semibold leading-tight truncate">${meta.title}</h1>
+        <p class="text-xs text-muted-foreground truncate">${meta.desc}</p>
+      </div>
+      <div class="relative ml-auto hidden md:block w-64 lg:w-80">
+        <i data-lucide="Search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"></i>
+        <input placeholder="Cari kontak, properti, order…" class="w-full h-9 pl-9 pr-3 rounded-md text-sm bg-muted/50 border border-transparent focus:bg-background" onkeydown="if(event.key==='Enter')toast('Pencarian: '+this.value,'info')" />
+      </div>
+      <button class="btn h-9 w-9 p-0 ml-auto md:ml-0 text-muted-foreground hover:bg-accent" onclick="toggleTheme()" title="Ganti tema"><i data-lucide="${state.theme==='light'?'Moon':'Sun'}" class="w-4 h-4"></i></button>
+      <div class="relative">
+        <button class="btn h-9 w-9 p-0 text-muted-foreground hover:bg-accent relative" onclick="toggleDropdown('notif')"><i data-lucide="Bell" class="w-4 h-4"></i><span class="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-background"></span></button>
+        <div id="dd-notif" class="dropdown hidden absolute right-0 mt-2 w-80 rounded-lg border border-border bg-popover shadow-lg z-40">
+          <div class="flex items-center justify-between px-3 py-2.5 border-b border-border"><span class="text-sm font-semibold">Notifikasi</span><span class="badge bg-secondary text-secondary-foreground">4 baru</span></div>
+          <div class="max-h-80 overflow-y-auto scroll-thin">
+            ${notifications.map(n=>`<div class="flex items-start gap-3 px-3 py-2.5 hover:bg-accent cursor-pointer border-b border-border/60">
+              <div class="w-8 h-8 rounded-lg bg-accent grid place-items-center ${n.color}"><i data-lucide="${n.icon}" class="w-4 h-4"></i></div>
+              <div class="min-w-0"><p class="text-sm font-medium leading-snug">${n.title}</p><p class="text-xs text-muted-foreground mt-0.5">${n.time}</p></div>
+            </div>`).join("")}
+          </div>
+          <button class="w-full px-3 py-2 text-sm text-emerald-600 hover:bg-accent font-medium" onclick="toast('Membuka pusat notifikasi','info')">Lihat semua notifikasi</button>
+        </div>
+      </div>
+      <div class="relative">
+        <button class="flex items-center gap-2 rounded-full pl-1 pr-2 py-1 hover:bg-accent" onclick="toggleDropdown('user')">
+          <div class="h-8 w-8 rounded-full grid place-items-center text-xs font-bold ring-1 ${roleT.bg} ${roleT.color} ${roleT.ring}">${initials(state.user.name)}</div>
+          <div class="hidden lg:block text-left"><p class="text-xs font-semibold leading-tight max-w-[120px] truncate">${escapeHtml(state.user.name)}</p><p class="text-[10px] text-muted-foreground">${ROLE_LABELS[state.user.role]}</p></div>
+          <i data-lucide="ChevronDown" class="w-3.5 h-3.5 text-muted-foreground hidden lg:block"></i>
+        </button>
+        <div id="dd-user" class="dropdown hidden absolute right-0 mt-2 w-56 rounded-lg border border-border bg-popover shadow-lg z-40">
+          <div class="px-3 py-2 border-b border-border">
+            <p class="text-sm font-semibold">${escapeHtml(state.user.name)}</p>
+            <p class="text-xs text-muted-foreground truncate">${escapeHtml(state.user.email)}</p>
+            <div class="mt-1.5">${roleBadge(state.user.role)}</div>
+          </div>
+          <button class="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent" onclick="navigate('settings')"><i data-lucide="User" class="w-4 h-4"></i>Profil Saya</button>
+          <button class="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent" onclick="navigate('settings')"><i data-lucide="Settings" class="w-4 h-4"></i>Pengaturan</button>
+          <button class="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent" onclick="toast('Pusat bantuan dibuka','info')"><i data-lucide="HelpCircle" class="w-4 h-4"></i>Bantuan</button>
+          <div class="border-t border-border"></div>
+          <button class="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600" onclick="doLogout()"><i data-lucide="LogOut" class="w-4 h-4"></i>Keluar</button>
+        </div>
+      </div>
+    </div>`;
+  refreshIcons();
+}
+function openSidebar(){ state.sidebarOpen=true; const w=$("#sidebar-mobile-wrap"); if(w) w.classList.remove("hidden"); }
+let ddListener = null;
+function toggleDropdown(name){
+  const dd = $("#dd-"+name);
+  if(!dd) return;
+  const isHidden = dd.classList.contains("hidden");
+  $$(".dropdown").forEach(d=>d.classList.add("hidden"));
+  if(isHidden) dd.classList.remove("hidden");
+  if(!ddListener){
+    ddListener = (e)=>{ if(!e.target.closest(".relative")) { $$(".dropdown").forEach(d=>d.classList.add("hidden")); } };
+    document.addEventListener("click", ddListener);
+  }
+}
+
+function navigate(view){
+  if(!canAccess(state.user.role, view)){ toast("Anda tidak memiliki akses ke modul ini","error"); return; }
+  state.activeView = view;
+  state.sidebarOpen = false;
+  const w=$("#sidebar-mobile-wrap"); if(w) w.classList.add("hidden");
+  persist();
+  render();
+}
+function render(){ if(!state.user){ renderAuth(); } else { renderDashboard(); } }
+
+/* ============================ MODULE DISPATCHER ============================ */
+function renderModule(){
+  const c = $("#content");
+  const v = state.activeView;
+  switch(v){
+    case "overview":   return renderOverview(c);
+    case "chatbot":    return renderChatbot(c);
+    case "contacts":   return renderContacts(c);
+    case "properties": return renderProperties(c);
+    case "orders":     return renderOrders(c);
+    case "marketing":  return renderMarketing(c);
+    case "finance":    return renderFinance(c);
+    case "users":      return renderUsers(c);
+    case "settings":   return renderSettings(c);
+    default: c.innerHTML = "<div class='p-6'>Modul tidak ditemukan</div>";
+  }
+}
+
+/* ============================ OVERVIEW ============================ */
+function kpisForRole(role){
+  const totalRev = state.invoices.filter(i=>i.status==="lunas").reduce((a,b)=>a+b.amount,0);
+  const piutang = state.invoices.filter(i=>i.status==="belum-bayar"||i.status==="jatuh-tempo").reduce((a,b)=>a+b.amount,0);
+  const dealOrders = state.orders.filter(o=>o.status==="deal").length;
+  const pipelineVal = state.orders.filter(o=>!["deal","gagal","dibatalkan"].includes(o.status)).reduce((a,b)=>a+b.amount,0);
+  const totalLeads = state.contactsList.length;
+  const activeCampaigns = state.campaigns.filter(c=>c.status==="aktif").length;
+  const unreadChats = state.chatContacts.reduce((a,b)=>a+b.unread,0);
+  const totalProps = state.properties.length;
+  const tersedia = state.properties.filter(p=>p.status==="tersedia").length;
+  const base = {
+    superadmin:[
+      {label:"Pendapatan (Lunas)", value:formatCurrency(totalRev), delta:12.4, icon:"TrendingUp", tone:"emerald"},
+      {label:"Total Leads",        value:totalLeads+" kontak", delta:8.1, icon:"Users", tone:"sky"},
+      {label:"Order Deal",         value:dealOrders+" order", delta:5.2, icon:"ShoppingBag", tone:"violet"},
+      {label:"Properti Aktif",     value:tersedia+" listing", delta:-2.1, icon:"Building2", tone:"amber"},
+    ],
+    admin:[
+      {label:"Pendapatan",      value:formatCurrency(totalRev), delta:12.4, icon:"Wallet", tone:"emerald"},
+      {label:"Order Berjalan",  value:state.orders.filter(o=>["baru","diproses","negosiasi"].includes(o.status)).length+" order", delta:3.2, icon:"ShoppingBag", tone:"amber"},
+      {label:"Pengguna Aktif",  value:state.users.filter(u=>u.status==="active").length+" user", delta:1.4, icon:"ShieldCheck", tone:"violet"},
+      {label:"Chat Belum Dibaca",value:unreadChats+" pesan", delta:-4.0, icon:"MessageCircle", tone:"rose"},
+    ],
+    operator:[
+      {label:"Chat Belum Dibaca",value:unreadChats+" pesan", delta:-4.0, icon:"MessageCircle", tone:"emerald"},
+      {label:"Leads Hari Ini",   value:totalLeads+" kontak", delta:8.1, icon:"Users", tone:"sky"},
+      {label:"Order Saya",       value:state.orders.filter(o=>o.agent===state.user.name).length+" order", delta:2.0, icon:"ShoppingBag", tone:"amber"},
+      {label:"Properti Tersedia",value:tersedia+" listing", delta:0, icon:"Building2", tone:"violet"},
+    ],
+    manager:[
+      {label:"Pendapatan",     value:formatCurrency(totalRev), delta:12.4, icon:"TrendingUp", tone:"emerald"},
+      {label:"Konversi Deal",  value:(dealOrders/totalLeads*100).toFixed(1)+"%", delta:1.8, icon:"Target", tone:"violet"},
+      {label:"Order Pipeline", value:formatCurrency(pipelineVal), delta:6.3, icon:"ShoppingBag", tone:"amber"},
+      {label:"Total Leads",    value:totalLeads+" kontak", delta:8.1, icon:"Users", tone:"sky"},
+    ],
+    marketing:[
+      {label:"Total Leads",       value:totalLeads+" kontak", delta:8.1, icon:"Users", tone:"pink"},
+      {label:"Kampanye Aktif",    value:activeCampaigns+" kampanye", delta:2, icon:"Megaphone", tone:"emerald"},
+      {label:"Chat Dibalas",      value:"94.2%", delta:3.4, icon:"MessageCircle", tone:"violet"},
+      {label:"Resolusi AI",       value:"78%", delta:5.0, icon:"Bot", tone:"amber"},
+    ],
+    keuangan:[
+      {label:"Pendapatan (Lunas)",value:formatCurrency(totalRev), delta:12.4, icon:"TrendingUp", tone:"teal"},
+      {label:"Piutang",           value:formatCurrency(piutang), delta:-3.1, icon:"Clock", tone:"amber"},
+      {label:"Invoice Lunas",     value:state.invoices.filter(i=>i.status==="lunas").length+" invoice", delta:2, icon:"CheckCircle2", tone:"emerald"},
+      {label:"Jatuh Tempo",       value:state.invoices.filter(i=>i.status==="jatuh-tempo").length+" invoice", delta:1, icon:"AlertTriangle", tone:"rose"},
+    ],
+  };
+  return base[role] || base.admin;
+}
+const TONE_BG = { emerald:"bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600", amber:"bg-amber-50 dark:bg-amber-950/40 text-amber-600", violet:"bg-violet-50 dark:bg-violet-950/40 text-violet-600", sky:"bg-sky-50 dark:bg-sky-950/40 text-sky-600", rose:"bg-rose-50 dark:bg-rose-950/40 text-rose-600", teal:"bg-teal-50 dark:bg-teal-950/40 text-teal-600", pink:"bg-pink-50 dark:bg-pink-950/40 text-pink-600" };
+
+function renderOverview(c){
+  const role = state.user.role;
+  const hour = new Date().getHours();
+  const greet = hour<11?"Selamat pagi":hour<15?"Selamat siang":hour<19?"Selamat sore":"Selamat malam";
+  const kpis = kpisForRole(role);
+  const recentOrders = [...state.orders].slice(0,5);
+  const unread = state.chatContacts.filter(x=>x.unread>0).slice(0,5);
+  c.innerHTML = `
+    <div class="space-y-6 animate-fade-in">
+      <!-- Greeting -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-xl font-bold">${greet}, ${escapeHtml(state.user.name.split(" ")[0])}! 👋</h2>
+          <p class="text-sm text-muted-foreground mt-0.5">Berikut ringkasan aktivitas PropertiKu Agent hari ini.</p>
+        </div>
+        ${roleBadge(role)}
+      </div>
+      <!-- KPI cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        ${kpis.map(k=>{
+          const deltaUp = k.delta>=0;
+          return `<div class="card p-5">
+            <div class="flex items-start justify-between">
+              <div class="w-10 h-10 rounded-lg grid place-items-center ${TONE_BG[k.tone]}"><i data-lucide="${k.icon}" class="w-5 h-5"></i></div>
+              <span class="badge ${deltaUp?'text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40':'text-rose-700 bg-rose-50 dark:bg-rose-950/40'}">${deltaUp?'+':''}${k.delta}%</span>
+            </div>
+            <p class="text-2xl font-bold mt-3">${k.value}</p>
+            <p class="text-xs text-muted-foreground mt-0.5">${k.label}</p>
+          </div>`;
+        }).join("")}
+      </div>
+      <!-- Charts row -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="card p-5 lg:col-span-2">
+          <div class="flex items-center justify-between mb-4">
+            <div><p class="font-semibold">Tren Pendapatan</p><p class="text-xs text-muted-foreground">7 bulan terakhir (dalam juta Rupiah)</p></div>
+            <span class="badge text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40"><i data-lucide="TrendingUp" class="w-3 h-3"></i>+12.4%</span>
+          </div>
+          <div class="h-64"><canvas id="revChart"></canvas></div>
+        </div>
+        <div class="card p-5">
+          <div class="mb-4"><p class="font-semibold">Sumber Lead</p><p class="text-xs text-muted-foreground">Distribusi渠道 akuisisi</p></div>
+          <div class="h-64"><canvas id="leadChart"></canvas></div>
+        </div>
+      </div>
+      <!-- Funnel + recent orders -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="card p-5">
+          <div class="mb-4"><p class="font-semibold">Funnel Konversi</p><p class="text-xs text-muted-foreground">Dari lead hingga deal</p></div>
+          <div class="space-y-3">
+            ${FUNNEL_DATA.map((f,i)=>{
+              const max = FUNNEL_DATA[0].value;
+              const colors = ["bg-sky-500","bg-amber-500","bg-violet-500","bg-emerald-500"];
+              const pct = (f.value/max*100).toFixed(0);
+              const conv = i>0 ? (f.value/FUNNEL_DATA[i-1].value*100).toFixed(0):100;
+              return `<div>
+                <div class="flex justify-between text-xs mb-1"><span class="font-medium">${f.label}</span><span class="text-muted-foreground">${f.value} · ${conv}%</span></div>
+                <div class="h-7 rounded-md bg-muted overflow-hidden"><div class="${colors[i]} h-full rounded-md flex items-center justify-end px-2 text-white text-xs font-semibold" style="width:${pct}%">${f.value}</div></div>
+              </div>`;
+            }).join("")}
+          </div>
+        </div>
+        <div class="card lg:col-span-2">
+          <div class="flex items-center justify-between p-5 pb-3">
+            <div><p class="font-semibold">Order Terbaru</p><p class="text-xs text-muted-foreground">5 transaksi terakhir</p></div>
+            <button class="btn h-8 px-3 text-sm border border-border hover:bg-accent" onclick="navigate('orders')">Lihat Semua <i data-lucide="ArrowRight" class="w-3.5 h-3.5"></i></button>
+          </div>
+          <div class="overflow-x-auto scroll-thin">
+            <table class="w-full text-sm">
+              <thead class="border-y border-border bg-muted/40">
+                <tr class="text-left text-xs text-muted-foreground">
+                  <th class="px-5 py-2.5 font-medium">Kode</th><th class="px-3 py-2.5 font-medium">Klien</th><th class="px-3 py-2.5 font-medium">Properti</th><th class="px-3 py-2.5 font-medium">Nilai</th><th class="px-3 py-2.5 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${recentOrders.map(o=>`<tr class="border-b border-border/60 hover:bg-accent/50 cursor-pointer" onclick="navigate('orders')">
+                  <td class="px-5 py-3 font-mono text-xs">${o.code}</td>
+                  <td class="px-3 py-3">${escapeHtml(o.contactName)}</td>
+                  <td class="px-3 py-3 truncate max-w-[180px] text-muted-foreground">${escapeHtml(o.propertyTitle)}</td>
+                  <td class="px-3 py-3 font-semibold">${formatCurrency(o.amount)}</td>
+                  <td class="px-3 py-3">${orderStatusBadge(o.status)}</td>
+                </tr>`).join("")}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <!-- WA sessions + unread chats + AI activity -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="card p-5">
+          <div class="flex items-center justify-between mb-4"><div><p class="font-semibold">Sesi WhatsApp</p><p class="text-xs text-muted-foreground">Status koneksi Waha</p></div>
+            <button class="btn h-8 px-3 text-xs border border-border hover:bg-accent" onclick="navigate('settings')">Kelola</button></div>
+          <div class="space-y-2">
+            ${WA_SESSIONS.map(s=>{
+              const on = s.status==="connected";
+              return `<div class="flex items-center gap-3 p-2.5 rounded-lg bg-muted/40">
+                <div class="relative"><div class="w-9 h-9 rounded-lg bg-emerald-600/10 grid place-items-center text-emerald-600"><i data-lucide="Smartphone" class="w-4 h-4"></i></div><span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-card ${on?'bg-emerald-500':'bg-zinc-400'}"></span></div>
+                <div class="min-w-0 flex-1"><p class="text-sm font-medium truncate">${escapeHtml(s.name)}</p><p class="text-xs text-muted-foreground truncate">${s.phone}</p></div>
+                <div class="text-right"><p class="text-xs font-medium ${on?'text-emerald-600':'text-zinc-500'}">${on?'Online':escapeHtml(s.lastSeen)}</p>${on?`<p class="text-[10px] text-muted-foreground flex items-center gap-1 justify-end"><i data-lucide="BatteryMedium" class="w-3 h-3"></i>${s.battery}%</p>`:''}</div>
+              </div>`;
+            }).join("")}
+          </div>
+        </div>
+        ${canAccess(role,"chatbot") ? `
+        <div class="card p-5">
+          <div class="flex items-center justify-between mb-4"><div><p class="font-semibold">Chat Belum Dibaca</p><p class="text-xs text-muted-foreground">Butuh perhatian</p></div>
+            <button class="btn h-8 px-3 text-xs border border-border hover:bg-accent" onclick="navigate('chatbot')">Buka Chatbot</button></div>
+          <div class="space-y-2 max-h-64 overflow-y-auto scroll-thin">
+            ${unread.length?unread.map(u=>`<button class="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-accent text-left" onclick="navigate('chatbot')">
+              <div class="w-9 h-9 rounded-full grid place-items-center text-xs font-bold ${STAGE_META[u.stage].bg} ${STAGE_META[u.stage].color}">${initials(u.name)}</div>
+              <div class="min-w-0 flex-1"><p class="text-sm font-medium truncate">${escapeHtml(u.name)}</p><p class="text-xs text-muted-foreground truncate">${escapeHtml(u.lastMessage||'')}</p></div>
+              <span class="badge bg-rose-500 text-white">${u.unread}</span>
+            </button>`).join(""):`<p class="text-sm text-muted-foreground py-4 text-center">Tidak ada pesan belum dibaca 🎉</p>`}
+          </div>
+        </div>` : `
+        <div class="card p-5">
+          <div class="mb-4"><p class="font-semibold">Statistik Properti</p><p class="text-xs text-muted-foreground">Ringkasan listing</p></div>
+          <div class="space-y-3">
+            ${[["Total Properti",state.properties.length,"Building2","emerald"],["Tersedia",state.properties.filter(p=>p.status==="tersedia").length,"Home","sky"],["Terjual",state.properties.filter(p=>p.status==="terjual").length,"CheckCircle2","rose"],["Tersewa",state.properties.filter(p=>p.status==="tersewa").length,"KeyRound","amber"]].map(([l,v,i,t])=>`
+            <div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg grid place-items-center ${TONE_BG[t]}"><i data-lucide="${i}" class="w-4 h-4"></i></div><div class="flex-1"><p class="text-sm font-medium">${l}</p></div><p class="font-bold">${v}</p></div>`).join("")}
+          </div>
+        </div>`}
+        <div class="card p-5">
+          <div class="mb-4"><p class="font-semibold">Aktivitas AI</p><p class="text-xs text-muted-foreground">Performa chatbot 24 jam</p></div>
+          <div class="space-y-3">
+            ${[["Pesan Ditangani AI","1.248","Bot","emerald"],["Resolusi Otomatis","78%","CheckCircle2","teal"],["Rata-rata Respon","1.4 dtk","Zap","amber"],["Eskalasi ke Agent","22%","UserCheck","violet"]].map(([l,v,i,t])=>`
+            <div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg grid place-items-center ${TONE_BG[t]}"><i data-lucide="${i}" class="w-4 h-4"></i></div><div class="flex-1"><p class="text-sm text-muted-foreground">${l}</p><p class="font-bold">${v}</p></div></div>`).join("")}
+          </div>
+        </div>
+      </div>
+    </div>`;
+  refreshIcons();
+  // Charts
+  setTimeout(()=>{
+    const revCtx = $("#revChart");
+    if(revCtx){
+      new Chart(revCtx, {
+        type:"line",
+        data:{ labels:REVENUE_TREND.map(d=>d.label), datasets:[
+          { label:"Pendapatan", data:REVENUE_TREND.map(d=>d.value), borderColor:"#059669", backgroundColor:(ctx)=>{ const c=ctx.chart.ctx; const g=c.createLinearGradient(0,0,0,260); g.addColorStop(0,"rgba(5,150,105,.35)"); g.addColorStop(1,"rgba(5,150,105,0)"); return g; }, fill:true, tension:.4, borderWidth:2, pointRadius:3, pointBackgroundColor:"#059669" },
+          { label:"Target", data:REVENUE_TREND.map(d=>d.value2), borderColor:"#14b8a6", borderDash:[6,4], fill:false, tension:.4, borderWidth:2, pointRadius:0 }
+        ]},
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:true,position:"bottom",labels:{font:{size:11},usePointStyle:true,pointStyle:"circle"}} }, scales:{ x:{grid:{display:false}}, y:{grid:{color:"hsl(var(--border))"},ticks:{font:{size:11}}} } }
+      });
+    }
+    const leadCtx = $("#leadChart");
+    if(leadCtx){
+      new Chart(leadCtx, {
+        type:"doughnut",
+        data:{ labels:LEAD_SOURCE.map(d=>d.label), datasets:[{ data:LEAD_SOURCE.map(d=>d.value), backgroundColor:["#059669","#14b8a6","#f59e0b","#8b5cf6","#f43f5e"], borderWidth:2, borderColor:"hsl(var(--card))" }] },
+        options:{ responsive:true, maintainAspectRatio:false, cutout:"62%", plugins:{ legend:{position:"bottom",labels:{font:{size:11},usePointStyle:true,pointStyle:"circle",padding:12}} } }
+      });
+    }
+  }, 30);
+}
+
+/* ============================ CHATBOT ============================ */
+const AI_REPLIES = [
+  "Baik, saya catat permintaannya. Tim kami akan segera menindaklanjuti 🙏",
+  "Terima kasih informasinya. Apakah Bap/Ibu ingin dijadwalkan survey properti minggu ini?",
+  "Untuk harga terbaik, saya bisa bantu negosiasi dengan pemilik. Mau saya buatkan penawaran formal?",
+  "Saya kirimkan brosur lengkap & form KPR-nya ya. Silakan dicek 📎",
+  "Boleh kami tahu budget perkiraan Bap/Ibu? Agar kami bisa rekomendasikan unit yang paling sesuai.",
+  "Properti ini SHM lengkap, bebas sengketa. Untuk survey, kami bisa jadwalkan besok atau lusa.",
+];
+const AI_SUGGESTIONS = [
+  "Mau dijadwalkan survey properti minggu ini?",
+  "Berapa budget perkiraan Bap/Ibu?",
+  "Saya kirimkan simulasi KPR-nya ya 📎",
+  "Apakah ada pertanyaan lain seputar properti ini?",
+];
+
+function renderChatbot(c){
+  const sessions = WA_SESSIONS;
+  const sess = sessions.find(s=>s.id===state.chatSessionId) || sessions[0];
+  const t = state.chatSearch.toLowerCase();
+  let list = state.chatContacts.filter(c=>{
+    if(state.chatFilter==="unread" && c.unread===0) return false;
+    if(state.chatFilter==="mine" && c.assignedTo!==state.user.name) return false;
+    if(t && !(c.name.toLowerCase().includes(t) || (c.lastMessage||"").toLowerCase().includes(t))) return false;
+    return true;
+  });
+  const active = state.chatContacts.find(c=>c.id===state.activeContactId) || list[0] || state.chatContacts[0];
+  if(active && state.activeContactId!==active.id){ state.activeContactId=active.id; }
+  const msgs = state.chatMessages.filter(m=>m.contactId===active?.id);
+
+  c.innerHTML = `
+    <div class="card overflow-hidden flex" style="height:calc(100vh - 7rem);">
+      <!-- Left: sessions + contacts -->
+      <div class="w-72 shrink-0 border-r border-border flex flex-col ${state.chatMobileShowList?'':'hidden'} lg:flex">
+        <div class="p-3 border-b border-border">
+          <label class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Sesi WhatsApp (Waha)</label>
+          <select id="sessSelect" class="mt-1 w-full h-9 rounded-md border border-input bg-background px-2 text-sm">
+            ${sessions.map(s=>`<option value="${s.id}" ${s.id===state.chatSessionId?'selected':''}>${escapeHtml(s.name)} · ${s.status==="connected"?"🟢":"🔴"}</option>`).join("")}
+          </select>
+          <div class="flex items-center gap-2 mt-2 text-[10px]">
+            <span class="badge ${sess.status==="connected"?'text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40':'text-zinc-600 bg-zinc-100 dark:bg-zinc-800'}"><span class="w-1.5 h-1.5 rounded-full ${sess.status==="connected"?'bg-emerald-500 animate-pulse-dot':'bg-zinc-400'}"></span>${sess.status==="connected"?'Online':'Offline'}${sess.status==="connected" && sess.battery?` · ${sess.battery}%`:''}</span>
+            <span class="badge bg-secondary text-secondary-foreground">${state.chatContacts.reduce((a,b)=>a+b.unread,0)} belum dibaca</span>
+          </div>
+        </div>
+        <div class="p-3 border-b border-border">
+          <div class="relative"><i data-lucide="Search" class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"></i><input id="chatSearch" placeholder="Cari kontak…" value="${escapeHtml(state.chatSearch)}" class="w-full h-9 pl-8 pr-3 rounded-md border border-input bg-background text-sm" /></div>
+          <div class="flex gap-1 mt-2">
+            ${[["all","Semua"],["unread","Belum dibaca"],["mine","Saya"]].map(([k,l])=>`<button onclick="setChatFilter('${k}')" class="flex-1 h-7 rounded-md text-xs font-medium ${state.chatFilter===k?'bg-emerald-600 text-white':'bg-muted text-muted-foreground hover:bg-accent'}">${l}</button>`).join("")}
+          </div>
+        </div>
+        <div class="flex-1 overflow-y-auto scroll-thin">
+          ${list.length?list.map(ct=>{
+            const st = STAGE_META[ct.stage];
+            const isActive = active && ct.id===active.id;
+            return `<button onclick="selectContact('${ct.id}')" class="w-full flex items-start gap-3 p-3 border-b border-border/60 text-left ${isActive?'bg-emerald-50 dark:bg-emerald-950/30 ring-1 ring-inset ring-emerald-200 dark:ring-emerald-900':'hover:bg-accent'}">
+              <div class="relative shrink-0"><div class="w-10 h-10 rounded-full grid place-items-center text-sm font-bold ${st.bg} ${st.color}">${initials(ct.name)}</div><span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-card ${st.dot}"></span></div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center justify-between gap-2"><p class="text-sm font-semibold truncate">${escapeHtml(ct.name)}</p><span class="text-[10px] text-muted-foreground shrink-0">${ct.lastMessageAt||""}</span></div>
+                <p class="text-xs text-muted-foreground truncate mt-0.5">${escapeHtml(ct.lastMessage||"")}</p>
+                <div class="flex items-center gap-1 mt-1">${ct.unread>0?`<span class="badge bg-rose-500 text-white ml-auto">${ct.unread}</span>`:''}</div>
+              </div>
+            </button>`;
+          }).join(""):`<p class="text-sm text-muted-foreground p-6 text-center">Tidak ada kontak ditemukan.</p>`}
+        </div>
+      </div>
+
+      <!-- Middle: conversation -->
+      <div class="flex-1 flex flex-col min-w-0 ${state.chatMobileShowList?'hidden':'flex'} lg:flex">
+        ${active?`
+        <div class="flex items-center gap-3 px-4 h-16 border-b border-border bg-card/50 shrink-0">
+          <button class="btn lg:hidden h-8 w-8 p-0 text-muted-foreground" onclick="setChatMobileList(true)"><i data-lucide="ArrowLeft" class="w-4 h-4"></i></button>
+          <div class="relative"><div class="w-10 h-10 rounded-full grid place-items-center text-sm font-bold ${STAGE_META[active.stage].bg} ${STAGE_META[active.stage].color}">${initials(active.name)}</div><span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-card ${STAGE_META[active.stage].dot}"></span></div>
+          <div class="min-w-0 flex-1"><p class="font-semibold text-sm truncate">${escapeHtml(active.name)}</p><p class="text-xs text-muted-foreground">${active.phone} · ${stageBadge(active.stage)}</p></div>
+          <button class="btn h-9 w-9 p-0 text-muted-foreground hover:bg-accent" onclick="toast('Memanggil ${escapeHtml(active.name)}…','info')"><i data-lucide="Phone" class="w-4 h-4"></i></button>
+          <button class="btn lg:hidden h-9 w-9 p-0 text-muted-foreground hover:bg-accent" onclick="toast('Info kontak dibuka','info')"><i data-lucide="Info" class="w-4 h-4"></i></button>
+        </div>
+        <div id="msgScroll" class="flex-1 overflow-y-auto scroll-thin chat-bg p-4 space-y-2">
+          ${msgs.length?msgs.map(m=>msgBubble(m,active)).join(""):`<div class="h-full grid place-items-center text-center text-muted-foreground"><div><div class="w-16 h-16 mx-auto rounded-full bg-emerald-600/10 grid place-items-center text-emerald-600 mb-3"><i data-lucide="MessageCircle" class="w-8 h-8"></i></div><p class="text-sm">Mulai percakapan dengan ${escapeHtml(active.name)}</p></div></div>`}
+        </div>
+        ${state.chatAISuggest?`<div class="px-4 py-2 border-t border-border bg-muted/30"><button onclick="useAISuggestion()" class="text-xs flex items-center gap-2 text-emerald-700 dark:text-emerald-400 hover:underline"><i data-lucide="Sparkles" class="w-3.5 h-3.5"></i>Saran AI: "${AI_SUGGESTIONS[Math.floor(Math.random()*AI_SUGGESTIONS.length)]}"</button></div>`:''}
+        <div class="p-3 border-t border-border bg-card shrink-0">
+          <div class="flex items-center gap-2 mb-2">
+            <select id="tplSelect" class="h-8 rounded-md border border-input bg-background px-2 text-xs">
+              <option value="">📋 Template…</option>
+              ${state.templates.map(t=>`<option value="${t.id}">${escapeHtml(t.name)} (${t.category})</option>`).join("")}
+            </select>
+            <label class="flex items-center gap-1.5 text-xs cursor-pointer ml-auto"><input type="checkbox" id="aiAutoToggle" ${state.chatAIAuto?'checked':''} class="rounded" onchange="state.chatAIAuto=this.checked;toast('AI auto-reply '+(this.checked?'aktif':'nonaktif'),'info')" /> AI Auto</label>
+            <label class="flex items-center gap-1.5 text-xs cursor-pointer"><input type="checkbox" id="aiSugToggle" ${state.chatAISuggest?'checked':''} class="rounded" onchange="state.chatAISuggest=this.checked;renderModule()" /> Saran</label>
+          </div>
+          <div class="flex items-end gap-2">
+            <button class="btn h-9 w-9 p-0 text-muted-foreground hover:bg-accent" onclick="toast('Lampiran (demo)','info')" tabindex="-1"><i data-lucide="Paperclip" class="w-4 h-4"></i></button>
+            <button class="btn h-9 w-9 p-0 text-muted-foreground hover:bg-accent" onclick="toast('Emoji (demo)','info')" tabindex="-1"><i data-lucide="Smile" class="w-4 h-4"></i></button>
+            <textarea id="msgInput" rows="1" placeholder="Ketik pesan… (Enter untuk kirim)" class="flex-1 min-h-[36px] max-h-32 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm"></textarea>
+            <button onclick="sendChatMessage()" class="btn h-9 w-9 p-0 bg-emerald-600 hover:bg-emerald-700 text-white"><i data-lucide="Send" class="w-4 h-4"></i></button>
+          </div>
+        </div>`:`
+        <div class="flex-1 grid place-items-center text-center text-muted-foreground"><div><div class="w-16 h-16 mx-auto rounded-full bg-emerald-600/10 grid place-items-center text-emerald-600 mb-3"><i data-lucide="MessageCircle" class="w-8 h-8"></i></div><p class="text-sm">Pilih kontak untuk mulai chat</p></div></div>`}
+      </div>
+
+      <!-- Right: contact info (desktop) -->
+      <div class="hidden xl:flex w-72 shrink-0 border-l border-border flex-col">
+        ${active?renderContactInfoPanel(active):''}
+      </div>
+    </div>`;
+  refreshIcons();
+  // Wire up
+  const sessSel = $("#sessSelect"); if(sessSel) sessSel.onchange = e=>{ state.chatSessionId=e.target.value; renderModule(); };
+  const cs = $("#chatSearch"); if(cs) cs.oninput = e=>{ state.chatSearch=e.target.value; renderModule(); cs && cs.focus && cs.focus(); };
+  const ti = $("#tplSelect"); if(ti) ti.onchange = e=>{ if(e.target.value){ const tpl=state.templates.find(t=>t.id===e.target.value); if(tpl){ const inp=$("#msgInput"); inp.value = tpl.body.replace(/\{nama\}/g, active.name).replace(/\{nama_properti\}/g, active.propertyInterest||"properti"); inp.focus(); } e.target.value=""; } };
+  const mi = $("#msgInput"); if(mi){ mi.addEventListener("keydown", e=>{ if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); sendChatMessage(); } }); mi.addEventListener("input", ()=>{ mi.style.height="auto"; mi.style.height=Math.min(mi.scrollHeight,128)+"px"; }); }
+  // scroll to bottom
+  const ms = $("#msgScroll"); if(ms) ms.scrollTop = ms.scrollHeight;
+}
+function msgBubble(m, contact){
+  const out = m.direction==="out";
+  const ticks = out ? (m.status==="read"?`<span class="text-sky-500">✓✓</span>`:m.status==="delivered"?`<span class="text-muted-foreground">✓✓</span>`:m.status==="sent"?`<span class="text-muted-foreground">✓</span>`:`<span class="text-rose-500">✕</span>`) : "";
+  return `<div class="flex ${out?'justify-end':'justify-start'} items-end gap-2">
+    ${!out?`<div class="w-6 h-6 rounded-full grid place-items-center text-[10px] font-bold ${STAGE_META[contact.stage].bg} ${STAGE_META[contact.stage].color} shrink-0">${initials(contact.name)}</div>`:''}
+    <div class="max-w-[75%]">
+      ${m.isAI?`<span class="badge bg-violet-100 text-violet-700 dark:bg-violet-950/50 mb-1"><i data-lucide="Bot" class="w-3 h-3"></i>AI</span>`:''}
+      <div class="rounded-2xl px-3.5 py-2 text-sm whitespace-pre-wrap ${out?'bg-emerald-600 text-white rounded-br-md':'bg-card border border-border rounded-bl-md'}">${escapeHtml(m.text)}</div>
+      <div class="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1 ${out?'justify-end':''}">${escapeHtml(m.timestamp)} ${ticks}</div>
+    </div>
+  </div>`;
+}
+function renderContactInfoPanel(active){
+  return `
+    <div class="p-4 border-b border-border text-center">
+      <div class="w-16 h-16 mx-auto rounded-full grid place-items-center text-xl font-bold ${STAGE_META[active.stage].bg} ${STAGE_META[active.stage].color}">${initials(active.name)}</div>
+      <p class="font-semibold mt-2">${escapeHtml(active.name)}</p>
+      <p class="text-xs text-muted-foreground">${active.phone}</p>
+      <div class="mt-2">${stageBadge(active.stage)}</div>
+    </div>
+    <div class="flex-1 overflow-y-auto scroll-thin p-4 space-y-4 text-sm">
+      <div>
+        <p class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Tahap Pipeline</p>
+        <select onchange="updateContactStage('${active.id}', this.value)" class="w-full h-9 rounded-md border border-input bg-background px-2 text-sm">
+          ${[["lead","Lead"],["prospect","Prospek"],["negotiation","Negosiasi"],["customer","Customer"]].map(([k,l])=>`<option value="${k}" ${active.stage===k?'selected':''}>${l}</option>`).join("")}
+        </select>
+      </div>
+      <div>
+        <p class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Tag</p>
+        <div class="flex flex-wrap gap-1.5">${active.tags.length?active.tags.map(t=>`<span class="badge ${(TAG_META[t]||{color:'text-zinc-700',bg:'bg-zinc-100 dark:bg-zinc-800'}).color} ${(TAG_META[t]||{bg:'bg-zinc-100 dark:bg-zinc-800'}).bg}">${escapeHtml(t)} <button onclick="removeTag('${active.id}','${t}')" class="ml-1 hover:text-rose-600">×</button></span>`).join(""):'<span class="text-xs text-muted-foreground">Tidak ada tag</span>'}</div>
+        <input id="newTagInput" placeholder="+ Tambah tag…" class="mt-2 w-full h-8 rounded-md border border-input bg-background px-2 text-xs" onkeydown="if(event.key==='Enter'){addTag('${active.id}',this.value);this.value='';}" />
+      </div>
+      <div>
+        <p class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Properti Diminati</p>
+        <p class="text-sm font-medium flex items-center gap-2"><i data-lucide="Building2" class="w-4 h-4 text-emerald-600"></i>${escapeHtml(active.propertyInterest||"-")}</p>
+      </div>
+      <div>
+        <p class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Ditugaskan ke</p>
+        <p class="text-sm font-medium flex items-center gap-2"><i data-lucide="UserCheck" class="w-4 h-4 text-violet-600"></i>${escapeHtml(active.assignedTo||"-")}</p>
+      </div>
+      <div class="space-y-1.5">
+        <p class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Aksi Cepat</p>
+        <button onclick="navigate('orders')" class="btn w-full h-9 text-sm border border-border hover:bg-accent"><i data-lucide="ShoppingBag" class="w-4 h-4"></i>Buat Order</button>
+        <button onclick="toast('Detail properti dikirim','success')" class="btn w-full h-9 text-sm border border-border hover:bg-accent"><i data-lucide="Send" class="w-4 h-4"></i>Kirim Detail Properti</button>
+        <button onclick="addTag('${active.id}','VIP');toast('${escapeHtml(active.name)} ditandai VIP','success')" class="btn w-full h-9 text-sm border border-border hover:bg-accent"><i data-lucide="Star" class="w-4 h-4"></i>Tandai VIP</button>
+      </div>
+      <div>
+        <p class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Catatan</p>
+        <textarea id="notesArea" rows="3" placeholder="Tulis catatan…" class="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs" oninput="state.chatContactNotes['${active.id}']=this.value">${escapeHtml(state.chatContactNotes[active.id]||"")}</textarea>
+      </div>
+    </div>`;
+}
+function setChatFilter(f){ state.chatFilter=f; renderModule(); }
+function setChatMobileList(v){ state.chatMobileShowList=v; renderModule(); }
+function selectContact(id){ state.activeContactId=id; state.chatMobileShowList=false; const ct=state.chatContacts.find(c=>c.id===id); if(ct) ct.unread=0; renderModule(); }
+function updateContactStage(id, stage){ const c=state.chatContacts.find(c=>c.id===id); if(c){ c.stage=stage; toast("Tahap diubah ke "+STAGE_META[stage].label,"success"); renderModule(); } }
+function addTag(id, t){ t=t.trim(); if(!t) return; const c=state.chatContacts.find(c=>c.id===id); if(c && !c.tags.includes(t)){ c.tags.push(t); toast("Tag ditambahkan","success"); renderModule(); } }
+function removeTag(id, t){ const c=state.chatContacts.find(c=>c.id===id); if(c){ c.tags=c.tags.filter(x=>x!==t); renderModule(); } }
+function useAISuggestion(){ const inp=$("#msgInput"); if(inp){ inp.value = AI_SUGGESTIONS[Math.floor(Math.random()*AI_SUGGESTIONS.length)]; inp.focus(); } }
+function sendChatMessage(){
+  const inp = $("#msgInput"); if(!inp) return;
+  const text = inp.value.trim(); if(!text) return;
+  if(!state.activeContactId){ toast("Pilih kontak dulu","warning"); return; }
+  const id = "m"+(state.chatNextMsgId++);
+  state.chatMessages.push({ id, contactId:state.activeContactId, direction:"out", text, status:"sent", timestamp:nowTime(), isAI:false });
+  inp.value=""; inp.style.height="auto";
+  renderModule();
+  // status progression
+  setTimeout(()=>{ const m=state.chatMessages.find(x=>x.id===id); if(m){ m.status="delivered"; if(state.activeView==="chatbot") refreshChatMessages(); } }, 800);
+  setTimeout(()=>{ const m=state.chatMessages.find(x=>x.id===id); if(m){ m.status="read"; if(state.activeView==="chatbot") refreshChatMessages(); } }, 1500);
+  // AI auto-reply
+  if(state.chatAIAuto){
+    setTimeout(()=>{
+      const replyId = "m"+(state.chatNextMsgId++);
+      state.chatMessages.push({ id:replyId, contactId:state.activeContactId, direction:"in", text:AI_REPLIES[Math.floor(Math.random()*AI_REPLIES.length)], status:"read", timestamp:nowTime(), isAI:true });
+      const ct = state.chatContacts.find(c=>c.id===state.activeContactId); if(ct){ ct.lastMessage=state.chatMessages[state.chatMessages.length-1].text; ct.lastMessageAt=nowTime(); }
+      if(state.activeView==="chatbot") renderModule();
+    }, 1200);
+  }
+}
+function refreshChatMessages(){ const ms=$("#msgScroll"); const active=state.chatContacts.find(c=>c.id===state.activeContactId); const msgs=state.chatMessages.filter(m=>m.contactId===active?.id); if(ms && active){ ms.innerHTML=msgs.length?msgs.map(m=>msgBubble(m,active)).join(""):""; refreshIcons(); ms.scrollTop=ms.scrollHeight; } }
+
+/* ============================ CONTACTS ============================ */
+function renderContacts(c){
+  const total = state.contactsList.length;
+  const lead = state.contactsList.filter(x=>x.stage==="lead").length;
+  const neg = state.contactsList.filter(x=>x.stage==="negotiation").length;
+  const cust = state.contactsList.filter(x=>x.stage==="customer").length;
+  const stages = [["lead",lead,"sky"],["prospect",state.contactsList.filter(x=>x.stage==="prospect").length,"amber"],["negotiation",neg,"violet"],["customer",cust,"emerald"]];
+  const maxStage = Math.max(...stages.map(s=>s[1]),1);
+  const t = state.contactsSearch.toLowerCase();
+  let list = state.contactsList.filter(ct=>{
+    if(state.contactsStage!=="all" && ct.stage!==state.contactsStage) return false;
+    if(state.contactsTag!=="all" && !ct.tags.includes(state.contactsTag)) return false;
+    if(t && !(ct.name.toLowerCase().includes(t) || ct.phone.includes(t) || (ct.propertyInterest||"").toLowerCase().includes(t))) return false;
+    return true;
+  });
+  c.innerHTML = `
+    <div class="space-y-5 animate-fade-in">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg grid place-items-center bg-emerald-600 text-white"><i data-lucide="Users" class="w-5 h-5"></i></div>
+          <div><h2 class="text-lg font-bold">Kontak & Leads</h2><p class="text-xs text-muted-foreground">${total} kontak terdaftar</p></div>
+        </div>
+        <button onclick="openContactDialog()" class="btn h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"><i data-lucide="Plus" class="w-4 h-4"></i>Tambah Kontak</button>
+      </div>
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        ${[["Total Kontak",total,"Users","emerald"],["Lead Baru",lead,"UserPlus","sky"],["Negosiasi",neg,"MessagesSquare","violet"],["Customer",cust,"BadgeCheck","emerald"]].map(([l,v,i,t])=>`
+        <div class="card p-4"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg grid place-items-center ${TONE_BG[t]}"><i data-lucide="${i}" class="w-4 h-4"></i></div><div><p class="text-xs text-muted-foreground">${l}</p><p class="text-xl font-bold">${v}</p></div></div></div>`).join("")}
+      </div>
+      <div class="card p-5">
+        <div class="flex items-center justify-between mb-3"><div><p class="font-semibold text-sm">Pipeline Funnel</p><p class="text-xs text-muted-foreground">Distribusi tahap lead</p></div><span class="badge text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40">Konversi ${(cust/total*100).toFixed(1)}%</span></div>
+        <div class="flex h-8 rounded-lg overflow-hidden">
+          ${stages.map(([k,v,col])=>`<div class="bg-${col}-500 text-white text-xs font-semibold flex items-center justify-center" style="width:${(v/total*100)||2}%" title="${STAGE_META[k].label}: ${v}">${v>0?v:''}</div>`).join("")}
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
+          ${stages.map(([k,v,col])=>`<div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-${col}-500"></span><div><p class="text-xs text-muted-foreground">${STAGE_META[k].label}</p><p class="text-sm font-semibold">${v} · ${(v/total*100).toFixed(0)}%</p></div></div>`).join("")}
+        </div>
+      </div>
+      <div class="card p-4">
+        <div class="flex flex-col md:flex-row gap-3">
+          <div class="relative flex-1"><i data-lucide="Search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"></i><input id="ctSearch" value="${escapeHtml(state.contactsSearch)}" placeholder="Cari nama, telepon, properti…" class="w-full h-9 pl-9 pr-3 rounded-md border border-input bg-background text-sm" /></div>
+          <select id="ctStage" class="h-9 rounded-md border border-input bg-background px-2 text-sm">
+            ${[["all","Semua Tahap"],["lead","Lead"],["prospect","Prospek"],["negotiation","Negosiasi"],["customer","Customer"]].map(([k,l])=>`<option value="${k}" ${state.contactsStage===k?'selected':''}>${l}</option>`).join("")}
+          </select>
+          <select id="ctTag" class="h-9 rounded-md border border-input bg-background px-2 text-sm">
+            ${[["all","Semua Tag"],["VIP","VIP"],["Cash","Cash"],["KPR","KPR"],["Investor","Investor"],["Sewa","Sewa"]].map(([k,l])=>`<option value="${k}" ${state.contactsTag===k?'selected':''}>${l}</option>`).join("")}
+          </select>
+          <div class="flex rounded-md border border-input overflow-hidden">
+            ${[["card","LayoutGrid"],["table","Table"]].map(([k,i])=>`<button onclick="state.contactsView='${k}';renderModule()" class="h-9 w-9 grid place-items-center ${state.contactsView===k?'bg-emerald-600 text-white':'hover:bg-accent'}"><i data-lucide="${i}" class="w-4 h-4"></i></button>`).join("")}
+          </div>
+        </div>
+      </div>
+      ${state.contactsView==="card" ? `
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        ${list.map(ct=>contactCard(ct)).join("")}
+      </div>` : `
+      <div class="card overflow-x-auto scroll-thin">
+        <table class="w-full text-sm min-w-[800px]">
+          <thead class="border-b border-border bg-muted/40"><tr class="text-left text-xs text-muted-foreground">
+            <th class="px-4 py-3 font-medium">Nama</th><th class="px-3 py-3 font-medium">Telepon</th><th class="px-3 py-3 font-medium">Tahap</th><th class="px-3 py-3 font-medium">Tags</th><th class="px-3 py-3 font-medium">Properti</th><th class="px-3 py-3 font-medium">Ditugaskan</th><th class="px-3 py-3 font-medium">Pesan Terakhir</th><th class="px-3 py-3 font-medium">Aksi</th>
+          </tr></thead>
+          <tbody>
+            ${list.map(ct=>`<tr class="border-b border-border/60 hover:bg-accent/50">
+              <td class="px-4 py-3"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-full grid place-items-center text-xs font-bold ${STAGE_META[ct.stage].bg} ${STAGE_META[ct.stage].color}">${initials(ct.name)}</div><div><p class="font-medium">${escapeHtml(ct.name)}</p>${ct.unread?`<span class="text-[10px] text-rose-600">${ct.unread} belum dibaca</span>`:''}</div></div></td>
+              <td class="px-3 py-3 text-muted-foreground">${ct.phone}</td>
+              <td class="px-3 py-3">${stageBadge(ct.stage)}</td>
+              <td class="px-3 py-3"><div class="flex flex-wrap gap-1">${tagChips(ct.tags)}</div></td>
+              <td class="px-3 py-3 text-muted-foreground truncate max-w-[150px]">${escapeHtml(ct.propertyInterest||"-")}</td>
+              <td class="px-3 py-3 text-muted-foreground">${escapeHtml(ct.assignedTo||"-")}</td>
+              <td class="px-3 py-3"><p class="text-xs truncate max-w-[150px]">${escapeHtml(ct.lastMessage||"")}</p><p class="text-[10px] text-muted-foreground">${ct.lastMessageAt||""}</p></td>
+              <td class="px-3 py-3"><button onclick="gotoChat('${ct.id}')" class="btn h-8 px-3 text-xs bg-emerald-600 text-white hover:bg-emerald-700"><i data-lucide="MessageCircle" class="w-3.5 h-3.5"></i>Chat</button></td>
+            </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>`}
+    </div>`;
+  refreshIcons();
+  const s=$("#ctSearch"); if(s) s.oninput=e=>{ state.contactsSearch=e.target.value; renderModule(); s.focus&&s.focus(); };
+  $("#ctStage").onchange=e=>{ state.contactsStage=e.target.value; renderModule(); };
+  $("#ctTag").onchange=e=>{ state.contactsTag=e.target.value; renderModule(); };
+}
+function contactCard(ct){
+  return `<div class="card p-4">
+    <div class="flex items-start gap-3">
+      <div class="relative"><div class="w-11 h-11 rounded-full grid place-items-center text-sm font-bold ${STAGE_META[ct.stage].bg} ${STAGE_META[ct.stage].color}">${initials(ct.name)}</div>${ct.unread?`<span class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[10px] font-bold grid place-items-center ring-2 ring-card">${ct.unread}</span>`:''}</div>
+      <div class="min-w-0 flex-1"><p class="font-semibold truncate">${escapeHtml(ct.name)}</p><p class="text-xs text-muted-foreground">${ct.phone}</p></div>
+      ${stageBadge(ct.stage)}
+    </div>
+    <div class="flex flex-wrap gap-1 mt-3">${tagChips(ct.tags)}</div>
+    <div class="mt-3 space-y-1.5 text-xs">
+      <p class="flex items-center gap-2 text-muted-foreground"><i data-lucide="Building2" class="w-3.5 h-3.5 text-emerald-600"></i>${escapeHtml(ct.propertyInterest||"-")}</p>
+      <p class="flex items-center gap-2 text-muted-foreground"><i data-lucide="UserCheck" class="w-3.5 h-3.5 text-violet-600"></i>${escapeHtml(ct.assignedTo||"-")}</p>
+    </div>
+    <div class="mt-3 p-2 rounded-md bg-muted/40 text-xs text-muted-foreground"><p class="truncate">"${escapeHtml(ct.lastMessage||"")}"</p><p class="text-[10px] mt-0.5">${ct.lastMessageAt||""}</p></div>
+    <div class="flex gap-2 mt-3">
+      <button onclick="gotoChat('${ct.id}')" class="btn flex-1 h-8 text-xs bg-emerald-600 text-white hover:bg-emerald-700"><i data-lucide="MessageCircle" class="w-3.5 h-3.5"></i>Chat</button>
+      <button onclick="openContactDetail('${ct.id}')" class="btn h-8 px-3 text-xs border border-border hover:bg-accent">Detail</button>
+    </div>
+  </div>`;
+}
+function gotoChat(id){ state.activeContactId=id; state.chatMobileShowList=false; const ct=state.chatContacts.find(c=>c.id===id); if(ct) ct.unread=0; navigate("chatbot"); }
+function openContactDialog(){ toast("Form tambah kontak (demo)","info"); }
+function openContactDetail(id){ const ct=state.contactsList.find(c=>c.id===id); if(!ct) return; openModal(contactDetailModal(ct)); }
+function contactDetailModal(ct){
+  return { title:`${ct.name}`, body:`
+    <div class="space-y-4">
+      <div class="flex items-center gap-4">
+        <div class="w-16 h-16 rounded-full grid place-items-center text-xl font-bold ${STAGE_META[ct.stage].bg} ${STAGE_META[ct.stage].color}">${initials(ct.name)}</div>
+        <div><p class="font-semibold text-lg">${escapeHtml(ct.name)}</p><p class="text-sm text-muted-foreground">${ct.phone}</p><div class="mt-1">${stageBadge(ct.stage)}</div></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3 text-sm">
+        <div class="p-3 rounded-md bg-muted/40"><p class="text-xs text-muted-foreground">Properti Diminati</p><p class="font-medium">${escapeHtml(ct.propertyInterest||"-")}</p></div>
+        <div class="p-3 rounded-md bg-muted/40"><p class="text-xs text-muted-foreground">Ditugaskan</p><p class="font-medium">${escapeHtml(ct.assignedTo||"-")}</p></div>
+      </div>
+      <div><p class="text-xs text-muted-foreground mb-1.5">Tag</p><div class="flex flex-wrap gap-1.5">${tagChips(ct.tags)}</div></div>
+      <div><p class="text-xs text-muted-foreground mb-2">Aktivitas</p>
+        <div class="space-y-2 text-sm">
+          ${[["Lead masuk","3 hari lalu","sky"],["Dihubungi","2 hari lalu","amber"],["Survey","1 hari lalu","violet"]].map(([l,t,col])=>`<div class="flex items-center gap-3"><div class="w-2 h-2 rounded-full bg-${col}-500"></div><p class="flex-1">${l}</p><span class="text-xs text-muted-foreground">${t}</span></div>`).join("")}
+        </div>
+      </div>
+      <div><p class="text-xs text-muted-foreground mb-1">Catatan</p><p class="text-sm p-2 rounded-md bg-muted/40">Klien sangat tertarik, menunggu simulasi KPR. Follow up Senin depan.</p></div>
+    </div>`, footer:`<button onclick="closeModal()" class="btn h-9 px-4 border border-border hover:bg-accent">Tutup</button>
+      <button onclick="closeModal();navigate('orders')" class="btn h-9 px-4 bg-emerald-600 text-white hover:bg-emerald-700"><i data-lucide="ShoppingBag" class="w-4 h-4"></i>Buat Order</button>
+      <button onclick="toast('Membuka WhatsApp…','info');closeModal()" class="btn h-9 px-4 border border-border hover:bg-accent"><i data-lucide="MessageCircle" class="w-4 h-4"></i>Kirim WhatsApp</button>` };
+}
+
+/* ============================ PROPERTIES ============================ */
+function renderProperties(c){
+  const total = state.properties.length;
+  const tersedia = state.properties.filter(p=>p.status==="tersedia").length;
+  const terjual = state.properties.filter(p=>p.status==="terjual").length;
+  const totalVal = state.properties.reduce((a,b)=>a+b.price,0);
+  const t = state.propsSearch.toLowerCase();
+  let list = state.properties.filter(p=>{
+    if(state.propsType!=="all" && p.type!==state.propsType) return false;
+    if(state.propsStatus!=="all" && p.status!==state.propsStatus) return false;
+    if(t && !(p.title.toLowerCase().includes(t) || p.location.toLowerCase().includes(t))) return false;
+    return true;
+  });
+  c.innerHTML = `
+    <div class="space-y-5 animate-fade-in">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg grid place-items-center bg-emerald-600 text-white"><i data-lucide="Building2" class="w-5 h-5"></i></div>
+          <div><h2 class="text-lg font-bold">Daftar Properti</h2><p class="text-xs text-muted-foreground">${total} listing aktif</p></div>
+        </div>
+        <button onclick="openPropDialog()" class="btn h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"><i data-lucide="Plus" class="w-4 h-4"></i>Tambah Properti</button>
+      </div>
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        ${[["Total Properti",total,"Building2","emerald"],["Tersedia",tersedia,"Home","sky"],["Terjual",terjual,"CheckCircle2","rose"],["Total Nilai",formatCurrency(totalVal),"Wallet","violet"]].map(([l,v,i,t])=>`
+        <div class="card p-4"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg grid place-items-center ${TONE_BG[t]}"><i data-lucide="${i}" class="w-4 h-4"></i></div><div><p class="text-xs text-muted-foreground">${l}</p><p class="text-xl font-bold">${v}</p></div></div></div>`).join("")}
+      </div>
+      <div class="card p-4">
+        <div class="flex flex-col md:flex-row gap-3">
+          <div class="relative flex-1"><i data-lucide="Search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"></i><input id="pSearch" value="${escapeHtml(state.propsSearch)}" placeholder="Cari judul atau lokasi…" class="w-full h-9 pl-9 pr-3 rounded-md border border-input bg-background text-sm" /></div>
+          <div class="flex gap-1 flex-wrap">
+            ${[["all","Semua"],["rumah","Rumah"],["apartemen","Apartemen"],["ruko","Ruko"],["tanah","Tanah"],["gudang","Gudang"]].map(([k,l])=>`<button onclick="state.propsType='${k}';renderModule()" class="h-9 px-3 rounded-md text-xs font-medium ${state.propsType===k?'bg-emerald-600 text-white':'bg-muted text-muted-foreground hover:bg-accent'}">${l}</button>`).join("")}
+          </div>
+          <select id="pStatus" class="h-9 rounded-md border border-input bg-background px-2 text-sm">
+            ${[["all","Semua Status"],["tersedia","Tersedia"],["terjual","Terjual"],["tersewa","Tersewa"],["draft","Draft"]].map(([k,l])=>`<option value="${k}" ${state.propsStatus===k?'selected':''}>${l}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        ${list.map(p=>{
+          const tm = PROP_TYPE_META[p.type];
+          return `<div class="card overflow-hidden flex flex-col">
+            <div class="relative aspect-[4/3] bg-muted">
+              <img src="${p.image}" alt="${escapeHtml(p.title)}" loading="lazy" class="w-full h-full object-cover" onerror="this.style.display='none';this.parentElement.classList.add('grid','place-items-center');this.parentElement.innerHTML='<i data-lucide=\\'ImageOff\\' class=\\'w-10 h-10 text-muted-foreground\\'></i>'" />
+              <span class="absolute top-2 left-2 badge bg-white/90 text-zinc-800 backdrop-blur"><i data-lucide="${tm.icon}" class="w-3 h-3"></i>${tm.label}</span>
+              <span class="absolute top-2 right-2">${propStatusBadge(p.status)}</span>
+            </div>
+            <div class="p-4 flex-1 flex flex-col">
+              <p class="text-lg font-bold text-emerald-600">${formatFullCurrency(p.price)}</p>
+              <p class="font-semibold mt-1 truncate">${escapeHtml(p.title)}</p>
+              <p class="text-xs text-muted-foreground flex items-center gap-1 mt-1"><i data-lucide="MapPin" class="w-3 h-3 text-rose-500"></i>${escapeHtml(p.location)}</p>
+              <div class="flex items-center gap-3 mt-3 text-xs text-muted-foreground">
+                ${p.bedrooms?`<span class="flex items-center gap-1"><i data-lucide="BedDouble" class="w-3.5 h-3.5"></i>${p.bedrooms} KT</span>`:''}
+                ${p.bathrooms?`<span class="flex items-center gap-1"><i data-lucide="Bath" class="w-3.5 h-3.5"></i>${p.bathrooms} KM</span>`:''}
+                <span class="flex items-center gap-1"><i data-lucide="Maximize" class="w-3.5 h-3.5"></i>${p.area} m²</span>
+              </div>
+              <div class="flex items-center gap-2 mt-3 pt-3 border-t border-border">
+                <div class="w-7 h-7 rounded-full grid place-items-center text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50">${initials(p.agent)}</div>
+                <span class="text-xs text-muted-foreground flex-1 truncate">${escapeHtml(p.agent)}</span>
+                <button onclick="openPropDetail('${p.id}')" class="btn h-8 px-3 text-xs border border-border hover:bg-accent">Lihat Detail</button>
+              </div>
+            </div>
+          </div>`;
+        }).join("")}
+      </div>
+      ${list.length===0?`<p class="text-center text-muted-foreground py-10">Tidak ada properti ditemukan.</p>`:''}
+    </div>`;
+  refreshIcons();
+  const s=$("#pSearch"); if(s) s.oninput=e=>{ state.propsSearch=e.target.value; renderModule(); s.focus&&s.focus(); };
+  $("#pStatus").onchange=e=>{ state.propsStatus=e.target.value; renderModule(); };
+}
+function openPropDialog(){ toast("Form tambah properti (demo)","info"); }
+function openPropDetail(id){ const p=state.properties.find(x=>x.id===id); if(!p) return; const tm=PROP_TYPE_META[p.type];
+  openModal({ title:p.title, body:`
+    <div class="space-y-4">
+      <img src="${p.image}" alt="${escapeHtml(p.title)}" class="w-full h-56 object-cover rounded-lg" onerror="this.style.display='none'" />
+      <div class="flex items-center gap-2"><span class="badge bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40"><i data-lucide="${tm.icon}" class="w-3 h-3"></i>${tm.label}</span>${propStatusBadge(p.status)}</div>
+      <p class="text-2xl font-bold text-emerald-600">${formatFullCurrency(p.price)}</p>
+      <p class="text-sm text-muted-foreground flex items-center gap-1"><i data-lucide="MapPin" class="w-4 h-4 text-rose-500"></i>${escapeHtml(p.location)}</p>
+      <div class="grid grid-cols-3 gap-2 text-center">
+        ${p.bedrooms?`<div class="p-3 rounded-md bg-muted/40"><i data-lucide="BedDouble" class="w-4 h-4 mx-auto text-emerald-600"></i><p class="font-bold mt-1">${p.bedrooms}</p><p class="text-[10px] text-muted-foreground">Kamar Tidur</p></div>`:''}
+        ${p.bathrooms?`<div class="p-3 rounded-md bg-muted/40"><i data-lucide="Bath" class="w-4 h-4 mx-auto text-emerald-600"></i><p class="font-bold mt-1">${p.bathrooms}</p><p class="text-[10px] text-muted-foreground">Kamar Mandi</p></div>`:''}
+        <div class="p-3 rounded-md bg-muted/40"><i data-lucide="Maximize" class="w-4 h-4 mx-auto text-emerald-600"></i><p class="font-bold mt-1">${p.area}</p><p class="text-[10px] text-muted-foreground">m²</p></div>
+      </div>
+      <div class="p-3 rounded-md bg-muted/40 flex items-center gap-3"><div class="w-9 h-9 rounded-full grid place-items-center text-sm font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50">${initials(p.agent)}</div><div><p class="text-xs text-muted-foreground">Agent</p><p class="font-medium">${escapeHtml(p.agent)}</p></div></div>
+    </div>`, footer:`<button onclick="closeModal()" class="btn h-9 px-4 border border-border hover:bg-accent">Tutup</button>
+      <button onclick="closeModal();toast('Menghubungi agent ${escapeHtml(p.agent)}','info')" class="btn h-9 px-4 bg-emerald-600 text-white hover:bg-emerald-700"><i data-lucide="Phone" class="w-4 h-4"></i>Hubungi Agent</button>` });
+}
+
+/* ============================ ORDERS ============================ */
+function renderOrders(c){
+  const total = state.orders.length;
+  const deal = state.orders.filter(o=>o.status==="deal");
+  const dealVal = deal.reduce((a,b)=>a+b.amount,0);
+  const proses = state.orders.filter(o=>["baru","diproses","negosiasi"].includes(o.status)).length;
+  const pipelineVal = state.orders.filter(o=>!["deal","gagal","dibatalkan"].includes(o.status)).reduce((a,b)=>a+b.amount,0);
+  const t = state.ordersSearch.toLowerCase();
+  let list = state.orders.filter(o=>{
+    if(state.ordersStatus!=="all" && o.status!==state.ordersStatus) return false;
+    if(state.ordersType!=="all" && o.type!==state.ordersType) return false;
+    if(t && !(o.code.toLowerCase().includes(t) || o.contactName.toLowerCase().includes(t) || o.propertyTitle.toLowerCase().includes(t))) return false;
+    return true;
+  });
+  c.innerHTML = `
+    <div class="space-y-5 animate-fade-in">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg grid place-items-center bg-emerald-600 text-white"><i data-lucide="ShoppingBag" class="w-5 h-5"></i></div>
+          <div><h2 class="text-lg font-bold">Manajemen Order</h2><p class="text-xs text-muted-foreground">${total} transaksi</p></div>
+        </div>
+        <button onclick="openOrderDialog()" class="btn h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"><i data-lucide="Plus" class="w-4 h-4"></i>Buat Order</button>
+      </div>
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        ${[["Total Order",total,"ShoppingBag","emerald"],["Order Deal",deal.length+" · "+formatCurrency(dealVal),"BadgeCheck","emerald"],["Sedang Diproses",proses,"Loader","amber"],["Nilai Pipeline",formatCurrency(pipelineVal),"TrendingUp","violet"]].map(([l,v,i,t])=>`
+        <div class="card p-4"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg grid place-items-center ${TONE_BG[t]}"><i data-lucide="${i}" class="w-4 h-4"></i></div><div><p class="text-xs text-muted-foreground">${l}</p><p class="text-xl font-bold">${v}</p></div></div></div>`).join("")}
+      </div>
+      <div class="card p-4">
+        <div class="flex flex-col md:flex-row gap-3">
+          <div class="relative flex-1"><i data-lucide="Search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"></i><input id="oSearch" value="${escapeHtml(state.ordersSearch)}" placeholder="Cari kode, klien, properti…" class="w-full h-9 pl-9 pr-3 rounded-md border border-input bg-background text-sm" /></div>
+          <select id="oStatus" class="h-9 rounded-md border border-input bg-background px-2 text-sm">
+            ${[["all","Semua Status"],["baru","Baru"],["diproses","Diproses"],["negosiasi","Negosiasi"],["deal","Deal"],["gagal","Gagal"],["dibatalkan","Dibatalkan"]].map(([k,l])=>`<option value="${k}" ${state.ordersStatus===k?'selected':''}>${l}</option>`).join("")}
+          </select>
+          <select id="oType" class="h-9 rounded-md border border-input bg-background px-2 text-sm">
+            ${[["all","Semua Tipe"],["jual","Jual"],["sewa","Sewa"]].map(([k,l])=>`<option value="${k}" ${state.ordersType===k?'selected':''}>${l}</option>`).join("")}
+          </select>
+          <div class="flex rounded-md border border-input overflow-hidden">
+            ${[["table","Table"],["kanban","Columns3"]].map(([k,i])=>`<button onclick="state.ordersView='${k}';renderModule()" class="h-9 w-9 grid place-items-center ${state.ordersView===k?'bg-emerald-600 text-white':'hover:bg-accent'}"><i data-lucide="${i}" class="w-4 h-4"></i></button>`).join("")}
+          </div>
+        </div>
+      </div>
+      ${state.ordersView==="table" ? `
+      <div class="card overflow-x-auto scroll-thin">
+        <table class="w-full text-sm min-w-[900px]">
+          <thead class="border-b border-border bg-muted/40"><tr class="text-left text-xs text-muted-foreground">
+            <th class="px-4 py-3 font-medium">Kode</th><th class="px-3 py-3 font-medium">Klien</th><th class="px-3 py-3 font-medium">Properti</th><th class="px-3 py-3 font-medium">Tipe</th><th class="px-3 py-3 font-medium">Nilai</th><th class="px-3 py-3 font-medium">Status</th><th class="px-3 py-3 font-medium">Agent</th><th class="px-3 py-3 font-medium">Tanggal</th><th class="px-3 py-3 font-medium">Aksi</th>
+          </tr></thead>
+          <tbody>
+            ${list.map(o=>`<tr class="border-b border-border/60 hover:bg-accent/50 cursor-pointer" onclick="openOrderDetail('${o.id}')">
+              <td class="px-4 py-3 font-mono text-xs">${o.code}</td>
+              <td class="px-3 py-3"><div class="flex items-center gap-2"><div class="w-7 h-7 rounded-full grid place-items-center text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50">${initials(o.contactName)}</div>${escapeHtml(o.contactName)}</div></td>
+              <td class="px-3 py-3 truncate max-w-[160px] text-muted-foreground">${escapeHtml(o.propertyTitle)}</td>
+              <td class="px-3 py-3"><span class="badge ${o.type==="jual"?'text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40':'text-amber-700 bg-amber-50 dark:bg-amber-950/40'}">${o.type==="jual"?"Jual":"Sewa"}</span></td>
+              <td class="px-3 py-3 font-semibold">${formatCurrency(o.amount)}</td>
+              <td class="px-3 py-3">${orderStatusBadge(o.status)}</td>
+              <td class="px-3 py-3 text-muted-foreground">${escapeHtml(o.agent)}</td>
+              <td class="px-3 py-3 text-xs text-muted-foreground">${o.createdAt}</td>
+              <td class="px-3 py-3"><button onclick="event.stopPropagation();openOrderDetail('${o.id}')" class="btn h-8 px-3 text-xs border border-border hover:bg-accent"><i data-lucide="Eye" class="w-3.5 h-3.5"></i>Lihat</button></td>
+            </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>` : `
+      <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3 overflow-x-auto scroll-thin">
+        ${["baru","diproses","negosiasi","deal","gagal"].map(st=>{
+          const items = list.filter(o=>o.status===st);
+          const m = ORDER_STATUS_META[st];
+          const sum = items.reduce((a,b)=>a+b.amount,0);
+          return `<div class="card p-3 flex flex-col" style="min-height:300px;">
+            <div class="flex items-center justify-between mb-2"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full ${m.dot}"></span><p class="text-sm font-semibold">${m.label}</p></div><span class="badge bg-secondary text-secondary-foreground">${items.length}</span></div>
+            <p class="text-[10px] text-muted-foreground mb-2">${formatCurrency(sum)}</p>
+            <div class="flex-1 space-y-2 overflow-y-auto scroll-thin max-h-[50vh]">
+              ${items.map(o=>`<button onclick="openOrderDetail('${o.id}')" class="w-full text-left p-3 rounded-lg border border-border hover:border-emerald-300 hover:bg-accent/50">
+                <div class="flex items-center justify-between"><span class="font-mono text-[10px] text-muted-foreground">${o.code}</span><span class="badge ${o.type==="jual"?'text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40':'text-amber-700 bg-amber-50 dark:bg-amber-950/40'}">${o.type}</span></div>
+                <p class="text-sm font-medium mt-1 truncate">${escapeHtml(o.propertyTitle)}</p>
+                <p class="text-xs text-muted-foreground truncate">${escapeHtml(o.contactName)}</p>
+                <p class="text-sm font-bold text-emerald-600 mt-1">${formatCurrency(o.amount)}</p>
+                <p class="text-[10px] text-muted-foreground mt-1">${escapeHtml(o.agent)}</p>
+              </button>`).join("")}
+              ${items.length===0?`<p class="text-xs text-muted-foreground text-center py-4">Kosong</p>`:''}
+            </div>
+          </div>`;
+        }).join("")}
+      </div>`}
+    </div>`;
+  refreshIcons();
+  const s=$("#oSearch"); if(s) s.oninput=e=>{ state.ordersSearch=e.target.value; renderModule(); s.focus&&s.focus(); };
+  $("#oStatus").onchange=e=>{ state.ordersStatus=e.target.value; renderModule(); };
+  $("#oType").onchange=e=>{ state.ordersType=e.target.value; renderModule(); };
+}
+function openOrderDialog(){ toast("Form buat order (demo)","info"); }
+function openOrderDetail(id){
+  const o = state.orders.find(x=>x.id===id); if(!o) return;
+  openModal({ title:`${o.code}`, body:`
+    <div class="space-y-4">
+      <div class="flex items-center gap-2">${orderStatusBadge(o.status)}<span class="badge ${o.type==="jual"?'text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40':'text-amber-700 bg-amber-50 dark:bg-amber-950/40'}">${o.type==="jual"?"Jual":"Sewa"}</span></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div class="p-4 rounded-lg bg-emerald-50 dark:bg-emerald-950/40"><p class="text-xs text-muted-foreground">Nilai Transaksi</p><p class="text-xl font-bold text-emerald-700 dark:text-emerald-400">${formatFullCurrency(o.amount)}</p></div>
+        <div class="p-4 rounded-lg bg-muted/40"><p class="text-xs text-muted-foreground">Tipe</p><p class="text-xl font-bold capitalize">${o.type}</p></div>
+      </div>
+      <div class="p-3 rounded-md bg-muted/40 flex items-center gap-3"><div class="w-10 h-10 rounded-full grid place-items-center text-sm font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50">${initials(o.contactName)}</div><div><p class="text-xs text-muted-foreground">Klien</p><p class="font-medium">${escapeHtml(o.contactName)}</p></div></div>
+      <div class="p-3 rounded-md bg-muted/40"><p class="text-xs text-muted-foreground">Properti</p><p class="font-medium">${escapeHtml(o.propertyTitle)}</p></div>
+      <div><p class="text-xs text-muted-foreground mb-2">Timeline</p>
+        <div class="space-y-2 text-sm">
+          ${[["Order dibuat",o.createdAt,"sky"],["Klien dihubungi",o.createdAt,"amber"],["Survey properti","-",o.status==="baru"?"zinc":"violet"],["Negosiasi","-",["negosiasi","deal"].includes(o.status)?"violet":"zinc"],["Closing",["deal"].includes(o.status)?o.updatedAt:"-","emerald"]].map(([l,t,col])=>`<div class="flex items-center gap-3"><div class="w-2 h-2 rounded-full bg-${col}-500"></div><p class="flex-1">${l}</p><span class="text-xs text-muted-foreground">${t}</span></div>`).join("")}
+        </div>
+      </div>
+      <div class="p-3 rounded-md bg-muted/40 flex items-center gap-3"><div class="w-9 h-9 rounded-full grid place-items-center text-xs font-bold bg-violet-100 text-violet-700 dark:bg-violet-950/50">${initials(o.agent)}</div><div><p class="text-xs text-muted-foreground">Agent</p><p class="font-medium">${escapeHtml(o.agent)}</p></div></div>
+    </div>`, footer:`<button onclick="closeModal()" class="btn h-9 px-4 border border-border hover:bg-accent">Tutup</button>
+      <button onclick="toast('Invoice dicetak','success');closeModal()" class="btn h-9 px-4 border border-border hover:bg-accent"><i data-lucide="Printer" class="w-4 h-4"></i>Cetak Invoice</button>
+      <button onclick="closeModal();gotoChat('${o.contactId}')" class="btn h-9 px-4 bg-emerald-600 text-white hover:bg-emerald-700"><i data-lucide="MessageCircle" class="w-4 h-4"></i>Hubungi Klien</button>` });
+}
+
+/* ============================ MARKETING ============================ */
+function renderMarketing(c){
+  c.innerHTML = `
+    <div class="space-y-5 animate-fade-in">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg grid place-items-center bg-emerald-600 text-white"><i data-lucide="Megaphone" class="w-5 h-5"></i></div>
+          <div><h2 class="text-lg font-bold">Marketing</h2><p class="text-xs text-muted-foreground">Kampanye, template & broadcast WhatsApp</p></div>
+        </div>
+        ${state.marketingTab==="kampanye"?`<button onclick="toast('Form buat kampanye (demo)','info')" class="btn h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"><i data-lucide="Plus" class="w-4 h-4"></i>Buat Kampanye</button>`:''}
+        ${state.marketingTab==="template"?`<button onclick="toast('Form template baru (demo)','info')" class="btn h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"><i data-lucide="Plus" class="w-4 h-4"></i>Template Baru</button>`:''}
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+        ${[["kampanye","Megaphone","Kampanye"],["template","FileText","Template Pesan"],["broadcast","Send","Broadcast"]].map(([k,i,l])=>`<button onclick="state.marketingTab='${k}';renderModule()" class="btn h-11 px-3 text-sm font-medium gap-2 ${state.marketingTab===k?'bg-emerald-600 text-white':'bg-card border border-border hover:bg-accent'}"><i data-lucide="${i}" class="w-4 h-4"></i>${l}</button>`).join("")}
+      </div>
+      <div id="mktBody"></div>
+    </div>`;
+  if(state.marketingTab==="kampanye") renderCampaigns($("#mktBody"));
+  else if(state.marketingTab==="template") renderTemplates($("#mktBody"));
+  else renderBroadcast($("#mktBody"));
+}
+function renderCampaigns(host){
+  const total = state.campaigns.length;
+  const aktif = state.campaigns.filter(c=>c.status==="aktif").length;
+  const sent = state.campaigns.reduce((a,b)=>a+b.sent,0);
+  const replied = state.campaigns.reduce((a,b)=>a+b.replied,0);
+  const respRate = sent>0?(replied/sent*100).toFixed(1):0;
+  host.innerHTML = `
+    <div class="space-y-4">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        ${[["Total Kampanye",total,"Megaphone","pink"],["Kampanye Aktif",aktif,"Radio","emerald"],["Pesan Terkirim",sent.toLocaleString("id-ID"),"Send","sky"],["Tingkat Respon",respRate+"%","MessageSquare","violet"]].map(([l,v,i,t])=>`
+        <div class="card p-4"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg grid place-items-center ${TONE_BG[t]}"><i data-lucide="${i}" class="w-4 h-4"></i></div><div><p class="text-xs text-muted-foreground">${l}</p><p class="text-xl font-bold">${v}</p></div></div></div>`).join("")}
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        ${state.campaigns.map(cmp=>{
+          const m = CAMPAIGN_STATUS_META[cmp.status];
+          const prog = cmp.audience>0?(cmp.delivered/cmp.audience*100):0;
+          const chIcon = cmp.channel==="whatsapp"?"MessageCircle":cmp.channel==="email"?"Mail":"Smartphone";
+          return `<div class="card p-5">
+            <div class="flex items-start justify-between gap-2">
+              <div class="flex items-center gap-3 min-w-0"><div class="w-10 h-10 rounded-lg grid place-items-center ${cmp.channel==="whatsapp"?"bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600":cmp.channel==="email"?"bg-amber-50 dark:bg-amber-950/40 text-amber-600":"bg-sky-50 dark:bg-sky-950/40 text-sky-600"}"><i data-lucide="${chIcon}" class="w-5 h-5"></i></div>
+                <div class="min-w-0"><p class="font-semibold truncate">${escapeHtml(cmp.name)}</p><p class="text-xs text-muted-foreground capitalize">${cmp.channel}${cmp.scheduledAt?` · ⏰ ${escapeHtml(cmp.scheduledAt)}`:''}</p></div></div>
+              ${campaignStatusBadge(cmp.status)}
+            </div>
+            <div class="grid grid-cols-4 gap-2 mt-4 text-center">
+              ${[["Audiens",cmp.audience],["Terkirim",cmp.sent],["Dibaca",cmp.read],["Dibalas",cmp.replied]].map(([l,v])=>`<div class="p-2 rounded-md bg-muted/40"><p class="text-lg font-bold">${v}</p><p class="text-[10px] text-muted-foreground">${l}</p></div>`).join("")}
+            </div>
+            <div class="mt-3"><div class="flex justify-between text-xs mb-1"><span class="text-muted-foreground">Terkirim ke audiens</span><span class="font-medium">${prog.toFixed(0)}%</span></div><div class="h-2 rounded-full bg-muted overflow-hidden"><div class="bg-emerald-500 h-full" style="width:${prog}%"></div></div></div>
+            <p class="text-xs text-muted-foreground mt-3 line-clamp-2 truncate-2">${escapeHtml(cmp.message)}</p>
+            <div class="flex gap-2 mt-3">
+              <button onclick="toast('Detail kampanye ${escapeHtml(cmp.name)}','info')" class="btn flex-1 h-8 text-xs border border-border hover:bg-accent">Lihat Detail</button>
+              ${cmp.status==="aktif"?`<button onclick="state.campaigns.find(c=>c.id==='${cmp.id}').status='selesai';renderModule();toast('Kampanye dijeda','warning')" class="btn h-8 px-3 text-xs border border-border hover:bg-accent"><i data-lucide="Pause" class="w-3.5 h-3.5"></i>Jeda</button>`:''}
+            </div>
+          </div>`;
+        }).join("")}
+      </div>
+    </div>`;
+  refreshIcons();
+}
+function renderTemplates(host){
+  host.innerHTML = `
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      ${state.templates.map(t=>`
+        <div class="card p-5">
+          <div class="flex items-start justify-between"><div><p class="font-semibold">${escapeHtml(t.name)}</p><span class="badge bg-secondary text-secondary-foreground mt-1">${escapeHtml(t.category)}</span></div><i data-lucide="FileText" class="w-5 h-5 text-muted-foreground"></i></div>
+          <pre class="text-xs text-muted-foreground bg-muted/40 p-3 rounded-md mt-3 whitespace-pre-wrap font-sans line-clamp-4 truncate-2" style="-webkit-line-clamp:4">${escapeHtml(t.body)}</pre>
+          <div class="flex gap-2 mt-3">
+            <button onclick="useTemplate('${t.id}')" class="btn flex-1 h-8 text-xs bg-emerald-600 text-white hover:bg-emerald-700">Gunakan</button>
+            <button onclick="navigator.clipboard&&navigator.clipboard.writeText(\`${t.body.replace(/`/g,'\\`')}\`);toast('Template disalin','success')" class="btn h-8 px-3 text-xs border border-border hover:bg-accent"><i data-lucide="Copy" class="w-3.5 h-3.5"></i>Salin</button>
+          </div>
+        </div>`).join("")}
+    </div>`;
+  refreshIcons();
+}
+function useTemplate(id){ const t=state.templates.find(x=>x.id===id); if(t){ state.marketingTab="broadcast"; state.broadcastTemplate=t.body; renderModule(); toast("Template dimuat ke broadcast","success"); } }
+function renderBroadcast(host){
+  const tmpl = state.broadcastTemplate || "Halo {nama}, kami memiliki penawaran spesial properti untuk Anda. Mau info detailnya? 🏡";
+  const preview = tmpl.replace(/\{nama\}/g,"Budi").replace(/\{nama_properti\}/g,"Rumah Cibaduyut").replace(/\{harga\}/g,"Rp 850 juta").replace(/\{lokasi\}/g,"Cibaduyut, Bandung");
+  host.innerHTML = `
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="card p-5 space-y-4">
+        <p class="font-semibold">Komposer Broadcast</p>
+        <div><label class="text-xs font-medium">Channel</label><select class="w-full h-9 mt-1 rounded-md border border-input bg-background px-2 text-sm"><option>WhatsApp</option><option>Email</option><option>SMS</option></select></div>
+        <div><label class="text-xs font-medium">Segmen Audiens</label><select class="w-full h-9 mt-1 rounded-md border border-input bg-background px-2 text-sm"><option>Semua Leads (10)</option><option>Prospek (4)</option><option>VIP (4)</option><option>Investor (2)</option><option>Pelanggan (2)</option></select></div>
+        <div><label class="text-xs font-medium">Template Pesan</label><select id="bctTmpl" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-2 text-sm">
+          <option value="">— Pilih template —</option>
+          ${state.templates.map(t=>`<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("")}
+        </select></div>
+        <div><label class="text-xs font-medium">Pesan</label><textarea id="bctMsg" rows="5" class="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm font-mono" placeholder="Tulis pesan… gunakan {nama}, {nama_properti}, {harga}">${escapeHtml(tmpl)}</textarea>
+        <p class="text-[10px] text-muted-foreground mt-1"><span id="bctCount">${tmpl.length}</span> karakter</p></div>
+        <div><label class="text-xs font-medium">Jadwalkan (opsional)</label><input type="datetime-local" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-2 text-sm" /></div>
+        <div class="flex gap-2">
+          <button onclick="toast('Broadcast dikirim ke audiens','success')" class="btn flex-1 h-10 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"><i data-lucide="Send" class="w-4 h-4"></i>Kirim Sekarang</button>
+          <button onclick="toast('Broadcast dijadwalkan','info')" class="btn flex-1 h-10 border border-border hover:bg-accent text-sm font-medium"><i data-lucide="CalendarClock" class="w-4 h-4"></i>Jadwalkan</button>
+        </div>
+      </div>
+      <div class="card p-5">
+        <p class="font-semibold mb-3">Pratinjau WhatsApp</p>
+        <div class="mx-auto max-w-[280px] rounded-3xl border-4 border-zinc-800 dark:border-zinc-700 p-3 bg-zinc-100 dark:bg-zinc-900">
+          <div class="rounded-2xl overflow-hidden bg-[#e5ddd5] dark:bg-[#0b141a] chat-bg h-[420px] flex flex-col">
+            <div class="bg-emerald-600 text-white px-3 py-2 flex items-center gap-2 shrink-0"><div class="w-7 h-7 rounded-full bg-white/20 grid place-items-center text-xs font-bold">P</div><div><p class="text-xs font-semibold">PropertiKu Agent</p><p class="text-[9px] opacity-80">online</p></div></div>
+            <div class="flex-1 p-3 overflow-y-auto scroll-thin">
+              <div class="max-w-[85%] bg-white dark:bg-zinc-800 rounded-lg rounded-tl-none p-2.5 shadow-sm"><p class="text-xs whitespace-pre-wrap text-zinc-800 dark:text-zinc-100">${escapeHtml(preview)}</p><p class="text-[9px] text-zinc-400 text-right mt-1">${nowTime()} ✓✓</p></div>
+            </div>
+            <div class="px-2 py-1.5 shrink-0"><div class="bg-white dark:bg-zinc-800 rounded-full px-3 py-1.5 text-[10px] text-zinc-400">Ketik pesan…</div></div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  refreshIcons();
+  const sel=$("#bctTmpl"); if(sel) sel.onchange=e=>{ const t=state.templates.find(x=>x.id===e.target.value); if(t){ $("#bctMsg").value=t.body; $("#bctCount").textContent=t.body.length; } };
+  const msg=$("#bctMsg"); if(msg) msg.oninput=e=>{ $("#bctCount").textContent=e.target.value.length; };
+}
+
+/* ============================ FINANCE ============================ */
+function renderFinance(c){
+  const lunas = state.invoices.filter(i=>i.status==="lunas");
+  const piutang = state.invoices.filter(i=>i.status==="belum-bayar"||i.status==="jatuh-tempo");
+  const pendapatan = lunas.reduce((a,b)=>a+b.amount,0);
+  const piutangVal = piutang.reduce((a,b)=>a+b.amount,0);
+  const jatuh = state.invoices.filter(i=>i.status==="jatuh-tempo").length;
+  const t = state.financeSearch.toLowerCase();
+  let list = state.invoices.filter(i=>{
+    if(state.financeStatus!=="all" && i.status!==state.financeStatus) return false;
+    if(t && !(i.number.toLowerCase().includes(t) || i.contactName.toLowerCase().includes(t))) return false;
+    return true;
+  });
+  c.innerHTML = `
+    <div class="space-y-5 animate-fade-in">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg grid place-items-center bg-emerald-600 text-white"><i data-lucide="Wallet" class="w-5 h-5"></i></div>
+          <div><h2 class="text-lg font-bold">Keuangan</h2><p class="text-xs text-muted-foreground">Faktur, pembayaran & pendapatan</p></div>
+        </div>
+        <div class="flex gap-2">
+          <select id="fPeriod" class="h-9 rounded-md border border-input bg-background px-2 text-sm">
+            ${[["bulan-ini","Bulan Ini"],["bulan-lalu","Bulan Lalu"],["kuartal","Kuartal Ini"],["tahun","Tahun Ini"]].map(([k,l])=>`<option value="${k}" ${state.financePeriod===k?'selected':''}>${l}</option>`).join("")}
+          </select>
+          <button onclick="openInvoiceDialog()" class="btn h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"><i data-lucide="Plus" class="w-4 h-4"></i>Buat Invoice</button>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        ${[["Pendapatan",formatCurrency(pendapatan),"TrendingUp","emerald"],["Piutang",formatCurrency(piutangVal),"Clock","amber"],["Invoice Lunas",lunas.length+" invoice","CheckCircle2","emerald"],["Jatuh Tempo",jatuh+" invoice","AlertTriangle","rose"]].map(([l,v,i,t])=>`
+        <div class="card p-4"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg grid place-items-center ${TONE_BG[t]}"><i data-lucide="${i}" class="w-4 h-4"></i></div><div><p class="text-xs text-muted-foreground">${l}</p><p class="text-xl font-bold">${v}</p></div></div></div>`).join("")}
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="card p-5 lg:col-span-2"><div class="mb-4"><p class="font-semibold">Tren Pendapatan</p><p class="text-xs text-muted-foreground">7 bulan terakhir (juta Rupiah)</p></div><div class="h-60"><canvas id="finRevChart"></canvas></div></div>
+        <div class="card p-5"><div class="mb-4"><p class="font-semibold">Status Invoice</p><p class="text-xs text-muted-foreground">Distribusi</p></div><div class="h-60"><canvas id="finDonut"></canvas></div></div>
+      </div>
+      <div class="card p-4">
+        <div class="flex flex-col md:flex-row gap-3">
+          <div class="relative flex-1"><i data-lucide="Search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"></i><input id="fSearch" value="${escapeHtml(state.financeSearch)}" placeholder="Cari nomor atau klien…" class="w-full h-9 pl-9 pr-3 rounded-md border border-input bg-background text-sm" /></div>
+          <div class="flex gap-1 flex-wrap">
+            ${[["all","Semua","zinc"],["lunas","Lunas","emerald"],["belum-bayar","Belum Bayar","amber"],["jatuh-tempo","Jatuh Tempo","rose"],["dibatalkan","Dibatalkan","zinc"]].map(([k,l,col])=>`<button onclick="state.financeStatus='${k}';renderModule()" class="h-9 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${state.financeStatus===k?'bg-emerald-600 text-white':'bg-muted text-muted-foreground hover:bg-accent'}"><span class="w-1.5 h-1.5 rounded-full bg-${col}-500"></span>${l}</button>`).join("")}
+          </div>
+        </div>
+      </div>
+      <div class="card overflow-x-auto scroll-thin">
+        <table class="w-full text-sm min-w-[900px]">
+          <thead class="border-b border-border bg-muted/40"><tr class="text-left text-xs text-muted-foreground">
+            <th class="px-4 py-3 font-medium">Nomor</th><th class="px-3 py-3 font-medium">Klien</th><th class="px-3 py-3 font-medium">Nilai</th><th class="px-3 py-3 font-medium">Metode</th><th class="px-3 py-3 font-medium">Status</th><th class="px-3 py-3 font-medium">Terbit</th><th class="px-3 py-3 font-medium">Jatuh Tempo</th><th class="px-3 py-3 font-medium">Aksi</th>
+          </tr></thead>
+          <tbody>
+            ${list.map(inv=>{ const pm=PAYMENT_META[inv.method]; return `<tr class="border-b border-border/60 hover:bg-accent/50">
+              <td class="px-4 py-3 font-mono text-xs">${inv.number}</td>
+              <td class="px-3 py-3">${escapeHtml(inv.contactName)}</td>
+              <td class="px-3 py-3 font-semibold">${formatCurrency(inv.amount)}</td>
+              <td class="px-3 py-3"><span class="badge ${pm.color} ${pm.bg}"><i data-lucide="${pm.icon}" class="w-3 h-3"></i>${pm.label}</span></td>
+              <td class="px-3 py-3">${invoiceStatusBadge(inv.status)}</td>
+              <td class="px-3 py-3 text-xs text-muted-foreground">${inv.issuedAt}</td>
+              <td class="px-3 py-3 text-xs text-muted-foreground">${inv.dueAt}</td>
+              <td class="px-3 py-3"><div class="flex gap-1">
+                <button onclick="openInvoiceDetail('${inv.id}')" class="btn h-8 w-8 p-0 border border-border hover:bg-accent" title="Lihat"><i data-lucide="Eye" class="w-3.5 h-3.5"></i></button>
+                ${inv.status!=="lunas"&&inv.status!=="dibatalkan"?`<button onclick="markInvoicePaid('${inv.id}')" class="btn h-8 w-8 p-0 border border-emerald-200 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40" title="Tandai Lunas"><i data-lucide="Check" class="w-3.5 h-3.5"></i></button>`:''}
+              </div></td>
+            </tr>`; }).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  refreshIcons();
+  const s=$("#fSearch"); if(s) s.oninput=e=>{ state.financeSearch=e.target.value; renderModule(); s.focus&&s.focus(); };
+  $("#fPeriod").onchange=e=>{ state.financePeriod=e.target.value; renderModule(); };
+  setTimeout(()=>{
+    const rc=$("#finRevChart"); if(rc){
+      new Chart(rc,{ type:"bar", data:{ labels:REVENUE_TREND.map(d=>d.label), datasets:[{ label:"Pendapatan", data:REVENUE_TREND.map(d=>d.value), backgroundColor:(ctx)=>{const c=ctx.chart.ctx; const g=c.createLinearGradient(0,0,0,240); g.addColorStop(0,"rgba(5,150,105,.9)"); g.addColorStop(1,"rgba(20,184,166,.5)"); return g;}, borderRadius:6, maxBarThickness:36 }] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{grid:{display:false}}, y:{grid:{color:"hsl(var(--border))"},ticks:{font:{size:11}}} } } });
+    }
+    const dc=$("#finDonut"); if(dc){
+      const counts = { lunas:state.invoices.filter(i=>i.status==="lunas").length, "belum-bayar":state.invoices.filter(i=>i.status==="belum-bayar").length, "jatuh-tempo":state.invoices.filter(i=>i.status==="jatuh-tempo").length, dibatalkan:state.invoices.filter(i=>i.status==="dibatalkan").length };
+      new Chart(dc,{ type:"doughnut", data:{ labels:["Lunas","Belum Bayar","Jatuh Tempo","Dibatalkan"], datasets:[{ data:[counts.lunas,counts["belum-bayar"],counts["jatuh-tempo"],counts.dibatalkan], backgroundColor:["#059669","#f59e0b","#f43f5e","#71717a"], borderWidth:2, borderColor:"hsl(var(--card))" }] }, options:{ responsive:true, maintainAspectRatio:false, cutout:"60%", plugins:{legend:{position:"bottom",labels:{font:{size:10},usePointStyle:true,pointStyle:"circle",padding:8}}} } });
+    }
+  },30);
+}
+function openInvoiceDialog(){ toast("Form buat invoice (demo)","info"); }
+function markInvoicePaid(id){ const inv=state.invoices.find(i=>i.id===id); if(inv){ inv.status="lunas"; inv.paidAt=new Date().toISOString().slice(0,10); toast("Invoice "+inv.number+" ditandai lunas","success"); renderModule(); } }
+function openInvoiceDetail(id){ const inv=state.invoices.find(i=>i.id===id); if(!inv) return; const pm=PAYMENT_META[inv.method]; const ppn = Math.round(inv.amount*0.11);
+  openModal({ title:inv.number, body:`
+    <div class="space-y-4">
+      <div class="flex items-center justify-between">${invoiceStatusBadge(inv.status)}<span class="badge ${pm.color} ${pm.bg}"><i data-lucide="${pm.icon}" class="w-3 h-3"></i>${pm.label}</span></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div class="p-3 rounded-md bg-muted/40"><p class="text-xs text-muted-foreground">Dari</p><p class="font-semibold">PropertiKu Agent</p><p class="text-xs text-muted-foreground">PT PropertiKu Sejahtera</p></div>
+        <div class="p-3 rounded-md bg-muted/40"><p class="text-xs text-muted-foreground">Kepada</p><p class="font-semibold">${escapeHtml(inv.contactName)}</p></div>
+      </div>
+      <div class="grid grid-cols-3 gap-2 text-xs">
+        <div class="p-2 rounded-md bg-muted/40"><p class="text-muted-foreground">Terbit</p><p class="font-medium">${inv.issuedAt}</p></div>
+        <div class="p-2 rounded-md bg-muted/40"><p class="text-muted-foreground">Jatuh Tempo</p><p class="font-medium">${inv.dueAt}</p></div>
+        <div class="p-2 rounded-md bg-muted/40"><p class="text-muted-foreground">Dibayar</p><p class="font-medium">${inv.paidAt||"-"}</p></div>
+      </div>
+      <table class="w-full text-sm border border-border rounded-md">
+        <thead class="bg-muted/40"><tr class="text-left text-xs text-muted-foreground"><th class="px-3 py-2">Deskripsi</th><th class="px-3 py-2 text-right">Jumlah</th></tr></thead>
+        <tbody><tr class="border-t border-border"><td class="px-3 py-2">Transaksi Properti (${inv.number})</td><td class="px-3 py-2 text-right">${formatFullCurrency(inv.amount)}</td></tr>
+        <tr class="border-t border-border"><td class="px-3 py-2">PPN 11%</td><td class="px-3 py-2 text-right">${formatFullCurrency(ppn)}</td></tr>
+        <tr class="border-t border-border font-bold"><td class="px-3 py-2">Total</td><td class="px-3 py-2 text-right text-emerald-600">${formatFullCurrency(inv.amount+ppn)}</td></tr></tbody>
+      </table>
+    </div>`, footer:`<button onclick="closeModal()" class="btn h-9 px-4 border border-border hover:bg-accent">Tutup</button>
+      ${inv.status!=="lunas"&&inv.status!=="dibatalkan"?`<button onclick="closeModal();markInvoicePaid('${inv.id}')" class="btn h-9 px-4 bg-emerald-600 text-white hover:bg-emerald-700"><i data-lucide="Check" class="w-4 h-4"></i>Tandai Lunas</button>`:''}
+      <button onclick="toast('Invoice dicetak','success');closeModal()" class="btn h-9 px-4 border border-border hover:bg-accent"><i data-lucide="Printer" class="w-4 h-4"></i>Cetak</button>` });
+}
+
+/* ============================ USERS (RBAC) ============================ */
+function renderUsers(c){
+  const total = state.users.length;
+  const active = state.users.filter(u=>u.status==="active").length;
+  const suspended = state.users.filter(u=>u.status==="suspended").length;
+  const t = state.usersSearch.toLowerCase();
+  let list = state.users.filter(u=>{
+    if(state.usersRole!=="all" && u.role!==state.usersRole) return false;
+    if(t && !(u.name.toLowerCase().includes(t) || u.email.toLowerCase().includes(t) || (u.phone||"").includes(t))) return false;
+    return true;
+  });
+  c.innerHTML = `
+    <div class="space-y-5 animate-fade-in">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg grid place-items-center bg-emerald-600 text-white"><i data-lucide="ShieldCheck" class="w-5 h-5"></i></div>
+          <div><h2 class="text-lg font-bold">Manajemen Pengguna</h2><p class="text-xs text-muted-foreground">Kelola akun & hak akses (RBAC)</p></div>
+        </div>
+        <button onclick="openUserDialog()" class="btn h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"><i data-lucide="UserPlus" class="w-4 h-4"></i>Tambah Pengguna</button>
+      </div>
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        ${[["Total Pengguna",total,"Users","emerald"],["Pengguna Aktif",active,"UserCheck","emerald"],["Suspended",suspended,"UserX","rose"],["Total Role",ROLES.length,"ShieldCheck","violet"]].map(([l,v,i,t])=>`
+        <div class="card p-4"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg grid place-items-center ${TONE_BG[t]}"><i data-lucide="${i}" class="w-4 h-4"></i></div><div><p class="text-xs text-muted-foreground">${l}</p><p class="text-xl font-bold">${v}</p></div></div></div>`).join("")}
+      </div>
+      <div>
+        <p class="text-sm font-semibold mb-3">Overview Role & Hak Akses</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          ${ROLES.map(r=>{
+            const t=ROLE_THEME[r.value];
+            const count = state.users.filter(u=>u.role===r.value).length;
+            const menus = menuForRole(r.value);
+            return `<div class="card p-5">
+              <div class="flex items-start justify-between"><div class="flex items-center gap-2"><span class="w-9 h-9 rounded-lg grid place-items-center ${t.bg} ${t.color} ring-1 ${t.ring} font-bold">${r.label.charAt(0)}</span><div><p class="font-semibold text-sm">${r.label}</p><p class="text-xs text-muted-foreground">${count} pengguna</p></div></div></div>
+              <p class="text-xs text-muted-foreground mt-3">${escapeHtml(r.description)}</p>
+              <div class="mt-3 flex flex-wrap gap-1">${menus.map(m=>`<span class="badge bg-secondary text-secondary-foreground"><i data-lucide="${m.icon}" class="w-3 h-3"></i>${m.label}</span>`).join("")}</div>
+            </div>`;
+          }).join("")}
+        </div>
+      </div>
+      <div class="card p-4">
+        <div class="flex flex-col md:flex-row gap-3">
+          <div class="relative flex-1"><i data-lucide="Search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"></i><input id="uSearch" value="${escapeHtml(state.usersSearch)}" placeholder="Cari nama, email, telepon…" class="w-full h-9 pl-9 pr-3 rounded-md border border-input bg-background text-sm" /></div>
+          <select id="uRole" class="h-9 rounded-md border border-input bg-background px-2 text-sm">
+            ${[["all","Semua Role"],...ROLES.map(r=>[r.value,r.label])].map(([k,l])=>`<option value="${k}" ${state.usersRole===k?'selected':''}>${l}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+      <div class="card overflow-x-auto scroll-thin">
+        <table class="w-full text-sm min-w-[900px]">
+          <thead class="border-b border-border bg-muted/40"><tr class="text-left text-xs text-muted-foreground">
+            <th class="px-4 py-3 font-medium">Nama</th><th class="px-3 py-3 font-medium">Email</th><th class="px-3 py-3 font-medium">Telepon</th><th class="px-3 py-3 font-medium">Role</th><th class="px-3 py-3 font-medium">Status</th><th class="px-3 py-3 font-medium">Dibuat</th><th class="px-3 py-3 font-medium">Login Terakhir</th><th class="px-3 py-3 font-medium">Aksi</th>
+          </tr></thead>
+          <tbody>
+            ${list.map(u=>{ const t=ROLE_THEME[u.role]; return `<tr class="border-b border-border/60 hover:bg-accent/50">
+              <td class="px-4 py-3"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-full grid place-items-center text-xs font-bold ring-1 ${t.bg} ${t.color} ${t.ring}">${initials(u.name)}</div><span class="font-medium">${escapeHtml(u.name)}</span></div></td>
+              <td class="px-3 py-3 text-muted-foreground">${escapeHtml(u.email)}</td>
+              <td class="px-3 py-3 text-muted-foreground">${u.phone||"-"}</td>
+              <td class="px-3 py-3">${roleBadge(u.role)}</td>
+              <td class="px-3 py-3"><span class="badge ${u.status==="active"?"text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40":"text-rose-700 bg-rose-50 dark:bg-rose-950/40"}">${u.status==="active"?"Aktif":"Suspended"}</span></td>
+              <td class="px-3 py-3 text-xs text-muted-foreground">${u.createdAt}</td>
+              <td class="px-3 py-3 text-xs text-muted-foreground">${u.lastLogin||"-"}</td>
+              <td class="px-3 py-3"><div class="flex gap-1">
+                <button onclick="toast('Edit pengguna ${escapeHtml(u.name)} (demo)','info')" class="btn h-8 w-8 p-0 border border-border hover:bg-accent" title="Edit"><i data-lucide="Pencil" class="w-3.5 h-3.5"></i></button>
+                <button onclick="toggleUserStatus('${u.id}')" class="btn h-8 w-8 p-0 border border-border hover:bg-accent" title="${u.status==="active"?"Suspend":"Aktifkan"}"><i data-lucide="${u.status==="active"?"Ban":"Check"}" class="w-3.5 h-3.5"></i></button>
+                <button onclick="deleteUser('${u.id}')" class="btn h-8 w-8 p-0 border border-rose-200 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40" title="Hapus"><i data-lucide="Trash2" class="w-3.5 h-3.5"></i></button>
+              </div></td>
+            </tr>`; }).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  refreshIcons();
+  const s=$("#uSearch"); if(s) s.oninput=e=>{ state.usersSearch=e.target.value; renderModule(); s.focus&&s.focus(); };
+  $("#uRole").onchange=e=>{ state.usersRole=e.target.value; renderModule(); };
+}
+function openUserDialog(){ toast("Form tambah pengguna (demo)","info"); }
+function toggleUserStatus(id){ const u=state.users.find(x=>x.id===id); if(u){ u.status = u.status==="active"?"suspended":"active"; toast(u.name+" "+(u.status==="active"?"diaktifkan":"disuspend"),u.status==="active"?"success":"warning"); renderModule(); } }
+function deleteUser(id){ const u=state.users.find(x=>x.id===id); if(!u) return; state.users=state.users.filter(x=>x.id!==id); toast("Pengguna "+u.name+" dihapus","success"); renderModule(); }
+
+/* ============================ SETTINGS ============================ */
+function renderSettings(c){
+  const role = state.user.role;
+  c.innerHTML = `
+    <div class="space-y-5 animate-fade-in">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg grid place-items-center bg-emerald-600 text-white"><i data-lucide="Settings" class="w-5 h-5"></i></div>
+        <div><h2 class="text-lg font-bold">Pengaturan</h2><p class="text-xs text-muted-foreground">Profil, integrasi & preferensi</p></div>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+        ${[["profil","User","Profil"],["integrasi","Plug","Integrasi WhatsApp"],["rbac","ShieldCheck","RBAC & Hak Akses"],["preferensi","SlidersHorizontal","Preferensi"]].map(([k,i,l])=>`<button onclick="state.settingsTab='${k}';renderModule()" class="btn h-11 px-3 text-sm font-medium gap-2 ${state.settingsTab===k?'bg-emerald-600 text-white':'bg-card border border-border hover:bg-accent'}"><i data-lucide="${i}" class="w-4 h-4"></i>${l}</button>`).join("")}
+      </div>
+      <div id="settingsBody"></div>
+    </div>`;
+  const sb=$("#settingsBody");
+  if(state.settingsTab==="profil") renderSettingsProfil(sb);
+  else if(state.settingsTab==="integrasi") renderSettingsIntegrasi(sb);
+  else if(state.settingsTab==="rbac") renderSettingsRBAC(sb);
+  else renderSettingsPreferensi(sb);
+}
+function renderSettingsProfil(host){
+  const t=ROLE_THEME[state.user.role];
+  host.innerHTML = `
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div class="card p-5 space-y-4">
+        <div class="text-center">
+          <div class="w-20 h-20 mx-auto rounded-full grid place-items-center text-2xl font-bold ring-2 ${t.bg} ${t.color} ${t.ring}">${initials(state.user.name)}</div>
+          <p class="font-semibold mt-2">${escapeHtml(state.user.name)}</p>
+          <p class="text-xs text-muted-foreground">${escapeHtml(state.user.email)}</p>
+          <div class="mt-2 flex justify-center gap-2">${roleBadge(state.user.role)}<span class="badge ${state.user.status==="active"?"text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40":"text-rose-700 bg-rose-50 dark:bg-rose-950/40"}">${state.user.status==="active"?"Aktif":"Suspended"}</span></div>
+          <button onclick="toast('Unggah foto (demo)','info')" class="btn h-8 px-4 mt-3 text-xs border border-border hover:bg-accent">Ganti Foto</button>
+        </div>
+      </div>
+      <div class="card p-5 lg:col-span-2 space-y-4">
+        <p class="font-semibold">Informasi Profil</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div><label class="text-xs font-medium">Nama Lengkap</label><input value="${escapeHtml(state.user.name)}" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm" /></div>
+          <div><label class="text-xs font-medium">Email</label><input value="${escapeHtml(state.user.email)}" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm" /></div>
+          <div><label class="text-xs font-medium">No. WhatsApp</label><input value="${escapeHtml(state.user.phone||"")}" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm" /></div>
+          <div><label class="text-xs font-medium">Role</label><input value="${ROLE_LABELS[state.user.role]}" disabled class="w-full h-9 mt-1 rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground" /></div>
+        </div>
+        <button onclick="toast('Profil disimpan','success')" class="btn h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"><i data-lucide="Save" class="w-4 h-4"></i>Simpan Perubahan</button>
+        <div class="pt-4 border-t border-border">
+          <p class="font-semibold mb-3">Ubah Password</p>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div><label class="text-xs font-medium">Password Saat Ini</label><input type="password" placeholder="••••••••" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm" /></div>
+            <div><label class="text-xs font-medium">Password Baru</label><input type="password" placeholder="min. 6 karakter" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm" /></div>
+            <div><label class="text-xs font-medium">Konfirmasi</label><input type="password" placeholder="ulangi" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm" /></div>
+          </div>
+          <button onclick="toast('Password diperbarui','success')" class="btn h-9 px-4 mt-3 border border-border hover:bg-accent text-sm font-medium">Update Password</button>
+        </div>
+      </div>
+    </div>`;
+  refreshIcons();
+}
+function renderSettingsIntegrasi(host){
+  host.innerHTML = `
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="card p-5 space-y-4">
+        <p class="font-semibold">Koneksi WhatsApp (Waha)</p>
+        <div><label class="text-xs font-medium">Waha API URL</label><input value="https://waha.propertiku.id/api" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm font-mono" /></div>
+        <div><label class="text-xs font-medium">API Key</label><div class="relative"><input type="password" value="waha-sk-xxxxxxxxxxxxxx" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 pr-10 text-sm font-mono" /><button onclick="const i=this.previousElementSibling;i.type=i.type==='password'?'text':'password'" class="absolute right-2 top-2.5 text-muted-foreground">👁️</button></div></div>
+        <div><label class="text-xs font-medium">Default Session Name</label><input value="agent-sales-1" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm" /></div>
+        <div class="flex gap-2">
+          <button onclick="const b=this;b.disabled=true;b.textContent='Menguji…';setTimeout(()=>{b.disabled=false;b.innerHTML='Test Koneksi';toast('Tersambung ke Waha API','success')},900)" class="btn h-9 px-4 border border-border hover:bg-accent text-sm font-medium">Test Koneksi</button>
+          <button onclick="toast('Konfigurasi disimpan','success')" class="btn h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"><i data-lucide="Save" class="w-4 h-4"></i>Simpan Konfigurasi</button>
+        </div>
+      </div>
+      <div class="card p-5">
+        <p class="font-semibold mb-3">Sesi WhatsApp Aktif</p>
+        <div class="space-y-2">
+          ${WA_SESSIONS.map(s=>{
+            const on=s.status==="connected";
+            return `<div class="flex items-center gap-3 p-3 rounded-md bg-muted/40">
+              <div class="relative"><div class="w-10 h-10 rounded-lg bg-emerald-600/10 grid place-items-center text-emerald-600"><i data-lucide="Smartphone" class="w-5 h-5"></i></div><span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-card ${on?'bg-emerald-500':'bg-zinc-400'}"></span></div>
+              <div class="min-w-0 flex-1"><p class="text-sm font-medium truncate">${escapeHtml(s.name)}</p><p class="text-xs text-muted-foreground">${s.phone}${on?` · ${s.battery}%`:''}</p></div>
+              <button onclick="toast('${on?'Scan QR (demo)':'Sesi offline'}','info')" class="btn h-8 px-3 text-xs border border-border hover:bg-accent ${on?'opacity-50':''}" ${on?'disabled':''}><i data-lucide="QrCode" class="w-3.5 h-3.5"></i>Scan QR</button>
+              <button onclick="toggleWASession('${s.id}')" class="btn h-8 px-3 text-xs ${on?'border-rose-200 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40':'border-emerald-200 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'}"><i data-lucide="${on?'Unplug':'Plug'}" class="w-3.5 h-3.5"></i>${on?'Putus':'Sambung'}</button>
+            </div>`;
+          }).join("")}
+        </div>
+      </div>
+    </div>`;
+  refreshIcons();
+}
+function toggleWASession(id){ const s=WA_SESSIONS.find(x=>x.id===id); if(s){ s.status = s.status==="connected"?"disconnected":"connected"; s.battery = s.status==="connected"?80:0; s.lastSeen = s.status==="connected"?"online":"baru saja"; toast(s.name+" "+(s.status==="connected"?"disambungkan":"diputus"),s.status==="connected"?"success":"warning"); renderModule(); } }
+function renderSettingsRBAC(host){
+  host.innerHTML = `
+    <div class="card p-5">
+      <div class="flex items-center gap-2 mb-4"><i data-lucide="Info" class="w-4 h-4 text-amber-600"></i><p class="text-xs text-muted-foreground">Matriks hak akses — centang hijau berarti role dapat mengakses menu tersebut.</p></div>
+      <div class="overflow-x-auto scroll-thin">
+        <table class="w-full text-sm min-w-[700px]">
+          <thead><tr class="border-b border-border">
+            <th class="px-3 py-3 text-left text-xs font-medium text-muted-foreground">Menu</th>
+            ${ROLES.map(r=>{ const t=ROLE_THEME[r.value]; return `<th class="px-3 py-3 text-center"><div class="inline-flex items-center gap-1.5"><span class="w-6 h-6 rounded-full grid place-items-center text-[10px] font-bold ring-1 ${t.bg} ${t.color} ${t.ring}">${r.label.charAt(0)}</span><span class="text-xs font-medium">${r.label}</span></div></th>`; }).join("")}
+          </tr></thead>
+          <tbody>
+            ${MENU_ITEMS.map(m=>`<tr class="border-b border-border/60">
+              <td class="px-3 py-3"><div class="flex items-center gap-2"><i data-lucide="${m.icon}" class="w-4 h-4 text-muted-foreground"></i><span class="font-medium">${m.label}</span></div></td>
+              ${ROLES.map(r=>{ const ok = canAccess(r.value, m.key); return `<td class="px-3 py-3 text-center"><div class="inline-flex w-7 h-7 rounded-md grid place-items-center ${ok?'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50':'bg-muted text-muted-foreground'}"><i data-lucide="${ok?'Check':'X'}" class="w-4 h-4"></i></div></td>`; }).join("")}
+            </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>
+      ${state.user.role!=="superadmin"?`<div class="mt-4 p-3 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 text-xs flex items-center gap-2"><i data-lucide="AlertTriangle" class="w-4 h-4"></i>Hanya Superadmin yang dapat mengubah hak akses.</div>`:''}
+    </div>`;
+  refreshIcons();
+}
+function renderSettingsPreferensi(host){
+  const items = [
+    { key:"theme", label:"Tema Gelap", desc:"Aktifkan mode gelap untuk kenyamanan mata", icon:"Moon", get:()=>state.theme==="dark", set:(v)=>{ state.theme=v?"dark":"light"; applyTheme(); persist(); renderModule(); } },
+    { key:"notifEmail", label:"Notifikasi Email", desc:"Terima email ringkasan harian", icon:"Mail", get:()=>state.prefs.notifEmail, set:(v)=>state.prefs.notifEmail=v },
+    { key:"notifPush", label:"Notifikasi Push", desc:"Notifikasi browser realtime", icon:"Bell", get:()=>state.prefs.notifPush, set:(v)=>state.prefs.notifPush=v },
+    { key:"aiAutoreply", label:"Auto-reply AI", desc:"Chatbot membalas otomatis pesan masuk", icon:"Bot", get:()=>state.prefs.aiAutoreply, set:(v)=>state.prefs.aiAutoreply=v },
+    { key:"sound", label:"Suara Notifikasi", desc:"Bunyi saat pesan baru masuk", icon:"Volume2", get:()=>state.prefs.sound, set:(v)=>state.prefs.sound=v },
+  ];
+  host.innerHTML = `
+    <div class="card p-5 space-y-3">
+      <p class="font-semibold">Preferensi Aplikasi</p>
+      ${items.map(it=>`
+        <div class="flex items-center gap-3 p-3 rounded-md bg-muted/30">
+          <div class="w-9 h-9 rounded-lg grid place-items-center bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600"><i data-lucide="${it.icon}" class="w-4 h-4"></i></div>
+          <div class="flex-1"><p class="text-sm font-medium">${it.label}</p><p class="text-xs text-muted-foreground">${it.desc}</p></div>
+          <button onclick='togglePref("${it.key}")' class="relative w-11 h-6 rounded-full transition-colors ${it.get()?'bg-emerald-600':'bg-muted-foreground/30'}">
+            <span class="absolute top-0.5 ${it.get()?'left-5':'left-0.5'} w-5 h-5 rounded-full bg-white transition-all shadow"></span>
+          </button>
+        </div>`).join("")}
+      <div class="pt-3 border-t border-border">
+        <label class="text-xs font-medium">Bahasa</label>
+        <select class="w-full h-9 mt-1 rounded-md border border-input bg-background px-2 text-sm" onchange="state.prefs.language=this.value;toast('Bahasa diubah','info')">
+          <option value="id" ${state.prefs.language==="id"?"selected":""}>Bahasa Indonesia</option>
+          <option value="en" ${state.prefs.language==="en"?"selected":""}>English</option>
+        </select>
+        <p class="text-[10px] text-muted-foreground mt-1">Pratinjau perubahan akan diterapkan setelah dimuat ulang.</p>
+      </div>
+      <button onclick="toast('Preferensi disimpan','success')" class="btn h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"><i data-lucide="Save" class="w-4 h-4"></i>Simpan Preferensi</button>
+    </div>`;
+  refreshIcons();
+}
+function togglePref(key){
+  const map = { theme:(v)=>{ state.theme=v?"dark":"light"; applyTheme(); }, notifEmail:v=>state.prefs.notifEmail=v, notifPush:v=>state.prefs.notifPush=v, aiAutoreply:v=>state.prefs.aiAutoreply=v, sound:v=>state.prefs.sound=v };
+  if(key==="theme"){ const nv = state.theme!=="dark"; state.theme = nv?"dark":"light"; applyTheme(); persist(); toast("Tema "+(nv?"gelap":"terang")+" aktif","info"); }
+  else { state.prefs[key] = !state.prefs[key]; toast(state.prefs[key]?"Aktif":"Nonaktif","info"); }
+  renderModule();
+}
+
+/* ============================ MODAL ============================ */
+function openModal({title, body, footer}){
+  const root = $("#modal-root");
+  root.innerHTML = `<div class="fixed inset-0 z-[90] flex items-center justify-center p-4 modal-backdrop" onclick="if(event.target===this)closeModal()">
+    <div class="card w-full max-w-lg max-h-[90vh] flex flex-col animate-fade-in">
+      <div class="flex items-center justify-between p-5 border-b border-border">
+        <h3 class="font-semibold text-lg">${escapeHtml(title)}</h3>
+        <button onclick="closeModal()" class="btn h-8 w-8 p-0 text-muted-foreground hover:bg-accent"><i data-lucide="X" class="w-4 h-4"></i></button>
+      </div>
+      <div class="flex-1 overflow-y-auto scroll-thin p-5">${body}</div>
+      ${footer?`<div class="flex flex-wrap gap-2 justify-end p-5 border-t border-border">${footer}</div>`:''}
+    </div>
+  </div>`;
+  refreshIcons();
+}
+function closeModal(){ $("#modal-root").innerHTML=""; }
+
+/* ============================ INIT ============================ */
+function init(){
+  loadPersisted();
+  applyTheme();
+  render();
+  // close dropdowns on Escape
+  document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ $$(".dropdown").forEach(d=>d.classList.add("hidden")); closeModal(); } });
+}
+window.addEventListener("DOMContentLoaded", init);
+
+// expose for inline handlers
+Object.assign(window, {
+  quickLogin, doLogout, toggleTheme, navigate, openSidebar, closeSidebar, toggleDropdown,
+  setChatFilter, setChatMobileList, selectContact, updateContactStage, addTag, removeTag, useAISuggestion, sendChatMessage,
+  gotoChat, openContactDialog, openContactDetail,
+  openPropDialog, openPropDetail,
+  openOrderDialog, openOrderDetail,
+  openInvoiceDialog, markInvoicePaid, openInvoiceDetail,
+  openUserDialog, toggleUserStatus, deleteUser,
+  toggleWASession, togglePref, useTemplate,
+  openModal, closeModal, toast, render, renderModule,
+});
+</script>
+</body>
+</html>

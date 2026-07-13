@@ -1,0 +1,302 @@
+     1→<!DOCTYPE html>
+     2→<html lang="id" class="">
+     3→<head>
+     4→<meta charset="UTF-8" />
+     5→<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+     6→<title>PropertiKu Agent — AI Asisten Properti (WhatsApp Waha)</title>
+     7→<script src="https://cdn.tailwindcss.com"></script>
+     8→<script>
+     9→  tailwind.config = {
+    10→    darkMode: 'class',
+    11→    theme: {
+    12→      extend: {
+    13→        colors: {
+    14→          border: 'hsl(var(--border))',
+    15→          input: 'hsl(var(--input))',
+    16→          ring: 'hsl(var(--ring))',
+    17→          background: 'hsl(var(--background))',
+    18→          foreground: 'hsl(var(--foreground))',
+    19→          primary: { DEFAULT: 'hsl(var(--primary))', foreground: 'hsl(var(--primary-foreground))' },
+    20→          secondary: { DEFAULT: 'hsl(var(--secondary))', foreground: 'hsl(var(--secondary-foreground))' },
+    21→          destructive: { DEFAULT: 'hsl(var(--destructive))', foreground: 'hsl(var(--destructive-foreground))' },
+    22→          muted: { DEFAULT: 'hsl(var(--muted))', foreground: 'hsl(var(--muted-foreground))' },
+    23→          accent: { DEFAULT: 'hsl(var(--accent))', foreground: 'hsl(var(--accent-foreground))' },
+    24→          popover: { DEFAULT: 'hsl(var(--popover))', foreground: 'hsl(var(--popover-foreground))' },
+    25→          card: { DEFAULT: 'hsl(var(--card))', foreground: 'hsl(var(--card-foreground))' },
+    26→          sidebar: { DEFAULT: 'hsl(var(--sidebar))', foreground: 'hsl(var(--sidebar-foreground))', accent: 'hsl(var(--sidebar-accent))', border: 'hsl(var(--sidebar-border))' },
+    27→        },
+    28→        borderRadius: {
+    29→          lg: 'var(--radius)',
+    30→          md: 'calc(var(--radius) - 2px)',
+    31→          sm: 'calc(var(--radius) - 4px)',
+    32→        },
+    33→        fontFamily: { sans: ['Inter','ui-sans-serif','system-ui','sans-serif'] },
+    34→        keyframes: {
+    35→          'fade-in': { from: { opacity: 0, transform: 'translateY(4px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
+    36→          'slide-in': { from: { transform: 'translateX(-100%)' }, to: { transform: 'translateX(0)' } },
+    37→          'pulse-dot': { '0%,100%': { opacity: 1 }, '50%': { opacity: .4 } },
+    38→        },
+    39→        animation: {
+    40→          'fade-in': 'fade-in .2s ease-out',
+    41→          'slide-in': 'slide-in .25s ease-out',
+    42→          'pulse-dot': 'pulse-dot 1.6s ease-in-out infinite',
+    43→        }
+    44→      }
+    45→    }
+    46→  }
+    47→</script>
+    48→<style>
+    49→  :root {
+    50→    --background: 0 0% 100%; --foreground: 222 22% 12%;
+    51→    --card: 0 0% 100%; --card-foreground: 222 22% 12%;
+    52→    --popover: 0 0% 100%; --popover-foreground: 222 22% 12%;
+    53→    --primary: 158 64% 40%; --primary-foreground: 0 0% 100%;
+    54→    --secondary: 160 20% 96%; --secondary-foreground: 222 22% 18%;
+    55→    --muted: 160 16% 95%; --muted-foreground: 215 14% 45%;
+    56→    --accent: 160 20% 95%; --accent-foreground: 222 22% 18%;
+    57→    --destructive: 0 84% 60%; --destructive-foreground: 0 0% 100%;
+    58→    --border: 214 20% 90%; --input: 214 20% 90%; --ring: 158 64% 40%;
+    59→    --sidebar: 152 30% 97%; --sidebar-foreground: 222 22% 18%; --sidebar-accent: 152 30% 92%; --sidebar-border: 214 20% 88%;
+    60→    --radius: 0.6rem;
+    61→  }
+    62→  .dark {
+    63→    --background: 222 24% 8%; --foreground: 210 20% 92%;
+    64→    --card: 222 22% 11%; --card-foreground: 210 20% 92%;
+    65→    --popover: 222 22% 11%; --popover-foreground: 210 20% 92%;
+    66→    --primary: 158 64% 42%; --primary-foreground: 0 0% 100%;
+    67→    --secondary: 222 18% 16%; --secondary-foreground: 210 20% 92%;
+    68→    --muted: 222 18% 16%; --muted-foreground: 215 14% 60%;
+    69→    --accent: 222 18% 18%; --accent-foreground: 210 20% 92%;
+    70→    --destructive: 0 72% 52%; --destructive-foreground: 0 0% 98%;
+    71→    --border: 222 14% 20%; --input: 222 14% 22%; --ring: 158 64% 45%;
+    72→    --sidebar: 222 26% 7%; --sidebar-foreground: 210 20% 88%; --sidebar-accent: 222 18% 14%; --sidebar-border: 222 14% 18%;
+    73→  }
+    74→  * { -webkit-tap-highlight-color: transparent; }
+    75→  html, body { height: 100%; }
+    76→  body { background: hsl(var(--background)); color: hsl(var(--foreground)); font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    77→  ::-webkit-scrollbar { width: 8px; height: 8px; }
+    78→  ::-webkit-scrollbar-track { background: transparent; }
+    79→  ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 8px; }
+    80→  ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / .5); }
+    81→  .scroll-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+    82→  .scroll-thin::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / .35); border-radius: 6px; }
+    83→  .lucide { stroke-width: 2; }
+    84→  [data-lucide] { display: inline-block; vertical-align: middle; }
+    85→  .chat-bg { background-image: radial-gradient(hsl(var(--muted-foreground) / .12) 1px, transparent 1px); background-size: 22px 22px; }
+    86→  input, textarea, select, button { font: inherit; }
+    87→  input:focus, textarea:focus, select:focus { outline: none; box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring) / .5); }
+    88→  .btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; font-weight: 500; border-radius: var(--radius); transition: all .15s; cursor: pointer; white-space: nowrap; }
+    89→  .btn:disabled { opacity: .5; cursor: not-allowed; }
+    90→  .card { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: var(--radius); }
+    91→  .badge { display: inline-flex; align-items: center; gap: .25rem; padding: .125rem .5rem; border-radius: 9999px; font-size: 11px; font-weight: 600; line-height: 1.2; }
+    92→  .modal-backdrop { background: rgba(0,0,0,.55); backdrop-filter: blur(2px); }
+    93→  .toast-in { animation: toastIn .25s ease-out; }
+    94→  @keyframes toastIn { from { opacity: 0; transform: translateY(12px) scale(.97);} to { opacity:1; transform: translateY(0) scale(1);} }
+    95→  .truncate-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    96→  details > summary { list-style: none; }
+    97→  details > summary::-webkit-details-marker { display: none; }
+    98→</style>
+    99→<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+   100→<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+   101→</head>
+   102→<body>
+   103→<div id="app"></div>
+   104→<div id="toast-container" class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 max-w-sm"></div>
+   105→<div id="modal-root"></div>
+   106→
+   107→<script>
+   108→/* =========================================================================
+   109→   PropertiKu Agent — Self-contained HTML build (Task H1)
+   110→   Mirrors the Next.js app: RBAC, 9 modules, auth, dark mode, charts.
+   111→   ========================================================================= */
+   112→
+   113→/* ============================ MOCK DATA ============================ */
+   114→const DEMO_ACCOUNTS = [
+   115→  { email: "superadmin@propertiku.id", password: "demo1234", role: "superadmin", name: "Andi Pratama" },
+   116→  { email: "admin@propertiku.id",      password: "demo1234", role: "admin",      name: "Budi Santoso" },
+   117→  { email: "operator@propertiku.id",   password: "demo1234", role: "operator",   name: "Citra Lestari" },
+   118→  { email: "manager@propertiku.id",    password: "demo1234", role: "manager",    name: "Dewi Anggraini" },
+   119→  { email: "marketing@propertiku.id",  password: "demo1234", role: "marketing",  name: "Eka Wijaya" },
+   120→  { email: "keuangan@propertiku.id",   password: "demo1234", role: "keuangan",   name: "Fajar Nugroho" },
+   121→];
+   122→
+   123→const ALL_USERS = [
+   124→  { id:"u1", name:"Andi Pratama",  email:"superadmin@propertiku.id", phone:"0812-1111-0001", role:"superadmin", status:"active",    createdAt:"2024-01-05", lastLogin:"2025-01-15 08:30" },
+   125→  { id:"u2", name:"Budi Santoso",  email:"admin@propertiku.id",      phone:"0812-1111-0002", role:"admin",     status:"active",    createdAt:"2024-02-10", lastLogin:"2025-01-15 07:45" },
+   126→  { id:"u3", name:"Citra Lestari", email:"operator@propertiku.id",   phone:"0812-1111-0003", role:"operator",  status:"active",    createdAt:"2024-03-12", lastLogin:"2025-01-14 16:20" },
+   127→  { id:"u4", name:"Dewi Anggraini",email:"manager@propertiku.id",    phone:"0812-1111-0004", role:"manager",   status:"active",    createdAt:"2024-01-20", lastLogin:"2025-01-15 09:10" },
+   128→  { id:"u5", name:"Eka Wijaya",    email:"marketing@propertiku.id",  phone:"0812-1111-0005", role:"marketing", status:"active",    createdAt:"2024-04-01", lastLogin:"2025-01-14 18:00" },
+   129→  { id:"u6", name:"Fajar Nugroho", email:"keuangan@propertiku.id",   phone:"0812-1111-0006", role:"keuangan",  status:"active",    createdAt:"2024-02-15", lastLogin:"2025-01-15 06:30" },
+   130→  { id:"u7", name:"Gita Permata",  email:"gita@propertiku.id",       phone:"0812-1111-0007", role:"operator",  status:"active",    createdAt:"2024-05-08", lastLogin:"2025-01-13 14:00" },
+   131→  { id:"u8", name:"Hadi Kusuma",   email:"hadi@propertiku.id",       phone:"0812-1111-0008", role:"marketing", status:"suspended", createdAt:"2024-06-01", lastLogin:"2025-01-02 11:25" },
+   132→  { id:"u9", name:"Indah Sari",    email:"indah@propertiku.id",      phone:"0812-1111-0009", role:"operator",  status:"active",    createdAt:"2024-07-19", lastLogin:"2025-01-14 20:15" },
+   133→];
+   134→
+   135→const WA_SESSIONS = [
+   136→  { id:"s1", name:"Agent Sales 1",  phone:"6281234567001", status:"connected",    battery:82, lastSeen:"online" },
+   137→  { id:"s2", name:"Agent CS",       phone:"6281234567002", status:"connected",    battery:64, lastSeen:"online" },
+   138→  { id:"s3", name:"Broadcast Resmi",phone:"6281234567003", status:"disconnected", battery:0,  lastSeen:"2 jam lalu" },
+   139→];
+   140→
+   141→const CONTACTS = [
+   142→  { id:"c1", name:"Rina Marlina",   phone:"6285212345001", tags:["VIP","Cash"],     lastMessage:"Bisa kirim detail rumah di Bandung?", lastMessageAt:"10:24",        unread:2, stage:"prospect",    assignedTo:"Citra Lestari", propertyInterest:"Rumah Cibaduyut" },
+   143→  { id:"c2", name:"Joko Susilo",    phone:"6285212345002", tags:["KPR"],            lastMessage:"Terima kasih infonya",                lastMessageAt:"09:50",        unread:0, stage:"negotiation",  assignedTo:"Gita Permata",  propertyInterest:"Apartemen Dago" },
+   144→  { id:"c3", name:"Siti Aminah",    phone:"6285212345003", tags:["Investor"],       lastMessage:"Berapa DP ruko ini?",                 lastMessageAt:"Kemarin",      unread:5, stage:"lead",         assignedTo:"Citra Lestari", propertyInterest:"Ruko Setiabudi" },
+   145→  { id:"c4", name:"Agus Setiawan",  phone:"6285212345004", tags:["Cash"],           lastMessage:"Saya minat tanahnya",                 lastMessageAt:"Kemarin",      unread:0, stage:"customer",     assignedTo:"Gita Permata",  propertyInterest:"Tanah Padalarang" },
+   146→  { id:"c5", name:"Maya Putri",     phone:"6285212345005", tags:["KPR","VIP"],      lastMessage:"Jadwal survey kapan?",                lastMessageAt:"2 hari lalu",  unread:0, stage:"prospect",     assignedTo:"Indah Sari",    propertyInterest:"Rumah Lembang" },
+   147→  { id:"c6", name:"Bayu Prakoso",   phone:"6285212345006", tags:["Sewa"],           lastMessage:"Apakah bisa nego harga sewa?",        lastMessageAt:"2 hari lalu",  unread:1, stage:"negotiation",  assignedTo:"Indah Sari",    propertyInterest:"Apartemen Ciumbuleuit" },
+   148→  { id:"c7", name:"Lia Ramadhani",  phone:"6285212345007", tags:["Investor"],       lastMessage:"Ada listing gudang baru?",            lastMessageAt:"3 hari lalu",  unread:0, stage:"lead",         assignedTo:"Citra Lestari", propertyInterest:"Gudang Cimahi" },
+   149→  { id:"c8", name:"Tono Wibowo",    phone:"6285212345008", tags:["KPR"],            lastMessage:"Sudah saya kirim berkas KPR",         lastMessageAt:"4 hari lalu",  unread:0, stage:"customer",     assignedTo:"Gita Permata",  propertyInterest:"Rumah Cibaduyut" },
+   150→  { id:"c9", name:"Dewi Saraswati", phone:"6285212345009", tags:["Cash","VIP"],     lastMessage:"Mau kunjungi besok sore",             lastMessageAt:"5 hari lalu",  unread:0, stage:"prospect",     assignedTo:"Indah Sari",    propertyInterest:"Rumah Lembang" },
+   151→  { id:"c10",name:"Rudi Hartono",   phone:"6285212345010", tags:["Sewa"],           lastMessage:"Boleh lihat foto rukonya?",           lastMessageAt:"1 minggu lalu",unread:0, stage:"lead",         assignedTo:"Citra Lestari", propertyInterest:"Ruko Setiabudi" },
+   152→];
+   153→
+   154→const CHAT_MESSAGES = [
+   155→  { id:"m1",  contactId:"c1", direction:"in",  text:"Halo, saya lihat iklan rumah di Cibaduyut. Masih tersedia?", status:"read",      timestamp:"10:20",          isAI:false },
+   156→  { id:"m2",  contactId:"c1", direction:"out", text:"Halo Bu Rina! Ya, rumah Cibaduyut masih tersedia. Luas tanah 120m², luas bangunan 90m², harga Rp 850 juta. Saya kirimkan detail & fotonya ya 🏡", status:"read", timestamp:"10:21", isAI:true },
+   157→  { id:"m3",  contactId:"c1", direction:"in",  text:"Bisa kirim detail rumah di Bandung?", status:"read",      timestamp:"10:24",          isAI:false },
+   158→  { id:"m4",  contactId:"c1", direction:"in",  text:"Dan foto-fotonya juga dong",          status:"delivered", timestamp:"10:24",          isAI:false },
+   159→  { id:"m5",  contactId:"c3", direction:"in",  text:"Berapa DP ruko ini?",                 status:"read",      timestamp:"Kemarin 14:10",  isAI:false },
+   160→  { id:"m6",  contactId:"c3", direction:"out", text:"Untuk ruko Setiabudi, DP 20% dari harga Rp 2,5 M. Bisa dicicil DP 3x. Mau saya buatkan simulasi cicilannya, Bu Siti?", status:"read", timestamp:"Kemarin 14:12", isAI:true },
+   161→  { id:"m7",  contactId:"c3", direction:"in",  text:"Boleh, kirim simulasinya",            status:"read",      timestamp:"Kemarin 14:15",  isAI:false },
+   162→  { id:"m8",  contactId:"c3", direction:"in",  text:"Dan info lokasi pastinya",            status:"delivered", timestamp:"Kemarin 14:15",  isAI:false },
+   163→  { id:"m9",  contactId:"c3", direction:"in",  text:"Saya juga mau tanya kelengkapan surat",status:"delivered",timestamp:"Kemarin 14:16",  isAI:false },
+   164→  { id:"m10", contactId:"c3", direction:"in",  text:"Apakah SHM sudah lengkap?",           status:"delivered", timestamp:"Kemarin 14:16",  isAI:false },
+   165→  { id:"m11", contactId:"c3", direction:"in",  text:"Berapa estimasi waktu closing?",      status:"delivered", timestamp:"Kemarin 14:17",  isAI:false },
+   166→];
+   167→
+   168→const PROPERTIES = [
+   169→  { id:"p1", title:"Rumah Modern Cibaduyut",        type:"rumah",     price:850000000,  location:"Cibaduyut, Bandung",      bedrooms:3, bathrooms:2, area:120, status:"tersedia", agent:"Citra Lestari", createdAt:"2024-12-01", image:"https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800" },
+   170→  { id:"p2", title:"Apartemen Mewah Dago",          type:"apartemen", price:1200000000, location:"Dago, Bandung",           bedrooms:2, bathrooms:2, area:75,  status:"tersedia", agent:"Gita Permata",  createdAt:"2024-12-05", image:"https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800" },
+   171→  { id:"p3", title:"Ruko Strategis Setiabudi",      type:"ruko",      price:2500000000, location:"Setiabudi, Bandung",      area:200, status:"tersedia", agent:"Citra Lestari", createdAt:"2024-11-20", image:"https://images.unsplash.com/photo-1582407947304-fd86f028f716?w=800" },
+   172→  { id:"p4", title:"Tanah Kavling Padalarang",      type:"tanah",     price:450000000,  location:"Padalarang, Bandung Barat",area:300, status:"terjual",  agent:"Gita Permata",  createdAt:"2024-10-15", image:"https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=800" },
+   173→  { id:"p5", title:"Rumah Nyaman Lembang",          type:"rumah",     price:1500000000, location:"Lembang, Bandung",        bedrooms:4, bathrooms:3, area:180, status:"tersedia", agent:"Indah Sari",    createdAt:"2024-12-10", image:"https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800" },
+   174→  { id:"p6", title:"Gudang Industri Cimahi",        type:"gudang",    price:1800000000, location:"Cimahi",                  area:500, status:"tersewa",  agent:"Citra Lestari", createdAt:"2024-09-30", image:"https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800" },
+   175→  { id:"p7", title:"Apartemen City View Ciumbuleuit",type:"apartemen",price:950000000,  location:"Ciumbuleuit, Bandung",    bedrooms:1, bathrooms:1, area:45,  status:"tersedia", agent:"Indah Sari",    createdAt:"2024-12-18", image:"https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800" },
+   176→  { id:"p8", title:"Rumah Minimalis Cibaduyut 2",   type:"rumah",     price:720000000,  location:"Cibaduyut, Bandung",      bedrooms:2, bathrooms:1, area:90,  status:"tersedia", agent:"Gita Permata",  createdAt:"2024-12-22", image:"https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=800" },
+   177→];
+   178→
+   179→const ORDERS = [
+   180→  { id:"o1", code:"ORD-2025-0001", contactId:"c4", contactName:"Agus Setiawan", propertyId:"p4", propertyTitle:"Tanah Kavling Padalarang",        type:"jual", amount:450000000,  status:"deal",       agent:"Gita Permata",  createdAt:"2024-12-20", updatedAt:"2025-01-05" },
+   181→  { id:"o2", code:"ORD-2025-0002", contactId:"c2", contactName:"Joko Susilo",   propertyId:"p2", propertyTitle:"Apartemen Mewah Dago",            type:"jual", amount:1200000000, status:"negosiasi",  agent:"Gita Permata",  createdAt:"2025-01-02", updatedAt:"2025-01-12" },
+   182→  { id:"o3", code:"ORD-2025-0003", contactId:"c8", contactName:"Tono Wibowo",   propertyId:"p1", propertyTitle:"Rumah Modern Cibaduyut",          type:"jual", amount:850000000,  status:"diproses",   agent:"Gita Permata",  createdAt:"2025-01-08", updatedAt:"2025-01-13" },
+   183→  { id:"o4", code:"ORD-2025-0004", contactId:"c6", contactName:"Bayu Prakoso",  propertyId:"p7", propertyTitle:"Apartemen City View Ciumbuleuit", type:"sewa", amount:36000000,   status:"negosiasi",  agent:"Indah Sari",    createdAt:"2025-01-10", updatedAt:"2025-01-14" },
+   184→  { id:"o5", code:"ORD-2025-0005", contactId:"c3", contactName:"Siti Aminah",   propertyId:"p3", propertyTitle:"Ruko Strategis Setiabudi",        type:"jual", amount:2500000000, status:"baru",       agent:"Citra Lestari", createdAt:"2025-01-13", updatedAt:"2025-01-14" },
+   185→  { id:"o6", code:"ORD-2025-0006", contactId:"c5", contactName:"Maya Putri",    propertyId:"p5", propertyTitle:"Rumah Nyaman Lembang",            type:"jual", amount:1500000000, status:"diproses",   agent:"Indah Sari",    createdAt:"2025-01-11", updatedAt:"2025-01-14" },
+   186→  { id:"o7", code:"ORD-2024-0098", contactId:"c1", contactName:"Rina Marlina",  propertyId:"p8", propertyTitle:"Rumah Minimalis Cibaduyut 2",     type:"jual", amount:720000000,  status:"gagal",      agent:"Citra Lestari", createdAt:"2024-11-15", updatedAt:"2024-12-01" },
+   187→  { id:"o8", code:"ORD-2024-0095", contactId:"c4", contactName:"Agus Setiawan", propertyId:"p6", propertyTitle:"Gudang Industri Cimahi",          type:"sewa", amount:120000000,  status:"deal",       agent:"Citra Lestari", createdAt:"2024-10-20", updatedAt:"2024-11-10" },
+   188→];
+   189→
+   190→const CAMPAIGNS = [
+   191→  { id:"cmp1", name:"Promo Rumah Cibaduyut Januari",    channel:"whatsapp", status:"aktif",       audience:320,  sent:320,  delivered:305, read:248, replied:42, createdAt:"2025-01-10", message:"🏠 Promo Awal Tahun! Rumah Cibaduyut 3KT hanya Rp 850jt. DP ringan, KPR approval cepat. Reply INFO untuk detail." },
+   192→  { id:"cmp2", name:"Broadcast Listing Baru Lembang",   channel:"whatsapp", status:"selesai",     audience:180,  sent:180,  delivered:178, read:156, replied:28, createdAt:"2025-01-05", message:"✨ Listing Baru! Rumah Nyaman Lembang 4KT, view pegunungan. Rp 1,5 M. Hubungi kami untuk survey." },
+   193→  { id:"cmp3", name:"Reminder DP Apartemen Dago",       channel:"whatsapp", status:"dijadwalkan", audience:45,   sent:0,    delivered:0,   read:0,   replied:0,  scheduledAt:"2025-01-18 09:00", createdAt:"2025-01-14", message:"Pengingat: Pembayaran DP Apartemen Dago jatuh tempo 20 Januari. Mohon segera dilunasi ya 🙏" },
+   194→  { id:"cmp4", name:"Investasi Ruko Setiabudi",         channel:"whatsapp", status:"draft",       audience:95,   sent:0,    delivered:0,   read:0,   replied:0,  createdAt:"2025-01-13", message:"🏪 Peluang Investasi Ruko Setiabudi. Lokasi strategis, harga Rp 2,5 M. ROI tinggi. Konsultasi gratis!" },
+   195→  { id:"cmp5", name:"Newsletter Properti Q4",           channel:"email",    status:"selesai",     audience:1240, sent:1240, delivered:1198, read:642, replied:18, createdAt:"2024-12-28", message:"Ringkasan properti terbaik Q4 2024. Lihat penawaran eksklusif untuk pelanggan setia." },
+   196→  { id:"cmp6", name:"Flash Sale Tanah Padalarang",      channel:"whatsapp", status:"gagal",       audience:210,  sent:0,    delivered:0,   read:0,   replied:0,  createdAt:"2025-01-08", message:"Flash Sale! Tanah Padalarang 300m². Harga spesial terbatas." },
+   197→];
+   198→
+   199→const MESSAGE_TEMPLATES = [
+   200→  { id:"t1", name:"Sapaan Awal",          category:"Opening",   body:"Halo {nama}, terima kasih sudah menghubungi PropertiKu. Ada yang bisa saya bantu terkait kebutuhan properti Anda? 🏡", createdAt:"2024-12-01" },
+   201→  { id:"t2", name:"Kirim Detail Properti",category:"Listing",   body:"Berikut detail properti yang Bap/Ibu tanyakan:\n\n🏠 {nama_properti}\n📍 Lokasi: {lokasi}\n💰 Harga: {harga}\n📐 Luas: {luas}\n\nMau dijadwalkan survey?", createdAt:"2024-12-02" },
+   202→  { id:"t3", name:"Simulasi KPR",         category:"Financing", body:"Simulasi KPR {nama_properti}:\n- DP 20%: {dp}\n- Tenor 15 thn: cicilan ± {cicilan}/bln\n- Tenor 20 thn: cicilan ± {cicilan2}/bln\n\nBerminat lanjutkan prosesnya?", createdAt:"2024-12-03" },
+   203→  { id:"t4", name:"Follow Up Negosiasi",  category:"Follow Up", body:"Halo {nama}, menindaklanjuti obrolan kita soal {nama_properti}. Apakah ada keputusan yang sudah diambil? Saya siap membantu negosiasi terbaik 🙏", createdAt:"2024-12-04" },
+   204→  { id:"t5", name:"Reminder DP",          category:"Financing", body:"Pengingat: Pembayaran DP {nama_properti} akan jatuh tempo pada {tanggal}. Mohon segera dilunasi ya 🙏", createdAt:"2024-12-05" },
+   205→  { id:"t6", name:"Terima Kasih Closing", category:"Closing",   body:"Selamat dan terima kasih {nama} telah mempercayakan transaksi properti Anda kepada kami. Semoga {nama_properti} membawa keberkahan 🎉", createdAt:"2024-12-06" },
+   206→];
+   207→
+   208→const INVOICES = [
+   209→  { id:"inv1", number:"INV-2025-0001", orderId:"o1", contactName:"Agus Setiawan", amount:450000000, status:"lunas",       method:"transfer", issuedAt:"2024-12-20", dueAt:"2025-01-05", paidAt:"2025-01-04" },
+   210→  { id:"inv2", number:"INV-2025-0002", orderId:"o3", contactName:"Tono Wibowo",   amount:85000000,  status:"belum-bayar", method:"cicilan",  issuedAt:"2025-01-08", dueAt:"2025-01-23" },
+   211→  { id:"inv3", number:"INV-2025-0003", orderId:"o4", contactName:"Bayu Prakoso",  amount:36000000,  status:"belum-bayar", method:"transfer", issuedAt:"2025-01-10", dueAt:"2025-01-25" },
+   212→  { id:"inv4", number:"INV-2025-0004", orderId:"o6", contactName:"Maya Putri",    amount:150000000, status:"belum-bayar", method:"cicilan",  issuedAt:"2025-01-11", dueAt:"2025-01-26" },
+   213→  { id:"inv5", number:"INV-2024-0098", orderId:"o8", contactName:"Agus Setiawan", amount:120000000, status:"lunas",       method:"transfer", issuedAt:"2024-10-20", dueAt:"2024-11-10", paidAt:"2024-11-08" },
+   214→  { id:"inv6", number:"INV-2025-0005", orderId:"o2", contactName:"Joko Susilo",   amount:120000000, status:"jatuh-tempo", method:"transfer", issuedAt:"2025-01-02", dueAt:"2025-01-12" },
+   215→  { id:"inv7", number:"INV-2025-0006", orderId:"o5", contactName:"Siti Aminah",   amount:250000000, status:"belum-bayar", method:"transfer", issuedAt:"2025-01-13", dueAt:"2025-01-28" },
+   216→];
+   217→
+   218→const REVENUE_TREND = [
+   219→  { label:"Jul", value:420, value2:280 },
+   220→  { label:"Agu", value:510, value2:320 },
+   221→  { label:"Sep", value:480, value2:360 },
+   222→  { label:"Okt", value:620, value2:410 },
+   223→  { label:"Nov", value:580, value2:390 },
+   224→  { label:"Des", value:720, value2:480 },
+   225→  { label:"Jan", value:645, value2:430 },
+   226→];
+   227→
+   228→const LEAD_SOURCE = [
+   229→  { label:"WhatsApp", value:42 },
+   230→  { label:"Website",  value:23 },
+   231→  { label:"Referensi",value:18 },
+   232→  { label:"Iklan",    value:12 },
+   233→  { label:"Lainnya",  value:5 },
+   234→];
+   235→
+   236→const FUNNEL_DATA = [
+   237→  { label:"Lead Masuk", value:420 },
+   238→  { label:"Prospek",    value:240 },
+   239→  { label:"Negosiasi",  value:110 },
+   240→  { label:"Deal",       value:48 },
+   241→];
+   242→
+   243→function formatCurrency(n){
+   244→  if(n>=1e9) return "Rp "+(n/1e9).toFixed(1).replace(".",",")+" M";
+   245→  if(n>=1e6) return "Rp "+(n/1e6).toFixed(0)+" jt";
+   246→  if(n>=1e3) return "Rp "+(n/1e3).toFixed(0)+" rb";
+   247→  return "Rp "+n;
+   248→}
+   249→function formatFullCurrency(n){ return "Rp "+n.toLocaleString("id-ID"); }
+   250→
+   251→/* ============================ RBAC ============================ */
+   252→const ROLES = [
+   253→  { value:"superadmin", label:"Superadmin", description:"Akses penuh seluruh sistem & pengaturan" },
+   254→  { value:"admin",      label:"Admin",      description:"Manajemen operasional & pengguna" },
+   255→  { value:"operator",   label:"Operator",   description:"Chatbot, kontak, dan order harian" },
+   256→  { value:"manager",    label:"Manager",    description:"Pantau laporan & performa tim" },
+   257→  { value:"marketing",  label:"Marketing",  description:"Kampanye, broadcast, dan konten" },
+   258→  { value:"keuangan",   label:"Keuangan",   description:"Faktur, pembayaran, dan pendapatan" },
+   259→];
+   260→const ROLE_LABELS = { superadmin:"Superadmin", admin:"Admin", operator:"Operator", manager:"Manager", marketing:"Marketing", keuangan:"Keuangan" };
+   261→const MENU_ITEMS = [
+   262→  { key:"overview",  label:"Dashboard",         icon:"LayoutDashboard", roles:["superadmin","admin","operator","manager","marketing","keuangan"] },
+   263→  { key:"chatbot",   label:"Chatbot WhatsApp",  icon:"MessageCircle",   roles:["superadmin","admin","operator","marketing"] },
+   264→  { key:"contacts",  label:"Kontak & Leads",    icon:"Users",           roles:["superadmin","admin","operator","manager","marketing"] },
+   265→  { key:"properties",label:"Properti",          icon:"Building2",       roles:["superadmin","admin","operator","manager","marketing"] },
+   266→  { key:"orders",    label:"Order",             icon:"ShoppingBag",     roles:["superadmin","admin","operator","manager","keuangan"] },
+   267→  { key:"marketing", label:"Marketing",         icon:"Megaphone",       roles:["superadmin","admin","manager","marketing"] },
+   268→  { key:"finance",   label:"Keuangan",          icon:"Wallet",          roles:["superadmin","admin","manager","keuangan"] },
+   269→  { key:"users",     label:"Manajemen Pengguna",icon:"ShieldCheck",     roles:["superadmin","admin"] },
+   270→  { key:"settings",  label:"Pengaturan",        icon:"Settings",        roles:["superadmin","admin","operator","manager","marketing","keuangan"] },
+   271→];
+   272→const ROLE_THEME = {
+   273→  superadmin:{ color:"text-rose-600",    bg:"bg-rose-50 dark:bg-rose-950/40",    ring:"ring-rose-200 dark:ring-rose-900",    dot:"bg-rose-500"    },
+   274→  admin:     { color:"text-emerald-600", bg:"bg-emerald-50 dark:bg-emerald-950/40",ring:"ring-emerald-200 dark:ring-emerald-900",dot:"bg-emerald-500" },
+   275→  operator:  { color:"text-amber-600",   bg:"bg-amber-50 dark:bg-amber-950/40",  ring:"ring-amber-200 dark:ring-amber-900",  dot:"bg-amber-500"   },
+   276→  manager:   { color:"text-violet-600",  bg:"bg-violet-50 dark:bg-violet-950/40",ring:"ring-violet-200 dark:ring-violet-900",dot:"bg-violet-500"  },
+   277→  marketing: { color:"text-pink-600",    bg:"bg-pink-50 dark:bg-pink-950/40",    ring:"ring-pink-200 dark:ring-pink-900",    dot:"bg-pink-500"    },
+   278→  keuangan:  { color:"text-teal-600",    bg:"bg-teal-50 dark:bg-teal-950/40",    ring:"ring-teal-200 dark:ring-teal-900",    dot:"bg-teal-500"    },
+   279→};
+   280→const VIEW_TITLES = {
+   281→  overview:  { title:"Dashboard",          desc:"Ringkasan performa penjualan & chatbot" },
+   282→  chatbot:   { title:"Chatbot WhatsApp",   desc:"Kelola percakapan & sesi Waha" },
+   283→  contacts:  { title:"Kontak & Leads",     desc:"CRM pipeline calon pembeli" },
+   284→  properties:{ title:"Daftar Properti",    desc:"Katalog listing properti" },
+   285→  orders:    { title:"Manajemen Order",    desc:"Transaksi jual & sewa properti" },
+   286→  marketing: { title:"Marketing",          desc:"Kampanye, template & broadcast WhatsApp" },
+   287→  finance:   { title:"Keuangan",           desc:"Faktur, pembayaran & pendapatan" },
+   288→  users:     { title:"Manajemen Pengguna", desc:"Kelola akun & hak akses (RBAC)" },
+   289→  settings:  { title:"Pengaturan",         desc:"Profil, integrasi & preferensi" },
+   290→};
+   291→function menuForRole(role){ return MENU_ITEMS.filter(m=>m.roles.includes(role)); }
+   292→function canAccess(role,view){ const m = MENU_ITEMS.find(x=>x.key===view); return m ? m.roles.includes(role) : false; }
+   293→
+   294→/* ============================ STATE ============================ */
+   295→const STORAGE_KEY = "propertiku-agent-ui-html";
+   296→const state = {
+   297→  user: null,
+   298→  authView: "login",          // login | register | forgot
+   299→  forgotSent: false,
+   300→  activeView: "overview",
+
+[showing lines 1-300 of 2028; use offset=301 with limit to continue reading]

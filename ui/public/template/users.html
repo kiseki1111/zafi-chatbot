@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="id" class="">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Manajemen Pengguna — PropertiKu Agent</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="assets/tailwind-config.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/shared.css" />
+<script>(function(){var t=localStorage.getItem('propertiku-theme')||'light';if(t==='dark')document.documentElement.classList.add('dark');})();</script>
+</head>
+<body>
+<div id="app"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/rbac.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/ui-helpers.js"></script>
+<script src="assets/layout.js"></script>
+
+<script>
+(function(){
+  const user = requireAuth();
+  if(!user) return;
+  if(!requireAccess("users")) return;
+
+  const state = {
+    users: JSON.parse(JSON.stringify(ALL_USERS)),
+    search: "",
+    role: "all",
+  };
+
+  function content(){
+    const total = state.users.length;
+    const active = state.users.filter(u=>u.status==="active").length;
+    const suspended = state.users.filter(u=>u.status==="suspended").length;
+    const t = state.search.toLowerCase();
+    let list = state.users.filter(u=>{
+      if(state.role!=="all" && u.role!==state.role) return false;
+      if(t && !(u.name.toLowerCase().includes(t) || u.email.toLowerCase().includes(t) || (u.phone||"").includes(t))) return false;
+      return true;
+    });
+
+    return `
+      <div class="space-y-5 animate-fade-in">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg grid place-items-center bg-emerald-600 text-white"><i data-lucide="ShieldCheck" class="w-5 h-5"></i></div>
+            <div><h2 class="text-lg font-bold">Manajemen Pengguna</h2><p class="text-xs text-muted-foreground">Kelola akun & hak akses (RBAC)</p></div>
+          </div>
+          <button onclick="openAddUser()" class="btn h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"><i data-lucide="UserPlus" class="w-4 h-4"></i>Tambah Pengguna</button>
+        </div>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          ${[["Total Pengguna",total,"Users","emerald"],["Pengguna Aktif",active,"UserCheck","emerald"],["Suspended",suspended,"UserX","rose"],["Total Role",ROLES.length,"ShieldCheck","violet"]].map(([l,v,i,t])=>`
+          <div class="card p-4"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg grid place-items-center ${TONE_BG[t]}"><i data-lucide="${i}" class="w-4 h-4"></i></div><div><p class="text-xs text-muted-foreground">${l}</p><p class="text-xl font-bold">${v}</p></div></div></div>`).join("")}
+        </div>
+
+        <div>
+          <p class="text-sm font-semibold mb-3">Overview Role & Hak Akses</p>
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            ${ROLES.map(r=>{
+              const t=ROLE_THEME[r.value];
+              const count = state.users.filter(u=>u.role===r.value).length;
+              const menus = menuForRole(r.value);
+              return `<div class="card p-5">
+                <div class="flex items-start justify-between"><div class="flex items-center gap-2"><span class="w-9 h-9 rounded-lg grid place-items-center ${t.bg} ${t.color} ring-1 ${t.ring} font-bold">${r.label.charAt(0)}</span><div><p class="font-semibold text-sm">${r.label}</p><p class="text-xs text-muted-foreground">${count} pengguna</p></div></div></div>
+                <p class="text-xs text-muted-foreground mt-3">${escapeHtml(r.description)}</p>
+                <div class="mt-3 flex flex-wrap gap-1">${menus.map(m=>`<span class="badge bg-secondary text-secondary-foreground"><i data-lucide="${m.icon}" class="w-3 h-3"></i>${m.label}</span>`).join("")}</div>
+              </div>`;
+            }).join("")}
+          </div>
+        </div>
+
+        <div class="card p-4">
+          <div class="flex flex-col md:flex-row gap-3">
+            <div class="relative flex-1"><i data-lucide="Search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"></i><input id="uSearch" value="${escapeHtml(state.search)}" placeholder="Cari nama, email, telepon…" class="w-full h-9 pl-9 pr-3 rounded-md border border-input bg-background text-sm" /></div>
+            <select id="uRole" class="h-9 rounded-md border border-input bg-background px-2 text-sm">
+              ${[["all","Semua Role"],...ROLES.map(r=>[r.value,r.label])].map(([k,l])=>`<option value="${k}" ${state.role===k?'selected':''}>${l}</option>`).join("")}
+            </select>
+          </div>
+        </div>
+
+        <div class="card overflow-x-auto scroll-thin">
+          <table class="w-full text-sm min-w-[900px]">
+            <thead class="border-b border-border bg-muted/40"><tr class="text-left text-xs text-muted-foreground">
+              <th class="px-4 py-3 font-medium">Nama</th><th class="px-3 py-3 font-medium">Email</th><th class="px-3 py-3 font-medium">Telepon</th><th class="px-3 py-3 font-medium">Role</th><th class="px-3 py-3 font-medium">Status</th><th class="px-3 py-3 font-medium">Dibuat</th><th class="px-3 py-3 font-medium">Login Terakhir</th><th class="px-3 py-3 font-medium">Aksi</th>
+            </tr></thead>
+            <tbody>
+              ${list.map(u=>{ const t=ROLE_THEME[u.role]; return `<tr class="border-b border-border/60 hover:bg-accent/50">
+                <td class="px-4 py-3"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-full grid place-items-center text-xs font-bold ring-1 ${t.bg} ${t.color} ${t.ring}">${initials(u.name)}</div><span class="font-medium">${escapeHtml(u.name)}</span></div></td>
+                <td class="px-3 py-3 text-muted-foreground">${escapeHtml(u.email)}</td>
+                <td class="px-3 py-3 text-muted-foreground">${u.phone||"-"}</td>
+                <td class="px-3 py-3">${roleBadge(u.role)}</td>
+                <td class="px-3 py-3"><span class="badge ${u.status==="active"?"text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40":"text-rose-700 bg-rose-50 dark:bg-rose-950/40"}">${u.status==="active"?"Aktif":"Suspended"}</span></td>
+                <td class="px-3 py-3 text-xs text-muted-foreground">${u.createdAt}</td>
+                <td class="px-3 py-3 text-xs text-muted-foreground">${u.lastLogin||"-"}</td>
+                <td class="px-3 py-3"><div class="flex gap-1">
+                  <button onclick="openEditUser('${u.id}')" class="btn h-8 w-8 p-0 border border-border hover:bg-accent" title="Edit" aria-label="Edit"><i data-lucide="Pencil" class="w-3.5 h-3.5"></i></button>
+                  <button onclick="toggleUserStatus('${u.id}')" class="btn h-8 w-8 p-0 border border-border hover:bg-accent" title="${u.status==="active"?"Suspend":"Aktifkan"}" aria-label="Status"><i data-lucide="${u.status==="active"?"Ban":"Check"}" class="w-3.5 h-3.5"></i></button>
+                  <button onclick="deleteUser('${u.id}')" class="btn h-8 w-8 p-0 border border-rose-200 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40" title="Hapus" aria-label="Hapus"><i data-lucide="Trash2" class="w-3.5 h-3.5"></i></button>
+                </div></td>
+              </tr>`; }).join("")}
+            </tbody>
+          </table>
+        </div>
+        ${list.length===0?`<p class="text-center text-muted-foreground py-8">Tidak ada pengguna pada filter ini.</p>`:''}
+      </div>`;
+  }
+
+  function openAddUser(){
+    const opts = ROLES.map(r=>`<option value="${r.value}">${r.label}</option>`).join("");
+    openModal({
+      title:"Tambah Pengguna Baru",
+      body: `
+        <div class="space-y-3">
+          <div><label class="text-xs font-medium">Nama Lengkap</label><input id="nu_name" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm" placeholder="Nama pengguna" /></div>
+          <div class="grid grid-cols-2 gap-3">
+            <div><label class="text-xs font-medium">Email</label><input id="nu_email" type="email" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm" placeholder="user@propertiku.id" /></div>
+            <div><label class="text-xs font-medium">Telepon</label><input id="nu_phone" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm" placeholder="0812-xxxx-xxxx" /></div>
+          </div>
+          <div><label class="text-xs font-medium">Role</label><select id="nu_role" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-2 text-sm" onchange="updateAccessPreview(this.value)">${opts}</select></div>
+          <div class="p-3 rounded-md bg-muted/40">
+            <p class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Menu yang dapat diakses</p>
+            <div id="nu_access" class="flex flex-wrap gap-1"></div>
+          </div>
+        </div>`,
+      footer: `<button onclick="closeModal()" class="btn h-9 px-4 border border-border hover:bg-accent">Batal</button>
+        <button onclick="submitAddUser()" class="btn h-9 px-4 bg-emerald-600 text-white hover:bg-emerald-700"><i data-lucide="Save" class="w-4 h-4"></i>Simpan</button>`
+    });
+    updateAccessPreview("operator");
+  }
+
+  function updateAccessPreview(role){
+    const host = document.getElementById("nu_access") || document.getElementById("eu_access");
+    if(!host) return;
+    const menus = menuForRole(role);
+    const t = ROLE_THEME[role];
+    host.innerHTML = menus.length ? menus.map(m=>`<span class="badge ${t.color} ${t.bg}"><i data-lucide="${m.icon}" class="w-3 h-3"></i>${m.label}</span>`).join("") : '<span class="text-xs text-muted-foreground">Tidak ada akses</span>';
+    refreshIcons();
+  }
+
+  function submitAddUser(){
+    const name = document.getElementById("nu_name").value.trim();
+    const email = document.getElementById("nu_email").value.trim();
+    const phone = document.getElementById("nu_phone").value.trim();
+    const role = document.getElementById("nu_role").value;
+    if(!name || !email){ toast("Nama & email wajib diisi","error"); return; }
+    state.users.push({ id:"u-"+Date.now(), name, email, phone:phone||"-", role, status:"active", createdAt: todayStr(), lastLogin:"-" });
+    toast("Pengguna "+name+" ditambahkan","success");
+    closeModal();
+    rerender();
+  }
+
+  function openEditUser(id){
+    const u = state.users.find(x=>x.id===id);
+    if(!u) return;
+    const opts = ROLES.map(r=>`<option value="${r.value}" ${r.value===u.role?'selected':''}>${r.label}</option>`).join("");
+    openModal({
+      title:"Edit Pengguna",
+      body: `
+        <div class="space-y-3">
+          <div><label class="text-xs font-medium">Nama Lengkap</label><input id="eu_name" value="${escapeHtml(u.name)}" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm" /></div>
+          <div class="grid grid-cols-2 gap-3">
+            <div><label class="text-xs font-medium">Email</label><input id="eu_email" type="email" value="${escapeHtml(u.email)}" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm" /></div>
+            <div><label class="text-xs font-medium">Telepon</label><input id="eu_phone" value="${escapeHtml(u.phone||"")}" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm" /></div>
+          </div>
+          <div><label class="text-xs font-medium">Role</label><select id="eu_role" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-2 text-sm" onchange="updateAccessPreview(this.value)">${opts}</select></div>
+          <div class="p-3 rounded-md bg-muted/40">
+            <p class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Menu yang dapat diakses</p>
+            <div id="eu_access" class="flex flex-wrap gap-1"></div>
+          </div>
+        </div>`,
+      footer: `<button onclick="closeModal()" class="btn h-9 px-4 border border-border hover:bg-accent">Batal</button>
+        <button onclick="submitEditUser('${u.id}')" class="btn h-9 px-4 bg-emerald-600 text-white hover:bg-emerald-700"><i data-lucide="Save" class="w-4 h-4"></i>Simpan Perubahan</button>`
+    });
+    updateAccessPreview(u.role);
+  }
+
+  function submitEditUser(id){
+    const u = state.users.find(x=>x.id===id);
+    if(!u) return;
+    const name = document.getElementById("eu_name").value.trim();
+    const email = document.getElementById("eu_email").value.trim();
+    const phone = document.getElementById("eu_phone").value.trim();
+    const role = document.getElementById("eu_role").value;
+    if(!name || !email){ toast("Nama & email wajib diisi","error"); return; }
+    u.name = name; u.email = email; u.phone = phone||"-"; u.role = role;
+    toast("Perubahan disimpan","success");
+    closeModal();
+    rerender();
+  }
+
+  function toggleUserStatus(id){
+    const u = state.users.find(x=>x.id===id);
+    if(u){ u.status = u.status==="active"?"suspended":"active"; toast(u.name+" "+(u.status==="active"?"diaktifkan":"disuspend"),u.status==="active"?"success":"warning"); rerender(); }
+  }
+  function deleteUser(id){
+    const u = state.users.find(x=>x.id===id);
+    if(!u) return;
+    state.users = state.users.filter(x=>x.id!==id);
+    toast("Pengguna "+u.name+" dihapus","success");
+    rerender();
+  }
+
+  window.openAddUser = openAddUser;
+  window.openEditUser = openEditUser;
+  window.updateAccessPreview = updateAccessPreview;
+  window.submitAddUser = submitAddUser;
+  window.submitEditUser = submitEditUser;
+  window.toggleUserStatus = toggleUserStatus;
+  window.deleteUser = deleteUser;
+  function rerender(){
+    const c = document.getElementById("content");
+    if(!c) return;
+    c.innerHTML = content();
+    initLayout();
+    wireUp();
+  }
+  function wireUp(){
+    const s = document.getElementById("uSearch");
+    if(s){ s.oninput = e=>{ state.search=e.target.value; rerender(); const n=document.getElementById("uSearch"); if(n){ n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }; }
+    const r = document.getElementById("uRole"); if(r) r.onchange = e=>{ state.role=e.target.value; rerender(); };
+  }
+
+  document.getElementById("app").innerHTML = renderLayoutShell("users", content());
+  initLayout();
+  wireUp();
+})();
+</script>
+</body>
+</html>

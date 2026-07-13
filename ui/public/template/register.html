@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="id" class="">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Daftar Akun — PropertiKu Agent</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="assets/tailwind-config.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/shared.css" />
+<script>(function(){var t=localStorage.getItem('propertiku-theme')||'light';if(t==='dark')document.documentElement.classList.add('dark');})();</script>
+</head>
+<body class="min-h-screen">
+<div id="app"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/rbac.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/layout.js"></script>
+
+<script>
+(function(){
+  if(getCurrentUser()){ window.location.href = "dashboard.html"; return; }
+
+  function render(){
+    document.getElementById("app").innerHTML = `
+      <div class="min-h-screen w-full grid lg:grid-cols-2 bg-background">
+        <aside class="relative hidden lg:flex flex-col justify-between overflow-hidden p-12 text-white" style="background:linear-gradient(135deg,#047857,#0f766e 45%,#064e3b);">
+          <div class="absolute inset-0 opacity-20" style="background-image:radial-gradient(circle at 20% 30%, white 1px, transparent 1px),radial-gradient(circle at 70% 60%, white 1px, transparent 1px);background-size:48px 48px;"></div>
+          <a href="index.html" class="relative z-10 flex items-center gap-3">
+            <div class="grid place-items-center h-11 w-11 rounded-xl bg-white/15 backdrop-blur ring-1 ring-white/25"><i data-lucide="Building2" class="w-6 h-6"></i></div>
+            <div>
+              <p class="text-lg font-bold leading-tight">PropertiKu Agent</p>
+              <p class="text-xs text-emerald-100/80">AI Assistant · WhatsApp Waha</p>
+            </div>
+          </a>
+          <div class="relative z-10 space-y-6 max-w-md">
+            <h2 class="text-3xl font-bold leading-tight">Mulai otomatisasi penjualan properti hari ini</h2>
+            <p class="text-emerald-50/90 text-sm leading-relaxed">Buat akun gratis untuk mencoba chatbot WhatsApp, CRM leads, kampanye marketing, dan dashboard analitik.</p>
+            <ul class="space-y-2 text-sm text-emerald-50/90">
+              ${[["Check","Gratis 14 hari, tanpa kartu kredit"],["Check","Setup chatbot WhatsApp < 5 menit"],["Check","6 role RBAC siap pakai"],["Check","Support Bahasa Indonesia"]].map(([i,t])=>`<li class="flex items-center gap-2"><i data-lucide="${i}" class="w-4 h-4"></i>${t}</li>`).join("")}
+            </ul>
+          </div>
+          <p class="relative z-10 text-xs text-emerald-100/70">© 2025 PropertiKu Agent. Ditenagai oleh Waha WhatsApp API.</p>
+        </aside>
+
+        <div class="flex flex-col min-h-screen">
+          <div class="lg:hidden flex items-center gap-2 p-6 border-b border-border">
+            <a href="index.html" class="grid place-items-center h-9 w-9 rounded-lg bg-emerald-600 text-white"><i data-lucide="Building2" class="w-5 h-5"></i></a>
+            <p class="font-bold">PropertiKu Agent</p>
+          </div>
+          <div class="flex-1 flex items-center justify-center p-6 sm:p-10">
+            <div class="w-full max-w-md">
+              <h1 class="text-2xl font-bold tracking-tight">Buat Akun Baru</h1>
+              <p class="text-sm text-muted-foreground mt-1.5">Mulai otomatisasi penjualan properti Anda hari ini</p>
+
+              <form id="registerForm" class="space-y-4 mt-7">
+                <div class="space-y-1.5"><label class="text-sm font-medium">Nama Lengkap</label><input name="name" required placeholder="Nama Anda" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" /></div>
+                <div class="space-y-1.5"><label class="text-sm font-medium">Email</label><input name="email" type="email" required placeholder="anda@email.com" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" /></div>
+                <div class="space-y-1.5"><label class="text-sm font-medium">No. WhatsApp</label><input name="wa" required placeholder="62812xxxxxxx" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" /></div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div class="space-y-1.5"><label class="text-sm font-medium">Password</label><input name="password" type="password" required placeholder="min. 6 karakter" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" /></div>
+                  <div class="space-y-1.5"><label class="text-sm font-medium">Konfirmasi</label><input name="confirm" type="password" required placeholder="ulangi password" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" /></div>
+                </div>
+                <label class="flex items-start gap-2 text-sm select-none cursor-pointer">
+                  <input type="checkbox" name="terms" class="rounded border-input mt-0.5" />
+                  <span>Saya menyetujui <a class="text-emerald-600 hover:underline">Syarat & Ketentuan</a> dan <a class="text-emerald-600 hover:underline">Kebijakan Privasi</a></span>
+                </label>
+                <button type="submit" class="btn w-full h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-medium">Daftar Sekarang</button>
+              </form>
+
+              <p class="mt-6 text-center text-sm text-muted-foreground">Sudah punya akun? <a href="login.html" class="font-semibold text-emerald-600 hover:underline">Masuk</a></p>
+              <p class="mt-3 text-center text-xs"><a href="index.html" class="text-muted-foreground hover:text-foreground">← Kembali ke Gallery</a></p>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    refreshIcons();
+
+    document.getElementById("registerForm").addEventListener("submit", e=>{
+      e.preventDefault();
+      const f = e.target;
+      if(!f.terms.checked){ toast("Anda harus menyetujui syarat & ketentuan","error"); return; }
+      const r = register(f.name.value.trim(), f.email.value.trim(), f.wa.value.trim(), f.password.value, f.confirm.value);
+      if(r.ok){ setTimeout(()=>{ window.location.href = "dashboard.html"; }, 300); }
+    });
+  }
+  render();
+})();
+</script>
+</body>
+</html>

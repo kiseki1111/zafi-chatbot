@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="id" class="">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Marketing — PropertiKu Agent</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="assets/tailwind-config.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/shared.css" />
+<script>(function(){var t=localStorage.getItem('propertiku-theme')||'light';if(t==='dark')document.documentElement.classList.add('dark');})();</script>
+</head>
+<body>
+<div id="app"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/rbac.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/ui-helpers.js"></script>
+<script src="assets/layout.js"></script>
+<script src="assets/charts.js"></script>
+
+<script>
+(function(){
+  const user = requireAuth();
+  if(!user) return;
+  if(!requireAccess("marketing")) return;
+
+  const state = {
+    tab: "kampanye",
+    filter: "all",
+    broadcastTemplate: "",
+  };
+
+  function content(){
+    return `
+      <div class="space-y-5 animate-fade-in">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg grid place-items-center bg-emerald-600 text-white"><i data-lucide="Megaphone" class="w-5 h-5"></i></div>
+            <div><h2 class="text-lg font-bold">Marketing</h2><p class="text-xs text-muted-foreground">Kampanye, template & broadcast WhatsApp</p></div>
+          </div>
+          ${state.tab==="kampanye"?`<button onclick="toast('Form buat kampanye (demo)','info')" class="btn h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"><i data-lucide="Plus" class="w-4 h-4"></i>Buat Kampanye</button>`:''}
+          ${state.tab==="template"?`<button onclick="toast('Form template baru (demo)','info')" class="btn h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"><i data-lucide="Plus" class="w-4 h-4"></i>Template Baru</button>`:''}
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+          ${[["kampanye","Megaphone","Kampanye"],["template","FileText","Template Pesan"],["broadcast","Send","Broadcast"]].map(([k,i,l])=>`<button onclick="setTab('${k}')" class="btn h-11 px-3 text-sm font-medium gap-2 ${state.tab===k?'bg-emerald-600 text-white':'bg-card border border-border hover:bg-accent'}"><i data-lucide="${i}" class="w-4 h-4"></i>${l}</button>`).join("")}
+        </div>
+
+        <div id="mktBody"></div>
+      </div>`;
+  }
+
+  function renderCampaigns(host){
+    const total = CAMPAIGNS.length;
+    const aktif = CAMPAIGNS.filter(c=>c.status==="aktif").length;
+    const sent = CAMPAIGNS.reduce((a,b)=>a+b.sent,0);
+    const replied = CAMPAIGNS.reduce((a,b)=>a+b.replied,0);
+    const respRate = sent>0?(replied/sent*100).toFixed(1):0;
+    let list = CAMPAIGNS.filter(c=>state.filter==="all"||c.status===state.filter);
+
+    host.innerHTML = `
+      <div class="space-y-4">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          ${[["Total Kampanye",total,"Megaphone","pink"],["Kampanye Aktif",aktif,"Radio","emerald"],["Pesan Terkirim",sent.toLocaleString("id-ID"),"Send","sky"],["Tingkat Respon",respRate+"%","MessageSquare","violet"]].map(([l,v,i,t])=>`
+          <div class="card p-4"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg grid place-items-center ${TONE_BG[t]}"><i data-lucide="${i}" class="w-4 h-4"></i></div><div><p class="text-xs text-muted-foreground">${l}</p><p class="text-xl font-bold">${v}</p></div></div></div>`).join("")}
+        </div>
+
+        <div class="card p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div><p class="font-semibold">Read vs Replied per Kampanye</p><p class="text-xs text-muted-foreground">Performa kampanye WhatsApp & email</p></div>
+            <span class="badge text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40">Respon ${respRate}%</span>
+          </div>
+          <div class="h-64"><canvas id="mktChart"></canvas></div>
+        </div>
+
+        <div class="flex gap-1 flex-wrap">
+          ${[["all","Semua","zinc"],["aktif","Aktif","emerald"],["selesai","Selesai","violet"],["dijadwalkan","Dijadwalkan","sky"],["draft","Draft","zinc"],["gagal","Gagal","rose"]].map(([k,l,col])=>`<button onclick="setFilter('${k}')" class="h-9 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${state.filter===k?'bg-emerald-600 text-white':'bg-muted text-muted-foreground hover:bg-accent'}"><span class="w-1.5 h-1.5 rounded-full bg-${col}-500"></span>${l}</button>`).join("")}
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          ${list.map(cmp=>{
+            const m = CAMPAIGN_STATUS_META[cmp.status];
+            const prog = cmp.audience>0?(cmp.delivered/cmp.audience*100):0;
+            const chIcon = cmp.channel==="whatsapp"?"MessageCircle":cmp.channel==="email"?"Mail":"Smartphone";
+            const chTone = cmp.channel==="whatsapp"?"bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600":cmp.channel==="email"?"bg-amber-50 dark:bg-amber-950/40 text-amber-600":"bg-sky-50 dark:bg-sky-950/40 text-sky-600";
+            return `<div class="card p-5">
+              <div class="flex items-start justify-between gap-2">
+                <div class="flex items-center gap-3 min-w-0"><div class="w-10 h-10 rounded-lg grid place-items-center ${chTone}"><i data-lucide="${chIcon}" class="w-5 h-5"></i></div>
+                  <div class="min-w-0"><p class="font-semibold truncate">${escapeHtml(cmp.name)}</p><p class="text-xs text-muted-foreground capitalize">${cmp.channel}${cmp.scheduledAt?` · ⏰ ${escapeHtml(cmp.scheduledAt)}`:''}</p></div></div>
+                ${campaignStatusBadge(cmp.status)}
+              </div>
+              <div class="grid grid-cols-4 gap-2 mt-4 text-center">
+                ${[["Audiens",cmp.audience],["Terkirim",cmp.sent],["Dibaca",cmp.read],["Dibalas",cmp.replied]].map(([l,v])=>`<div class="p-2 rounded-md bg-muted/40"><p class="text-lg font-bold">${v}</p><p class="text-[10px] text-muted-foreground">${l}</p></div>`).join("")}
+              </div>
+              <div class="mt-3"><div class="flex justify-between text-xs mb-1"><span class="text-muted-foreground">Terkirim ke audiens</span><span class="font-medium">${prog.toFixed(0)}%</span></div><div class="h-2 rounded-full bg-muted overflow-hidden"><div class="bg-emerald-500 h-full" style="width:${prog}%"></div></div></div>
+              <p class="text-xs text-muted-foreground mt-3 truncate-2">${escapeHtml(cmp.message)}</p>
+              <div class="flex gap-2 mt-3">
+                <button onclick="toast('Detail kampanye ${escapeHtml(cmp.name)}','info')" class="btn flex-1 h-8 text-xs border border-border hover:bg-accent">Lihat Detail</button>
+                ${cmp.status==="aktif"?`<button onclick="pauseCampaign('${cmp.id}')" class="btn h-8 px-3 text-xs border border-border hover:bg-accent"><i data-lucide="Pause" class="w-3.5 h-3.5"></i>Jeda</button>`:''}
+              </div>
+            </div>`;
+          }).join("")}
+        </div>
+        ${list.length===0?`<p class="text-center text-muted-foreground py-8">Tidak ada kampanye pada filter ini.</p>`:''}
+      </div>`;
+    refreshIcons();
+    setTimeout(()=>{
+      campaignBarChart("mktChart", CAMPAIGNS.map(c=>({label:c.name.length>14?c.name.slice(0,12)+"…":c.name, read:c.read, replied:c.replied})));
+    }, 30);
+  }
+
+  function renderTemplates(host){
+    host.innerHTML = `
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        ${MESSAGE_TEMPLATES.map(t=>`
+          <div class="card p-5">
+            <div class="flex items-start justify-between"><div><p class="font-semibold">${escapeHtml(t.name)}</p><span class="badge bg-secondary text-secondary-foreground mt-1">${escapeHtml(t.category)}</span></div><i data-lucide="FileText" class="w-5 h-5 text-muted-foreground"></i></div>
+            <pre class="text-xs text-muted-foreground bg-muted/40 p-3 rounded-md mt-3 whitespace-pre-wrap font-sans truncate-2" style="-webkit-line-clamp:4">${escapeHtml(t.body)}</pre>
+            <div class="flex gap-2 mt-3">
+              <button onclick="useTemplate('${t.id}')" class="btn flex-1 h-8 text-xs bg-emerald-600 text-white hover:bg-emerald-700">Gunakan</button>
+              <button onclick="copyTemplate('${t.id}')" class="btn h-8 px-3 text-xs border border-border hover:bg-accent"><i data-lucide="Copy" class="w-3.5 h-3.5"></i>Salin</button>
+            </div>
+          </div>`).join("")}
+      </div>`;
+    refreshIcons();
+  }
+
+  function renderBroadcast(host){
+    const tmpl = state.broadcastTemplate || "Halo {nama}, kami memiliki penawaran spesial properti untuk Anda. Mau info detailnya? 🏡";
+    const preview = tmpl.replace(/\{nama\}/g,"Budi").replace(/\{nama_properti\}/g,"Rumah Cibaduyut").replace(/\{harga\}/g,"Rp 850 juta").replace(/\{lokasi\}/g,"Cibaduyut, Bandung");
+    host.innerHTML = `
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="card p-5 space-y-4">
+          <p class="font-semibold">Komposer Broadcast</p>
+          <div><label class="text-xs font-medium">Channel</label><select class="w-full h-9 mt-1 rounded-md border border-input bg-background px-2 text-sm"><option>WhatsApp</option><option>Email</option><option>SMS</option></select></div>
+          <div><label class="text-xs font-medium">Segmen Audiens</label><select class="w-full h-9 mt-1 rounded-md border border-input bg-background px-2 text-sm"><option>Semua Leads (10)</option><option>Prospek (4)</option><option>VIP (4)</option><option>Investor (2)</option><option>Pelanggan (2)</option></select></div>
+          <div><label class="text-xs font-medium">Template Pesan</label><select id="bctTmpl" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-2 text-sm">
+            <option value="">— Pilih template —</option>
+            ${MESSAGE_TEMPLATES.map(t=>`<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("")}
+          </select></div>
+          <div><label class="text-xs font-medium">Pesan</label><textarea id="bctMsg" rows="5" class="w-full mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm font-mono" placeholder="Tulis pesan… gunakan {nama}, {nama_properti}, {harga}">${escapeHtml(tmpl)}</textarea>
+          <p class="text-[10px] text-muted-foreground mt-1"><span id="bctCount">${tmpl.length}</span> karakter</p></div>
+          <div><label class="text-xs font-medium">Jadwalkan (opsional)</label><input type="datetime-local" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-2 text-sm" /></div>
+          <div class="flex gap-2">
+            <button onclick="toast('Broadcast dikirim ke audiens','success')" class="btn flex-1 h-10 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"><i data-lucide="Send" class="w-4 h-4"></i>Kirim Sekarang</button>
+            <button onclick="toast('Broadcast dijadwalkan','info')" class="btn flex-1 h-10 border border-border hover:bg-accent text-sm font-medium"><i data-lucide="CalendarClock" class="w-4 h-4"></i>Jadwalkan</button>
+          </div>
+        </div>
+        <div class="card p-5">
+          <p class="font-semibold mb-3">Pratinjau WhatsApp</p>
+          <div class="mx-auto max-w-[280px] rounded-3xl border-4 border-zinc-800 dark:border-zinc-700 p-3 bg-zinc-100 dark:bg-zinc-900">
+            <div class="rounded-2xl overflow-hidden bg-[#e5ddd5] dark:bg-[#0b141a] chat-bg h-[420px] flex flex-col">
+              <div class="bg-emerald-600 text-white px-3 py-2 flex items-center gap-2 shrink-0"><div class="w-7 h-7 rounded-full bg-white/20 grid place-items-center text-xs font-bold">P</div><div><p class="text-xs font-semibold">PropertiKu Agent</p><p class="text-[9px] opacity-80">online</p></div></div>
+              <div class="flex-1 p-3 overflow-y-auto scroll-thin">
+                <div class="max-w-[85%] bg-white dark:bg-zinc-800 rounded-lg rounded-tl-none p-2.5 shadow-sm"><p class="text-xs whitespace-pre-wrap text-zinc-800 dark:text-zinc-100">${escapeHtml(preview)}</p><p class="text-[9px] text-zinc-400 text-right mt-1">${nowTime()} ✓✓</p></div>
+              </div>
+              <div class="px-2 py-1.5 shrink-0"><div class="bg-white dark:bg-zinc-800 rounded-full px-3 py-1.5 text-[10px] text-zinc-400">Ketik pesan…</div></div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    refreshIcons();
+    const sel = document.getElementById("bctTmpl");
+    if(sel) sel.onchange = e=>{ const t = MESSAGE_TEMPLATES.find(x=>x.id===e.target.value); if(t){ document.getElementById("bctMsg").value=t.body; document.getElementById("bctCount").textContent=t.body.length; } };
+    const msg = document.getElementById("bctMsg");
+    if(msg) msg.oninput = e=>{ document.getElementById("bctCount").textContent=e.target.value.length; };
+  }
+
+  function rerender(){
+    const c = document.getElementById("content");
+    if(!c) return;
+    c.innerHTML = content();
+    initLayout();
+    const body = document.getElementById("mktBody");
+    if(state.tab==="kampanye") renderCampaigns(body);
+    else if(state.tab==="template") renderTemplates(body);
+    else renderBroadcast(body);
+  }
+
+  window.setTab = k=>{ state.tab=k; rerender(); };
+  window.setFilter = k=>{ state.filter=k; rerender(); };
+  window.pauseCampaign = id=>{ const c = CAMPAIGNS.find(x=>x.id===id); if(c){ c.status="selesai"; toast("Kampanye dijeda","warning"); rerender(); } };
+  window.useTemplate = id=>{ const t = MESSAGE_TEMPLATES.find(x=>x.id===id); if(t){ state.tab="broadcast"; state.broadcastTemplate=t.body; rerender(); toast("Template dimuat ke broadcast","success"); } };
+  window.copyTemplate = id=>{ const t = MESSAGE_TEMPLATES.find(x=>x.id===id); if(t){ if(navigator.clipboard) navigator.clipboard.writeText(t.body); toast("Template disalin","success"); } };
+
+  document.getElementById("app").innerHTML = renderLayoutShell("marketing", content());
+  initLayout();
+  const body = document.getElementById("mktBody");
+  if(state.tab==="kampanye") renderCampaigns(body);
+  else if(state.tab==="template") renderTemplates(body);
+  else renderBroadcast(body);
+})();
+</script>
+</body>
+</html>

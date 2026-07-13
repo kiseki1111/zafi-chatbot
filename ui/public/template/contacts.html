@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="id" class="">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Kontak & Leads — PropertiKu Agent</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="assets/tailwind-config.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/shared.css" />
+<script>(function(){var t=localStorage.getItem('propertiku-theme')||'light';if(t==='dark')document.documentElement.classList.add('dark');})();</script>
+</head>
+<body>
+<div id="app"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/rbac.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/ui-helpers.js"></script>
+<script src="assets/layout.js"></script>
+
+<script>
+(function(){
+  const user = requireAuth();
+  if(!user) return;
+  if(!requireAccess("contacts")) return;
+
+  const state = {
+    contacts: JSON.parse(JSON.stringify(CONTACTS)),
+    view: "card",
+    search: "",
+    stage: "all",
+    tag: "all",
+  };
+
+  function contactCard(ct){
+    return `<div class="card p-4">
+      <div class="flex items-start gap-3">
+        <div class="relative"><div class="w-11 h-11 rounded-full grid place-items-center text-sm font-bold ${STAGE_META[ct.stage].bg} ${STAGE_META[ct.stage].color}">${initials(ct.name)}</div>${ct.unread?`<span class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[10px] font-bold grid place-items-center ring-2 ring-card">${ct.unread}</span>`:''}</div>
+        <div class="min-w-0 flex-1"><p class="font-semibold truncate">${escapeHtml(ct.name)}</p><p class="text-xs text-muted-foreground">${ct.phone}</p></div>
+        ${stageBadge(ct.stage)}
+      </div>
+      <div class="flex flex-wrap gap-1 mt-3">${tagChips(ct.tags)}</div>
+      <div class="mt-3 space-y-1.5 text-xs">
+        <p class="flex items-center gap-2 text-muted-foreground"><i data-lucide="Building2" class="w-3.5 h-3.5 text-emerald-600"></i>${escapeHtml(ct.propertyInterest||"-")}</p>
+        <p class="flex items-center gap-2 text-muted-foreground"><i data-lucide="UserCheck" class="w-3.5 h-3.5 text-violet-600"></i>${escapeHtml(ct.assignedTo||"-")}</p>
+      </div>
+      <div class="mt-3 p-2 rounded-md bg-muted/40 text-xs text-muted-foreground"><p class="truncate">"${escapeHtml(ct.lastMessage||"")}"</p><p class="text-[10px] mt-0.5">${ct.lastMessageAt||""}</p></div>
+      <div class="flex gap-2 mt-3">
+        <a href="chatbot.html" class="btn flex-1 h-8 text-xs bg-emerald-600 text-white hover:bg-emerald-700"><i data-lucide="MessageCircle" class="w-3.5 h-3.5"></i>Chat</a>
+        <button onclick="openContactDetail('${ct.id}')" class="btn h-8 px-3 text-xs border border-border hover:bg-accent">Detail</button>
+      </div>
+    </div>`;
+  }
+
+  function content(){
+    const total = state.contacts.length;
+    const lead = state.contacts.filter(x=>x.stage==="lead").length;
+    const neg = state.contacts.filter(x=>x.stage==="negotiation").length;
+    const cust = state.contacts.filter(x=>x.stage==="customer").length;
+    const pros = state.contacts.filter(x=>x.stage==="prospect").length;
+    const stages = [["lead",lead,"sky"],["prospect",pros,"amber"],["negotiation",neg,"violet"],["customer",cust,"emerald"]];
+    const t = state.search.toLowerCase();
+    let list = state.contacts.filter(ct=>{
+      if(state.stage!=="all" && ct.stage!==state.stage) return false;
+      if(state.tag!=="all" && !ct.tags.includes(state.tag)) return false;
+      if(t && !(ct.name.toLowerCase().includes(t) || ct.phone.includes(t) || (ct.propertyInterest||"").toLowerCase().includes(t))) return false;
+      return true;
+    });
+
+    return `
+      <div class="space-y-5 animate-fade-in">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg grid place-items-center bg-emerald-600 text-white"><i data-lucide="Users" class="w-5 h-5"></i></div>
+            <div><h2 class="text-lg font-bold">Kontak & Leads</h2><p class="text-xs text-muted-foreground">${total} kontak terdaftar</p></div>
+          </div>
+          <button onclick="toast('Form tambah kontak (demo)','info')" class="btn h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"><i data-lucide="Plus" class="w-4 h-4"></i>Tambah Kontak</button>
+        </div>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          ${[["Total Kontak",total,"Users","emerald"],["Lead Baru",lead,"UserPlus","sky"],["Negosiasi",neg,"MessagesSquare","violet"],["Customer",cust,"BadgeCheck","emerald"]].map(([l,v,i,t])=>`
+          <div class="card p-4"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg grid place-items-center ${TONE_BG[t]}"><i data-lucide="${i}" class="w-4 h-4"></i></div><div><p class="text-xs text-muted-foreground">${l}</p><p class="text-xl font-bold">${v}</p></div></div></div>`).join("")}
+        </div>
+
+        <div class="card p-5">
+          <div class="flex items-center justify-between mb-3">
+            <div><p class="font-semibold text-sm">Pipeline Funnel</p><p class="text-xs text-muted-foreground">Distribusi tahap lead</p></div>
+            <span class="badge text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40">Konversi ${(cust/total*100).toFixed(1)}%</span>
+          </div>
+          <div class="flex h-8 rounded-lg overflow-hidden">
+            ${stages.map(([k,v,col])=>`<div class="bg-${col}-500 text-white text-xs font-semibold flex items-center justify-center" style="width:${(v/total*100)||2}%" title="${STAGE_META[k].label}: ${v}">${v>0?v:''}</div>`).join("")}
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
+            ${stages.map(([k,v,col])=>`<div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-${col}-500"></span><div><p class="text-xs text-muted-foreground">${STAGE_META[k].label}</p><p class="text-sm font-semibold">${v} · ${(v/total*100).toFixed(0)}%</p></div></div>`).join("")}
+          </div>
+        </div>
+
+        <div class="card p-4">
+          <div class="flex flex-col md:flex-row gap-3">
+            <div class="relative flex-1"><i data-lucide="Search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"></i><input id="ctSearch" value="${escapeHtml(state.search)}" placeholder="Cari nama, telepon, properti…" class="w-full h-9 pl-9 pr-3 rounded-md border border-input bg-background text-sm" /></div>
+            <select id="ctStage" class="h-9 rounded-md border border-input bg-background px-2 text-sm">
+              ${[["all","Semua Tahap"],["lead","Lead"],["prospect","Prospek"],["negotiation","Negosiasi"],["customer","Customer"]].map(([k,l])=>`<option value="${k}" ${state.stage===k?'selected':''}>${l}</option>`).join("")}
+            </select>
+            <select id="ctTag" class="h-9 rounded-md border border-input bg-background px-2 text-sm">
+              ${[["all","Semua Tag"],["VIP","VIP"],["Cash","Cash"],["KPR","KPR"],["Investor","Investor"],["Sewa","Sewa"]].map(([k,l])=>`<option value="${k}" ${state.tag===k?'selected':''}>${l}</option>`).join("")}
+            </select>
+            <div class="flex rounded-md border border-input overflow-hidden">
+              ${[["card","LayoutGrid"],["table","Table"]].map(([k,i])=>`<button onclick="setView('${k}')" class="h-9 w-9 grid place-items-center ${state.view===k?'bg-emerald-600 text-white':'hover:bg-accent'}" aria-label="${k}"><i data-lucide="${i}" class="w-4 h-4"></i></button>`).join("")}
+            </div>
+          </div>
+        </div>
+
+        ${state.view==="card" ? `
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          ${list.map(ct=>contactCard(ct)).join("")}
+        </div>` : `
+        <div class="card overflow-x-auto scroll-thin">
+          <table class="w-full text-sm min-w-[800px]">
+            <thead class="border-b border-border bg-muted/40"><tr class="text-left text-xs text-muted-foreground">
+              <th class="px-4 py-3 font-medium">Nama</th><th class="px-3 py-3 font-medium">Telepon</th><th class="px-3 py-3 font-medium">Tahap</th><th class="px-3 py-3 font-medium">Tags</th><th class="px-3 py-3 font-medium">Properti</th><th class="px-3 py-3 font-medium">Ditugaskan</th><th class="px-3 py-3 font-medium">Pesan Terakhir</th><th class="px-3 py-3 font-medium">Aksi</th>
+            </tr></thead>
+            <tbody>
+              ${list.map(ct=>`<tr class="border-b border-border/60 hover:bg-accent/50">
+                <td class="px-4 py-3"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-full grid place-items-center text-xs font-bold ${STAGE_META[ct.stage].bg} ${STAGE_META[ct.stage].color}">${initials(ct.name)}</div><div><p class="font-medium">${escapeHtml(ct.name)}</p>${ct.unread?`<span class="text-[10px] text-rose-600">${ct.unread} belum dibaca</span>`:''}</div></div></td>
+                <td class="px-3 py-3 text-muted-foreground">${ct.phone}</td>
+                <td class="px-3 py-3">${stageBadge(ct.stage)}</td>
+                <td class="px-3 py-3"><div class="flex flex-wrap gap-1">${tagChips(ct.tags)}</div></td>
+                <td class="px-3 py-3 text-muted-foreground truncate max-w-[150px]">${escapeHtml(ct.propertyInterest||"-")}</td>
+                <td class="px-3 py-3 text-muted-foreground">${escapeHtml(ct.assignedTo||"-")}</td>
+                <td class="px-3 py-3"><p class="text-xs truncate max-w-[150px]">${escapeHtml(ct.lastMessage||"")}</p><p class="text-[10px] text-muted-foreground">${ct.lastMessageAt||""}</p></td>
+                <td class="px-3 py-3"><a href="chatbot.html" class="btn h-8 px-3 text-xs bg-emerald-600 text-white hover:bg-emerald-700"><i data-lucide="MessageCircle" class="w-3.5 h-3.5"></i>Chat</a></td>
+              </tr>`).join("")}
+            </tbody>
+          </table>
+        </div>`}
+        ${list.length===0?`<p class="text-center text-muted-foreground py-10">Tidak ada kontak ditemukan.</p>`:''}
+      </div>`;
+  }
+
+  function openContactDetail(id){
+    const ct = state.contacts.find(c=>c.id===id);
+    if(!ct) return;
+    openModal({
+      title: ct.name,
+      body: `
+        <div class="space-y-4">
+          <div class="flex items-center gap-4">
+            <div class="w-16 h-16 rounded-full grid place-items-center text-xl font-bold ${STAGE_META[ct.stage].bg} ${STAGE_META[ct.stage].color}">${initials(ct.name)}</div>
+            <div><p class="font-semibold text-lg">${escapeHtml(ct.name)}</p><p class="text-sm text-muted-foreground">${ct.phone}</p><div class="mt-1">${stageBadge(ct.stage)}</div></div>
+          </div>
+          <div class="grid grid-cols-2 gap-3 text-sm">
+            <div class="p-3 rounded-md bg-muted/40"><p class="text-xs text-muted-foreground">Properti Diminati</p><p class="font-medium">${escapeHtml(ct.propertyInterest||"-")}</p></div>
+            <div class="p-3 rounded-md bg-muted/40"><p class="text-xs text-muted-foreground">Ditugaskan</p><p class="font-medium">${escapeHtml(ct.assignedTo||"-")}</p></div>
+          </div>
+          <div><p class="text-xs text-muted-foreground mb-1.5">Tag</p><div class="flex flex-wrap gap-1.5">${tagChips(ct.tags)}</div></div>
+          <div><p class="text-xs text-muted-foreground mb-2">Aktivitas</p>
+            <div class="space-y-2 text-sm">
+              ${[["Lead masuk","3 hari lalu","sky"],["Dihubungi","2 hari lalu","amber"],["Survey","1 hari lalu","violet"]].map(([l,t,col])=>`<div class="flex items-center gap-3"><div class="w-2 h-2 rounded-full bg-${col}-500"></div><p class="flex-1">${l}</p><span class="text-xs text-muted-foreground">${t}</span></div>`).join("")}
+            </div>
+          </div>
+          <div><p class="text-xs text-muted-foreground mb-1">Catatan</p><p class="text-sm p-2 rounded-md bg-muted/40">Klien sangat tertarik, menunggu simulasi KPR. Follow up Senin depan.</p></div>
+        </div>`,
+      footer: `<button onclick="closeModal()" class="btn h-9 px-4 border border-border hover:bg-accent">Tutup</button>
+        <a href="orders.html" onclick="closeModal()" class="btn h-9 px-4 bg-emerald-600 text-white hover:bg-emerald-700"><i data-lucide="ShoppingBag" class="w-4 h-4"></i>Buat Order</a>
+        <button onclick="toast('Membuka WhatsApp…','info');closeModal()" class="btn h-9 px-4 border border-border hover:bg-accent"><i data-lucide="MessageCircle" class="w-4 h-4"></i>Kirim WhatsApp</button>`
+    });
+  }
+
+  window.openContactDetail = openContactDetail;
+  window.setView = k=>{ state.view=k; rerender(); };
+  function rerender(){
+    const c = document.getElementById("content");
+    if(!c) return;
+    c.innerHTML = content();
+    initLayout();
+    wireUp();
+  }
+  function wireUp(){
+    const s = document.getElementById("ctSearch");
+    if(s){ s.oninput = e=>{ state.search=e.target.value; rerender(); const n=document.getElementById("ctSearch"); if(n){ n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }; }
+    const st = document.getElementById("ctStage"); if(st) st.onchange = e=>{ state.stage=e.target.value; rerender(); };
+    const tg = document.getElementById("ctTag"); if(tg) tg.onchange = e=>{ state.tag=e.target.value; rerender(); };
+  }
+
+  document.getElementById("app").innerHTML = renderLayoutShell("contacts", content());
+  initLayout();
+  wireUp();
+})();
+</script>
+</body>
+</html>

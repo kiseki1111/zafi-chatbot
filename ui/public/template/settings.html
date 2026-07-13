@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="id" class="">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Pengaturan — PropertiKu Agent</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="assets/tailwind-config.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/shared.css" />
+<script>(function(){var t=localStorage.getItem('propertiku-theme')||'light';if(t==='dark')document.documentElement.classList.add('dark');})();</script>
+</head>
+<body>
+<div id="app"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/rbac.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/ui-helpers.js"></script>
+<script src="assets/layout.js"></script>
+
+<script>
+(function(){
+  const user = requireAuth();
+  if(!user) return;
+  if(!requireAccess("settings")) return;
+
+  const state = {
+    tab: "profil",
+    prefs: { notifEmail:true, notifPush:true, aiAutoreply:true, sound:true, language:"id" },
+    sessions: JSON.parse(JSON.stringify(WA_SESSIONS)),
+  };
+
+  function content(){
+    return `
+      <div class="space-y-5 animate-fade-in">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg grid place-items-center bg-emerald-600 text-white"><i data-lucide="Settings" class="w-5 h-5"></i></div>
+          <div><h2 class="text-lg font-bold">Pengaturan</h2><p class="text-xs text-muted-foreground">Profil, integrasi & preferensi</p></div>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+          ${[["profil","User","Profil"],["integrasi","Plug","Integrasi WhatsApp"],["rbac","ShieldCheck","RBAC & Hak Akses"],["preferensi","SlidersHorizontal","Preferensi"]].map(([k,i,l])=>`<button onclick="setTab('${k}')" class="btn h-11 px-3 text-sm font-medium gap-2 ${state.tab===k?'bg-emerald-600 text-white':'bg-card border border-border hover:bg-accent'}"><i data-lucide="${i}" class="w-4 h-4"></i>${l}</button>`).join("")}
+        </div>
+        <div id="settingsBody"></div>
+      </div>`;
+  }
+
+  function renderProfil(host){
+    const t = ROLE_THEME[user.role];
+    host.innerHTML = `
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="card p-5 space-y-4">
+          <div class="text-center">
+            <div class="w-20 h-20 mx-auto rounded-full grid place-items-center text-2xl font-bold ring-2 ${t.bg} ${t.color} ${t.ring}">${initials(user.name)}</div>
+            <p class="font-semibold mt-2">${escapeHtml(user.name)}</p>
+            <p class="text-xs text-muted-foreground">${escapeHtml(user.email)}</p>
+            <div class="mt-2 flex justify-center gap-2">${roleBadge(user.role)}<span class="badge ${user.status==="active"?"text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40":"text-rose-700 bg-rose-50 dark:bg-rose-950/40"}">${user.status==="active"?"Aktif":"Suspended"}</span></div>
+            <button onclick="toast('Unggah foto (demo)','info')" class="btn h-8 px-4 mt-3 text-xs border border-border hover:bg-accent">Ganti Foto</button>
+          </div>
+        </div>
+        <div class="card p-5 lg:col-span-2 space-y-4">
+          <p class="font-semibold">Informasi Profil</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div><label class="text-xs font-medium">Nama Lengkap</label><input id="pf_name" value="${escapeHtml(user.name)}" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm" /></div>
+            <div><label class="text-xs font-medium">Email</label><input id="pf_email" value="${escapeHtml(user.email)}" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm" /></div>
+            <div><label class="text-xs font-medium">No. WhatsApp</label><input id="pf_phone" value="${escapeHtml(user.phone||"")}" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm" /></div>
+            <div><label class="text-xs font-medium">Role</label><input value="${ROLE_LABELS[user.role]}" disabled class="w-full h-9 mt-1 rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground" /></div>
+          </div>
+          <button onclick="saveProfile()" class="btn h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"><i data-lucide="Save" class="w-4 h-4"></i>Simpan Perubahan</button>
+          <div class="pt-4 border-t border-border">
+            <p class="font-semibold mb-3">Ubah Password</p>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div><label class="text-xs font-medium">Password Saat Ini</label><input type="password" placeholder="••••••••" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm" /></div>
+              <div><label class="text-xs font-medium">Password Baru</label><input type="password" placeholder="min. 6 karakter" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm" /></div>
+              <div><label class="text-xs font-medium">Konfirmasi</label><input type="password" placeholder="ulangi" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm" /></div>
+            </div>
+            <button onclick="toast('Password diperbarui','success')" class="btn h-9 px-4 mt-3 border border-border hover:bg-accent text-sm font-medium">Update Password</button>
+          </div>
+        </div>
+      </div>`;
+    refreshIcons();
+  }
+
+  function saveProfile(){
+    const name = document.getElementById("pf_name").value.trim();
+    const email = document.getElementById("pf_email").value.trim();
+    const phone = document.getElementById("pf_phone").value.trim();
+    if(!name){ toast("Nama wajib diisi","error"); return; }
+    user.name = name; user.email = email; user.phone = phone;
+    setCurrentUser(user);
+    toast("Profil disimpan","success");
+    rerender();
+  }
+
+  function renderIntegrasi(host){
+    host.innerHTML = `
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="card p-5 space-y-4">
+          <p class="font-semibold">Koneksi WhatsApp (Waha)</p>
+          <div><label class="text-xs font-medium">Waha API URL</label><input value="https://waha.propertiku.id/api" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm font-mono" /></div>
+          <div><label class="text-xs font-medium">API Key</label><div class="relative"><input id="waha_key" type="password" value="waha-sk-xxxxxxxxxxxxxx" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 pr-10 text-sm font-mono" /><button onclick="const i=this.previousElementSibling;i.type=i.type==='password'?'text':'password'" class="absolute right-2 top-2.5 text-muted-foreground" aria-label="Lihat API key">👁️</button></div></div>
+          <div><label class="text-xs font-medium">Default Session Name</label><input value="agent-sales-1" class="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm" /></div>
+          <div class="flex gap-2">
+            <button onclick="testWaha(this)" class="btn h-9 px-4 border border-border hover:bg-accent text-sm font-medium">Test Koneksi</button>
+            <button onclick="toast('Konfigurasi disimpan','success')" class="btn h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"><i data-lucide="Save" class="w-4 h-4"></i>Simpan Konfigurasi</button>
+          </div>
+        </div>
+        <div class="card p-5">
+          <p class="font-semibold mb-3">Sesi WhatsApp Aktif</p>
+          <div class="space-y-2">
+            ${state.sessions.map(s=>{
+              const on=s.status==="connected";
+              return `<div class="flex items-center gap-3 p-3 rounded-md bg-muted/40">
+                <div class="relative"><div class="w-10 h-10 rounded-lg bg-emerald-600/10 grid place-items-center text-emerald-600"><i data-lucide="Smartphone" class="w-5 h-5"></i></div><span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-card ${on?'bg-emerald-500':'bg-zinc-400'}"></span></div>
+                <div class="min-w-0 flex-1"><p class="text-sm font-medium truncate">${escapeHtml(s.name)}</p><p class="text-xs text-muted-foreground">${s.phone}${on?` · ${s.battery}%`:''}</p></div>
+                <button onclick="toast('${on?'Scan QR (demo)':'Sesi offline'}','info')" class="btn h-8 px-3 text-xs border border-border hover:bg-accent ${on?'opacity-50':''}" ${on?'disabled':''}><i data-lucide="QrCode" class="w-3.5 h-3.5"></i>Scan QR</button>
+                <button onclick="toggleWASession('${s.id}')" class="btn h-8 px-3 text-xs ${on?'border-rose-200 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40':'border-emerald-200 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'}"><i data-lucide="${on?'Unplug':'Plug'}" class="w-3.5 h-3.5"></i>${on?'Putus':'Sambung'}</button>
+              </div>`;
+            }).join("")}
+          </div>
+        </div>
+      </div>`;
+    refreshIcons();
+  }
+
+  function testWaha(btn){
+    btn.disabled = true;
+    const orig = btn.innerHTML;
+    btn.textContent = "Menguji…";
+    setTimeout(()=>{ btn.disabled=false; btn.innerHTML=orig; refreshIcons(); toast("Tersambung ke Waha API","success"); }, 900);
+  }
+
+  function toggleWASession(id){
+    const s = state.sessions.find(x=>x.id===id);
+    if(s){ s.status = s.status==="connected"?"disconnected":"connected"; s.battery = s.status==="connected"?80:0; s.lastSeen = s.status==="connected"?"online":"baru saja"; toast(s.name+" "+(s.status==="connected"?"disambungkan":"diputus"),s.status==="connected"?"success":"warning"); rerender(); }
+  }
+
+  function renderRBAC(host){
+    host.innerHTML = `
+      <div class="card p-5">
+        <div class="flex items-center gap-2 mb-4"><i data-lucide="Info" class="w-4 h-4 text-amber-600"></i><p class="text-xs text-muted-foreground">Matriks hak akses — centang hijau berarti role dapat mengakses menu tersebut.</p></div>
+        <div class="overflow-x-auto scroll-thin">
+          <table class="w-full text-sm min-w-[700px]">
+            <thead><tr class="border-b border-border">
+              <th class="px-3 py-3 text-left text-xs font-medium text-muted-foreground">Menu</th>
+              ${ROLES.map(r=>{ const t=ROLE_THEME[r.value]; return `<th class="px-3 py-3 text-center"><div class="inline-flex items-center gap-1.5"><span class="w-6 h-6 rounded-full grid place-items-center text-[10px] font-bold ring-1 ${t.bg} ${t.color} ${t.ring}">${r.label.charAt(0)}</span><span class="text-xs font-medium">${r.label}</span></div></th>`; }).join("")}
+            </tr></thead>
+            <tbody>
+              ${MENU_ITEMS.map(m=>`<tr class="border-b border-border/60">
+                <td class="px-3 py-3"><div class="flex items-center gap-2"><i data-lucide="${m.icon}" class="w-4 h-4 text-muted-foreground"></i><span class="font-medium">${m.label}</span></div></td>
+                ${ROLES.map(r=>{ const ok = canAccess(r.value, m.key); return `<td class="px-3 py-3 text-center"><div class="inline-flex w-7 h-7 rounded-md grid place-items-center ${ok?'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50':'bg-muted text-muted-foreground'}"><i data-lucide="${ok?'Check':'X'}" class="w-4 h-4"></i></div></td>`; }).join("")}
+              </tr>`).join("")}
+            </tbody>
+          </table>
+        </div>
+        ${user.role!=="superadmin"?`<div class="mt-4 p-3 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 text-xs flex items-center gap-2"><i data-lucide="AlertTriangle" class="w-4 h-4"></i>Hanya Superadmin yang dapat mengubah hak akses.</div>`:''}
+      </div>`;
+    refreshIcons();
+  }
+
+  function renderPreferensi(host){
+    const themeOn = currentTheme()==="dark";
+    const items = [
+      { key:"theme",        label:"Tema Gelap",       desc:"Aktifkan mode gelap untuk kenyamanan mata", icon:"Moon",     on: themeOn },
+      { key:"notifEmail",   label:"Notifikasi Email", desc:"Terima email ringkasan harian",             icon:"Mail",     on: state.prefs.notifEmail },
+      { key:"notifPush",    label:"Notifikasi Push",  desc:"Notifikasi browser realtime",               icon:"Bell",     on: state.prefs.notifPush },
+      { key:"aiAutoreply",  label:"Auto-reply AI",    desc:"Chatbot membalas otomatis pesan masuk",     icon:"Bot",      on: state.prefs.aiAutoreply },
+      { key:"sound",        label:"Suara Notifikasi", desc:"Bunyi saat pesan baru masuk",               icon:"Volume2",  on: state.prefs.sound },
+    ];
+    host.innerHTML = `
+      <div class="card p-5 space-y-3">
+        <p class="font-semibold">Preferensi Aplikasi</p>
+        ${items.map(it=>`
+          <div class="flex items-center gap-3 p-3 rounded-md bg-muted/30">
+            <div class="w-9 h-9 rounded-lg grid place-items-center bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600"><i data-lucide="${it.icon}" class="w-4 h-4"></i></div>
+            <div class="flex-1"><p class="text-sm font-medium">${it.label}</p><p class="text-xs text-muted-foreground">${it.desc}</p></div>
+            <button onclick='togglePref("${it.key}")' class="relative w-11 h-6 rounded-full transition-colors ${it.on?'bg-emerald-600':'bg-muted-foreground/30'}" aria-label="Toggle ${it.label}">
+              <span class="absolute top-0.5 ${it.on?'left-5':'left-0.5'} w-5 h-5 rounded-full bg-white transition-all shadow"></span>
+            </button>
+          </div>`).join("")}
+        <div class="pt-3 border-t border-border">
+          <label class="text-xs font-medium">Bahasa</label>
+          <select class="w-full h-9 mt-1 rounded-md border border-input bg-background px-2 text-sm" onchange="state.prefs.language=this.value;toast('Bahasa diubah','info')">
+            <option value="id" ${state.prefs.language==="id"?"selected":""}>Bahasa Indonesia</option>
+            <option value="en" ${state.prefs.language==="en"?"selected":""}>English</option>
+          </select>
+          <p class="text-[10px] text-muted-foreground mt-1">Pratinjau perubahan akan diterapkan setelah dimuat ulang.</p>
+        </div>
+        <button onclick="toast('Preferensi disimpan','success')" class="btn h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"><i data-lucide="Save" class="w-4 h-4"></i>Simpan Preferensi</button>
+      </div>`;
+    refreshIcons();
+  }
+
+  function togglePref(key){
+    if(key==="theme"){
+      toggleTheme();
+      rerender();
+    } else {
+      state.prefs[key] = !state.prefs[key];
+      toast(state.prefs[key]?"Aktif":"Nonaktif","info");
+      rerender();
+    }
+  }
+
+  function setTab(k){ state.tab=k; rerender(); }
+  function rerender(){
+    const c = document.getElementById("content");
+    if(!c) return;
+    c.innerHTML = content();
+    initLayout();
+    const sb = document.getElementById("settingsBody");
+    if(state.tab==="profil") renderProfil(sb);
+    else if(state.tab==="integrasi") renderIntegrasi(sb);
+    else if(state.tab==="rbac") renderRBAC(sb);
+    else renderPreferensi(sb);
+  }
+
+  window.setTab = setTab;
+  window.togglePref = togglePref;
+  window.saveProfile = saveProfile;
+  window.testWaha = testWaha;
+  window.toggleWASession = toggleWASession;
+
+  document.getElementById("app").innerHTML = renderLayoutShell("settings", content());
+  initLayout();
+  const sb0 = document.getElementById("settingsBody");
+  if(state.tab==="profil") renderProfil(sb0);
+  else if(state.tab==="integrasi") renderIntegrasi(sb0);
+  else if(state.tab==="rbac") renderRBAC(sb0);
+  else renderPreferensi(sb0);
+})();
+</script>
+</body>
+</html>

@@ -453,7 +453,8 @@ model Property {
   facilities      String @db.Text
   installmentInfo String @db.Text
 
-  imageUrl String?
+  imageUrl    String?
+  layoutDenah String? @db.Text
 
   embeddingText String?                      @db.Text
   embedding     Unsupported("vector(1536)")?

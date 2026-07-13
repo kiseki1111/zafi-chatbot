@@ -11,6 +11,7 @@ import { AssignmentsModule } from './modules/assignments/assignments.module';
 import { ChannelAccountsModule } from './modules/channel-accounts/channel-accounts.module';
 import { WahaModule } from './modules/waha/waha.module';
 import { ChatsModule } from './modules/chats/chats.module';
+import { TelegramModule } from './modules/telegram/telegram.module';
 import jwtConfig from './config/jwt.config'; // Pastikan file konfigurasi JWT terdaftar
 
 import { AiModule } from './modules/ai/ai.module';
@@ -38,6 +39,7 @@ import { KnowledgeModule } from './modules/knowledge/knowledge.module';
     ChatsModule,
     AiModule,
     KnowledgeModule,
+    TelegramModule,
   ],
   providers: [
     {

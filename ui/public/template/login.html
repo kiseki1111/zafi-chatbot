@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="id" class="">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Login — PropertiKu Agent</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="assets/tailwind-config.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/shared.css" />
+<script>(function(){var t=localStorage.getItem('propertiku-theme')||'light';if(t==='dark')document.documentElement.classList.add('dark');})();</script>
+</head>
+<body class="min-h-screen">
+<div id="app"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/rbac.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/layout.js"></script>
+
+<script>
+(function(){
+  // If already logged in, send to dashboard
+  if(getCurrentUser()){ window.location.href = "dashboard.html"; return; }
+
+  function render(){
+    document.getElementById("app").innerHTML = `
+      <div class="min-h-screen w-full grid lg:grid-cols-2 bg-background">
+        <!-- Branding panel -->
+        <aside class="relative hidden lg:flex flex-col justify-between overflow-hidden p-12 text-white" style="background:linear-gradient(135deg,#047857,#0f766e 45%,#064e3b);">
+          <div class="absolute inset-0 opacity-20" style="background-image:radial-gradient(circle at 20% 30%, white 1px, transparent 1px),radial-gradient(circle at 70% 60%, white 1px, transparent 1px);background-size:48px 48px;"></div>
+          <a href="index.html" class="relative z-10 flex items-center gap-3">
+            <div class="grid place-items-center h-11 w-11 rounded-xl bg-white/15 backdrop-blur ring-1 ring-white/25"><i data-lucide="Building2" class="w-6 h-6"></i></div>
+            <div>
+              <p class="text-lg font-bold leading-tight">PropertiKu Agent</p>
+              <p class="text-xs text-emerald-100/80">AI Assistant · WhatsApp Waha</p>
+            </div>
+          </a>
+          <div class="relative z-10 space-y-6 max-w-md">
+            <h2 class="text-3xl font-bold leading-tight">Otomatiskan penjualan properti Anda lewat WhatsApp</h2>
+            <p class="text-emerald-50/90 text-sm leading-relaxed">Chatbot cerdas yang membalas calon pembeli 24/7, mengelola leads, kampanye marketing, hingga closing — semua dalam satu dasbor.</p>
+            <div class="grid grid-cols-2 gap-3 pt-2">
+              ${[["MessageCircle","Chatbot AI","Auto-reply 24/7"],["Users","CRM Leads","Kelola prospek"],["TrendingUp","Marketing","Broadcast WA"],["ShieldCheck","RBAC","6 level akses"]].map(([i,t,d])=>`
+                <div class="rounded-lg bg-white/10 backdrop-blur ring-1 ring-white/15 p-3">
+                  <div class="h-8 w-8 rounded-md bg-white/15 grid place-items-center mb-2"><i data-lucide="${i}" class="w-4 h-4"></i></div>
+                  <p class="text-sm font-semibold">${t}</p>
+                  <p class="text-xs text-emerald-100/70">${d}</p>
+                </div>`).join("")}
+            </div>
+          </div>
+          <p class="relative z-10 text-xs text-emerald-100/70">© 2025 PropertiKu Agent. Ditenagai oleh Waha WhatsApp API.</p>
+        </aside>
+
+        <!-- Form panel -->
+        <div class="flex flex-col min-h-screen">
+          <div class="lg:hidden flex items-center gap-2 p-6 border-b border-border">
+            <a href="index.html" class="grid place-items-center h-9 w-9 rounded-lg bg-emerald-600 text-white"><i data-lucide="Building2" class="w-5 h-5"></i></a>
+            <p class="font-bold">PropertiKu Agent</p>
+          </div>
+          <div class="flex-1 flex items-center justify-center p-6 sm:p-10">
+            <div class="w-full max-w-md">
+              <h1 class="text-2xl font-bold tracking-tight">Selamat Datang Kembali</h1>
+              <p class="text-sm text-muted-foreground mt-1.5">Masuk untuk mengelola chatbot & properti Anda</p>
+
+              <form id="loginForm" class="space-y-4 mt-7" autocomplete="on">
+                <div class="space-y-1.5">
+                  <label class="text-sm font-medium" for="lemail">Email</label>
+                  <input id="lemail" name="email" type="email" required placeholder="anda@propertiku.id" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value="superadmin@propertiku.id" />
+                </div>
+                <div class="space-y-1.5">
+                  <div class="flex items-center justify-between">
+                    <label class="text-sm font-medium" for="lpass">Password</label>
+                    <a href="forgot-password.html" class="text-xs font-medium text-emerald-600 hover:underline">Lupa password?</a>
+                  </div>
+                  <div class="relative">
+                    <input id="lpass" name="password" type="password" required placeholder="••••••••" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 pr-10 text-sm" value="demo1234" />
+                    <button type="button" id="togglePass" class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" tabindex="-1" aria-label="Lihat password">👁️</button>
+                  </div>
+                </div>
+                <label class="flex items-center gap-2 text-sm select-none cursor-pointer">
+                  <input type="checkbox" id="remember" checked class="rounded border-input" />
+                  <span>Ingat saya</span>
+                </label>
+                <button type="submit" class="btn w-full h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-medium">Masuk</button>
+              </form>
+
+              <div class="mt-6">
+                <div class="relative text-center">
+                  <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-border"></div></div>
+                  <span class="relative bg-background px-3 text-xs text-muted-foreground">atau login cepat sebagai</span>
+                </div>
+                <div class="grid grid-cols-3 gap-2 mt-4">
+                  ${ROLES.map(r=>{
+                    const t=ROLE_THEME[r.value];
+                    return `<button type="button" class="btn h-auto py-2.5 flex-col gap-1 border border-border bg-card hover:bg-accent text-foreground" onclick="quickLogin('${r.value}')">
+                      <span class="w-7 h-7 rounded-full grid place-items-center text-xs font-bold ring-1 ${t.bg} ${t.color} ${t.ring}">${r.label.charAt(0)}</span>
+                      <span class="text-xs font-semibold">${r.label}</span>
+                    </button>`;
+                  }).join("")}
+                </div>
+              </div>
+
+              <div class="mt-6 p-3 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-xs text-emerald-800 dark:text-emerald-300 flex items-start gap-2">
+                <i data-lucide="Info" class="w-4 h-4 mt-0.5 shrink-0"></i>
+                <p>Demo: <code class="px-1 py-0.5 rounded bg-white/60 dark:bg-emerald-900/40">superadmin@propertiku.id</code> / <code class="px-1 py-0.5 rounded bg-white/60 dark:bg-emerald-900/40">demo1234</code>. Atau klik salah satu role di atas. Email lain + password ≥4 karakter → login sebagai Operator.</p>
+              </div>
+
+              <p class="mt-6 text-center text-sm text-muted-foreground">Belum punya akun? <a href="register.html" class="font-semibold text-emerald-600 hover:underline">Daftar gratis</a></p>
+              <p class="mt-3 text-center text-xs"><a href="index.html" class="text-muted-foreground hover:text-foreground">← Kembali ke Gallery</a></p>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    refreshIcons();
+
+    document.getElementById("loginForm").addEventListener("submit", e=>{
+      e.preventDefault();
+      const r = login(document.getElementById("lemail").value.trim(), document.getElementById("lpass").value);
+      if(r.ok){ setTimeout(()=>{ window.location.href = "dashboard.html"; }, 250); }
+    });
+    document.getElementById("togglePass").onclick = ()=>{
+      const i = document.getElementById("lpass");
+      i.type = i.type==="password" ? "text" : "password";
+    };
+  }
+
+  window.quickLogin = function(role){
+    loginAs(role);
+    setTimeout(()=>{ window.location.href = "dashboard.html"; }, 200);
+  };
+  render();
+})();
+</script>
+</body>
+</html>

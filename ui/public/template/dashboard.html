@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="id" class="">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Dashboard — PropertiKu Agent</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="assets/tailwind-config.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/shared.css" />
+<script>(function(){var t=localStorage.getItem('propertiku-theme')||'light';if(t==='dark')document.documentElement.classList.add('dark');})();</script>
+</head>
+<body>
+<div id="app"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/rbac.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/ui-helpers.js"></script>
+<script src="assets/layout.js"></script>
+<script src="assets/charts.js"></script>
+
+<script>
+(function(){
+  const user = requireAuth();
+  if(!user) return;
+  if(!requireAccess("overview")) return;
+
+  function kpisForRole(role){
+    const totalRev = INVOICES.filter(i=>i.status==="lunas").reduce((a,b)=>a+b.amount,0);
+    const piutang = INVOICES.filter(i=>i.status==="belum-bayar"||i.status==="jatuh-tempo").reduce((a,b)=>a+b.amount,0);
+    const dealOrders = ORDERS.filter(o=>o.status==="deal").length;
+    const pipelineVal = ORDERS.filter(o=>!["deal","gagal","dibatalkan"].includes(o.status)).reduce((a,b)=>a+b.amount,0);
+    const totalLeads = CONTACTS.length;
+    const activeCampaigns = CAMPAIGNS.filter(c=>c.status==="aktif").length;
+    const unreadChats = CONTACTS.reduce((a,b)=>a+b.unread,0);
+    const tersedia = PROPERTIES.filter(p=>p.status==="tersedia").length;
+    const activeUsers = ALL_USERS.filter(u=>u.status==="active").length;
+    const runningOrders = ORDERS.filter(o=>["baru","diproses","negosiasi"].includes(o.status)).length;
+    const myOrders = ORDERS.filter(o=>o.agent===user.name).length;
+    const convRate = (dealOrders/totalLeads*100).toFixed(1);
+    const base = {
+      superadmin:[
+        {label:"Pendapatan (Lunas)", value:formatCurrency(totalRev), delta:12.4, icon:"TrendingUp", tone:"emerald"},
+        {label:"Total Leads",        value:totalLeads+" kontak", delta:8.1, icon:"Users", tone:"sky"},
+        {label:"Order Deal",         value:dealOrders+" order", delta:5.2, icon:"ShoppingBag", tone:"violet"},
+        {label:"Properti Aktif",     value:tersedia+" listing", delta:-2.1, icon:"Building2", tone:"amber"},
+      ],
+      admin:[
+        {label:"Pendapatan",      value:formatCurrency(totalRev), delta:12.4, icon:"Wallet", tone:"emerald"},
+        {label:"Order Berjalan",  value:runningOrders+" order", delta:3.2, icon:"ShoppingBag", tone:"amber"},
+        {label:"Pengguna Aktif",  value:activeUsers+" user", delta:1.4, icon:"ShieldCheck", tone:"violet"},
+        {label:"Chat Belum Dibaca",value:unreadChats+" pesan", delta:-4.0, icon:"MessageCircle", tone:"rose"},
+      ],
+      operator:[
+        {label:"Chat Belum Dibaca",value:unreadChats+" pesan", delta:-4.0, icon:"MessageCircle", tone:"emerald"},
+        {label:"Leads Hari Ini",   value:totalLeads+" kontak", delta:8.1, icon:"Users", tone:"sky"},
+        {label:"Order Saya",       value:myOrders+" order", delta:2.0, icon:"ShoppingBag", tone:"amber"},
+        {label:"Properti Tersedia",value:tersedia+" listing", delta:0, icon:"Building2", tone:"violet"},
+      ],
+      manager:[
+        {label:"Pendapatan",     value:formatCurrency(totalRev), delta:12.4, icon:"TrendingUp", tone:"emerald"},
+        {label:"Konversi Deal",  value:convRate+"%", delta:1.8, icon:"Target", tone:"violet"},
+        {label:"Order Pipeline", value:formatCurrency(pipelineVal), delta:6.3, icon:"ShoppingBag", tone:"amber"},
+        {label:"Total Leads",    value:totalLeads+" kontak", delta:8.1, icon:"Users", tone:"sky"},
+      ],
+      marketing:[
+        {label:"Total Leads",       value:totalLeads+" kontak", delta:8.1, icon:"Users", tone:"pink"},
+        {label:"Kampanye Aktif",    value:activeCampaigns+" kampanye", delta:2, icon:"Megaphone", tone:"emerald"},
+        {label:"Chat Dibalas",      value:"94.2%", delta:3.4, icon:"MessageCircle", tone:"violet"},
+        {label:"Resolusi AI",       value:"78%", delta:5.0, icon:"Bot", tone:"amber"},
+      ],
+      keuangan:[
+        {label:"Pendapatan (Lunas)",value:formatCurrency(totalRev), delta:12.4, icon:"TrendingUp", tone:"teal"},
+        {label:"Piutang",           value:formatCurrency(piutang), delta:-3.1, icon:"Clock", tone:"amber"},
+        {label:"Invoice Lunas",     value:INVOICES.filter(i=>i.status==="lunas").length+" invoice", delta:2, icon:"CheckCircle2", tone:"emerald"},
+        {label:"Jatuh Tempo",       value:INVOICES.filter(i=>i.status==="jatuh-tempo").length+" invoice", delta:1, icon:"AlertTriangle", tone:"rose"},
+      ],
+    };
+    return base[role] || base.admin;
+  }
+
+  function content(){
+    const role = user.role;
+    const hour = new Date().getHours();
+    const greet = hour<11?"Selamat pagi":hour<15?"Selamat siang":hour<19?"Selamat sore":"Selamat malam";
+    const kpis = kpisForRole(role);
+    const recentOrders = ORDERS.slice(0,5);
+    const unread = CONTACTS.filter(x=>x.unread>0).slice(0,5);
+
+    return `
+      <div class="space-y-6 animate-fade-in">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold">${greet}, ${escapeHtml(user.name.split(" ")[0])}! 👋</h2>
+            <p class="text-sm text-muted-foreground mt-0.5">Berikut ringkasan aktivitas PropertiKu Agent hari ini.</p>
+          </div>
+          ${roleBadge(role)}
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          ${kpis.map(k=>{
+            const deltaUp = k.delta>=0;
+            return `<div class="card p-5">
+              <div class="flex items-start justify-between">
+                <div class="w-10 h-10 rounded-lg grid place-items-center ${TONE_BG[k.tone]}"><i data-lucide="${k.icon}" class="w-5 h-5"></i></div>
+                <span class="badge ${deltaUp?'text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40':'text-rose-700 bg-rose-50 dark:bg-rose-950/40'}">${deltaUp?'+':''}${k.delta}%</span>
+              </div>
+              <p class="text-2xl font-bold mt-3">${k.value}</p>
+              <p class="text-xs text-muted-foreground mt-0.5">${k.label}</p>
+            </div>`;
+          }).join("")}
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div class="card p-5 lg:col-span-2">
+            <div class="flex items-center justify-between mb-4">
+              <div><p class="font-semibold">Tren Pendapatan</p><p class="text-xs text-muted-foreground">7 bulan terakhir (dalam juta Rupiah)</p></div>
+              <span class="badge text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40"><i data-lucide="TrendingUp" class="w-3 h-3"></i>+12.4%</span>
+            </div>
+            <div class="h-64"><canvas id="revChart"></canvas></div>
+          </div>
+          <div class="card p-5">
+            <div class="mb-4"><p class="font-semibold">Sumber Lead</p><p class="text-xs text-muted-foreground">Distribusi kanal akuisisi</p></div>
+            <div class="h-64"><canvas id="leadChart"></canvas></div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div class="card p-5">
+            <div class="mb-4"><p class="font-semibold">Funnel Konversi</p><p class="text-xs text-muted-foreground">Dari lead hingga deal</p></div>
+            <div class="space-y-3">
+              ${FUNNEL_DATA.map((f,i)=>{
+                const max = FUNNEL_DATA[0].value;
+                const colors = ["bg-sky-500","bg-amber-500","bg-violet-500","bg-emerald-500"];
+                const pct = (f.value/max*100).toFixed(0);
+                const conv = i>0 ? (f.value/FUNNEL_DATA[i-1].value*100).toFixed(0):100;
+                return `<div>
+                  <div class="flex justify-between text-xs mb-1"><span class="font-medium">${f.label}</span><span class="text-muted-foreground">${f.value} · ${conv}%</span></div>
+                  <div class="h-7 rounded-md bg-muted overflow-hidden"><div class="${colors[i]} h-full rounded-md flex items-center justify-end px-2 text-white text-xs font-semibold" style="width:${pct}%">${f.value}</div></div>
+                </div>`;
+              }).join("")}
+            </div>
+          </div>
+          <div class="card lg:col-span-2">
+            <div class="flex items-center justify-between p-5 pb-3">
+              <div><p class="font-semibold">Order Terbaru</p><p class="text-xs text-muted-foreground">5 transaksi terakhir</p></div>
+              <a href="orders.html" class="btn h-8 px-3 text-sm border border-border hover:bg-accent">Lihat Semua <i data-lucide="ArrowRight" class="w-3.5 h-3.5"></i></a>
+            </div>
+            <div class="overflow-x-auto scroll-thin">
+              <table class="w-full text-sm">
+                <thead class="border-y border-border bg-muted/40">
+                  <tr class="text-left text-xs text-muted-foreground">
+                    <th class="px-5 py-2.5 font-medium">Kode</th><th class="px-3 py-2.5 font-medium">Klien</th><th class="px-3 py-2.5 font-medium">Properti</th><th class="px-3 py-2.5 font-medium">Nilai</th><th class="px-3 py-2.5 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${recentOrders.map(o=>`<tr class="border-b border-border/60 hover:bg-accent/50 cursor-pointer" onclick="location.href='orders.html'">
+                    <td class="px-5 py-3 font-mono text-xs">${o.code}</td>
+                    <td class="px-3 py-3">${escapeHtml(o.contactName)}</td>
+                    <td class="px-3 py-3 truncate max-w-[180px] text-muted-foreground">${escapeHtml(o.propertyTitle)}</td>
+                    <td class="px-3 py-3 font-semibold">${formatCurrency(o.amount)}</td>
+                    <td class="px-3 py-3">${orderStatusBadge(o.status)}</td>
+                  </tr>`).join("")}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div class="card p-5">
+            <div class="flex items-center justify-between mb-4">
+              <div><p class="font-semibold">Sesi WhatsApp</p><p class="text-xs text-muted-foreground">Status koneksi Waha</p></div>
+              <a href="settings.html" class="btn h-8 px-3 text-xs border border-border hover:bg-accent">Kelola</a>
+            </div>
+            <div class="space-y-2">
+              ${WA_SESSIONS.map(s=>{
+                const on = s.status==="connected";
+                return `<div class="flex items-center gap-3 p-2.5 rounded-lg bg-muted/40">
+                  <div class="relative"><div class="w-9 h-9 rounded-lg bg-emerald-600/10 grid place-items-center text-emerald-600"><i data-lucide="Smartphone" class="w-4 h-4"></i></div><span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-card ${on?'bg-emerald-500':'bg-zinc-400'}"></span></div>
+                  <div class="min-w-0 flex-1"><p class="text-sm font-medium truncate">${escapeHtml(s.name)}</p><p class="text-xs text-muted-foreground truncate">${s.phone}</p></div>
+                  <div class="text-right"><p class="text-xs font-medium ${on?'text-emerald-600':'text-zinc-500'}">${on?'Online':escapeHtml(s.lastSeen)}</p>${on?`<p class="text-[10px] text-muted-foreground flex items-center gap-1 justify-end"><i data-lucide="BatteryMedium" class="w-3 h-3"></i>${s.battery}%</p>`:''}</div>
+                </div>`;
+              }).join("")}
+            </div>
+          </div>
+          ${canAccess(role,"chatbot") ? `
+          <div class="card p-5">
+            <div class="flex items-center justify-between mb-4">
+              <div><p class="font-semibold">Chat Belum Dibaca</p><p class="text-xs text-muted-foreground">Butuh perhatian</p></div>
+              <a href="chatbot.html" class="btn h-8 px-3 text-xs border border-border hover:bg-accent">Buka Chatbot</a>
+            </div>
+            <div class="space-y-2 max-h-64 overflow-y-auto scroll-thin">
+              ${unread.length?unread.map(u=>`<a href="chatbot.html" class="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-accent text-left">
+                <div class="w-9 h-9 rounded-full grid place-items-center text-xs font-bold ${STAGE_META[u.stage].bg} ${STAGE_META[u.stage].color}">${initials(u.name)}</div>
+                <div class="min-w-0 flex-1"><p class="text-sm font-medium truncate">${escapeHtml(u.name)}</p><p class="text-xs text-muted-foreground truncate">${escapeHtml(u.lastMessage||'')}</p></div>
+                <span class="badge bg-rose-500 text-white">${u.unread}</span>
+              </a>`).join(""):`<p class="text-sm text-muted-foreground py-4 text-center">Tidak ada pesan belum dibaca 🎉</p>`}
+            </div>
+          </div>` : `
+          <div class="card p-5">
+            <div class="mb-4"><p class="font-semibold">Statistik Properti</p><p class="text-xs text-muted-foreground">Ringkasan listing</p></div>
+            <div class="space-y-3">
+              ${[["Total Properti",PROPERTIES.length,"Building2","emerald"],["Tersedia",tersedia,"Home","sky"],["Terjual",PROPERTIES.filter(p=>p.status==="terjual").length,"CheckCircle2","rose"],["Tersewa",PROPERTIES.filter(p=>p.status==="tersewa").length,"KeyRound","amber"]].map(([l,v,i,t])=>`
+              <div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg grid place-items-center ${TONE_BG[t]}"><i data-lucide="${i}" class="w-4 h-4"></i></div><div class="flex-1"><p class="text-sm font-medium">${l}</p></div><p class="font-bold">${v}</p></div>`).join("")}
+            </div>
+          </div>`}
+          <div class="card p-5">
+            <div class="mb-4"><p class="font-semibold">Aktivitas AI</p><p class="text-xs text-muted-foreground">Performa chatbot 24 jam</p></div>
+            <div class="space-y-3">
+              ${[["Pesan Ditangani AI","1.248","Bot","emerald"],["Resolusi Otomatis","78%","CheckCircle2","teal"],["Rata-rata Respon","1.4 dtk","Zap","amber"],["Eskalasi ke Agent","22%","UserCheck","violet"]].map(([l,v,i,t])=>`
+              <div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg grid place-items-center ${TONE_BG[t]}"><i data-lucide="${i}" class="w-4 h-4"></i></div><div class="flex-1"><p class="text-sm text-muted-foreground">${l}</p><p class="font-bold">${v}</p></div></div>`).join("")}
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  document.getElementById("app").innerHTML = renderLayoutShell("overview", content());
+  initLayout();
+
+  // Charts
+  setTimeout(()=>{
+    revenueAreaChart("revChart", REVENUE_TREND);
+    leadSourceDonut("leadChart", LEAD_SOURCE);
+  }, 30);
+})();
+</script>
+</body>
+</html>

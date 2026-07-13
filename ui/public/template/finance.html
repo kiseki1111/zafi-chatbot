@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="id" class="">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Keuangan — PropertiKu Agent</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="assets/tailwind-config.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/shared.css" />
+<script>(function(){var t=localStorage.getItem('propertiku-theme')||'light';if(t==='dark')document.documentElement.classList.add('dark');})();</script>
+</head>
+<body>
+<div id="app"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/rbac.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/ui-helpers.js"></script>
+<script src="assets/layout.js"></script>
+<script src="assets/charts.js"></script>
+
+<script>
+(function(){
+  const user = requireAuth();
+  if(!user) return;
+  if(!requireAccess("finance")) return;
+
+  const state = {
+    invoices: JSON.parse(JSON.stringify(INVOICES)),
+    search: "",
+    status: "all",
+  };
+
+  function content(){
+    const lunas = state.invoices.filter(i=>i.status==="lunas");
+    const piutang = state.invoices.filter(i=>i.status==="belum-bayar"||i.status==="jatuh-tempo");
+    const pendapatan = lunas.reduce((a,b)=>a+b.amount,0);
+    const piutangVal = piutang.reduce((a,b)=>a+b.amount,0);
+    const jatuh = state.invoices.filter(i=>i.status==="jatuh-tempo").length;
+    const t = state.search.toLowerCase();
+    let list = state.invoices.filter(i=>{
+      if(state.status!=="all" && i.status!==state.status) return false;
+      if(t && !(i.number.toLowerCase().includes(t) || i.contactName.toLowerCase().includes(t))) return false;
+      return true;
+    });
+
+    return `
+      <div class="space-y-5 animate-fade-in">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg grid place-items-center bg-emerald-600 text-white"><i data-lucide="Wallet" class="w-5 h-5"></i></div>
+            <div><h2 class="text-lg font-bold">Keuangan</h2><p class="text-xs text-muted-foreground">Faktur, pembayaran & pendapatan</p></div>
+          </div>
+          <button onclick="toast('Form buat invoice (demo)','info')" class="btn h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"><i data-lucide="Plus" class="w-4 h-4"></i>Buat Invoice</button>
+        </div>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          ${[["Pendapatan",formatCurrency(pendapatan),"TrendingUp","emerald"],["Piutang",formatCurrency(piutangVal),"Clock","amber"],["Invoice Lunas",lunas.length+" invoice","CheckCircle2","emerald"],["Jatuh Tempo",jatuh+" invoice","AlertTriangle","rose"]].map(([l,v,i,t])=>`
+          <div class="card p-4"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg grid place-items-center ${TONE_BG[t]}"><i data-lucide="${i}" class="w-4 h-4"></i></div><div><p class="text-xs text-muted-foreground">${l}</p><p class="text-xl font-bold">${v}</p></div></div></div>`).join("")}
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div class="card p-5 lg:col-span-2"><div class="mb-4"><p class="font-semibold">Tren Pendapatan</p><p class="text-xs text-muted-foreground">7 bulan terakhir (juta Rupiah)</p></div><div class="h-60"><canvas id="finRevChart"></canvas></div></div>
+          <div class="card p-5"><div class="mb-4"><p class="font-semibold">Status Invoice</p><p class="text-xs text-muted-foreground">Distribusi</p></div><div class="h-60"><canvas id="finDonut"></canvas></div></div>
+        </div>
+
+        <div class="card p-4">
+          <div class="flex flex-col md:flex-row gap-3">
+            <div class="relative flex-1"><i data-lucide="Search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"></i><input id="fSearch" value="${escapeHtml(state.search)}" placeholder="Cari nomor atau klien…" class="w-full h-9 pl-9 pr-3 rounded-md border border-input bg-background text-sm" /></div>
+            <div class="flex gap-1 flex-wrap">
+              ${[["all","Semua","zinc"],["lunas","Lunas","emerald"],["belum-bayar","Belum Bayar","amber"],["jatuh-tempo","Jatuh Tempo","rose"],["dibatalkan","Dibatalkan","zinc"]].map(([k,l,col])=>`<button onclick="setStatus('${k}')" class="h-9 px-3 rounded-md text-xs font-medium flex items-center gap-1.5 ${state.status===k?'bg-emerald-600 text-white':'bg-muted text-muted-foreground hover:bg-accent'}"><span class="w-1.5 h-1.5 rounded-full bg-${col}-500"></span>${l}</button>`).join("")}
+            </div>
+          </div>
+        </div>
+
+        <div class="card overflow-x-auto scroll-thin">
+          <table class="w-full text-sm min-w-[900px]">
+            <thead class="border-b border-border bg-muted/40"><tr class="text-left text-xs text-muted-foreground">
+              <th class="px-4 py-3 font-medium">Nomor</th><th class="px-3 py-3 font-medium">Klien</th><th class="px-3 py-3 font-medium">Nilai</th><th class="px-3 py-3 font-medium">Metode</th><th class="px-3 py-3 font-medium">Status</th><th class="px-3 py-3 font-medium">Terbit</th><th class="px-3 py-3 font-medium">Jatuh Tempo</th><th class="px-3 py-3 font-medium">Aksi</th>
+            </tr></thead>
+            <tbody>
+              ${list.map(inv=>{ const pm=PAYMENT_META[inv.method]; return `<tr class="border-b border-border/60 hover:bg-accent/50">
+                <td class="px-4 py-3 font-mono text-xs">${inv.number}</td>
+                <td class="px-3 py-3">${escapeHtml(inv.contactName)}</td>
+                <td class="px-3 py-3 font-semibold">${formatCurrency(inv.amount)}</td>
+                <td class="px-3 py-3"><span class="badge ${pm.color} ${pm.bg}"><i data-lucide="${pm.icon}" class="w-3 h-3"></i>${pm.label}</span></td>
+                <td class="px-3 py-3">${invoiceStatusBadge(inv.status)}</td>
+                <td class="px-3 py-3 text-xs text-muted-foreground">${inv.issuedAt}</td>
+                <td class="px-3 py-3 text-xs text-muted-foreground">${inv.dueAt}</td>
+                <td class="px-3 py-3"><div class="flex gap-1">
+                  <button onclick="openInvoiceDetail('${inv.id}')" class="btn h-8 w-8 p-0 border border-border hover:bg-accent" title="Lihat" aria-label="Lihat"><i data-lucide="Eye" class="w-3.5 h-3.5"></i></button>
+                  ${inv.status!=="lunas"&&inv.status!=="dibatalkan"?`<button onclick="markInvoicePaid('${inv.id}')" class="btn h-8 w-8 p-0 border border-emerald-200 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40" title="Tandai Lunas" aria-label="Tandai Lunas"><i data-lucide="Check" class="w-3.5 h-3.5"></i></button>`:''}
+                  <button onclick="toast('Invoice ${inv.number} dicetak','success')" class="btn h-8 w-8 p-0 border border-border hover:bg-accent" title="Cetak" aria-label="Cetak"><i data-lucide="Printer" class="w-3.5 h-3.5"></i></button>
+                </div></td>
+              </tr>`; }).join("")}
+            </tbody>
+          </table>
+        </div>
+        ${list.length===0?`<p class="text-center text-muted-foreground py-8">Tidak ada invoice pada filter ini.</p>`:''}
+      </div>`;
+  }
+
+  function openInvoiceDetail(id){
+    const inv = state.invoices.find(i=>i.id===id);
+    if(!inv) return;
+    const pm = PAYMENT_META[inv.method];
+    const ppn = Math.round(inv.amount*0.11);
+    openModal({
+      title: inv.number,
+      body: `
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">${invoiceStatusBadge(inv.status)}<span class="badge ${pm.color} ${pm.bg}"><i data-lucide="${pm.icon}" class="w-3 h-3"></i>${pm.label}</span></div>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="p-3 rounded-md bg-muted/40"><p class="text-xs text-muted-foreground">Dari</p><p class="font-semibold">PropertiKu Agent</p><p class="text-xs text-muted-foreground">PT PropertiKu Sejahtera</p></div>
+            <div class="p-3 rounded-md bg-muted/40"><p class="text-xs text-muted-foreground">Kepada</p><p class="font-semibold">${escapeHtml(inv.contactName)}</p></div>
+          </div>
+          <div class="grid grid-cols-3 gap-2 text-xs">
+            <div class="p-2 rounded-md bg-muted/40"><p class="text-muted-foreground">Terbit</p><p class="font-medium">${inv.issuedAt}</p></div>
+            <div class="p-2 rounded-md bg-muted/40"><p class="text-muted-foreground">Jatuh Tempo</p><p class="font-medium">${inv.dueAt}</p></div>
+            <div class="p-2 rounded-md bg-muted/40"><p class="text-muted-foreground">Dibayar</p><p class="font-medium">${inv.paidAt||"-"}</p></div>
+          </div>
+          <table class="w-full text-sm border border-border rounded-md">
+            <thead class="bg-muted/40"><tr class="text-left text-xs text-muted-foreground"><th class="px-3 py-2">Deskripsi</th><th class="px-3 py-2 text-right">Jumlah</th></tr></thead>
+            <tbody><tr class="border-t border-border"><td class="px-3 py-2">Transaksi Properti (${inv.number})</td><td class="px-3 py-2 text-right">${formatFullCurrency(inv.amount)}</td></tr>
+            <tr class="border-t border-border"><td class="px-3 py-2">PPN 11%</td><td class="px-3 py-2 text-right">${formatFullCurrency(ppn)}</td></tr>
+            <tr class="border-t border-border font-bold"><td class="px-3 py-2">Total</td><td class="px-3 py-2 text-right text-emerald-600">${formatFullCurrency(inv.amount+ppn)}</td></tr></tbody>
+          </table>
+        </div>`,
+      footer: `<button onclick="closeModal()" class="btn h-9 px-4 border border-border hover:bg-accent">Tutup</button>
+        ${inv.status!=="lunas"&&inv.status!=="dibatalkan"?`<button onclick="closeModal();markInvoicePaid('${inv.id}')" class="btn h-9 px-4 bg-emerald-600 text-white hover:bg-emerald-700"><i data-lucide="Check" class="w-4 h-4"></i>Tandai Lunas</button>`:''}
+        <button onclick="toast('Invoice ${inv.number} dicetak','success');closeModal()" class="btn h-9 px-4 border border-border hover:bg-accent"><i data-lucide="Printer" class="w-4 h-4"></i>Cetak</button>`
+    });
+  }
+
+  function markInvoicePaid(id){
+    const inv = state.invoices.find(i=>i.id===id);
+    if(inv){ inv.status="lunas"; inv.paidAt=todayStr(); toast("Invoice "+inv.number+" ditandai lunas","success"); rerender(); }
+  }
+
+  window.openInvoiceDetail = openInvoiceDetail;
+  window.markInvoicePaid = markInvoicePaid;
+  window.setStatus = k=>{ state.status=k; rerender(); };
+  function rerender(){
+    const c = document.getElementById("content");
+    if(!c) return;
+    c.innerHTML = content();
+    initLayout();
+    wireUp();
+    setTimeout(()=>{
+      financeBarChart("finRevChart", REVENUE_TREND);
+      const counts = {
+        lunas: state.invoices.filter(i=>i.status==="lunas").length,
+        "belum-bayar": state.invoices.filter(i=>i.status==="belum-bayar").length,
+        "jatuh-tempo": state.invoices.filter(i=>i.status==="jatuh-tempo").length,
+        dibatalkan: state.invoices.filter(i=>i.status==="dibatalkan").length,
+      };
+      invoiceStatusDonut("finDonut", counts);
+    }, 30);
+  }
+  function wireUp(){
+    const s = document.getElementById("fSearch");
+    if(s){ s.oninput = e=>{ state.search=e.target.value; rerender(); const n=document.getElementById("fSearch"); if(n){ n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }; }
+  }
+
+  document.getElementById("app").innerHTML = renderLayoutShell("finance", content());
+  initLayout();
+  wireUp();
+  setTimeout(()=>{
+    financeBarChart("finRevChart", REVENUE_TREND);
+    const counts = {
+      lunas: state.invoices.filter(i=>i.status==="lunas").length,
+      "belum-bayar": state.invoices.filter(i=>i.status==="belum-bayar").length,
+      "jatuh-tempo": state.invoices.filter(i=>i.status==="jatuh-tempo").length,
+      dibatalkan: state.invoices.filter(i=>i.status==="dibatalkan").length,
+    };
+    invoiceStatusDonut("finDonut", counts);
+  }, 30);
+})();
+</script>
+</body>
+</html>

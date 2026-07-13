@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="id" class="">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Properti — PropertiKu Agent</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="assets/tailwind-config.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/shared.css" />
+<script>(function(){var t=localStorage.getItem('propertiku-theme')||'light';if(t==='dark')document.documentElement.classList.add('dark');})();</script>
+</head>
+<body>
+<div id="app"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/rbac.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/ui-helpers.js"></script>
+<script src="assets/layout.js"></script>
+
+<script>
+(function(){
+  const user = requireAuth();
+  if(!user) return;
+  if(!requireAccess("properties")) return;
+
+  const state = {
+    search: "",
+    type: "all",
+    status: "all",
+  };
+
+  function content(){
+    const total = PROPERTIES.length;
+    const tersedia = PROPERTIES.filter(p=>p.status==="tersedia").length;
+    const terjual = PROPERTIES.filter(p=>p.status==="terjual").length;
+    const totalVal = PROPERTIES.reduce((a,b)=>a+b.price,0);
+    const t = state.search.toLowerCase();
+    let list = PROPERTIES.filter(p=>{
+      if(state.type!=="all" && p.type!==state.type) return false;
+      if(state.status!=="all" && p.status!==state.status) return false;
+      if(t && !(p.title.toLowerCase().includes(t) || p.location.toLowerCase().includes(t))) return false;
+      return true;
+    });
+
+    return `
+      <div class="space-y-5 animate-fade-in">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg grid place-items-center bg-emerald-600 text-white"><i data-lucide="Building2" class="w-5 h-5"></i></div>
+            <div><h2 class="text-lg font-bold">Daftar Properti</h2><p class="text-xs text-muted-foreground">${total} listing aktif</p></div>
+          </div>
+          <button onclick="toast('Form tambah properti (demo)','info')" class="btn h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"><i data-lucide="Plus" class="w-4 h-4"></i>Tambah Properti</button>
+        </div>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          ${[["Total Properti",total,"Building2","emerald"],["Tersedia",tersedia,"Home","sky"],["Terjual",terjual,"CheckCircle2","rose"],["Total Nilai",formatCurrency(totalVal),"Wallet","violet"]].map(([l,v,i,t])=>`
+          <div class="card p-4"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg grid place-items-center ${TONE_BG[t]}"><i data-lucide="${i}" class="w-4 h-4"></i></div><div><p class="text-xs text-muted-foreground">${l}</p><p class="text-xl font-bold">${v}</p></div></div></div>`).join("")}
+        </div>
+
+        <div class="card p-4">
+          <div class="flex flex-col md:flex-row gap-3">
+            <div class="relative flex-1"><i data-lucide="Search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"></i><input id="pSearch" value="${escapeHtml(state.search)}" placeholder="Cari judul atau lokasi…" class="w-full h-9 pl-9 pr-3 rounded-md border border-input bg-background text-sm" /></div>
+            <div class="flex gap-1 flex-wrap">
+              ${[["all","Semua"],["rumah","Rumah"],["apartemen","Apartemen"],["ruko","Ruko"],["tanah","Tanah"],["gudang","Gudang"]].map(([k,l])=>`<button onclick="setType('${k}')" class="h-9 px-3 rounded-md text-xs font-medium ${state.type===k?'bg-emerald-600 text-white':'bg-muted text-muted-foreground hover:bg-accent'}">${l}</button>`).join("")}
+            </div>
+            <select id="pStatus" class="h-9 rounded-md border border-input bg-background px-2 text-sm">
+              ${[["all","Semua Status"],["tersedia","Tersedia"],["terjual","Terjual"],["tersewa","Tersewa"],["draft","Draft"]].map(([k,l])=>`<option value="${k}" ${state.status===k?'selected':''}>${l}</option>`).join("")}
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          ${list.map(p=>{
+            const tm = PROP_TYPE_META[p.type];
+            return `<div class="card overflow-hidden flex flex-col">
+              <div class="relative aspect-[4/3] bg-muted">
+                <img src="${p.image}" alt="${escapeHtml(p.title)}" loading="lazy" class="w-full h-full object-cover" onerror="this.style.display='none';this.parentElement.classList.add('grid','place-items-center');this.parentElement.innerHTML='<i data-lucide=\\'ImageOff\\' class=\\'w-10 h-10 text-muted-foreground\\'></i>'" />
+                <span class="absolute top-2 left-2 badge bg-white/90 text-zinc-800 backdrop-blur"><i data-lucide="${tm.icon}" class="w-3 h-3"></i>${tm.label}</span>
+                <span class="absolute top-2 right-2">${propStatusBadge(p.status)}</span>
+              </div>
+              <div class="p-4 flex-1 flex flex-col">
+                <p class="text-lg font-bold text-emerald-600">${formatFullCurrency(p.price)}</p>
+                <p class="font-semibold mt-1 truncate">${escapeHtml(p.title)}</p>
+                <p class="text-xs text-muted-foreground flex items-center gap-1 mt-1"><i data-lucide="MapPin" class="w-3 h-3 text-rose-500"></i>${escapeHtml(p.location)}</p>
+                <div class="flex items-center gap-3 mt-3 text-xs text-muted-foreground">
+                  ${p.bedrooms?`<span class="flex items-center gap-1"><i data-lucide="BedDouble" class="w-3.5 h-3.5"></i>${p.bedrooms} KT</span>`:''}
+                  ${p.bathrooms?`<span class="flex items-center gap-1"><i data-lucide="Bath" class="w-3.5 h-3.5"></i>${p.bathrooms} KM</span>`:''}
+                  <span class="flex items-center gap-1"><i data-lucide="Maximize" class="w-3.5 h-3.5"></i>${p.area} m²</span>
+                </div>
+                <div class="flex items-center gap-2 mt-3 pt-3 border-t border-border">
+                  <div class="w-7 h-7 rounded-full grid place-items-center text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50">${initials(p.agent)}</div>
+                  <span class="text-xs text-muted-foreground flex-1 truncate">${escapeHtml(p.agent)}</span>
+                  <button onclick="openPropDetail('${p.id}')" class="btn h-8 px-3 text-xs border border-border hover:bg-accent">Lihat Detail</button>
+                </div>
+              </div>
+            </div>`;
+          }).join("")}
+        </div>
+        ${list.length===0?`<p class="text-center text-muted-foreground py-10">Tidak ada properti ditemukan.</p>`:''}
+      </div>`;
+  }
+
+  function openPropDetail(id){
+    const p = PROPERTIES.find(x=>x.id===id);
+    if(!p) return;
+    const tm = PROP_TYPE_META[p.type];
+    openModal({
+      title: p.title,
+      body: `
+        <div class="space-y-4">
+          <img src="${p.image}" alt="${escapeHtml(p.title)}" class="w-full h-56 object-cover rounded-lg" onerror="this.style.display='none'" />
+          <div class="flex items-center gap-2"><span class="badge bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40"><i data-lucide="${tm.icon}" class="w-3 h-3"></i>${tm.label}</span>${propStatusBadge(p.status)}</div>
+          <p class="text-2xl font-bold text-emerald-600">${formatFullCurrency(p.price)}</p>
+          <p class="text-sm text-muted-foreground flex items-center gap-1"><i data-lucide="MapPin" class="w-4 h-4 text-rose-500"></i>${escapeHtml(p.location)}</p>
+          <div class="grid grid-cols-3 gap-2 text-center">
+            ${p.bedrooms?`<div class="p-3 rounded-md bg-muted/40"><i data-lucide="BedDouble" class="w-4 h-4 mx-auto text-emerald-600"></i><p class="font-bold mt-1">${p.bedrooms}</p><p class="text-[10px] text-muted-foreground">Kamar Tidur</p></div>`:''}
+            ${p.bathrooms?`<div class="p-3 rounded-md bg-muted/40"><i data-lucide="Bath" class="w-4 h-4 mx-auto text-emerald-600"></i><p class="font-bold mt-1">${p.bathrooms}</p><p class="text-[10px] text-muted-foreground">Kamar Mandi</p></div>`:''}
+            <div class="p-3 rounded-md bg-muted/40"><i data-lucide="Maximize" class="w-4 h-4 mx-auto text-emerald-600"></i><p class="font-bold mt-1">${p.area}</p><p class="text-[10px] text-muted-foreground">m²</p></div>
+          </div>
+          <div class="p-3 rounded-md bg-muted/40 flex items-center gap-3"><div class="w-9 h-9 rounded-full grid place-items-center text-sm font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50">${initials(p.agent)}</div><div><p class="text-xs text-muted-foreground">Agent</p><p class="font-medium">${escapeHtml(p.agent)}</p></div></div>
+        </div>`,
+      footer: `<button onclick="closeModal()" class="btn h-9 px-4 border border-border hover:bg-accent">Tutup</button>
+        <button onclick="closeModal();toast('Menghubungi agent ${escapeHtml(p.agent)}','info')" class="btn h-9 px-4 bg-emerald-600 text-white hover:bg-emerald-700"><i data-lucide="Phone" class="w-4 h-4"></i>Hubungi Agent</button>`
+    });
+  }
+
+  window.openPropDetail = openPropDetail;
+  window.setType = k=>{ state.type=k; rerender(); };
+  function rerender(){
+    const c = document.getElementById("content");
+    if(!c) return;
+    c.innerHTML = content();
+    initLayout();
+    wireUp();
+  }
+  function wireUp(){
+    const s = document.getElementById("pSearch");
+    if(s){ s.oninput = e=>{ state.search=e.target.value; rerender(); const n=document.getElementById("pSearch"); if(n){ n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }; }
+    const st = document.getElementById("pStatus"); if(st) st.onchange = e=>{ state.status=e.target.value; rerender(); };
+  }
+
+  document.getElementById("app").innerHTML = renderLayoutShell("properties", content());
+  initLayout();
+  wireUp();
+})();
+</script>
+</body>
+</html>

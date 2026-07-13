@@ -220,7 +220,8 @@ export class WahaService {
 
       return response.data;
     } catch (error) {
-      this.logger.error(`Failed to send message: ${error.message}`);
+      const errorDetail = error.response?.data ? JSON.stringify(error.response.data) : error.message;
+      this.logger.error(`Failed to send message: ${errorDetail}`);
       
       // Increment messagesFailed
       await this.prisma.whatsappInstance.update({

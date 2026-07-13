@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="id" class="">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Order — PropertiKu Agent</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="assets/tailwind-config.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/shared.css" />
+<script>(function(){var t=localStorage.getItem('propertiku-theme')||'light';if(t==='dark')document.documentElement.classList.add('dark');})();</script>
+</head>
+<body>
+<div id="app"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/rbac.js"></script>
+<script src="assets/auth.js"></script>
+<script src="assets/ui-helpers.js"></script>
+<script src="assets/layout.js"></script>
+
+<script>
+(function(){
+  const user = requireAuth();
+  if(!user) return;
+  if(!requireAccess("orders")) return;
+
+  const state = {
+    orders: JSON.parse(JSON.stringify(ORDERS)),
+    view: "table",
+    search: "",
+    status: "all",
+    type: "all",
+  };
+
+  function content(){
+    const total = state.orders.length;
+    const deal = state.orders.filter(o=>o.status==="deal");
+    const dealVal = deal.reduce((a,b)=>a+b.amount,0);
+    const proses = state.orders.filter(o=>["baru","diproses","negosiasi"].includes(o.status)).length;
+    const pipelineVal = state.orders.filter(o=>!["deal","gagal","dibatalkan"].includes(o.status)).reduce((a,b)=>a+b.amount,0);
+    const t = state.search.toLowerCase();
+    let list = state.orders.filter(o=>{
+      if(state.status!=="all" && o.status!==state.status) return false;
+      if(state.type!=="all" && o.type!==state.type) return false;
+      if(t && !(o.code.toLowerCase().includes(t) || o.contactName.toLowerCase().includes(t) || o.propertyTitle.toLowerCase().includes(t))) return false;
+      return true;
+    });
+
+    return `
+      <div class="space-y-5 animate-fade-in">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg grid place-items-center bg-emerald-600 text-white"><i data-lucide="ShoppingBag" class="w-5 h-5"></i></div>
+            <div><h2 class="text-lg font-bold">Manajemen Order</h2><p class="text-xs text-muted-foreground">${total} transaksi</p></div>
+          </div>
+          <button onclick="toast('Form buat order (demo)','info')" class="btn h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium"><i data-lucide="Plus" class="w-4 h-4"></i>Buat Order</button>
+        </div>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          ${[["Total Order",total,"ShoppingBag","emerald"],["Order Deal",deal.length+" · "+formatCurrency(dealVal),"BadgeCheck","emerald"],["Sedang Diproses",proses,"Loader","amber"],["Nilai Pipeline",formatCurrency(pipelineVal),"TrendingUp","violet"]].map(([l,v,i,t])=>`
+          <div class="card p-4"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-lg grid place-items-center ${TONE_BG[t]}"><i data-lucide="${i}" class="w-4 h-4"></i></div><div><p class="text-xs text-muted-foreground">${l}</p><p class="text-xl font-bold">${v}</p></div></div></div>`).join("")}
+        </div>
+
+        <div class="card p-4">
+          <div class="flex flex-col md:flex-row gap-3">
+            <div class="relative flex-1"><i data-lucide="Search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"></i><input id="oSearch" value="${escapeHtml(state.search)}" placeholder="Cari kode, klien, properti…" class="w-full h-9 pl-9 pr-3 rounded-md border border-input bg-background text-sm" /></div>
+            <select id="oStatus" class="h-9 rounded-md border border-input bg-background px-2 text-sm">
+              ${[["all","Semua Status"],["baru","Baru"],["diproses","Diproses"],["negosiasi","Negosiasi"],["deal","Deal"],["gagal","Gagal"],["dibatalkan","Dibatalkan"]].map(([k,l])=>`<option value="${k}" ${state.status===k?'selected':''}>${l}</option>`).join("")}
+            </select>
+            <select id="oType" class="h-9 rounded-md border border-input bg-background px-2 text-sm">
+              ${[["all","Semua Tipe"],["jual","Jual"],["sewa","Sewa"]].map(([k,l])=>`<option value="${k}" ${state.type===k?'selected':''}>${l}</option>`).join("")}
+            </select>
+            <div class="flex rounded-md border border-input overflow-hidden">
+              ${[["table","Table"],["kanban","Columns3"]].map(([k,i])=>`<button onclick="setView('${k}')" class="h-9 w-9 grid place-items-center ${state.view===k?'bg-emerald-600 text-white':'hover:bg-accent'}" aria-label="${k}"><i data-lucide="${i}" class="w-4 h-4"></i></button>`).join("")}
+            </div>
+          </div>
+        </div>
+
+        ${state.view==="table" ? `
+        <div class="card overflow-x-auto scroll-thin">
+          <table class="w-full text-sm min-w-[900px]">
+            <thead class="border-b border-border bg-muted/40"><tr class="text-left text-xs text-muted-foreground">
+              <th class="px-4 py-3 font-medium">Kode</th><th class="px-3 py-3 font-medium">Klien</th><th class="px-3 py-3 font-medium">Properti</th><th class="px-3 py-3 font-medium">Tipe</th><th class="px-3 py-3 font-medium">Nilai</th><th class="px-3 py-3 font-medium">Status</th><th class="px-3 py-3 font-medium">Agent</th><th class="px-3 py-3 font-medium">Tanggal</th><th class="px-3 py-3 font-medium">Aksi</th>
+            </tr></thead>
+            <tbody>
+              ${list.map(o=>`<tr class="border-b border-border/60 hover:bg-accent/50 cursor-pointer" onclick="openOrderDetail('${o.id}')">
+                <td class="px-4 py-3 font-mono text-xs">${o.code}</td>
+                <td class="px-3 py-3"><div class="flex items-center gap-2"><div class="w-7 h-7 rounded-full grid place-items-center text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50">${initials(o.contactName)}</div>${escapeHtml(o.contactName)}</div></td>
+                <td class="px-3 py-3 truncate max-w-[160px] text-muted-foreground">${escapeHtml(o.propertyTitle)}</td>
+                <td class="px-3 py-3"><span class="badge ${o.type==="jual"?'text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40':'text-amber-700 bg-amber-50 dark:bg-amber-950/40'}">${o.type==="jual"?"Jual":"Sewa"}</span></td>
+                <td class="px-3 py-3 font-semibold">${formatCurrency(o.amount)}</td>
+                <td class="px-3 py-3">${orderStatusBadge(o.status)}</td>
+                <td class="px-3 py-3 text-muted-foreground">${escapeHtml(o.agent)}</td>
+                <td class="px-3 py-3 text-xs text-muted-foreground">${o.createdAt}</td>
+                <td class="px-3 py-3"><button onclick="event.stopPropagation();openOrderDetail('${o.id}')" class="btn h-8 px-3 text-xs border border-border hover:bg-accent"><i data-lucide="Eye" class="w-3.5 h-3.5"></i>Lihat</button></td>
+              </tr>`).join("")}
+            </tbody>
+          </table>
+        </div>` : `
+        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3 overflow-x-auto scroll-thin">
+          ${["baru","diproses","negosiasi","deal","gagal"].map(st=>{
+            const items = list.filter(o=>o.status===st);
+            const m = ORDER_STATUS_META[st];
+            const sum = items.reduce((a,b)=>a+b.amount,0);
+            return `<div class="card p-3 flex flex-col" style="min-height:300px;">
+              <div class="flex items-center justify-between mb-2"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full ${m.dot}"></span><p class="text-sm font-semibold">${m.label}</p></div><span class="badge bg-secondary text-secondary-foreground">${items.length}</span></div>
+              <p class="text-[10px] text-muted-foreground mb-2">${formatCurrency(sum)}</p>
+              <div class="flex-1 space-y-2 overflow-y-auto scroll-thin max-h-[50vh]">
+                ${items.map(o=>`<button onclick="openOrderDetail('${o.id}')" class="w-full text-left p-3 rounded-lg border border-border hover:border-emerald-300 hover:bg-accent/50">
+                  <div class="flex items-center justify-between"><span class="font-mono text-[10px] text-muted-foreground">${o.code}</span><span class="badge ${o.type==="jual"?'text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40':'text-amber-700 bg-amber-50 dark:bg-amber-950/40'}">${o.type}</span></div>
+                  <p class="text-sm font-medium mt-1 truncate">${escapeHtml(o.propertyTitle)}</p>
+                  <p class="text-xs text-muted-foreground truncate">${escapeHtml(o.contactName)}</p>
+                  <p class="text-sm font-bold text-emerald-600 mt-1">${formatCurrency(o.amount)}</p>
+                  <p class="text-[10px] text-muted-foreground mt-1">${escapeHtml(o.agent)}</p>
+                </button>`).join("")}
+                ${items.length===0?`<p class="text-xs text-muted-foreground text-center py-4">Kosong</p>`:''}
+              </div>
+            </div>`;
+          }).join("")}
+        </div>`}
+      </div>`;
+  }
+
+  function openOrderDetail(id){
+    const o = state.orders.find(x=>x.id===id);
+    if(!o) return;
+    openModal({
+      title: o.code,
+      body: `
+        <div class="space-y-4">
+          <div class="flex items-center gap-2">${orderStatusBadge(o.status)}<span class="badge ${o.type==="jual"?'text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40':'text-amber-700 bg-amber-50 dark:bg-amber-950/40'}">${o.type==="jual"?"Jual":"Sewa"}</span></div>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="p-4 rounded-lg bg-emerald-50 dark:bg-emerald-950/40"><p class="text-xs text-muted-foreground">Nilai Transaksi</p><p class="text-xl font-bold text-emerald-700 dark:text-emerald-400">${formatFullCurrency(o.amount)}</p></div>
+            <div class="p-4 rounded-lg bg-muted/40"><p class="text-xs text-muted-foreground">Tipe</p><p class="text-xl font-bold capitalize">${o.type}</p></div>
+          </div>
+          <div class="p-3 rounded-md bg-muted/40 flex items-center gap-3"><div class="w-10 h-10 rounded-full grid place-items-center text-sm font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50">${initials(o.contactName)}</div><div><p class="text-xs text-muted-foreground">Klien</p><p class="font-medium">${escapeHtml(o.contactName)}</p></div></div>
+          <div class="p-3 rounded-md bg-muted/40"><p class="text-xs text-muted-foreground">Properti</p><p class="font-medium">${escapeHtml(o.propertyTitle)}</p></div>
+          <div><p class="text-xs text-muted-foreground mb-2">Timeline</p>
+            <div class="space-y-2 text-sm">
+              ${[["Order dibuat",o.createdAt,"sky"],["Klien dihubungi",o.createdAt,"amber"],["Survey properti","-",o.status==="baru"?"zinc":"violet"],["Negosiasi","-",["negosiasi","deal"].includes(o.status)?"violet":"zinc"],["Closing",["deal"].includes(o.status)?o.updatedAt:"-","emerald"]].map(([l,t,col])=>`<div class="flex items-center gap-3"><div class="w-2 h-2 rounded-full bg-${col}-500"></div><p class="flex-1">${l}</p><span class="text-xs text-muted-foreground">${t}</span></div>`).join("")}
+            </div>
+          </div>
+          <div class="p-3 rounded-md bg-muted/40 flex items-center gap-3"><div class="w-9 h-9 rounded-full grid place-items-center text-xs font-bold bg-violet-100 text-violet-700 dark:bg-violet-950/50">${initials(o.agent)}</div><div><p class="text-xs text-muted-foreground">Agent</p><p class="font-medium">${escapeHtml(o.agent)}</p></div></div>
+        </div>`,
+      footer: `<button onclick="closeModal()" class="btn h-9 px-4 border border-border hover:bg-accent">Tutup</button>
+        <button onclick="toast('Invoice dicetak','success');closeModal()" class="btn h-9 px-4 border border-border hover:bg-accent"><i data-lucide="Printer" class="w-4 h-4"></i>Cetak Invoice</button>
+        <a href="chatbot.html" onclick="closeModal()" class="btn h-9 px-4 bg-emerald-600 text-white hover:bg-emerald-700"><i data-lucide="MessageCircle" class="w-4 h-4"></i>Hubungi Klien</a>`
+    });
+  }
+
+  window.openOrderDetail = openOrderDetail;
+  window.setView = k=>{ state.view=k; rerender(); };
+  function rerender(){
+    const c = document.getElementById("content");
+    if(!c) return;
+    c.innerHTML = content();
+    initLayout();
+    wireUp();
+  }
+  function wireUp(){
+    const s = document.getElementById("oSearch");
+    if(s){ s.oninput = e=>{ state.search=e.target.value; rerender(); const n=document.getElementById("oSearch"); if(n){ n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }; }
+    const st = document.getElementById("oStatus"); if(st) st.onchange = e=>{ state.status=e.target.value; rerender(); };
+    const ty = document.getElementById("oType"); if(ty) ty.onchange = e=>{ state.type=e.target.value; rerender(); };
+  }
+
+  document.getElementById("app").innerHTML = renderLayoutShell("orders", content());
+  initLayout();
+  wireUp();
+})();
+</script>
+</body>
+</html>

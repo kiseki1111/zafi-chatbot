@@ -292,6 +292,7 @@ export class KnowledgeService {
         const fasilitas = getCol(['fasilitas', 'facilities']);
         const infoCicilan = getCol(['info cicilan', 'cicilan', 'installment info']);
         const linkGambar = getCol(['link gambar', 'gambar', 'imageurl', 'image url', 'image']);
+        const layoutDenah = getCol(['layout denah', 'denah', 'layout']);
 
         await this.prisma.property.create({
           data: {
@@ -309,6 +310,7 @@ export class KnowledgeService {
             facilities: fasilitas,
             installmentInfo: infoCicilan,
             imageUrl: linkGambar,
+            layoutDenah: layoutDenah,
           }
         });
         syncedCount++;

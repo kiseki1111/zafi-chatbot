@@ -7,6 +7,11 @@ import { AiService } from '../ai/ai.service';
 @Controller('api/v1/waha')
 export class WahaController {
   private readonly logger = new Logger(WahaController.name);
+  
+  private messageBuffer = new Map<string, { texts: string[], msgIds: Set<string>, timer: NodeJS.Timeout }>();
+  private processingQueue: Array<{ sessionName: string, sender: string, combinedText: string }> = [];
+  private isProcessingQueue = false;
+
   constructor(
     private readonly wahaService: WahaService,
     private readonly prisma: PrismaService,
@@ -16,7 +21,8 @@ export class WahaController {
   @Post('instances')
   async createInstance(@Body('name') name: string, @Body('webhookUrl') webhookUrl?: string, @Body('channelAccountId') channelAccountId?: string) {
     try {
-      return await this.wahaService.startSession(name, webhookUrl, channelAccountId);
+      const finalWebhookUrl = process.env.WEBHOOK_URL || webhookUrl;
+      return await this.wahaService.startSession(name, finalWebhookUrl, channelAccountId);
     } catch (error) {
       if (error.response?.status === 422) {
          this.logger.warn(`Session ${name} already exists or is invalid.`);
@@ -161,28 +167,37 @@ export class WahaController {
         const msgId = message.id?._serialized || message.id || 'unknown';
 
         try {
-          const contact = await this.prisma.contact.upsert({
-            where: { phone: contactNumber },
-            update: {
-              name: contactName || undefined,
-            },
-            create: {
-              phone: contactNumber,
-              name: contactName || contactNumber,
-            }
-          });
+          const contact = await this.prisma.contact.findUnique({ where: { phone: contactNumber } });
+          let contactId;
+          if (contact) {
+            await this.prisma.contact.update({
+              where: { id: contact.id },
+              data: {
+                name: contactName || undefined
+              }
+            });
+            contactId = contact.id;
+          } else {
+            const newContact = await this.prisma.contact.create({
+              data: {
+                phone: contactNumber,
+                name: contactName || contactNumber
+              }
+            });
+            contactId = newContact.id;
+          }
 
           const conversation = await this.prisma.conversation.upsert({
             where: {
-              instanceName_contactId: { instanceName: sessionName, contactId: contact.id }
+              instanceName_contactId: { instanceName: sessionName, contactId: contactId }
             },
             update: {
               lastMessageAt: new Date(message.timestamp ? message.timestamp * 1000 : Date.now()),
-              unreadCount: message.fromMe ? undefined : { increment: 1 }
+              unreadCount: message.fromMe ? 0 : { increment: 1 }
             },
             create: {
               instanceName: sessionName,
-              contactId: contact.id,
+              contactId: contactId,
               unreadCount: message.fromMe ? 0 : 1,
             }
           });
@@ -203,75 +218,60 @@ export class WahaController {
             }
           });
         } catch (e) {
-          this.logger.warn(`Failed to save message to DB: ${e.message}`);
+          if (e.code === 'P2002') {
+             this.logger.debug(`Concurrent webhook for ${contactNumber}, ignoring unique constraint.`);
+          } else {
+             this.logger.warn(`Failed to save message to DB: ${e.message}`);
+          }
         }
       }
       
-      // Auto-reply logic
-      if (payload.event === 'message' && !message.fromMe) {
-        const text = message.body?.toLowerCase();
+      // Debounce Auto-reply logic
+      if ((payload.event === 'message' || payload.event === 'message.any') && !message.fromMe) {
+        const text = message.body?.trim();
         const sender = message.from;
+        const msgId = message.id?._serialized || message.id || 'unknown';
 
-        if (sessionName === 'marketing-1' && message.body) {
-          // AI Luna Reply Logic
-          try {
-            const contact = await this.prisma.contact.findUnique({ where: { phone: sender } });
-            const conversation = contact ? await this.prisma.conversation.findUnique({
-              where: { instanceName_contactId: { instanceName: sessionName, contactId: contact.id } }
-            }) : null;
-            
-            let chatHistory: any[] = [];
-            if (conversation) {
-              chatHistory = await this.prisma.message.findMany({
-                where: { conversationId: conversation.id },
-                orderBy: { createdAt: 'desc' },
-                take: 10
-              });
-              chatHistory.reverse(); // Order from oldest to newest for context
-            }
-
-            const aiResponse = await this.aiService.generateLunaResponse(message.body, sender, chatHistory);
-            
-            // Check for Google Drive links or generic Image Host links (ImgBB, etc.)
-            const gdriveRegex = /https:\/\/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)(?:\/[^\s]*)?/gi;
-            const genericHostRegex = /https?:\/\/(?:[a-zA-Z0-9-]+\.)*(?:ibb\.co\.com|ibb\.co|postimg\.cc|postimages\.org)[^\s]*/gi;
-            const extensionRegex = /https?:\/\/[^\s]+\.(?:jpg|jpeg|png|webp|gif)/gi;
-            
-            const gdriveMatch = gdriveRegex.exec(aiResponse);
-            const genericMatch = genericHostRegex.exec(aiResponse);
-            const extensionMatch = extensionRegex.exec(aiResponse);
-
-            let imageUrl: string | null = null;
-            let matchedText: string | null = null;
-
-            if (gdriveMatch && gdriveMatch[1]) {
-              imageUrl = `https://drive.google.com/uc?export=download&id=${gdriveMatch[1]}`;
-              matchedText = gdriveMatch[0];
-            } else if (extensionMatch) {
-              imageUrl = extensionMatch[0];
-              matchedText = extensionMatch[0];
-            } else if (genericMatch) {
-              imageUrl = genericMatch[0];
-              matchedText = genericMatch[0];
-            }
-
-            if (imageUrl && matchedText) {
-              // Remove the messy link and the label from the text so the rest becomes a clean caption
-              const cleanCaption = aiResponse.replace(matchedText, '').replace(/Link Gambar:\s*\[?\]?/gi, '').trim();
-              
-              // Send AI Response as Image + Caption
-              await this.wahaService.sendImage(sessionName, sender, imageUrl, cleanCaption);
-            } else {
-              // Send AI Response as normal text
-              await this.wahaService.sendMessage(sessionName, sender, aiResponse);
-            }
-          } catch (error) {
-            this.logger.error(`Failed to generate Luna response: ${error.message}`);
-          }
-        } else if (text === 'ping') {
-           const replyText = 'Pong! Bot is active 🚀';
-           // Send ping response
-           await this.wahaService.sendMessage(payload.session, sender, replyText);
+        if (text) {
+             const bufferKey = `${sessionName}_${sender}`;
+             const existing = this.messageBuffer.get(bufferKey);
+             
+             if (existing) {
+               if (!existing.msgIds.has(msgId)) {
+                 clearTimeout(existing.timer);
+                 existing.texts.push(text);
+                 existing.msgIds.add(msgId);
+                 
+                 // Reset 10-second debounce
+                 existing.timer = setTimeout(() => {
+                   const buffered = this.messageBuffer.get(bufferKey);
+                   if (buffered) {
+                     const combinedText = buffered.texts.join('\n');
+                     this.processingQueue.push({ sessionName, sender, combinedText });
+                     this.messageBuffer.delete(bufferKey);
+                     
+                     this.logger.debug(`[Debounce] 10s passed. Queueing message from ${sender}. Queue length: ${this.processingQueue.length}`);
+                     this.processQueue();
+                   }
+                 }, 10000);
+               }
+             } else {
+               this.messageBuffer.set(bufferKey, {
+                 texts: [text],
+                 msgIds: new Set([msgId]),
+                 timer: setTimeout(() => {
+                   const buffered = this.messageBuffer.get(bufferKey);
+                   if (buffered) {
+                     const combinedText = buffered.texts.join('\n');
+                     this.processingQueue.push({ sessionName, sender, combinedText });
+                     this.messageBuffer.delete(bufferKey);
+                     
+                     this.logger.debug(`[Debounce] 10s passed. Queueing message from ${sender}. Queue length: ${this.processingQueue.length}`);
+                     this.processQueue();
+                   }
+                 }, 10000)
+               });
+             }
         }
       }
     } else if (payload?.event === 'message.ack') {
@@ -305,5 +305,86 @@ export class WahaController {
     }
     
     return { status: 'success' };
+  }
+
+  private async processQueue() {
+    if (this.isProcessingQueue) return;
+    this.isProcessingQueue = true;
+
+    while (this.processingQueue.length > 0) {
+      const task = this.processingQueue.shift();
+      if (!task) continue;
+
+      const { sessionName, sender, combinedText } = task;
+
+      try {
+        const instanceData = await this.prisma.whatsappInstance.findUnique({
+          where: { instanceName: sessionName },
+          include: { channelAccount: { include: { division: true } } }
+        });
+        
+        const isMarketingChannel = instanceData?.channelAccount?.name?.toLowerCase().includes('marketing') 
+                                || instanceData?.channelAccount?.division?.name?.toLowerCase() === 'marketing';
+
+        if (isMarketingChannel) {
+          const contact = await this.prisma.contact.findUnique({ where: { phone: sender } });
+          const conversation = contact ? await this.prisma.conversation.findUnique({
+            where: { instanceName_contactId: { instanceName: sessionName, contactId: contact.id } }
+          }) : null;
+          
+          let chatHistory: any[] = [];
+          if (conversation) {
+            chatHistory = await this.prisma.message.findMany({
+              where: { conversationId: conversation.id },
+              orderBy: { createdAt: 'desc' },
+              take: 10
+            });
+            chatHistory.reverse();
+          }
+
+          const aiResponse = await this.aiService.generateLunaResponse(combinedText, sender, chatHistory);
+          
+          const gdriveRegex = /https:\/\/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)(?:\/[^\s]*)?/gi;
+          const genericHostRegex = /https?:\/\/(?:[a-zA-Z0-9-]+\.)*(?:ibb\.co\.com|ibb\.co|postimg\.cc|postimages\.org)[^\s]*/gi;
+          const extensionRegex = /https?:\/\/[^\s]+\.(?:jpg|jpeg|png|webp|gif)/gi;
+          
+          const imageUrls: { url: string, rawText: string }[] = [];
+
+          let match;
+          while ((match = gdriveRegex.exec(aiResponse)) !== null) {
+            imageUrls.push({ url: `https://drive.google.com/uc?export=download&id=${match[1]}`, rawText: match[0] });
+          }
+          while ((match = extensionRegex.exec(aiResponse)) !== null) {
+            imageUrls.push({ url: match[0], rawText: match[0] });
+          }
+          while ((match = genericHostRegex.exec(aiResponse)) !== null) {
+            imageUrls.push({ url: match[0], rawText: match[0] });
+          }
+
+          this.logger.debug(`[AI RAW RESPONSE] ${aiResponse}`);
+          this.logger.debug(`[EXTRACTED IMAGES] ${JSON.stringify(imageUrls)}`);
+
+          if (imageUrls.length > 0) {
+            let cleanCaption = aiResponse;
+            for (const img of imageUrls) {
+              cleanCaption = cleanCaption.replace(img.rawText, '');
+            }
+            cleanCaption = cleanCaption.replace(/Link Gambar:\s*\[?\]?/gi, '').trim();
+            
+            await this.wahaService.sendImage(sessionName, sender, imageUrls[0].url, cleanCaption);
+            
+            for (let i = 1; i < imageUrls.length; i++) {
+              await this.wahaService.sendImage(sessionName, sender, imageUrls[i].url, '');
+            }
+          } else {
+            await this.wahaService.sendMessage(sessionName, sender, aiResponse);
+          }
+        }
+      } catch (error) {
+        this.logger.error(`Failed to process queue task for ${sender}: ${error.message}`);
+      }
+    }
+
+    this.isProcessingQueue = false;
   }
 }
