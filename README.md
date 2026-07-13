@@ -1,117 +1,96 @@
-# Role-Based Access Control (RBAC) Identity & Access Management Service
+# PropertiKu - AI Agent & RBAC Management System
 
-Sistem manajemen identitas dan kontrol akses berbasis peran granular (*Role-Based Access Control*) tingkat industri yang dibangun menggunakan kerangka kerja **NestJS**, **Prisma ORM**, dan database **PostgreSQL**. Proyek ini menerapkan arsitektur berlapis (*layered architecture*) yang kokoh, dilengkapi sistem keamanan otomatis, pencatatan forensik, serta mekanisme rotasi token ganda (*dual-token rotation*).
+PropertiKu adalah ekosistem aplikasi tingkat industri yang memadukan sistem **Role-Based Access Control (RBAC)**, **Frontend Dashboard (Next.js)**, dan **AI Agent (Telegram & WhatsApp)** untuk otomasi pemasaran dan manajemen agen properti.
 
----
-
-## 🛠️ Arsitektur & Fitur Keamanan Sistem
-
-Sistem ini dirancang dengan mengutamakan aspek keamanan data dan ketahanan infrastruktur melalui penerapan instrumen berikut:
-1. **HTTP Security Headers (Helmet)**: Melindungi aplikasi dari celah eksploitasi standar peramban seperti *Cross-Site Scripting* (XSS) dan *Clickjacking*.
-2. **Strict CORS Whitelist**: Membatasi hak akses lintas domain secara ketat hanya untuk domain frontend resmi yang terdaftar.
-3. **Mass Assignment Protection**: Mengunci gerbang validasi data masuk menggunakan `ValidationPipe` global dikombinasikan dengan DTO (*Data Transfer Object*) berbasis `class-validator` untuk membuang properti ilegal secara otomatis.
-4. **Security-First Rate Limiting**: Membatasi lalu lintas permintaan jaringan pada ambang batas aman (maksimal 100 permintaan per 15 menit) untuk memitigasi serangan tebak kata sandi (*Brute Force*).
-5. **Cryptographic Credential Hashing**: Mengamankan kata sandi pengguna menggunakan algoritma Bcrypt dengan tingkat kekuatan 12 putaran (*rounds*) sebelum disimpan ke media penyimpanan fisik.
-6. **Integritas Data Historis (Soft Delete)**: Menghindari kehilangan data permanen pada entitas pengguna dengan memanfaatkan mekanisme stempel waktu `deletedAt`.
-7. **Automated Audit Logging**: Mencatat setiap insiden penolakan hak akses (`ACCESS_DENIED`) secara mandiri ke dalam tabel forensik bersama metadata perangkat klien (IP Address & User Agent).
+Sistem ini dirancang menggunakan arsitektur berlapis yang kokoh dengan **NestJS**, **Prisma ORM**, dan database **PostgreSQL**.
 
 ---
 
-## 🚀 Panduan Instalasi & Menjalankan Proyek
+## Struktur Proyek
 
-Ikuti urutan komando terminal berikut secara berurutan untuk menyiapkan lingkungan pengembangan lokal:
+Proyek ini menggunakan struktur monorepo sederhana yang terbagi menjadi dua bagian utama:
+1. **Backend (`/`)**: Berisi core API NestJS, integrasi AI, integrasi Telegram/WhatsApp, dan manajemen database Prisma.
+2. **Frontend (`/ui`)**: Berisi aplikasi dashboard berbasis **Next.js** (Tailwind CSS & Shadcn UI) untuk memonitor percakapan AI, mengatur properti, dan manajemen agen/RBAC.
 
-### 1. Pemasangan Dependensi Pustaka
-Unduh seluruh pustaka pendukung yang diperlukan oleh kerangka kerja aplikasi:
-```bash
-npm install
-```
+---
 
-### 2. Sinkronisasi Skema Database Fisik
-Pastikan service PostgreSQL Anda di Docker/Lokal sudah menyala, lalu jalankan migrasi terstruktur Prisma untuk membentuk tabel fisik:
-```bash
-npx prisma migrate dev
-```
+## Fitur Utama
 
-### 3. Penyemaian Data Awal (Database Seeding)
-Jalankan skrip penyemaian untuk mendaftarkan akun penguasa tertinggi (Super Admin), daftar peran, dan hak akses granular dasar:
-```bash
-npx prisma db seed
-```
-**Kredensial Akun Master:**
+### 1. AI Customer Service Agent (Luna)
+- **Multi-Channel**: Berjalan otomatis di Telegram dan WhatsApp (menggunakan WAHA).
+- **RAG Knowledge Base**: AI merespon berdasarkan database pintar yang bisa di-*update* secara dinamis melalui Google Sheets atau file lokal.
+- **Image Handling**: AI dapat mendeteksi properti yang diminta dan otomatis mengirimkan denah / foto wujud rumah langsung ke *customer* lengkap dengan *caption* teks.
+
+### 2. Role-Based Access Control (RBAC) 
+- Sistem manajemen akses pengguna yang granular (Super Admin, Admin, Agent).
+- Keamanan tinggi dengan *Mass Assignment Protection*, *Cryptographic Credential Hashing* (Bcrypt), dan JWT Authentication.
+- Perlindungan *Brute Force* (Rate Limiting).
+
+### 3. Ekosistem Frontend (Next.js)
+- Dashboard pemantauan *real-time* untuk seluruh aktivitas chat AI.
+- Manajemen properti, input *knowledge base*, dan CRM *(Customer Relationship Management)*.
+- Desain antarmuka modern yang estetik menggunakan *glassmorphism* dan *dark mode*.
+
+---
+
+## Panduan Instalasi (Development)
+
+Berikut adalah panduan lengkap menjalankan proyek ini di mesin lokal:
+
+### A. Persiapan Backend (NestJS)
+1. **Install Dependensi:**
+   ```bash
+   npm install
+   ```
+2. **Pengaturan Lingkungan (.env):**
+   Pastikan Anda telah mengisi file `.env` dengan kredensial yang tepat (seperti `DATABASE_URL`, `OPENAI_API_KEY`, dan `TELEGRAM_BOT_TOKEN`).
+3. **Migrasi Database:**
+   ```bash
+   npx prisma db push
+   ```
+4. **Jalankan Server Backend:**
+   ```bash
+   npm run start:dev
+   ```
+   *Backend akan berjalan di `http://localhost:3000`*
+
+### B. Persiapan Frontend (Next.js)
+1. **Masuk ke folder UI dan install dependensi:**
+   ```bash
+   cd ui
+   npm install
+   ```
+2. **Jalankan Server Frontend:**
+   ```bash
+   npm run dev
+   ```
+   *Frontend akan berjalan di `http://localhost:3001`*
+
+---
+
+## Ekspor & Impor Database
+
+Untuk mempermudah sinkronisasi data antar *developer*, Anda dapat menggunakan *script* bawaan:
+
+- **Ekspor Database**:
+  ```bash
+  node scripts/export-db.js
+  ```
+  *(Akan menghasilkan file `database-backup.json` / `.sql`)*
+
+- **Impor Database**:
+  ```bash
+  node scripts/import-db.js
+  ```
+  *(Memasukkan seluruh data, termasuk embedding vektor AI ke lokal Anda)*
+
+---
+
+## Kredensial Bawaan (Super Admin)
+
+Gunakan akun ini untuk masuk ke dalam Dashboard Frontend pertama kali:
 - **Email:** superadmin@gmail.com
 - **Password:** rahasia123
 
-### 4. Menjalankan Server Lokal
-Nyalakan server NestJS dalam mode pengembangan (development mode):
-```bash
-npm run start:dev
-```
-Server akan berjalan secara lokal pada tautan: `http://localhost:3000`
-
 ---
-
-## 🛣️ Dokumentasi Struktur URL Endpoint API (v1)
-Seluruh jalur komunikasi antarmuka wajib menggunakan awalan konteks `/api/v1`.
-
-### 1. Modul Otentikasi (Authentication)
-| Method | Endpoint URL | Fungsi Operasional | Proteksi Gerbang |
-|--------|-------------|-------------------|------------------|
-| POST | `/api/v1/auth/login` | Penyerahan kredensial untuk mendapatkan Access Token | Publik (`@Public`) |
-| POST | `/api/v1/auth/logout` | Penghancuran sesi dan penghapusan Refresh Token | `JwtAuthGuard` |
-| POST | `/api/v1/auth/refresh` | Pembaruan Access Token lewat mekanisme rotasi tunggal | `JwtAuthGuard` |
-
-### 2. Modul Pengguna (User CRUD)
-| Method | Endpoint URL | Fungsi Operasional | Izin Granular (Permissions) |
-|--------|-------------|-------------------|-----------------------------|
-| GET | `/api/v1/users` | Menampilkan seluruh daftar pengguna aktif | `user:read` |
-| GET | `/api/v1/users/:id` | Mengambil data satu pengguna berdasarkan ID | `user:read` |
-| POST | `/api/v1/users` | Membuat rekor data pengguna baru di sistem | `user:create` |
-| PATCH | `/api/v1/users/:id` | Memperbarui baris data pengguna spesifik | `user:update` |
-| DELETE | `/api/v1/users/:id` | Menandai pengguna dengan status *soft delete* | `user:delete` |
-
-### 3. Modul Peran (Role CRUD)
-| Method | Endpoint URL | Fungsi Operasional | Izin Granular (Permissions) |
-|--------|-------------|-------------------|-----------------------------|
-| GET | `/api/v1/roles` | Menampilkan seluruh rekor jabatan sistem | `role:read` |
-| GET | `/api/v1/roles/:id` | Mengambil data satu peran berdasarkan ID | `role:read` |
-| POST | `/api/v1/roles` | Membuat peran baru (Format: UPPERCASE/snake_case) | `role:create` |
-| PATCH | `/api/v1/roles/:id` | Memperbarui data peran (Proteksi khusus SUPER_ADMIN) | `role:update` |
-| DELETE | `/api/v1/roles/:id` | Menghapus peran (Proteksi khusus SUPER_ADMIN) | `role:delete` |
-
-### 4. Modul Izin (Permission CRUD)
-| Method | Endpoint URL | Fungsi Operasional | Izin Granular (Permissions) |
-|--------|-------------|-------------------|-----------------------------|
-| GET | `/api/v1/permissions` | Menampilkan seluruh izin granular sistem | `permission:read` |
-| GET | `/api/v1/permissions/:id` | Mengambil data satu izin berdasarkan ID | `permission:read` |
-| POST | `/api/v1/permissions` | Membuat izin baru terikat aturan unik ganda | `permission:create` |
-
-### 5. Modul Penugasan (Assignment via Junction Table)
-| Method | Endpoint URL | Request Body (JSON) | Fungsi Operasional |
-|--------|-------------|---------------------|-------------------|
-| POST | `/api/v1/user-roles` | `{ "userId": "CUID", "roleId": "UUID" }` | Menugaskan jabatan peran kepada pengguna |
-| POST | `/api/v1/role-permissions` | `{ "roleId": "UUID", "permissionId": "UUID" }` | Menempelkan hak akses izin kepada jabatan peran |
-
----
-
-## 🧪 Metode Pengujian Validasi Sistem (Postman)
-Koleksi berkas pengujian API telah diekspor dan dilampirkan pada direktori proyek: `docs/postman/koleksi_api_v1.json`.
-
-**Skenario Verifikasi Kekebalan Otorisasi (RBAC Penetration Test)**
-1. Lakukan request `POST /api/v1/auth/login` menggunakan akun non-admin yang telah dibuat.
-2. Salin string `accessToken` dari respon sukses, lalu sematkan pada tab **Authorization** Postman dengan tipe **Bearer Token**.
-3. Eksekusi permintaan `GET /api/v1/users` menggunakan token non-admin tersebut.
-
-**Hasil yang Diharapkan:** Server menolak secara absolut dengan kode status `403 Forbidden` dan mengembalikan respon JSON terstandardisasi:
-```json
-{
-  "statusCode": 403,
-  "message": [
-    "Anda tidak memiliki hak akses yang cukup untuk mengeksekusi aksi ini."
-  ]
-}
-```
-Periksa tabel `audit_logs` di database, pastikan rekor log percobaan peretasan tersebut telah terekam secara otomatis demi kebutuhan investigasi forensik.
-
----
-
+*Dibuat oleh Tim Pengembang PropertiKu | 2026*

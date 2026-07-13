@@ -59,3 +59,7 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 # Google Cloud Credentials
 zafi-project-*.json
+
+# Database Backups
+database-backup.json
+database-backup.sql
