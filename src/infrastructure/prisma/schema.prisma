@@ -404,3 +404,30 @@ model OnboardingSession {
 
   @@map("onboarding_sessions")
 }
+
+// --- DESIGN BOT (telegram-ai-bot merged) ---
+
+model DesignSession {
+  id         String   @id @default(uuid())
+  userId     String   @unique @map("user_id")
+  step       String   @default("prompting") @db.VarChar(50)
+  data       Json     @default("{}")
+  lastActive DateTime @default(now()) @map("last_active")
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("design_sessions")
+}
+
+model DesignGeneration {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  prompt     String?  @db.Text
+  imageUrl   String?  @db.Text @map("image_url")
+  designType String?  @db.VarChar(50) @map("design_type")
+  status     String   @default("success") @db.VarChar(20)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("design_generations")
+}

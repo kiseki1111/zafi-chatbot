@@ -5,6 +5,7 @@ import { AiService } from '../ai/ai.service';
 import { ConfigService } from '@nestjs/config';
 import { OnboardingService } from '../onboarding/onboarding.service';
 import { OnboardingState } from '../onboarding/onboarding-states';
+import { DesignFlowService } from './design/design-flow.service';
 import axios from 'axios';
 const sharp = require('sharp');
 
@@ -13,17 +14,25 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TelegramService.name);
   private csBot: TelegramBot | null = null;
   private onboardingBot: TelegramBot | null = null;
+  private designBot: TelegramBot | null = null;
   private readonly INSTANCE_NAME = 'telegram-dev-bot';
   
+  // Buffer & queue untuk CS bot
   private messageBuffer = new Map<string, { texts: string[], msgIds: Set<string>, timer: NodeJS.Timeout }>();
   private processingQueue: Array<{ sender: string, combinedText: string }> = [];
   private isProcessingQueue = false;
+
+  // Buffer untuk Design bot (debounce 5 detik untuk teks)
+  private designUserBuffers = new Map<string, string[]>();
+  private designUserTimers = new Map<string, NodeJS.Timeout>();
+  private readonly DESIGN_DEBOUNCE_MS = 5000;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly aiService: AiService,
     private readonly configService: ConfigService,
     private readonly onboardingService: OnboardingService,
+    private readonly designFlowService: DesignFlowService,
   ) {}
 
   async onModuleInit() {
@@ -56,6 +65,22 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
         });
       }
 
+      const designToken = this.configService.get<string>('TELEGRAM_BOT_DESIGN_API');
+      if (designToken) {
+        this.designBot = new TelegramBot(designToken, { polling: true });
+        this.logger.log('Design Telegram Bot initialized.');
+
+        this.designBot.on('message', async (msg) => {
+          await this.handleDesignMessage(msg);
+        });
+
+        this.designBot.on('polling_error', (err) => {
+          this.logger.error(`Design bot polling error: ${err.message}`);
+        });
+      } else {
+        this.logger.warn('TELEGRAM_BOT_DESIGN_API not set. Design Bot will not start.');
+      }
+
     } catch (e) {
       this.logger.error(`Failed to initialize Telegram Bots: ${e.message}`);
     }
@@ -69,6 +94,10 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     if (this.onboardingBot) {
       await this.onboardingBot.stopPolling();
       this.logger.log('Onboarding Telegram Bot polling stopped.');
+    }
+    if (this.designBot) {
+      await this.designBot.stopPolling();
+      this.logger.log('Design Telegram Bot polling stopped.');
     }
   }
 
@@ -145,6 +174,60 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       await this.onboardingBot?.sendMessage(chatId, 'Silakan ketik /onboarding untuk mendaftar.');
     }
   }
+
+  // ─── Design Bot Handler ────────────────────────────────────────────────────
+  private async handleDesignMessage(msg: any): Promise<void> {
+    const userId = msg.chat.id;
+    const text: string | undefined = msg.text?.trim();
+    const photo = msg.photo;
+
+    if (!text && !photo) return;
+
+    // Command atau gambar → langsung proses tanpa debounce
+    if (text === '/start' || text === '/baru' || photo) {
+      if (this.designUserTimers.has(userId)) {
+        clearTimeout(this.designUserTimers.get(userId)!);
+        this.designUserTimers.delete(userId);
+      }
+      this.designUserBuffers.delete(userId);
+      try {
+        await this.designFlowService.handle(this.designBot!, msg);
+      } catch (err: any) {
+        this.logger.error(`Design flow error: ${err.message}`);
+        await this.designBot?.sendMessage(userId, '❌ Terjadi kesalahan. Coba ketik /start untuk mulai ulang.');
+      }
+      return;
+    }
+
+    // Teks biasa → debounce 5 detik (gabung pesan pendek)
+    const currentBuffer = this.designUserBuffers.get(userId) || [];
+    currentBuffer.push(text!);
+    this.designUserBuffers.set(userId, currentBuffer);
+
+    if (this.designUserTimers.has(userId)) {
+      clearTimeout(this.designUserTimers.get(userId)!);
+    }
+
+    const timer = setTimeout(async () => {
+      const texts = this.designUserBuffers.get(userId) || [];
+      if (texts.length === 0) return;
+
+      const combinedText = texts.join('\n');
+      this.designUserBuffers.delete(userId);
+      this.designUserTimers.delete(userId);
+
+      const combinedMsg = { ...msg, text: combinedText, photo: undefined };
+      try {
+        await this.designFlowService.handle(this.designBot!, combinedMsg);
+      } catch (err: any) {
+        this.logger.error(`Design flow error: ${err.message}`);
+        await this.designBot?.sendMessage(userId, '❌ Terjadi kesalahan. Coba ketik /start untuk mulai ulang.');
+      }
+    }, this.DESIGN_DEBOUNCE_MS);
+
+    this.designUserTimers.set(userId, timer);
+  }
+  // ──────────────────────────────────────────────────────────────────────────
 
   private async handleCSMessage(msg: any) {
     if (!msg.text) return;

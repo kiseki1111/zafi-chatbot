@@ -38,6 +38,7 @@
     "@nestjs/throttler": "^6.5.0",
     "@prisma/adapter-pg": "^6.19.3",
     "@prisma/client": "^6.19.3",
+    "@supabase/supabase-js": "^2.110.6",
     "axios": "^1.18.1",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
