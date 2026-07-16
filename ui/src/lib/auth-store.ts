@@ -13,7 +13,7 @@ interface AuthState {
   authView: AuthView;
   setAuthView: (v: AuthView) => void;
   login: (email: string, password: string) => { ok: boolean; message?: string };
-  loginAs: (role: Role, division?: import("./types").Division | null) => void;
+  loginAs: (role: Role) => void;
   googleLogin: (idToken: string) => Promise<{ ok: boolean; message?: string }>;
   register: (data: { name: string; email: string; phone: string; password: string }) => { ok: boolean; message?: string };
   logout: () => void;
@@ -34,7 +34,6 @@ export const useAuthStore = create<AuthState>()(
             name: email.split("@")[0] || "Pengguna",
             email,
             role: "superadmin",
-            division: null,
             status: "active",
             createdAt: "2024-01-01",
             lastLogin: new Date().toISOString().slice(0, 16).replace("T", " "),
@@ -44,13 +43,12 @@ export const useAuthStore = create<AuthState>()(
         }
         return { ok: false, message: "Email atau password salah." };
       },
-      loginAs: (role: Role, division?: import("./types").Division | null) => {
+      loginAs: (role: Role) => {
         const user: User = {
-          id: "u-" + role + (division ? "-" + division : ""),
+          id: "u-" + role,
           name: role === "superadmin" ? "Superadmin Global" : `Demo ${role}`,
-          email: `${role}${division ? "." + division : ""}@propertiku.id`,
+          email: `${role}@umkm.id`,
           role,
-          division: division || null,
           status: "active",
           createdAt: "2024-01-01",
           lastLogin: new Date().toISOString().slice(0, 16).replace("T", " "),
@@ -75,7 +73,6 @@ export const useAuthStore = create<AuthState>()(
             name: data.user.name,
             email: data.user.email,
             role: (data.user.roles && data.user.roles.length > 0) ? data.user.roles[0].toLowerCase() : "operator", 
-            division: data.user.division ? data.user.division.toLowerCase() : null,
             status: "active",
             createdAt: new Date().toISOString().slice(0, 10),
             lastLogin: new Date().toISOString().slice(0, 16).replace("T", " ")
@@ -108,6 +105,6 @@ export const useAuthStore = create<AuthState>()(
       },
       logout: () => set({ user: null, isAuthenticated: false, authView: "login" }),
     }),
-    { name: "propertiku-auth" },
+    { name: "umkm-auth" },
   ),
 );

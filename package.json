@@ -24,11 +24,10 @@
     "prisma:studio": "npx prisma studio --schema=src/infrastructure/prisma/schema.prisma"
   },
   "prisma": {
+    "schema": "src/infrastructure/prisma/schema.prisma",
     "seed": "ts-node src/infrastructure/prisma/seed.ts"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
-    "@nestjs/axios": "^4.0.1",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.0.1",
@@ -44,11 +43,9 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "csv-parser": "^3.2.1",
-    "dotenv": "^17.4.2",
     "google-auth-library": "^10.9.0",
     "googleapis": "^173.0.0",
     "helmet": "^8.2.0",
-    "nest-winston": "^1.10.2",
     "node-telegram-bot-api": "^1.1.2",
     "openai": "^6.46.0",
     "passport": "^0.7.0",
@@ -56,8 +53,7 @@
     "pg": "^8.22.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "sharp": "^0.35.3",
-    "winston": "^3.19.0"
+    "sharp": "^0.35.3"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

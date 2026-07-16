@@ -3,7 +3,7 @@
 import { Building2, LogOut, ChevronLeft } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { useAppStore } from "@/lib/app-store";
-import { menuForRoleAndDivision, ROLE_LABELS, ROLE_THEME, DIVISION_LABELS } from "@/lib/rbac";
+import { menuForRole, ROLE_LABELS, ROLE_THEME } from "@/lib/rbac";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -15,7 +15,7 @@ export function Sidebar() {
   const { view, setView, setSidebarOpen } = useAppStore();
 
   if (!user) return null;
-  const items = menuForRoleAndDivision(user.role, user.division);
+  const items = menuForRole(user.role);
   const theme = ROLE_THEME[user.role];
 
   const go = (v: ViewKey) => setView(v);
@@ -28,8 +28,8 @@ export function Sidebar() {
           <Building2 className="h-5 w-5" />
         </div>
         <div className="min-w-0">
-          <p className="font-bold text-sm leading-tight truncate">PropertiKu Agent</p>
-          <p className="text-[10px] text-muted-foreground truncate">AI · WhatsApp Waha</p>
+          <p className="font-bold text-sm leading-tight truncate">UMKM Assistant</p>
+          <p className="text-[10px] text-muted-foreground truncate">AI · WhatsApp Bot</p>
         </div>
         <Button
           variant="ghost"
@@ -77,7 +77,7 @@ export function Sidebar() {
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold truncate leading-tight">{user.name}</p>
             <p className={cn("text-[10px] font-medium uppercase", theme.color)}>
-              {ROLE_LABELS[user.role]} {user.division ? `· ${DIVISION_LABELS[user.division]}` : ""}
+              {ROLE_LABELS[user.role]}
             </p>
           </div>
           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={logout} title="Keluar">

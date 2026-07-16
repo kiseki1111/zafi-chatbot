@@ -1,15 +1,18 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import TelegramBot from 'node-telegram-bot-api';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
 import { ConfigService } from '@nestjs/config';
+import { OnboardingService } from '../onboarding/onboarding.service';
+import { OnboardingState } from '../onboarding/onboarding-states';
 import axios from 'axios';
 const sharp = require('sharp');
 
 @Injectable()
-export class TelegramService implements OnModuleInit {
+export class TelegramService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TelegramService.name);
-  private bot: TelegramBot | null = null;
+  private csBot: TelegramBot | null = null;
+  private onboardingBot: TelegramBot | null = null;
   private readonly INSTANCE_NAME = 'telegram-dev-bot';
   
   private messageBuffer = new Map<string, { texts: string[], msgIds: Set<string>, timer: NodeJS.Timeout }>();
@@ -20,44 +23,63 @@ export class TelegramService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly aiService: AiService,
     private readonly configService: ConfigService,
+    private readonly onboardingService: OnboardingService,
   ) {}
 
   async onModuleInit() {
-    const token = this.configService.get<string>('TELEGRAM_BOT_TOKEN');
-    if (!token) {
-      this.logger.warn('TELEGRAM_BOT_TOKEN is not defined in .env. Telegram dev bot will not start.');
-      return;
+    const csToken = this.configService.get<string>('TELEGRAM_BOT_CS_API');
+    const onboardingToken = this.configService.get<string>('TELEGRAM_BOT_ONBOARDING_API');
+
+    if (!csToken || !onboardingToken) {
+      this.logger.warn('TELEGRAM_BOT_CS_API or TELEGRAM_BOT_ONBOARDING_API is not defined. Bots might not start.');
     }
 
     try {
-      this.bot = new TelegramBot(token, { polling: true });
-      this.logger.log('Telegram Bot initialized for development with polling.');
-
       // Ensure mock instance exists in DB so UI can see it
       await this.ensureMockInstance();
 
-      this.bot.on('message', async (msg) => {
-        await this.handleIncomingMessage(msg);
-      });
+      if (csToken) {
+        this.csBot = new TelegramBot(csToken, { polling: true });
+        this.logger.log('CS Telegram Bot initialized.');
+        
+        this.csBot.on('message', async (msg) => {
+          await this.handleCSMessage(msg);
+        });
+      }
+
+      if (onboardingToken) {
+        this.onboardingBot = new TelegramBot(onboardingToken, { polling: true });
+        this.logger.log('Onboarding Telegram Bot initialized.');
+        
+        this.onboardingBot.on('message', async (msg) => {
+          await this.handleOnboardingMessage(msg);
+        });
+      }
 
     } catch (e) {
-      this.logger.error(`Failed to initialize Telegram Bot: ${e.message}`);
+      this.logger.error(`Failed to initialize Telegram Bots: ${e.message}`);
+    }
+  }
+
+  async onModuleDestroy() {
+    if (this.csBot) {
+      await this.csBot.stopPolling();
+      this.logger.log('CS Telegram Bot polling stopped.');
+    }
+    if (this.onboardingBot) {
+      await this.onboardingBot.stopPolling();
+      this.logger.log('Onboarding Telegram Bot polling stopped.');
     }
   }
 
   private async ensureMockInstance() {
-    // Create a mock channel account for telegram if not exist
     let channel = await this.prisma.channelAccount.findFirst({
       where: { name: 'Telegram Development' }
     });
     
     if (!channel) {
       channel = await this.prisma.channelAccount.create({
-        data: {
-          name: 'Telegram Development',
-          platform: 'TELEGRAM',
-          isActive: true
-        }
+        data: { name: 'Telegram Development', platform: 'TELEGRAM', isActive: true }
       });
     }
 
@@ -74,15 +96,65 @@ export class TelegramService implements OnModuleInit {
     });
   }
 
-  private async handleIncomingMessage(msg: any) {
-    if (!msg.text) return; // Only process text messages for now
+  private async handleOnboardingMessage(msg: any) {
+    if (!msg.text) return;
 
     const chatId = msg.chat.id.toString();
     const senderName = msg.from?.first_name || 'Telegram User';
     const text = msg.text;
+
+    this.logger.log(`\n[ONBOARDING BOT] Dari: ${chatId} (${senderName}) | Isi: "${text}"\n`);
+
+    if (text.startsWith('/reset')) {
+      const existingSession = await this.prisma.onboardingSession.findUnique({ where: { chatId } });
+      if (existingSession) {
+        await this.prisma.onboardingSession.delete({ where: { chatId } });
+        if (existingSession.tenantId) {
+          await this.prisma.tenant.delete({ where: { id: existingSession.tenantId } }).catch(() => {});
+        }
+      }
+      await this.onboardingBot?.sendMessage(chatId, 'Data onboarding Anda telah direset. Silakan ketik /onboarding untuk memulai dari awal.');
+      return;
+    }
+
+    if (text.startsWith('/onboarding') || text.startsWith('/start')) {
+      const existingSession = await this.prisma.onboardingSession.findUnique({ where: { chatId } });
+      if (existingSession && existingSession.state === OnboardingState.COMPLETED) {
+        await this.onboardingBot?.sendMessage(chatId, 'Toko Anda sudah selesai di-onboard. Jika ingin mengulang dari awal, ketik /reset.');
+        return;
+      }
+      
+      const session = await this.prisma.onboardingSession.upsert({
+        where: { chatId },
+        update: { state: OnboardingState.IN_PROGRESS, data: {} },
+        create: { chatId, state: OnboardingState.IN_PROGRESS, platform: 'TELEGRAM' }
+      });
+
+      await this.onboardingService.handleMessage(chatId, 'Halo, saya ingin mendaftarkan toko saya dari awal.', session, async (cid, t) => {
+        await this.onboardingBot?.sendMessage(cid, t);
+      });
+      return;
+    }
+
+    const session = await this.prisma.onboardingSession.findUnique({ where: { chatId } });
+    if (session && session.state !== OnboardingState.COMPLETED) {
+      await this.onboardingService.handleMessage(chatId, text, session, async (cid, t) => {
+        await this.onboardingBot?.sendMessage(cid, t);
+      });
+    } else {
+      await this.onboardingBot?.sendMessage(chatId, 'Silakan ketik /onboarding untuk mendaftar.');
+    }
+  }
+
+  private async handleCSMessage(msg: any) {
+    if (!msg.text) return;
+
+    const chatId = msg.chat.id.toString();
+    const senderName = msg.from?.first_name || 'Customer';
+    const text = msg.text;
     const msgId = msg.message_id.toString();
 
-    this.logger.log(`\n[TELEGRAM PESAN BARU] Dari: ${chatId} (${senderName}) | Isi: "${text}"\n`);
+    this.logger.log(`\n[CS BOT] Dari: ${chatId} (${senderName}) | Isi: "${text}"\n`);
 
     try {
       // 1. Upsert Contact
@@ -122,15 +194,14 @@ export class TelegramService implements OnModuleInit {
           metadata: msg
         }
       });
-
     } catch (e) {
-      this.logger.warn(`Failed to save Telegram message to DB: ${e.message}`);
+      this.logger.warn(`Failed to save CS message to DB: ${e.message}`);
     }
 
     // Buffer logic (10s debounce)
     const bufferKey = chatId;
+
     const existing = this.messageBuffer.get(bufferKey);
-    
     if (existing) {
       if (!existing.msgIds.has(msgId)) {
         clearTimeout(existing.timer);
@@ -190,8 +261,12 @@ export class TelegramService implements OnModuleInit {
           chatHistory.reverse();
         }
 
-        this.bot?.sendChatAction(sender, 'typing');
-        const aiResponse = await this.aiService.generateLunaResponse(combinedText, sender, chatHistory);
+        // For dev CS Bot, we just use the first tenant we can find
+        const firstTenant = await this.prisma.tenant.findFirst();
+        const tenantId = firstTenant?.id;
+
+        this.csBot?.sendChatAction(sender, 'typing');
+        const aiResponse = await this.aiService.generateLunaResponse(combinedText, sender, chatHistory, tenantId);
         
         // Extract images
         const gdriveRegex = /https:\/\/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)(?:\/[^\s]*)?/gi;
@@ -209,32 +284,25 @@ export class TelegramService implements OnModuleInit {
           }
         });
 
-        // Clean up empty bullet points left behind (e.g. "- Layout Denah: ")
         cleanText = cleanText.replace(/^\s*-\s*.*?:\s*$/gm, '').trim();
-        // Clean up excessive newlines left behind
         cleanText = cleanText.replace(/\n{3,}/g, '\n\n');
 
-        this.logger.debug(`[TELEGRAM AI RESPONSE] ${cleanText}`);
+        this.logger.debug(`[CS BOT RESPONSE] ${cleanText}`);
         
         let sentTextAsCaption = false;
 
-        // Send to Telegram
         if (extractedImages.length > 0) {
           for (let i = 0; i < extractedImages.length; i++) {
             const imgUrl = extractedImages[i];
             try {
               let photoData: any = imgUrl;
-
-              // Check if it's a Google Drive link
               const gdriveMatch = /https:\/\/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/i.exec(imgUrl);
               if (gdriveMatch) {
                 const fileId = gdriveMatch[1];
-                // Use uc?export=download to bypass HTML viewer
                 const directUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
                 const response = await axios.get(directUrl, { responseType: 'arraybuffer' });
                 let buffer = Buffer.from(response.data);
                 
-                // Compress if larger than 5MB
                 if (buffer.length > 5 * 1024 * 1024) {
                    buffer = await sharp(buffer)
                      .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
@@ -245,14 +313,12 @@ export class TelegramService implements OnModuleInit {
               }
 
               const options: any = {};
-              
-              // Add caption to the first image if text fits
               if (i === 0 && cleanText && cleanText.length <= 1024) {
                 options.caption = cleanText;
                 sentTextAsCaption = true;
               }
 
-              await this.bot?.sendPhoto(sender, photoData, options).catch(e => this.logger.warn(`Telegram failed to send photo: ${e.message}`));
+              await this.csBot?.sendPhoto(sender, photoData, options).catch(e => this.logger.warn(`Telegram failed to send photo: ${e.message}`));
             } catch (e) {
               this.logger.warn(`Failed to process or send image ${imgUrl}: ${e.message}`);
             }
@@ -261,7 +327,7 @@ export class TelegramService implements OnModuleInit {
         
         if (cleanText) {
           if (!sentTextAsCaption) {
-            const sentMsg = await this.bot?.sendMessage(sender, cleanText);
+            const sentMsg = await this.csBot?.sendMessage(sender, cleanText);
             
             if (sentMsg && conversation) {
               await this.prisma.message.create({
@@ -277,11 +343,10 @@ export class TelegramService implements OnModuleInit {
               });
             }
           } else {
-             // If sent as caption, we still record the text in the DB for the dashboard
              if (conversation) {
                await this.prisma.message.create({
                   data: {
-                    wahaMessageId: Date.now().toString(), // Mock ID since caption message_id is shared with photo
+                    wahaMessageId: Date.now().toString(),
                     conversationId: conversation.id,
                     senderType: 'bot',
                     messageType: 'text',
@@ -295,7 +360,7 @@ export class TelegramService implements OnModuleInit {
         }
       } catch (error) {
         this.logger.error(`Error processing AI for Telegram: ${error.message}`);
-        await this.bot?.sendMessage(sender, 'Maaf, sistem AI sedang mengalami gangguan. Mohon coba beberapa saat lagi.');
+        await this.csBot?.sendMessage(sender, 'Maaf, sistem AI sedang mengalami gangguan. Mohon coba beberapa saat lagi.');
       }
     }
 

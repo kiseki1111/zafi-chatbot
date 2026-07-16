@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
+import axios from 'axios';
 import { ConfigService } from '@nestjs/config';
-import { firstValueFrom } from 'rxjs';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 
 @Injectable()
@@ -11,7 +10,6 @@ export class WahaService {
   private readonly apiKey: string;
 
   constructor(
-    private readonly httpService: HttpService,
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
   ) {
@@ -54,22 +52,18 @@ export class WahaService {
   async sendTypingPresence(sessionName: string, chatId: string): Promise<void> {
     try {
       // Try older API pattern where session is passed in the body
-      await firstValueFrom(
-        this.httpService.post(
-          `${this.baseUrl}/api/startTyping`,
-          { session: sessionName, chatId: chatId },
-          { headers: this.getHeaders() }
-        )
+      await axios.post(
+        `${this.baseUrl}/api/startTyping`,
+        { session: sessionName, chatId: chatId },
+        { headers: this.getHeaders() }
       );
     } catch (error) {
       try {
         // Fallback to newer API pattern
-        await firstValueFrom(
-          this.httpService.post(
-            `${this.baseUrl}/api/sessions/${sessionName}/presence`,
-            { chatId: chatId, presence: 'typing' },
-            { headers: this.getHeaders() }
-          )
+        await axios.post(
+          `${this.baseUrl}/api/sessions/${sessionName}/presence`,
+          { chatId: chatId, presence: 'typing' },
+          { headers: this.getHeaders() }
         );
       } catch (innerError) {
         this.logger.debug(`Could not send typing presence for ${sessionName}. Error: ${innerError.message}`);
@@ -128,12 +122,10 @@ export class WahaService {
         broadcast: false
       };
 
-      const response = await firstValueFrom(
-        this.httpService.post(
-          `${this.baseUrl}/api/sessions/start`,
-          payload,
-          { headers: this.getHeaders() },
-        ),
+      const response = await axios.post(
+        `${this.baseUrl}/api/sessions/start`,
+        payload,
+        { headers: this.getHeaders() },
       );
       return response.data;
     } catch (error) {
@@ -146,12 +138,10 @@ export class WahaService {
     try {
       let wahaSessions: any[] = [];
       try {
-        const response = await firstValueFrom(
-          this.httpService.get(`${this.baseUrl}/api/sessions`, {
-            headers: this.getHeaders(),
-            timeout: 5000,
-          }),
-        );
+        const response = await axios.get(`${this.baseUrl}/api/sessions`, {
+          headers: this.getHeaders(),
+          timeout: 5000,
+        });
         wahaSessions = response.data || [];
       } catch (httpErr) {
         this.logger.warn(`WAHA API is unreachable: ${httpErr.message}. Falling back to database records.`);
@@ -204,12 +194,10 @@ export class WahaService {
       // Apply Adaptive WPM Delay (around 70 WPM)
       await this.adaptiveWpmDelay(text, 70);
 
-      const response = await firstValueFrom(
-        this.httpService.post(
-          `${this.baseUrl}/api/sendText`,
-          { session: sessionName, chatId: chatId, text: text },
-          { headers: this.getHeaders() }
-        ),
+      const response = await axios.post(
+        `${this.baseUrl}/api/sendText`,
+        { session: sessionName, chatId: chatId, text: text },
+        { headers: this.getHeaders() }
       );
       
       // Increment messagesSent
@@ -239,9 +227,7 @@ export class WahaService {
       await this.sendTypingPresence(sessionName, chatId);
       
       // Download the image first to avoid WAHA redirect/HTML issues
-      const imageResponse = await firstValueFrom(
-        this.httpService.get(imageUrl, { responseType: 'arraybuffer' })
-      );
+      const imageResponse = await axios.get(imageUrl, { responseType: 'arraybuffer' });
       
       const base64Data = Buffer.from(imageResponse.data).toString('base64');
       const mimeType = String(imageResponse.headers['content-type'] || 'image/jpeg');
@@ -260,12 +246,10 @@ export class WahaService {
         payload.caption = caption;
       }
 
-      const response = await firstValueFrom(
-        this.httpService.post(
-          `${this.baseUrl}/api/sendImage`,
-          payload,
-          { headers: this.getHeaders() }
-        ),
+      const response = await axios.post(
+        `${this.baseUrl}/api/sendImage`,
+        payload,
+        { headers: this.getHeaders() }
       );
       
       await this.prisma.whatsappInstance.update({
@@ -289,21 +273,17 @@ export class WahaService {
 
   async getQrCode(sessionName: string): Promise<any> {
     try {
-      const response = await firstValueFrom(
-        this.httpService.get(`${this.baseUrl}/api/${sessionName}/auth/qr`, {
-          headers: { ...this.getHeaders(), 'Accept': 'image/png' },
-          responseType: 'arraybuffer',
-        }),
-      );
+      const response = await axios.get(`${this.baseUrl}/api/${sessionName}/auth/qr`, {
+        headers: { ...this.getHeaders(), 'Accept': 'image/png' },
+        responseType: 'arraybuffer',
+      });
       return response.data;
     } catch (error) {
       try {
-        const fallbackResponse = await firstValueFrom(
-          this.httpService.get(`${this.baseUrl}/api/sessions/${sessionName}/auth/qr`, {
-            headers: { ...this.getHeaders(), 'Accept': 'image/png' },
-            responseType: 'arraybuffer',
-          }),
-        );
+        const fallbackResponse = await axios.get(`${this.baseUrl}/api/sessions/${sessionName}/auth/qr`, {
+          headers: { ...this.getHeaders(), 'Accept': 'image/png' },
+          responseType: 'arraybuffer',
+        });
         return fallbackResponse.data;
       } catch (innerError) {
         this.logger.error(`Failed to get QR code for session ${sessionName}`, innerError.message);
@@ -314,12 +294,10 @@ export class WahaService {
 
   async stopSession(sessionName: string): Promise<any> {
     try {
-      const response = await firstValueFrom(
-        this.httpService.post(
-          `${this.baseUrl}/api/sessions/stop`,
-          { name: sessionName },
-          { headers: this.getHeaders() },
-        ),
+      const response = await axios.post(
+        `${this.baseUrl}/api/sessions/stop`,
+        { name: sessionName },
+        { headers: this.getHeaders() },
       );
       return response.data;
     } catch (error) {
@@ -330,12 +308,10 @@ export class WahaService {
 
   async logoutSession(sessionName: string): Promise<any> {
     try {
-      const response = await firstValueFrom(
-        this.httpService.post(
-          `${this.baseUrl}/api/sessions/logout`,
-          { name: sessionName },
-          { headers: this.getHeaders() },
-        ),
+      const response = await axios.post(
+        `${this.baseUrl}/api/sessions/logout`,
+        { name: sessionName },
+        { headers: this.getHeaders() },
       );
       return response.data;
     } catch (error) {

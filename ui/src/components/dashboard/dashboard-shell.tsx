@@ -7,21 +7,7 @@ import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
 import { OverviewPage } from "@/components/modules/overview/overview-page";
 import { ChatbotPage } from "@/components/modules/chatbot/chatbot-page";
-import { MarketingPage } from "@/components/modules/marketing/marketing-page";
-import { OrdersPage } from "@/components/modules/orders/orders-page";
-import { ContactsPage } from "@/components/modules/contacts/contacts-page";
-import { PropertiesPage } from "@/components/modules/properties/properties-page";
-import { UsersPage } from "@/components/modules/users/users-page";
-import { FinancePage } from "@/components/modules/finance/finance-page";
 import { SettingsPage } from "@/components/modules/settings/settings-page";
-
-// Marketing Pages
-import { BookingPage } from "@/components/modules/booking/booking-page";
-import { SalesPage } from "@/components/modules/sales/sales-page";
-import { KprPage } from "@/components/modules/kpr/kpr-page";
-import { ListingPage } from "@/components/modules/listing/listing-page";
-import { SocialPage } from "@/components/modules/social/social-page";
-import { ReportsPage } from "@/components/modules/reports/reports-page";
 
 import { canAccess, defaultViewForRole } from "@/lib/rbac";
 import type { ViewKey } from "@/lib/types";
@@ -32,7 +18,7 @@ export function DashboardShell() {
 
   // Ensure current view is allowed for role
   useEffect(() => {
-    if (user && !canAccess(user.role, user.division, view)) {
+    if (user && !canAccess(user.role, view)) {
       setView(defaultViewForRole(user.role));
     }
   }, [user, view, setView]);
@@ -48,21 +34,7 @@ export function DashboardShell() {
     switch (view as ViewKey) {
       case "overview": return <OverviewPage />;
       case "chatbot": return <ChatbotPage />;
-      case "marketing": return <MarketingPage />;
-      case "orders": return <OrdersPage />;
-      case "contacts": return <ContactsPage />;
-      case "properties": return <PropertiesPage />;
-      case "users": return <UsersPage />;
-      case "finance": return <FinancePage />;
       case "settings": return <SettingsPage />;
-      
-      // Marketing pages
-      case "booking": return <BookingPage />;
-      case "sales": return <SalesPage />;
-      case "kpr": return <KprPage />;
-      case "listing": return <ListingPage />;
-      case "social": return <SocialPage />;
-      case "reports": return <ReportsPage />;
 
       default: return <OverviewPage />;
     }

@@ -1,28 +1,20 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { OpenAI } from 'openai';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
+import { OPENAI_CLIENT } from '../../infrastructure/openai/openai.module';
+import { OpenAI } from 'openai';
 
 @Injectable()
 export class RagService {
-  private openai: OpenAI;
+  private openai: OpenAI | null;
   private readonly logger = new Logger(RagService.name);
 
   constructor(
     private configService: ConfigService,
     private prisma: PrismaService,
+    @Inject(OPENAI_CLIENT) private injectedOpenai: OpenAI | null,
   ) {
-    const openaiApiKey = this.configService.get<string>('CHATGPT_API_KEY') || this.configService.get<string>('OPENAI_API_KEY');
-    const openaiBaseUrl = this.configService.get<string>('OPENAI_BASE_URL');
-    
-    if (openaiApiKey) {
-      this.openai = new OpenAI({
-        apiKey: openaiApiKey,
-        baseURL: openaiBaseUrl || undefined,
-      });
-    } else {
-      this.logger.warn('OpenAI API Key is not configured. RAG will not work.');
-    }
+    this.openai = this.injectedOpenai;
   }
 
   /**
@@ -47,64 +39,57 @@ export class RagService {
   }
 
   /**
-   * Mengambil data Properti dari database untuk dijadikan konteks AI.
-   * Karena saat ini jumlah properti masih sedikit (puluhan), kita bisa mengambil semuanya 
-   * secara langsung yang menjamin tingkat akurasi 100% tanpa risiko "missed vector".
-   * Jika jumlah properti sudah ribuan, kita akan mengaktifkan kembali Vector Search (pgvector).
+   * Mengambil konteks dari tabel VectorKnowledge menggunakan pencarian semantik (Vector Similarity Search)
+   * Ini meminimalkan penggunaan token karena hanya mengambil Top K konteks yang paling relevan.
    */
-  async searchRelevantContext(query: string, limit: number = 3): Promise<string> {
+  async searchRelevantContext(query: string, topK: number = 3, tenantId?: string): Promise<string> {
     try {
-      const properties = await this.prisma.property.findMany();
-      const knowledgeBases = await this.prisma.knowledgeBase.findMany();
+      // 1. Generate embedding dari pertanyaan user
+      const queryEmbedding = await this.generateEmbedding(query);
+      const vectorString = `[${queryEmbedding.join(',')}]`;
 
-      if ((!properties || properties.length === 0) && (!knowledgeBases || knowledgeBases.length === 0)) {
+      // 2. Lakukan pencarian menggunakan Cosine Similarity (<=>)
+      // Jika tenantId diberikan, filter hanya untuk tenant tersebut.
+      let results: any[];
+      if (tenantId) {
+         results = await this.prisma.$queryRaw<any[]>`
+           SELECT id, title, content, 
+                  1 - (embedding <=> ${vectorString}::vector) AS similarity
+           FROM vector_knowledge
+           WHERE tenant_id = ${tenantId}
+           ORDER BY embedding <=> ${vectorString}::vector
+           LIMIT ${topK};
+         `;
+      } else {
+         results = await this.prisma.$queryRaw<any[]>`
+           SELECT id, title, content, 
+                  1 - (embedding <=> ${vectorString}::vector) AS similarity
+           FROM vector_knowledge
+           ORDER BY embedding <=> ${vectorString}::vector
+           LIMIT ${topK};
+         `;
+      }
+
+      if (!results || results.length === 0) {
         return '';
       }
 
-      // Format semua properti menjadi teks yang rapi agar mudah dibaca oleh LLM
-      const contextBlock = properties.map((p, index) => {
-        return `[PROPERTI ${index + 1}]
-Nama Perumahan: ${p.name}
-Lokasi: ${p.location}
-Kategori Tipe: ${p.type}
-Harga Cash: Rp ${p.cashPrice.toLocaleString('id-ID')}
-Admin Fee: ${p.adminFee ? `Rp ${p.adminFee.toLocaleString('id-ID')}` : '-'}
-DP (Minimal): ${p.dp ? `Rp ${p.dp.toLocaleString('id-ID')}` : '-'}
+      // 3. Filter similarity yang terlalu rendah jika perlu (misal similarity > 0.6)
+      const threshold = 0.6;
+      const relevantResults = results.filter(r => r.similarity >= threshold);
 
-Luas Tanah: ${p.landArea}
-Listrik: ${p.electricity}
-Kamar Tidur: ${p.bedrooms}
-Kamar Mandi: ${p.bathrooms}
-
-Spesifikasi Teknis:
-${p.specifications}
-
-Fasilitas:
-${p.facilities}
-
-Informasi Cicilan & Detail DP:
-${p.installmentInfo}
-
-Link Gambar:
-${p.imageUrl || ''}
-Layout Denah: ${p.layoutDenah || ''}
-`;
-      }).join('\n\n=========================================\n\n');
-      
-      let finalContext = contextBlock;
-      
-      if (knowledgeBases && knowledgeBases.length > 0) {
-        const kbText = knowledgeBases.map((kb, index) => {
-          return `[PANDUAN/INFORMASI UMUM ${index + 1}]\n${kb.content}`;
-        }).join('\n\n');
-        
-        finalContext += `\n\n=== PENGETAHUAN UMUM & SYARAT ADMINISTRASI ===\n\n${kbText}`;
+      if (relevantResults.length === 0) {
+        return '';
       }
-      
-      return finalContext;
+
+      // 4. Format hasil ke dalam teks
+      const contextBlocks = relevantResults.map((r, index) => {
+        return `--- Referensi ${index + 1} (Similarity: ${(r.similarity * 100).toFixed(1)}%) ---\nJudul: ${r.title}\nIsi:\n${r.content}`;
+      });
+
+      return contextBlocks.join('\n\n');
     } catch (error) {
-      this.logger.error(`Error fetching properties for context: ${error.message}`);
-      // In case of error, just return empty context so the bot can still answer without it
+      this.logger.error(`Error fetching relevant context via pgvector: ${error.message}`);
       return '';
     }
   }

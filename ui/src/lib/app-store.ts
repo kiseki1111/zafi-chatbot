@@ -34,7 +34,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   toggleTheme: () => set({ theme: get().theme === "light" ? "dark" : "light" }),
   resetForRole: (role) => {
-    const v = canAccess(role, undefined, get().view) ? get().view : defaultViewForRole(role);
+    const v = canAccess(role, get().view) ? get().view : defaultViewForRole(role);
     set({ view: v, activeContactId: null, activeOrderId: null });
   },
 }));

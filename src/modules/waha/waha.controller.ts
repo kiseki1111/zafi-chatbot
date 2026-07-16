@@ -320,11 +320,10 @@ export class WahaController {
       try {
         const instanceData = await this.prisma.whatsappInstance.findUnique({
           where: { instanceName: sessionName },
-          include: { channelAccount: { include: { division: true } } }
+          include: { channelAccount: true }
         });
         
-        const isMarketingChannel = instanceData?.channelAccount?.name?.toLowerCase().includes('marketing') 
-                                || instanceData?.channelAccount?.division?.name?.toLowerCase() === 'marketing';
+        const isMarketingChannel = instanceData?.channelAccount?.name?.toLowerCase().includes('marketing');
 
         if (isMarketingChannel) {
           const contact = await this.prisma.contact.findUnique({ where: { phone: sender } });

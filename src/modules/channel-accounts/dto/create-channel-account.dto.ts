@@ -9,11 +9,4 @@ export class CreateChannelAccountDto {
   @IsOptional()
   description?: string;
 
-  @IsString()
-  @IsOptional()
-  divisionId?: string;
-
-  @IsString()
-  @IsOptional()
-  divisionName?: string;
 }

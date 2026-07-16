@@ -23,11 +23,7 @@ export class AuthService {
         //Cari user berdasarkan email memanfaatkan relasi userRoles resmi
         const user = await this.prisma.user.findUnique({
             where: { email: dto.email, deletedAt: null },
-            include: {
-                userRoles: {
-                    include: { role: true }
-                }
-            }
+
         });
 
         // Cek mode bypass dari env
@@ -55,8 +51,8 @@ export class AuthService {
             throw new UnauthorizedException('Alamat email atau password keliru.');
         }
 
-        //Ekstraksi seluruh kode peran yang dikantongi pengguna untuk payload JWT
-        const userRolesArray = user.userRoles.map((ur) => ur.role.name);
+        //Ekstraksi kode peran yang dikantongi pengguna untuk payload JWT
+        const userRolesArray = [user.role];
         const jwtPayload = { sub: user.id, email: user.email, roles: userRolesArray };
 
         //Penerbitan pasangan token
@@ -94,12 +90,10 @@ export class AuthService {
             },
         });
 
-        const division = user.divisionId ? await this.prisma.division.findUnique({ where: { id: user.divisionId } }) : null;
-
         return {
             accessToken,
             refreshToken: refreshTokenPlain,
-            user: { id: user.id, email: user.email, name: user.name, roles: userRolesArray, division: division ? division.name : null }
+            user: { id: user.id, email: user.email, name: user.name, roles: userRolesArray, division: null }
         };
     }
 
@@ -123,11 +117,7 @@ export class AuthService {
         // Cari user berdasarkan email
         let user = await this.prisma.user.findUnique({
             where: { email: payload.email, deletedAt: null },
-            include: {
-                userRoles: {
-                    include: { role: true }
-                }
-            }
+
         });
 
         // Jika tidak ada, buat user baru
@@ -142,37 +132,9 @@ export class AuthService {
                     name: payload.name || payload.email.split('@')[0],
                     password: hashedPassword,
                     isActive: true,
-                },
-                include: {
-                    userRoles: {
-                        include: { role: true }
-                    }
+                    role: 'USER'
                 }
             });
-
-            // Beri role default 'operator'
-            const defaultRole = await this.prisma.role.findUnique({ where: { name: 'operator' } });
-            if (defaultRole) {
-                await this.prisma.userRole.create({
-                    data: {
-                        userId: user.id,
-                        roleId: defaultRole.id
-                    }
-                });
-                
-                // Ambil ulang user agar roles ter-update
-                const updatedUser = await this.prisma.user.findUnique({
-                    where: { id: user.id, deletedAt: null },
-                    include: {
-                        userRoles: {
-                            include: { role: true }
-                        }
-                    }
-                });
-                if (updatedUser) {
-                    user = updatedUser;
-                }
-            }
         }
 
         if (!user) {
@@ -180,7 +142,7 @@ export class AuthService {
         }
 
         // Ekstraksi role
-        const userRolesArray = user.userRoles.map((ur) => ur.role.name);
+        const userRolesArray = [user.role];
         const jwtPayload = { sub: user.id, email: user.email, roles: userRolesArray };
 
         // Penerbitan pasangan token
@@ -216,12 +178,10 @@ export class AuthService {
             },
         });
 
-        const division = user.divisionId ? await this.prisma.division.findUnique({ where: { id: user.divisionId } }) : null;
-
         return {
             accessToken,
             refreshToken: refreshTokenPlain,
-            user: { id: user.id, email: user.email, name: user.name, roles: userRolesArray, division: division ? division.name : null }
+            user: { id: user.id, email: user.email, name: user.name, roles: userRolesArray, division: null }
         };
     }
 
@@ -243,15 +203,14 @@ export class AuthService {
 
         //Ambil data user
         const user = await this.prisma.user.findUnique({
-            where: { id: userId, deletedAt: null },
-            include: { userRoles: { include: { role: true } } }
+            where: { id: userId, deletedAt: null }
         });
 
         if (!user) {
             throw new UnauthorizedException('Pengguna tidak ditemukan.');
         }
 
-        const userRolesArray = user.userRoles.map((ur) => ur.role.name);
+        const userRolesArray = [user.role];
         const jwtPayload = { sub: user.id, email: user.email, roles: userRolesArray };
 
         //Terbitkan token baru

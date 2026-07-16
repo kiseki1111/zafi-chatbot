@@ -47,7 +47,7 @@ async function bootstrap() {
   app.useGlobalInterceptors(new TransformInterceptor());
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  const port = configService.get<number>('app.port') || 3000;
-  await app.listen(port);
+  const port = process.env.PORT || configService.get<number>('app.port') || 3000;
+  await app.listen(port, '0.0.0.0');
 }
 bootstrap();

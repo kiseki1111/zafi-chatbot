@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Building2, Loader2, Mail, Lock } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
-import { ROLES, ROLE_THEME, DIVISIONS } from "@/lib/rbac";
+import { ROLES, ROLE_THEME } from "@/lib/rbac";
 import type { Role } from "@/lib/types";
 import { AuthShell, PasswordInput } from "./auth-shell";
 import { DEMO_ACCOUNTS } from "@/lib/mock-data";
@@ -19,7 +19,6 @@ export function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,16 +34,12 @@ export function LoginForm() {
     }, 600);
   };
 
-  const quick = (role: Role, division: import("@/lib/types").Division | null = null) => {
-    if (role !== "superadmin" && !division) {
-      setSelectedRole(role);
-      return;
-    }
+  const quick = (role: Role) => {
     setLoading(true);
     setTimeout(() => {
-      loginAs(role, division);
+      loginAs(role);
       setLoading(false);
-      toast({ title: "Login demo", description: `Masuk sebagai ${role}${division ? ` di divisi ${division}` : ""}` });
+      toast({ title: "Login demo", description: `Masuk sebagai ${role}` });
     }, 300);
   };
 
@@ -149,7 +144,6 @@ export function LoginForm() {
           </div>
         </div>
         
-        {!selectedRole ? (
           <div className="grid grid-cols-3 gap-2 mt-4">
             {ROLES.map((r) => {
               const theme = ROLE_THEME[r] || { bg: "bg-muted", ring: "ring-muted", color: "text-foreground" };
@@ -165,31 +159,6 @@ export function LoginForm() {
               );
             })}
           </div>
-        ) : (
-          <div className="mt-4 space-y-3">
-            <p className="text-xs text-center text-muted-foreground">
-              Pilih Divisi untuk role <strong className="capitalize">{selectedRole}</strong>:
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              {DIVISIONS.map((d) => (
-                <button
-                  key={d}
-                  onClick={() => quick(selectedRole, d)}
-                  disabled={loading}
-                  className="rounded-lg border p-2.5 text-center transition-all hover:bg-muted"
-                >
-                  <div className="text-xs font-bold capitalize">{d}</div>
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => setSelectedRole(null)}
-              className="w-full text-xs text-center text-muted-foreground hover:underline mt-2"
-            >
-              Kembali pilih Role
-            </button>
-          </div>
-        )}
         
         <p className="text-[11px] text-muted-foreground mt-4 text-center">
           Atau gunakan sembarang email & password untuk login sebagai Operator

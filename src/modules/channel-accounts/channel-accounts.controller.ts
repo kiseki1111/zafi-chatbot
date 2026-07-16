@@ -12,14 +12,9 @@ export class ChannelAccountsController {
     return this.channelAccountsService.create(createChannelAccountDto);
   }
 
-  @Get('divisions')
-  getDivisions() {
-    return this.channelAccountsService.getDivisions();
-  }
-
   @Get()
-  findAll(@Query('divisionName') divisionName?: string) {
-    return this.channelAccountsService.findAll(divisionName);
+  findAll() {
+    return this.channelAccountsService.findAll();
   }
 
   @Get(':id')

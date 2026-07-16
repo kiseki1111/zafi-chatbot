@@ -3,11 +3,8 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { UsersModule } from './modules/users/users.module';
-import { RolesModule } from './modules/roles/roles.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { PrismaModule } from './infrastructure/prisma/prisma.module';
-import { PermissionsModule } from './modules/permissions/permissions.module';
-import { AssignmentsModule } from './modules/assignments/assignments.module';
 import { ChannelAccountsModule } from './modules/channel-accounts/channel-accounts.module';
 import { WahaModule } from './modules/waha/waha.module';
 import { ChatsModule } from './modules/chats/chats.module';
@@ -16,6 +13,8 @@ import jwtConfig from './config/jwt.config'; // Pastikan file konfigurasi JWT te
 
 import { AiModule } from './modules/ai/ai.module';
 import { KnowledgeModule } from './modules/knowledge/knowledge.module';
+import { AppController } from './app.controller';
+import { OpenAiModule } from './infrastructure/openai/openai.module';
 
 @Module({
   imports: [
@@ -30,17 +29,16 @@ import { KnowledgeModule } from './modules/knowledge/knowledge.module';
     }]),
     PrismaModule,
     UsersModule,
-    RolesModule,
     AuthModule,
-    PermissionsModule,
-    AssignmentsModule,
     ChannelAccountsModule,
     WahaModule,
     ChatsModule,
     AiModule,
     KnowledgeModule,
     TelegramModule,
+    OpenAiModule,
   ],
+  controllers: [AppController],
   providers: [
     {
       provide: APP_GUARD,

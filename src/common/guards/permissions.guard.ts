@@ -15,18 +15,15 @@ export class PermissionsGuard implements CanActivate {
             return true;
         }
 
-        // 1. Ambil metadata permission yang diminta oleh controller
         const requiredPermissions = this.reflector.getAllAndOverride<string[]>(PERMISSIONS_KEY, [
             context.getHandler(),
             context.getClass(),
         ]);
 
-        // Jika endpoint tidak diberi dekorator @Permissions(), izinkan masuk
         if (!requiredPermissions) {
             return true;
         }
 
-        // 2. Ambil data user hasil ekstraksi JwtAuthGuard
         const request = context.switchToHttp().getRequest();
         const user = request.user;
 
@@ -34,68 +31,18 @@ export class PermissionsGuard implements CanActivate {
             throw new ForbiddenException('Akses ditolak: Identitas pengguna tidak ditemukan.');
         }
 
-        // 3. Query ke PostgreSQL menggunakan nama relasi yang benar sesuai schema ('roles' dan 'permissions')
         const dbUser = await this.prisma.user.findUnique({
-            where: { id: user.sub, deletedAt: null },
-            include: {
-                userRoles: { 
-                    include: {
-                        role: {
-                            include: {
-                                permissions: { // Diperbarui dari rolePermissions menjadi permissions
-                                    include: {
-                                        permission: true,
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
-            },
+            where: { id: user.sub, deletedAt: null }
         });
 
         if (!dbUser) return false;
 
-        // 4. Flattening struktur data. Menggunakan dbUser.userRoles dan rp.permission.action
-        const userPermissions = dbUser.userRoles.flatMap((ur) =>
-            ur.role.permissions.map((rp) => rp.permission.name), 
-        );
-
-        // 5. Evaluasi: Apakah seluruh permission yang diwajibkan oleh controller sudah dikantongi oleh user?
-        const hasPermission = requiredPermissions.every((permission) =>
-            userPermissions.includes(permission),
-        );
-
-        if (!hasPermission) {
-            // Catat log menggunakan kolom yang tersedia di schema (memasukkan data ekstra ke dalam 'details')
-            const logDetails = JSON.stringify({
-                method: request.method,
-                endpoint: request.url,
-                ipAddress: request.ip,
-                userAgent: request.headers['user-agent']
-            });
-
-            await this.prisma.auditLog.create({
-                data: {
-                    userId: user.sub,
-                    action: 'ACCESS_DENIED',
-                    module: 'AUTHORIZATION',
-                    endpoint: request.url || 'UNKNOWN',
-                    ipAddress: request.ip,
-                    userAgent: request.headers['user-agent'],
-                    status: 'FAILED',
-                    details: {
-                        method: request.method,
-                        endpoint: request.url,
-                        ipAddress: request.ip,
-                        userAgent: request.headers['user-agent']
-                    },
-                },
-            });
-
-            throw new ForbiddenException('Anda tidak memiliki hak akses yang cukup untuk mengeksekusi aksi ini.');
+        // Simplified for UMKM Assistant: SUPERADMIN and ADMIN get full access
+        if (dbUser.role === 'SUPERADMIN' || dbUser.role === 'ADMIN') {
+            return true;
         }
 
-        return true;
+        // We can add finer grained rules here, but for now reject.
+        throw new ForbiddenException('Anda tidak memiliki hak akses yang cukup untuk mengeksekusi aksi ini.');
     }
 }

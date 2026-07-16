@@ -63,3 +63,9 @@ zafi-project-*.json
 # Database Backups
 database-backup.json
 database-backup.sql
+# Secrets and Backups
+*.json
+*.sql
+!package.json
+!package-lock.json
+!tsconfig*.json

@@ -34,8 +34,8 @@ export function OverviewPage() {
   const role = user?.role ?? "operator";
 
   const kpis = getKpis(user?.division || role);
-  const canChat = canAccess(role, user?.division, "chatbot");
-  const canOrders = canAccess(role, user?.division, "orders");
+  const canChat = canAccess(role, "chatbot");
+  // const canOrders = canAccess(role, "orders"); // orders is removed
 
   return (
     <div className="space-y-5">
@@ -54,11 +54,6 @@ export function OverviewPage() {
           {canChat && (
             <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setView("chatbot")}>
               <MessageCircle className="h-4 w-4" /> Buka Chatbot
-            </Button>
-          )}
-          {canOrders && (
-            <Button variant="outline" onClick={() => setView("orders")}>
-              <ShoppingBag className="h-4 w-4" /> Lihat Order
             </Button>
           )}
         </div>
