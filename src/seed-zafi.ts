@@ -61,7 +61,12 @@ Estimasi Cicilan : 10 Tahun = Rp. 1.901.400, 15 Tahun = Rp. 1.414.500, 20 Tahun 
 
 async function bootstrap() {
   console.log('Bootstrapping Zafi Residence Data...');
-  const app = await NestFactory.createApplicationContext(AppModule);
+  
+  // Disable Telegram bots to prevent polling conflict during seed
+  process.env.TELEGRAM_BOT_CS_API = '';
+  process.env.TELEGRAM_BOT_ONBOARDING_API = '';
+
+  const app = await NestFactory.createApplicationContext(AppModule, { logger: false });
   const prisma = app.get(PrismaService);
   const dataAgent = app.get(DataAgentService);
 

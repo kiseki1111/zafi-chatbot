@@ -72,7 +72,7 @@ export class DataAgentService {
           await this.prisma.$executeRawUnsafe(`
             INSERT INTO vector_knowledge (id, title, content, embedding, tenant_id, updated_at)
             VALUES (gen_random_uuid(), $1, $2, $3::vector, $4, CURRENT_TIMESTAMP)
-          `, `KnowledgeBase: ${kb.id}`, kb.content, vectorString, kb.tenantId || null);
+          `, `KnowledgeBase: ${(kb.metadata as any)?.title || kb.id}`, kb.content, vectorString, kb.tenantId || null);
           inserted++;
         } catch (err) {
           this.logger.error(`Failed to sync KB item ${kb.id}: ${err.message}`);

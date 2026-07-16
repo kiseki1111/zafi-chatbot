@@ -81,6 +81,39 @@ Output strictly just the English prompt:`;
   }
 
 
+  /**
+   * Helper untuk Multi-turn Context: 
+   * Jika ada chat history, rumuskan ulang pertanyaan user (message) menjadi Standalone Question
+   * agar Vector Search (RAG) tetap bisa mencari konteks spesifik yang mungkin terlewat di pesan terakhir.
+   */
+  private async rewriteQueryForRag(message: string, chatHistory: any[]): Promise<string> {
+    if (!chatHistory || chatHistory.length === 0) return message;
+
+    // Ambil 4 pesan terakhir saja agar tidak terlalu panjang
+    const recentHistory = chatHistory.slice(-4).map(h => `${h.senderType === 'bot' ? 'CS' : 'User'}: ${h.content}`).join('\n');
+    
+    const prompt = `Given the following conversation history and a follow-up question, rephrase the follow-up question to be a standalone question that captures all relevant context from the history. 
+Do NOT answer the question, just return the standalone question. If the follow-up question is already standalone or changes the topic entirely, return it as is.
+
+Conversation History:
+${recentHistory}
+
+Follow-up Question: ${message}
+
+Standalone Question:`;
+
+    try {
+      const response = await this.openai!.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0, // Deterministic
+      });
+      return response.choices[0].message?.content?.trim() || message;
+    } catch (e) {
+      this.logger.error('Error rewriting query for RAG: ' + e.message);
+      return message; // Fallback to original message
+    }
+  }
 
   /**
    * CS AGENT (LUNA)
@@ -93,8 +126,13 @@ Output strictly just the English prompt:`;
     }
 
     try {
-      // 1. Fetch relevant context from Spreadsheet Knowledge Base using RAG (READ-ONLY)
-      const context = await this.ragService.searchRelevantContext(message, 3, tenantId);
+      // 1. Rewrite query if there is context
+      const standaloneQuery = await this.rewriteQueryForRag(message, chatHistory);
+      this.logger.log(`[RAG Rewrite] Original: "${message}" -> Standalone: "${standaloneQuery}"`);
+
+      // 2. Fetch relevant context from Spreadsheet Knowledge Base using RAG (READ-ONLY)
+      // Note: ragService.searchRelevantContext now uses topK=5
+      const context = await this.ragService.searchRelevantContext(standaloneQuery, 5, tenantId);
 
       let systemPrompt = `Anda adalah Luna, CS Agent sebuah perusahaan konstruksi dan properti. Tugas Anda adalah merespon pertanyaan pelanggan (kebanyakan Bapak/Ibu/Kakak) terkait produk dan properti yang kami jual. 
 Berikan jawaban yang ramah, hangat, dan luwes seperti manusia sungguhan (CS profesional). Hindari bahasa kaku atau gaya bahasa robotik/AI. Gunakan bahasa Indonesia sehari-hari yang sopan. Fokus utama Anda adalah memberikan informasi yang akurat berdasarkan database.
@@ -113,10 +151,19 @@ Jika pelanggan ingin survei lokasi atau meminta kontak marketing, berikan 2 opsi
 2. Tawarkan agar tim marketing kami yang menghubungi mereka langsung.
 
 ATURAN PENGIRIMAN FOTO/GAMBAR:
-Jika pelanggan meminta foto properti, Anda WAJIB menempelkan 'Link Gambar' secara utuh di paling akhir pesan Anda.
-Jika di database terdapat beberapa link gambar, Anda harus mengklasifikasikannya: link yang TIDAK memiliki nama/label di depannya adalah foto wujud rumah utama (Tampak Depan). Sedangkan link yang memiliki label adalah detail spesifik (seperti Dapur, Layout, dll).
-Jika pelanggan HANYA meminta gambar spesifik (misal: "lihat dapurnya dong"), maka Anda HANYA boleh mengirimkan link yang relevan saja (link Dapur). Jika pelanggan meminta "foto rumahnya", kirimkan link foto utama (yang tidak berlabel) atau kirimkan semuanya jika pelanggan ingin melihat selengkapnya.
-SANGAT PENTING: JANGAN PERNAH menyuruh pelanggan "mengklik link" atau berkata "Berikut adalah link gambarnya". Karena sistem kami akan mengubah link itu menjadi gambar asli. Cukup katakan kalimat pengantar yang natural seperti: "Ini fotonya ya Kak, silakan dilihat-lihat" atau "Berikut foto rumahnya Pak/Bu".
+Jika pelanggan meminta foto properti, WAJIB tempelkan URL gambar secara UTUH (copy-paste, tanpa diubah sedikitpun) di paling AKHIR pesan Anda. Anda BEBAS mengirim lebih dari 1 gambar jika produk tersebut memiliki beberapa tipe (misalnya Griya Amanah 2 memiliki 2 foto). Tempelkan URL-URL tersebut berbaris ke bawah.
+
+DAFTAR URL GAMBAR RESMI (hanya gunakan yang ada di daftar ini):
+- Zafi Residence: https://bzexgkcgpzxqtbfixatj.supabase.co/storage/v1/object/public/gambar_produk_zafi/Zafi%20Residence/Zafi%20Residence.png
+- Griya Amanah 2 (Tipe 40 & 45): https://bzexgkcgpzxqtbfixatj.supabase.co/storage/v1/object/public/gambar_produk_zafi/Griya%20Amanah%202/Griya%20Amanah%20Type%2040%20%26%2045.png
+- Griya Amanah 2 (Rumah Type 36): https://bzexgkcgpzxqtbfixatj.supabase.co/storage/v1/object/public/gambar_produk_zafi/Griya%20Amanah%202/Rumah%20Type%2036%20Griya2.png
+- Kahyana Residence: https://bzexgkcgpzxqtbfixatj.supabase.co/storage/v1/object/public/gambar_produk_zafi/Kahyana%20Residence/Kahyana%20Residence.png
+- Seven Residence: https://bzexgkcgpzxqtbfixatj.supabase.co/storage/v1/object/public/gambar_produk_zafi/Seven%20Residence/Seven%20Residence.png
+
+LARANGAN KERAS:
+1. JANGAN PERNAH mengarang URL sendiri atau menggunakan placeholder seperti example.com. HANYA gunakan URL dari daftar di atas.
+2. JANGAN membungkus URL dengan Markdown seperti [teks](URL). Tuliskan URL mentah apa adanya.
+3. JANGAN menyuruh pelanggan mengklik link. Cukup katakan: "Ini fotonya ya Kak, silakan dilihat-lihat".
 
 PASTIKAN rincian rumah (seperti Tipe, Harga, Luas) dibuat rapi berjejer ke bawah agar enak dibaca di layar HP!`;
 

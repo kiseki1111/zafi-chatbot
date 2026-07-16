@@ -42,7 +42,7 @@ export class RagService {
    * Mengambil konteks dari tabel VectorKnowledge menggunakan pencarian semantik (Vector Similarity Search)
    * Ini meminimalkan penggunaan token karena hanya mengambil Top K konteks yang paling relevan.
    */
-  async searchRelevantContext(query: string, topK: number = 3, tenantId?: string): Promise<string> {
+  async searchRelevantContext(query: string, topK: number = 10, tenantId?: string): Promise<string> {
     try {
       // 1. Generate embedding dari pertanyaan user
       const queryEmbedding = await this.generateEmbedding(query);
@@ -74,8 +74,8 @@ export class RagService {
         return '';
       }
 
-      // 3. Filter similarity yang terlalu rendah jika perlu (misal similarity > 0.6)
-      const threshold = 0.6;
+      // 3. Filter similarity yang terlalu rendah jika perlu
+      const threshold = 0.2;
       const relevantResults = results.filter(r => r.similarity >= threshold);
 
       if (relevantResults.length === 0) {

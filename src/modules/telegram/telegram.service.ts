@@ -251,6 +251,8 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
           where: { instanceName_contactId: { instanceName: this.INSTANCE_NAME, contactId: contact.id } }
         }) : null;
         
+        this.logger.log(`[CS PIPELINE] Step 1: Contact=${contact?.id || 'N/A'}, Conversation=${conversation?.id || 'N/A'}`);
+
         let chatHistory: any[] = [];
         if (conversation) {
           chatHistory = await this.prisma.message.findMany({
@@ -259,56 +261,100 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
             take: 10
           });
           chatHistory.reverse();
+          
+          // SANITASI: Hapus pesan halusinasi example.com dari history agar AI tidak meniru
+          const beforeCount = chatHistory.length;
+          chatHistory = chatHistory.filter(msg => {
+            if (msg.senderType === 'bot' && msg.content && msg.content.includes('example.com')) {
+              return false;
+            }
+            return true;
+          });
+          if (chatHistory.length < beforeCount) {
+            this.logger.warn(`[CS PIPELINE] Removed ${beforeCount - chatHistory.length} poisoned history messages containing example.com`);
+          }
         }
+        this.logger.log(`[CS PIPELINE] Step 2: Chat history loaded (${chatHistory.length} messages)`);
 
         // For dev CS Bot, we just use the first tenant we can find
         const firstTenant = await this.prisma.tenant.findFirst();
         const tenantId = firstTenant?.id;
+        this.logger.log(`[CS PIPELINE] Step 3: Tenant=${firstTenant?.name || 'N/A'} (${tenantId || 'N/A'})`);
 
         this.csBot?.sendChatAction(sender, 'typing');
+        this.logger.log(`[CS PIPELINE] Step 4: Calling AI with message="${combinedText.substring(0, 80)}..."`);
         const aiResponse = await this.aiService.generateLunaResponse(combinedText, sender, chatHistory, tenantId);
+        this.logger.log(`[CS PIPELINE] Step 5: RAW AI Response (first 300 chars):\n${aiResponse.substring(0, 300)}`);
         
-        // Extract images
-        const gdriveRegex = /https:\/\/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)(?:\/[^\s]*)?/gi;
-        const genericHostRegex = /https?:\/\/(?:[a-zA-Z0-9-]+\.)*(?:ibb\.co\.com|ibb\.co|postimg\.cc|postimages\.org)[^\s]*/gi;
-        const extensionRegex = /https?:\/\/[^\s]+\.(?:jpg|jpeg|png|webp|gif)/gi;
+        // Extract images - semua jenis URL
+        const gdriveRegex = /https:\/\/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)(?:\/[^\s)\]]*)?/gi;
+        const genericHostRegex = /https?:\/\/(?:[a-zA-Z0-9-]+\.)*(?:ibb\.co\.com|ibb\.co|postimg\.cc|postimages\.org)[^\s)\]]*/gi;
+        const supabaseRegex = /https?:\/\/[a-zA-Z0-9-]+\.supabase\.co\/storage\/v1\/object\/public\/[^\s)\]]+/gi;
         
         const extractedImages: string[] = [];
         let cleanText = aiResponse;
 
-        [gdriveRegex, genericHostRegex, extensionRegex].forEach(regex => {
+        [gdriveRegex, genericHostRegex, supabaseRegex].forEach(regex => {
           let match;
           while ((match = regex.exec(aiResponse)) !== null) {
-            extractedImages.push(match[0]);
+            if (!extractedImages.includes(match[0])) {
+              extractedImages.push(match[0]);
+            }
             cleanText = cleanText.replace(match[0], '').trim();
           }
         });
+        
+        // Tangkap juga URL yang berakhiran .jpg/.png/.webp (tapi SKIP example.com)
+        const extensionRegex = /https?:\/\/[^\s)\]]+\.(?:jpg|jpeg|png|webp|gif)/gi;
+        let extMatch;
+        while ((extMatch = extensionRegex.exec(aiResponse)) !== null) {
+          const url = extMatch[0];
+          if (url.includes('example.com')) continue; // SKIP placeholder palsu
+          if (!extractedImages.includes(url)) {
+            extractedImages.push(url);
+          }
+          cleanText = cleanText.replace(url, '').trim();
+        }
 
+        // Bersihkan sisa Markdown format halusinasi: [Link Gambar](url), [Link](url), dll
+        cleanText = cleanText.replace(/\[Link Gambar\]\([^)]*\)/gi, '');
+        cleanText = cleanText.replace(/\[Link[^\]]*\]\([^)]*\)/gi, '');
         cleanText = cleanText.replace(/^\s*-\s*.*?:\s*$/gm, '').trim();
         cleanText = cleanText.replace(/\n{3,}/g, '\n\n');
 
-        this.logger.debug(`[CS BOT RESPONSE] ${cleanText}`);
+        this.logger.log(`[CS PIPELINE] Step 6: Extracted ${extractedImages.length} image(s): ${JSON.stringify(extractedImages)}`);
+        this.logger.log(`[CS PIPELINE] Step 7: Clean text (first 200 chars): ${cleanText.substring(0, 200)}`);
         
         let sentTextAsCaption = false;
 
         if (extractedImages.length > 0) {
           for (let i = 0; i < extractedImages.length; i++) {
             const imgUrl = extractedImages[i];
+            this.logger.log(`[CS PIPELINE] Step 8.${i}: Processing image: ${imgUrl}`);
             try {
               let photoData: any = imgUrl;
               const gdriveMatch = /https:\/\/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/i.exec(imgUrl);
-              if (gdriveMatch) {
-                const fileId = gdriveMatch[1];
-                const directUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
-                const response = await axios.get(directUrl, { responseType: 'arraybuffer' });
-                let buffer = Buffer.from(response.data);
-                
-                if (buffer.length > 5 * 1024 * 1024) {
-                   buffer = await sharp(buffer)
-                     .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
-                     .jpeg({ quality: 80 })
-                     .toBuffer();
+              const isSupabase = imgUrl.includes('.supabase.co/storage');
+              
+              if (gdriveMatch || isSupabase) {
+                let downloadUrl = imgUrl;
+                if (gdriveMatch) {
+                  const fileId = gdriveMatch[1];
+                  downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
                 }
+                
+                this.logger.log(`[CS PIPELINE] Downloading from: ${downloadUrl}`);
+                const response = await axios.get(downloadUrl, { responseType: 'arraybuffer', timeout: 15000 });
+                let buffer = Buffer.from(response.data);
+                this.logger.log(`[CS PIPELINE] Downloaded: ${(buffer.length / 1024 / 1024).toFixed(2)} MB`);
+                
+                // Selalu kompresi gambar dari Supabase agar ukurannya ringan
+                buffer = await sharp(buffer)
+                  .resize({ width: 1280, height: 1280, fit: 'inside', withoutEnlargement: true })
+                  .jpeg({ quality: 70 })
+                  .toBuffer();
+                this.logger.log(`[CS PIPELINE] Compressed to: ${(buffer.length / 1024).toFixed(0)} KB`);
+                
                 photoData = buffer;
               }
 
@@ -318,16 +364,20 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
                 sentTextAsCaption = true;
               }
 
-              await this.csBot?.sendPhoto(sender, photoData, options).catch(e => this.logger.warn(`Telegram failed to send photo: ${e.message}`));
+              await this.csBot?.sendPhoto(sender, photoData, options);
+              this.logger.log(`[CS PIPELINE] Step 9.${i}: Photo sent to Telegram successfully!`);
             } catch (e) {
-              this.logger.warn(`Failed to process or send image ${imgUrl}: ${e.message}`);
+              this.logger.error(`[CS PIPELINE] FAILED to send image ${imgUrl}: ${e.message}`);
             }
           }
+        } else {
+          this.logger.warn(`[CS PIPELINE] No images extracted from AI response!`);
         }
         
         if (cleanText) {
           if (!sentTextAsCaption) {
             const sentMsg = await this.csBot?.sendMessage(sender, cleanText);
+            this.logger.log(`[CS PIPELINE] Step 10: Text message sent.`);
             
             if (sentMsg && conversation) {
               await this.prisma.message.create({
