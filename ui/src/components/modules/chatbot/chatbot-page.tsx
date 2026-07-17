@@ -242,10 +242,18 @@ function ContactListItem({
 }) {
   const stage = STAGE_META[contact.stage];
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       className={cn(
-        "w-full flex items-center gap-3 rounded-lg p-2.5 text-left transition-colors",
+        "w-full grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-lg p-2.5 text-left transition-colors cursor-pointer select-none outline-none focus-visible:ring-2 focus-visible:ring-emerald-500",
         active
           ? "bg-emerald-50 dark:bg-emerald-950/30 ring-1 ring-emerald-200 dark:ring-emerald-800"
           : "hover:bg-muted/60",
@@ -265,18 +273,16 @@ function ContactListItem({
           title={stage.label}
         />
       </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-2">
+      <div className="min-w-0 flex-1 flex flex-col justify-center">
+        <div className="grid grid-cols-[1fr_auto] items-center gap-2">
           <p className="text-sm font-medium truncate">{contact.name}</p>
-          <span className="text-[10px] text-muted-foreground shrink-0">
+          <span className="text-[10px] text-muted-foreground">
             {contact.lastMessageAt}
           </span>
         </div>
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-xs text-muted-foreground truncate">
-            {contact.lastMessage}
-          </p>
-        </div>
+        <p className="text-xs text-muted-foreground truncate mt-0.5">
+          {contact.lastMessage}
+        </p>
         {contact.tags.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-1">
             {contact.tags.slice(0, 3).map((t) => (
@@ -293,7 +299,7 @@ function ContactListItem({
           </div>
         )}
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -910,7 +916,7 @@ export function ChatbotPage() {
         {/* ----- Left: contact list ----- */}
         <Card
           className={cn(
-            "w-full md:w-80 shrink-0 flex flex-col",
+            "w-full md:w-80 shrink-0 flex flex-col min-h-0 overflow-hidden",
             // On mobile hide when a conversation is shown
             mobileShowList || !activeId ? "flex" : "hidden md:flex",
           )}
@@ -939,8 +945,8 @@ export function ChatbotPage() {
               </TabsList>
             </Tabs>
           </div>
-          <ScrollArea className="flex-1">
-            <div className="p-2 space-y-1 max-h-full">
+          <ScrollArea className="flex-1 min-h-0">
+            <div className="px-2 py-1 space-y-0.5">
               {filteredContacts.length === 0 ? (
                 <div className="text-center text-xs text-muted-foreground py-10">
                   Tidak ada kontak cocok.

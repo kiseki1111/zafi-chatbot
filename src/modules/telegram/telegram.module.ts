@@ -17,7 +17,7 @@ import { DesignSessionService } from './design/design-session.service';
     DesignImageService,
     DesignSessionService,
   ],
-  exports: [TelegramService],
+  exports: [TelegramService, DesignFlowService, DesignSessionService],
 })
 export class TelegramModule {}
 

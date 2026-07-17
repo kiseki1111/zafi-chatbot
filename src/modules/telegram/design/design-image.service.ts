@@ -55,7 +55,8 @@ export class DesignImageService {
         size: size as any,
       });
 
-      const data = response.data[0];
+      const data = response.data?.[0];
+      if (!data) throw new Error('No image returned from OpenAI API');
       let base64: string;
 
       if (data.b64_json) {
@@ -168,7 +169,8 @@ Respond in English only.`,
         quality: 'medium',
       } as any);
 
-      const data = response.data[0];
+      const data = response.data?.[0];
+      if (!data) throw new Error('No image returned from OpenAI API');
       let base64Result: string;
 
       if (data.b64_json) {

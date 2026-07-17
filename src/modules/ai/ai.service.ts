@@ -82,36 +82,80 @@ Output strictly just the English prompt:`;
 
 
   /**
-   * Helper untuk Multi-turn Context: 
-   * Jika ada chat history, rumuskan ulang pertanyaan user (message) menjadi Standalone Question
-   * agar Vector Search (RAG) tetap bisa mencari konteks spesifik yang mungkin terlewat di pesan terakhir.
+   * Helper untuk Multi-turn Context & Intent Detection: 
+   * Merumuskan ulang pertanyaan menjadi Standalone Question dan mendeteksi
+   * apakah user meminta daftar katalog produk.
    */
-  private async rewriteQueryForRag(message: string, chatHistory: any[]): Promise<string> {
-    if (!chatHistory || chatHistory.length === 0) return message;
+  private async rewriteQueryAndDetectIntent(message: string, chatHistory: any[]): Promise<{ standaloneQuery: string, isCatalogRequest: boolean }> {
+    const recentHistory = chatHistory && chatHistory.length > 0
+      ? chatHistory.slice(-4).map(h => `${h.senderType === 'bot' ? 'CS' : 'User'}: ${h.content}`).join('\n')
+      : 'No history yet.';
 
-    // Ambil 4 pesan terakhir saja agar tidak terlalu panjang
-    const recentHistory = chatHistory.slice(-4).map(h => `${h.senderType === 'bot' ? 'CS' : 'User'}: ${h.content}`).join('\n');
-    
-    const prompt = `Given the following conversation history and a follow-up question, rephrase the follow-up question to be a standalone question that captures all relevant context from the history. 
-Do NOT answer the question, just return the standalone question. If the follow-up question is already standalone or changes the topic entirely, return it as is.
+    const prompt = `You are a query analyzer.
+1. Rephrase the user's Follow-up Question into a standalone question using the Conversation History. If no history, just return the question as is or slightly cleaned up.
+2. Determine if the user's intent is to list, see, or ask for ALL available products/houses/options (e.g. "ada rumah apa aja?", "daftar harga", "kirimkan list perumahan", "sebutkan semua produk").
+Respond ONLY in valid JSON format:
+{
+  "standaloneQuery": "string",
+  "isCatalogRequest": boolean
+}
 
 Conversation History:
 ${recentHistory}
 
-Follow-up Question: ${message}
-
-Standalone Question:`;
+Follow-up Question: ${message}`;
 
     try {
       const response = await this.openai!.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [{ role: 'user', content: prompt }],
-        temperature: 0, // Deterministic
+        temperature: 0,
+        response_format: { type: 'json_object' }
       });
-      return response.choices[0].message?.content?.trim() || message;
+      const resJson = JSON.parse(response.choices[0].message?.content || '{}');
+      return {
+        standaloneQuery: resJson.standaloneQuery || message,
+        isCatalogRequest: !!resJson.isCatalogRequest
+      };
     } catch (e) {
       this.logger.error('Error rewriting query for RAG: ' + e.message);
-      return message; // Fallback to original message
+      return { standaloneQuery: message, isCatalogRequest: false }; // Fallback
+    }
+  }
+
+  /**
+   * Top-level intent router untuk pesan Omnichannel WAHA.
+   * Menentukan apakah pesan masuk adalah untuk CS atau Design Bot.
+   */
+  async detectTopLevelIntent(message: string): Promise<'CS' | 'DESIGN'> {
+    if (!this.openai) return 'CS';
+
+    // Quick keyword check to save API calls
+    const lowerMsg = message.toLowerCase();
+    if (lowerMsg.includes('poster') || lowerMsg.includes('gambar') || lowerMsg.includes('desain') || lowerMsg.includes('design') || lowerMsg.includes('bikin brosur') || lowerMsg.includes('edit')) {
+      return 'DESIGN';
+    }
+
+    const prompt = `You are an intent router for a property company's Omnichannel Bot.
+The user sent a message: "${message}"
+
+Classify their intent into exactly ONE of the following categories:
+- DESIGN: If the user is asking to create, make, generate, or design an image, poster, brochure, or graphic.
+- CS: For all other requests (asking for house prices, catalog, location, general questions, or chatting).
+
+Respond with ONLY the category word: DESIGN or CS.`;
+
+    try {
+      const response = await this.openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0,
+        max_tokens: 5
+      });
+      const intent = response.choices[0].message?.content?.trim().toUpperCase();
+      return intent === 'DESIGN' ? 'DESIGN' : 'CS';
+    } catch (e) {
+      return 'CS'; // Default fallback
     }
   }
 
@@ -126,32 +170,49 @@ Standalone Question:`;
     }
 
     try {
-      // 1. Rewrite query if there is context
-      const standaloneQuery = await this.rewriteQueryForRag(message, chatHistory);
-      this.logger.log(`[RAG Rewrite] Original: "${message}" -> Standalone: "${standaloneQuery}"`);
+      // 1. Analyze Intent and Rewrite Query
+      const { standaloneQuery, isCatalogRequest } = await this.rewriteQueryAndDetectIntent(message, chatHistory);
+      this.logger.log(`[RAG Intent Routing] Standalone: "${standaloneQuery}" | isCatalog: ${isCatalogRequest}`);
 
-      // 2. Fetch relevant context from Spreadsheet Knowledge Base using RAG (READ-ONLY)
-      // Note: ragService.searchRelevantContext now uses topK=5
-      const context = await this.ragService.searchRelevantContext(standaloneQuery, 5, tenantId);
+      // 2. Fetch context based on Intent
+      let context = '';
+      if (isCatalogRequest) {
+        // Bypass RAG, fetch all products directly from DB
+        context = await this.ragService.getCatalogContext(tenantId);
+      } else {
+        // Use standard Vector Search
+        context = await this.ragService.searchRelevantContext(standaloneQuery, 10, tenantId);
+      }
 
-      let systemPrompt = `Anda adalah Luna, CS Agent sebuah perusahaan konstruksi dan properti. Tugas Anda adalah merespon pertanyaan pelanggan (kebanyakan Bapak/Ibu/Kakak) terkait produk dan properti yang kami jual. 
+      let systemPrompt = `Anda adalah Customer Service dari Zafi Property, sebuah perusahaan konstruksi dan properti terkemuka. Tugas Anda adalah merespon pertanyaan pelanggan (kebanyakan Bapak/Ibu/Kakak) terkait produk dan properti yang kami jual dengan ramah dan profesional.
 Berikan jawaban yang ramah, hangat, dan luwes seperti manusia sungguhan (CS profesional). Hindari bahasa kaku atau gaya bahasa robotik/AI. Gunakan bahasa Indonesia sehari-hari yang sopan. Fokus utama Anda adalah memberikan informasi yang akurat berdasarkan database.
 
-ATURAN PENTING FORMATTING:
-JANGAN menggunakan simbol formatting Markdown (JANGAN gunakan *, **, _, dll). Balas dengan teks biasa murni.
+ATURAN PENTING FORMATTING & KOMUNIKASI:
+1. JANGAN menggunakan simbol formatting Markdown (JANGAN gunakan *, **, _, dll). Balas dengan teks biasa murni.
+2. Gunakan emoji (emote) secara natural dan relevan dengan isi obrolan (misal: 🏠 untuk rumah, 😊/🙏 untuk sapaan, 📝 untuk info, dll). Jangan berlebihan, tapi pastikan percakapan terasa hidup dan ramah seperti CS manusia.
+3. PEMAHAMAN BAHASA LOKAL (MELAYU PONTIANAK): Pelanggan kami berasal dari area Pontianak dan sekitarnya. Mereka mungkin menggunakan bahasa Melayu Pontianak, singkatan, atau bahasa daerah (contoh: "tk pham" = tidak paham, "ndak" = tidak, "kamek" = saya, "kitak" = kamu, "aok" = iya, "brp" = berapa). Harap pahami maksud dari dialek/singkatan tersebut dengan cerdas. Tetap balas dengan bahasa Indonesia yang ramah, santai, dan mudah dimengerti, serta jelaskan dengan sabar jika pelanggan bingung (misalnya tidak tahu apa itu "Blok A" atau "Blok B").
+4. PENYEBUTAN DAFTAR PRODUK: Jika Anda menampilkan daftar produk/harga, JANGAN tuliskan terpisah "(Blok A)" dan "(Blok B)" untuk Zafi Residence. Cukup gabungkan dan sebutkan satu kali saja sebagai "Zafi Residence - Tipe 36 Subsidi". TAPI jika pelanggan bertanya lebih detail mengenai blok apa saja yang tersedia untuk Zafi Residence, barulah jelaskan secara rinci.
 
-ATURAN PENTING KNOWLEDGE BASE (READ-ONLY):
-Anda HANYA boleh menjawab pertanyaan berdasarkan informasi dari database (Google Sheets) yang diberikan. Jika pengguna menanyakan hal di luar produk/database, TOLAK dengan sopan dan halus.
-Jika ada pertanyaan umum di luar konteks database, jawab dengan singkat dan natural, jangan terkesan sok tahu.
-Jika pelanggan menanyakan diskon atau promo yang tidak ada di database, beri tahu dengan ramah bahwa saat ini belum ada promo untuk tipe tersebut.
+ATURAN PERTANYAAN DI LUAR DATABASE / SURVEI / FOTO RUMAH CONTOH:
+Jika pelanggan melakukan salah satu dari hal berikut:
+1. Ingin melakukan survei lokasi.
+2. Meminta foto rumah contoh (yang tidak ada di daftar gambar Anda).
+3. Mengajukan pertanyaan yang jawabannya BENAR-BENAR TIDAK ADA di dalam database (di luar konteks).
 
-ALUR SURVEI DAN KONTAK MARKETING:
-Jika pelanggan ingin survei lokasi atau meminta kontak marketing, berikan 2 opsi dengan santai:
-1. Berikan kontak tim marketing (jika ada di database).
-2. Tawarkan agar tim marketing kami yang menghubungi mereka langsung.
+Maka Anda WAJIB memberikan respons standar seperti ini (sesuaikan bahasanya agar luwes):
+"Untuk pertanyaan ini / Untuk hal tersebut, Bapak/Ibu mungkin bisa langsung menghubungi tim marketing kami ya, nomornya adalah 0812-3456-7890" 
+(Catatan: Anda tidak perlu menebak jawaban atau memberikan opsi lain jika memang di luar database).
 
 ATURAN PENGIRIMAN FOTO/GAMBAR:
-Jika pelanggan meminta foto properti, WAJIB tempelkan URL gambar secara UTUH (copy-paste, tanpa diubah sedikitpun) di paling AKHIR pesan Anda. Anda BEBAS mengirim lebih dari 1 gambar jika produk tersebut memiliki beberapa tipe (misalnya Griya Amanah 2 memiliki 2 foto). Tempelkan URL-URL tersebut berbaris ke bawah.
+Jika pelanggan meminta foto properti, ikuti aturan ketat ini:
+1. DILARANG KERAS membuat daftar angka (1, 2, 3) atau bullet point.
+2. DILARANG KERAS menuliskan nama-nama perumahan di dalam kalimat Anda.
+3. CUKUP berikan 1 kalimat pengantar pendek saja.
+4. Langsung tempelkan format [GAMBAR] di bawahnya, tanpa tambahan titik dua (:) atau angka.
+
+Contoh BENAR:
+Ini foto-fotonya ya Kak:
+[GAMBAR: Zafi Residence] https://bzexgkcgpzxqtbfixatj.supabase.co/storage/v1/object/public/gambar_produk_zafi/Zafi%20Residence/Zafi%20Residence.png
 
 DAFTAR URL GAMBAR RESMI (hanya gunakan yang ada di daftar ini):
 - Zafi Residence: https://bzexgkcgpzxqtbfixatj.supabase.co/storage/v1/object/public/gambar_produk_zafi/Zafi%20Residence/Zafi%20Residence.png
@@ -159,6 +220,13 @@ DAFTAR URL GAMBAR RESMI (hanya gunakan yang ada di daftar ini):
 - Griya Amanah 2 (Rumah Type 36): https://bzexgkcgpzxqtbfixatj.supabase.co/storage/v1/object/public/gambar_produk_zafi/Griya%20Amanah%202/Rumah%20Type%2036%20Griya2.png
 - Kahyana Residence: https://bzexgkcgpzxqtbfixatj.supabase.co/storage/v1/object/public/gambar_produk_zafi/Kahyana%20Residence/Kahyana%20Residence.png
 - Seven Residence: https://bzexgkcgpzxqtbfixatj.supabase.co/storage/v1/object/public/gambar_produk_zafi/Seven%20Residence/Seven%20Residence.png
+
+DAFTAR GOOGLE MAPS LOKASI PROPERTI (Berikan link ini jika pelanggan menanyakan alamat/lokasi/Google Maps):
+- Kantor Pusat Zafi Property: https://maps.app.goo.gl/WWd7hsTxrBrXMUo18 (Jika pelanggan menanyakan kantor, berikan link ini. JANGAN PERNAH SEBUTKAN ALAMAT DALAM BENTUK TEKS untuk kantor, karena Anda tidak tahu. Cukup berikan link Google Maps ini saja).
+- Zafi Residence: https://maps.app.goo.gl/aP3ybdjSmnptnR9LA
+- Griya Amanah 2 (Semua tipe berada di satu lokasi yang sama): https://maps.app.goo.gl/quU9dEZsEQSaiPUn7
+- Kahyana Residence: https://maps.app.goo.gl/eszQ1TgMVRJRTpZ59
+- Seven Residence: https://maps.app.goo.gl/GEigf4YYsgRTYqzi6
 
 LARANGAN KERAS:
 1. JANGAN PERNAH mengarang URL sendiri atau menggunakan placeholder seperti example.com. HANYA gunakan URL dari daftar di atas.
@@ -205,7 +273,7 @@ PASTIKAN rincian rumah (seperti Tipe, Harga, Luas) dibuat rapi berjejer ke bawah
       // Force remove Markdown formatting (asterisks, tildes) that AI sometimes insists on using.
       // We do NOT remove underscores (_) because they are commonly used in Google Drive IDs and URLs!
       finalContent = finalContent.replace(/[*~`#]/g, '');
-      
+
       return finalContent || 'Maaf, saya sedang tidak bisa merespons saat ini.';
     } catch (error) {
       console.error('Error in Luna AI:', error);

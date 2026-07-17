@@ -33,41 +33,23 @@ export class WahaService {
 
   // Adaptive delay based on WPM (Words Per Minute)
   private async adaptiveWpmDelay(text: string, wpm: number = 70): Promise<void> {
-    const words = Math.max(1, text.length / 5);
-    const readingDelay = 1500; // 1.5s simulated reading time
-    const typingDelay = Math.floor((words / wpm) * 60000);
-    
-    let totalDelay = readingDelay + typingDelay;
-    const jitter = Math.floor(totalDelay * 0.15 * (Math.random() > 0.5 ? 1 : -1));
-    totalDelay += jitter;
-    
-    // Cap delay to 25 seconds to avoid extreme waits for very long messages
-    const finalDelay = Math.min(totalDelay, 25000);
+    // User requested a strict 3-4 seconds delay
+    const finalDelay = Math.floor(Math.random() * (4000 - 3000 + 1)) + 3000;
 
-    this.logger.log(`Adaptive delay (WPM: ${wpm}, Chars: ${text.length}): sleeping for ${finalDelay}ms...`);
+    this.logger.log(`Typing delay: sleeping for ${finalDelay}ms...`);
     return new Promise(resolve => setTimeout(resolve, finalDelay));
   }
 
   // Sends the 'typing...' status to WA
   async sendTypingPresence(sessionName: string, chatId: string): Promise<void> {
     try {
-      // Try older API pattern where session is passed in the body
       await axios.post(
         `${this.baseUrl}/api/startTyping`,
         { session: sessionName, chatId: chatId },
         { headers: this.getHeaders() }
       );
     } catch (error) {
-      try {
-        // Fallback to newer API pattern
-        await axios.post(
-          `${this.baseUrl}/api/sessions/${sessionName}/presence`,
-          { chatId: chatId, presence: 'typing' },
-          { headers: this.getHeaders() }
-        );
-      } catch (innerError) {
-        this.logger.debug(`Could not send typing presence for ${sessionName}. Error: ${innerError.message}`);
-      }
+      this.logger.debug(`Could not send typing presence for ${sessionName}. Error: ${error.message}`);
     }
   }
 
@@ -95,8 +77,8 @@ export class WahaService {
               url: finalWebhookUrl,
               events: ['message', 'message.any', 'session.status'],
               retries: {
-                delaySeconds: 2,
-                attempts: 3,
+                delaySeconds: 10,
+                attempts: 15,
                 policy: 'fixed'
               }
             },
