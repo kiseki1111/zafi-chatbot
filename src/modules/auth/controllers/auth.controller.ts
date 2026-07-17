@@ -3,10 +3,12 @@ import { AuthService } from '../services/auth.service';
 import { LoginDto } from '../dto/login.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 
+//mengatur api endpoint untuk otentikasi dan otorisasi
 @Controller('api/v1/auth')
 export class AuthController {
     constructor(private readonly authService: AuthService) {}
 
+    //mengatur request login
     @Post('login')
     @HttpCode(HttpStatus.OK)
     async login(
@@ -16,6 +18,8 @@ export class AuthController {
     ) {
         return this.authService.login(loginDto, ip, userAgent);
     }
+
+    //mengatur request login dengan google
     @Post('google')
     @HttpCode(HttpStatus.OK)
     async googleLogin(
@@ -26,6 +30,7 @@ export class AuthController {
         return this.authService.googleLogin(body.idToken, ip, userAgent);
     }
 
+    //mengatur request logout
     @Post('logout')
     @UseGuards(JwtAuthGuard)
     @HttpCode(HttpStatus.OK)
@@ -33,6 +38,7 @@ export class AuthController {
         return this.authService.logout(req.user.sub);
     }
 
+    //mengatur request refresh token untuk mendapatkan token akses baru
     @Post('refresh')
     @HttpCode(HttpStatus.OK)
     async refresh(@Body() body: { userId: string, refreshTokenPlain: string }) {

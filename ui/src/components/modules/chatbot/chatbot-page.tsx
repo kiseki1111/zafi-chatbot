@@ -498,7 +498,7 @@ export function ChatbotPage() {
   const { user } = useAuthStore();
   const { activeContactId, setActiveContactId, activeSessionId, setActiveSessionId } = useAppStore();
   const me = user?.name ?? "Saya";
-  const [sessions, setSessions] = useState<{id: string, name: string, status: string}[]>([]);
+  const [sessions, setSessions] = useState<{id: string, name: string, status: string, battery?: number}[]>([]);
   const sessionId = activeSessionId || "";
   const setSessionId = setActiveSessionId;
   

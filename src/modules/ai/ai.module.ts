@@ -5,7 +5,7 @@ import { KnowledgeModule } from '../knowledge/knowledge.module';
 
 @Module({
   imports: [forwardRef(() => KnowledgeModule)],
-  controllers: [AiController],
+  controllers: [AiController], 
   providers: [AiService],
   exports: [AiService]
 })

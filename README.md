@@ -87,7 +87,7 @@ Untuk mempermudah sinkronisasi data antar *developer*, Anda dapat menggunakan *s
 ---
 
 ## Kredensial Bawaan (Super Admin)
-
+   
 Gunakan akun ini untuk masuk ke dalam Dashboard Frontend pertama kali:
 - **Email:** superadmin@gmail.com
 - **Password:** rahasia123

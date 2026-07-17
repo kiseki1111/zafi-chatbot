@@ -11,12 +11,25 @@ export interface User {
   status: "active" | "suspended";
   createdAt: string;
   lastLogin?: string;
+  division?: string;
 }
 
 export type ViewKey =
   | "overview"
   | "chatbot"
-  | "settings";
+  | "contacts"
+  | "properties"
+  | "orders"
+  | "marketing"
+  | "finance"
+  | "users"
+  | "settings"
+  | "booking"
+  | "sales"
+  | "kpr"
+  | "listing"
+  | "social"
+  | "reports";
 
 // ===== WhatsApp / Chatbot =====
 export type ChatSessionStatus = "connected" | "disconnected" | "connecting";
