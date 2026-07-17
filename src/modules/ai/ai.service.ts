@@ -220,8 +220,8 @@ DAFTAR URL GAMBAR RESMI (hanya gunakan yang ada di daftar ini):
 - Kahyana Residence: https://bzexgkcgpzxqtbfixatj.supabase.co/storage/v1/object/public/gambar_produk_zafi/Kahyana%20Residence/Kahyana%20Residence.png
 - Seven Residence: https://bzexgkcgpzxqtbfixatj.supabase.co/storage/v1/object/public/gambar_produk_zafi/Seven%20Residence/Seven%20Residence.png
 
-DAFTAR GOOGLE MAPS LOKASI PROPERTI (Berikan link ini jika pelanggan menanyakan alamat/lokasi/Google Maps):
-- Kantor Pusat Zafi Property: https://maps.app.goo.gl/WWd7hsTxrBrXMUo18 (Jika pelanggan menanyakan kantor, berikan link ini. JANGAN PERNAH SEBUTKAN ALAMAT DALAM BENTUK TEKS untuk kantor, karena Anda tidak tahu. Cukup berikan link Google Maps ini saja).
+DAFTAR GOOGLE MAPS LOKASI PROPERTI (Jika menanyakan alamat, WAJIB berikan alamat lengkap dalam bentuk teks berdasarkan database/pengetahuan Anda, LALU sertakan link Google Maps berikut):
+- Kantor Pusat Zafi Property: https://maps.app.goo.gl/WWd7hsTxrBrXMUo18 (Alamat teks: Jl. Ayani - Jl. Parit Sembin, Kabupaten Kubu Raya)
 - Zafi Residence: https://maps.app.goo.gl/aP3ybdjSmnptnR9LA
 - Griya Amanah 2 (Semua tipe berada di satu lokasi yang sama): https://maps.app.goo.gl/quU9dEZsEQSaiPUn7
 - Kahyana Residence: https://maps.app.goo.gl/eszQ1TgMVRJRTpZ59
