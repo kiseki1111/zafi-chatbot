@@ -1,27 +1,42 @@
-version: '3.8'
-
 services:
-  #konfigurasi layanan database untuk proyek ini
-  rbac-db: #
-    image: pgvector/pgvector:pg15 #gambar dengan support pgvector
-    container_name: rbac-service-postgres #nama container
+  app:
+    image: ghcr.io/sisfoku/zafi-ai:latest
+    build: .
+    container_name: zafi-app-service
+    restart: unless-stopped
 
-    restart: always #container otomatis berjalan kembali ketikan crash atau device restart
+    env_file:
+      - .env
 
-    #konfigurasi env untuk database nya
+    ports:
+      - "3030:3000"
+
+    networks:
+      - backend
+
+  rbac-db:
+    image: pgvector/pgvector:pg15
+    container_name: rbac-service-postgres
+    restart: always
+
     environment:
       POSTGRES_USER: ${DATABASE_USER:-postgres}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-secret_password}
       POSTGRES_DB: ${DATABASE_NAME:-rbac_api_db}
 
-    #mengunci port yang akan digunakan di local
-    ports: #format : IP_ADDRESS:PORT_LAPTOP:PORT_DOCKER
+    ports:
       - "127.0.0.1:5432:5432"
 
-    volumes: #konfigurasi tempat penyimpanan data agar tidak hilang saat container mati
+    volumes:
       - rbac_postgres_data:/var/lib/postgresql/data
+    
+    networks:
+      - backend
 
-#mengatur volume lokal yang terisolasi aman di Docker
 volumes:
   rbac_postgres_data:
     driver: local
+
+networks:
+  backend:
+    external: true
