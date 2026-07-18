@@ -1,16 +1,24 @@
 services:
   app:
-    image: ghcr.io/sisfoku/zafi-ai:latest
-    build: .
+    image: ghcr.io/sisfoku/iqbal-backend:latest
     container_name: zafi-app-service
     restart: unless-stopped
 
     env_file:
-      - .env
+      - apps/backend/.env
 
     ports:
       - "3030:3000"
 
+    networks:
+      - backend
+
+  web:
+    image: ghcr.io/sisfoku/iqbal-web:latest
+    container_name: zafi-web-service
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
     networks:
       - backend
 

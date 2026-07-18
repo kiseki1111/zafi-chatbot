@@ -1,0 +1,57 @@
+name: Build and Deploy Application
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/backend/**'
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Ambil kode program dari GitHub
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 2. Login ke GitHub Container Registry (GHCR)
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }} # Otomatis menggunakan nama pemilik repo (sisfoku)
+          password: ${{ secrets.GH_PAT }}
+
+      # 3. Setup Node.js di server GitHub
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      # 4. Install dependensi & Generate Prisma Client (Proses berat)
+      - name: Install dependencies & Generate Prisma
+        working-directory: ./apps/backend
+        run: |
+          npm install --no-audit --progress=false
+          npx prisma generate --schema=src/infrastructure/prisma/schema.prisma
+          npm run build
+          npm prune --production
+
+      # 5. Build Docker Image (Menggunakan instruksi lokal agar folder dist & node_modules ikut terbawa)
+      - name: Build and Push Docker Image
+        run: |
+          docker build -t ghcr.io/sisfoku/iqbal-backend:latest ./apps/backend
+          docker push ghcr.io/sisfoku/iqbal-backend:latest
+
+  deploy-to-komodo:
+    needs: build-and-push # Hanya berjalan JIKA proses build di atas sukses
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Komodo Deploy Webhook
+        run: |
+          curl -X POST "${{ secrets.KOMODO_WEBHOOK_URL }}" \
+          -H "Content-Type: application/json" \
+          -d "{\"secret\":\"${{ secrets.KOMODO_WEBHOOK_SECRET }}\",\"event\":\"deploy\",\"source\":\"github-actions\"}"

@@ -1,0 +1,32 @@
+import { OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { PrismaService } from '../../infrastructure/prisma/prisma.service';
+import { AiService } from '../ai/ai.service';
+import { ConfigService } from '@nestjs/config';
+import { OnboardingService } from '../onboarding/onboarding.service';
+import { DesignFlowService } from './design/design-flow.service';
+export declare class TelegramService implements OnModuleInit, OnModuleDestroy {
+    private readonly prisma;
+    private readonly aiService;
+    private readonly configService;
+    private readonly onboardingService;
+    private readonly designFlowService;
+    private readonly logger;
+    private csBot;
+    private onboardingBot;
+    private designBot;
+    private readonly INSTANCE_NAME;
+    private messageBuffer;
+    private processingQueue;
+    private isProcessingQueue;
+    private designUserBuffers;
+    private designUserTimers;
+    private readonly DESIGN_DEBOUNCE_MS;
+    constructor(prisma: PrismaService, aiService: AiService, configService: ConfigService, onboardingService: OnboardingService, designFlowService: DesignFlowService);
+    onModuleInit(): Promise<void>;
+    onModuleDestroy(): Promise<void>;
+    private ensureMockInstance;
+    private handleOnboardingMessage;
+    private handleDesignMessage;
+    private handleCSMessage;
+    private processQueue;
+}
