@@ -32,8 +32,8 @@ export declare class WahaController {
     }>;
     getLogs(id: string): Promise<{
         id: string;
-        instanceName: string;
         createdAt: Date;
+        instanceName: string;
         event: string;
         payload: import("@prisma/client/runtime/library").JsonValue;
     }[]>;

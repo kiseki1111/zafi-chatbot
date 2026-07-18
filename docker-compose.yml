@@ -1,6 +1,6 @@
 services:
   app:
-    image: ghcr.io/sisfoku/iqbal-backend:latest
+    image: ghcr.io/kiseki1111/zafi-monorepo-backend:latest
     container_name: zafi-app-service
     restart: unless-stopped
 
@@ -8,13 +8,13 @@ services:
       - apps/backend/.env
 
     ports:
-      - "3030:3000"
+      - "3030:3030"
 
     networks:
       - backend
 
   web:
-    image: ghcr.io/sisfoku/iqbal-web:latest
+    image: ghcr.io/kiseki1111/zafi-monorepo-web:latest
     container_name: zafi-web-service
     restart: unless-stopped
     ports:

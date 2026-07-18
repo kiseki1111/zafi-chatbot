@@ -19,8 +19,8 @@ export declare class ChannelAccountsService {
             createdAt: Date;
             updatedAt: Date;
             status: string;
-            instanceName: string;
             channelAccountId: string | null;
+            instanceName: string;
             phone: string | null;
             profileName: string | null;
             profilePicture: string | null;
@@ -47,8 +47,8 @@ export declare class ChannelAccountsService {
             createdAt: Date;
             updatedAt: Date;
             status: string;
-            instanceName: string;
             channelAccountId: string | null;
+            instanceName: string;
             phone: string | null;
             profileName: string | null;
             profilePicture: string | null;

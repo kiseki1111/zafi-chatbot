@@ -24,8 +24,8 @@ jobs:
 
       - name: Build and Push Docker Image
         run: |
-          docker build -f apps/web/Dockerfile -t ghcr.io/sisfoku/iqbal-web:latest .
-          docker push ghcr.io/sisfoku/iqbal-web:latest
+          docker build -f apps/web/Dockerfile -t ghcr.io/${{ github.repository }}-web:latest .
+          docker push ghcr.io/${{ github.repository }}-web:latest
 
   deploy-to-komodo:
     needs: build-and-push-web

@@ -43,8 +43,8 @@ jobs:
       # 5. Build Docker Image (Menggunakan instruksi lokal agar folder dist & node_modules ikut terbawa)
       - name: Build and Push Docker Image
         run: |
-          docker build -t ghcr.io/sisfoku/iqbal-backend:latest ./apps/backend
-          docker push ghcr.io/sisfoku/iqbal-backend:latest
+          docker build -t ghcr.io/${{ github.repository }}-backend:latest ./apps/backend
+          docker push ghcr.io/${{ github.repository }}-backend:latest
 
   deploy-to-komodo:
     needs: build-and-push # Hanya berjalan JIKA proses build di atas sukses

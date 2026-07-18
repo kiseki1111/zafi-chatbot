@@ -1,25 +1,14 @@
-FROM node:20
+FROM node:20-slim
 
 WORKDIR /app
 
-# Salin package-lock dan package.json
-COPY package*.json ./
-COPY src/infrastructure/prisma/schema.prisma ./src/infrastructure/prisma/
+# Salin seluruh folder hasil build dan node_modules yang sudah dimasak oleh GitHub Actions
+COPY package.json ./
+COPY dist ./dist
+COPY node_modules ./node_modules
 
-# Install semua dependensi
-RUN npm ci
-
-# Salin seluruh kode program (membutuhkan file Dockerfile terdeteksi di build context)
-COPY . .
-
-# Generate Prisma Client
-RUN npx prisma generate --schema=src/infrastructure/prisma/schema.prisma
-
-# Build aplikasi NestJS ke folder dist/
-RUN npm run build
-
-# Buang devDependencies untuk menghemat space runtime
-RUN npm prune --production
+# Khusus Prisma, kita butuh schema
+COPY src/infrastructure/prisma ./src/infrastructure/prisma
 
 ENV NODE_ENV=production
 EXPOSE 3030
