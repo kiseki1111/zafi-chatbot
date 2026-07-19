@@ -8,26 +8,27 @@ const nextConfig: NextConfig = {
   },
   reactStrictMode: false,
   async rewrites() {
+    const backendUrl = process.env.BACKEND_URL || "http://localhost:3000";
     return [
       {
         source: "/api/v1/waha/:path*",
-        destination: "http://localhost:3000/api/v1/waha/:path*",
+        destination: `${backendUrl}/api/v1/waha/:path*`,
       },
       {
         source: "/api/v1/channel-accounts",
-        destination: "http://localhost:3000/api/v1/channel-accounts",
+        destination: `${backendUrl}/api/v1/channel-accounts`,
       },
       {
         source: "/api/v1/channel-accounts/:path*",
-        destination: "http://localhost:3000/api/v1/channel-accounts/:path*",
+        destination: `${backendUrl}/api/v1/channel-accounts/:path*`,
       },
       {
         source: "/api/v1/chats",
-        destination: "http://localhost:3000/api/v1/chats",
+        destination: `${backendUrl}/api/v1/chats`,
       },
       {
         source: "/api/v1/chats/:path*",
-        destination: "http://localhost:3000/api/v1/chats/:path*",
+        destination: `${backendUrl}/api/v1/chats/:path*`,
       },
     ];
   },

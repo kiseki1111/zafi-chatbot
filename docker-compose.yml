@@ -19,6 +19,8 @@ services:
     restart: unless-stopped
     ports:
       - "3001:3001"
+    environment:
+      - BACKEND_URL=http://app:3030
     networks:
       - backend
 
