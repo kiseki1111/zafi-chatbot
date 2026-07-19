@@ -1,6 +1,6 @@
 services:
   app:
-    image: ghcr.io/kiseki1111/zafi-monorepo-backend:latest
+    image: ghcr.io/sisfoku/iqbal-backend:latest
     container_name: zafi-app-service
     restart: unless-stopped
 
@@ -14,7 +14,7 @@ services:
       - backend
 
   web:
-    image: ghcr.io/kiseki1111/zafi-monorepo-web:latest
+    image: ghcr.io/sisfoku/iqbal-web:latest
     container_name: zafi-web-service
     restart: unless-stopped
     ports:
