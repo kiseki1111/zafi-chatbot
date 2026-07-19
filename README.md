@@ -36,20 +36,36 @@ npx prisma db push
 cd ../..
 ```
 
-### 4. Jalankan Aplikasi
+### 4. Menyalakan Database Lokal (Wajib)
+Aplikasi *backend* membutuhkan PostgreSQL. Anda bisa menyalakannya dengan mudah tanpa perlu *install* PostgreSQL di komputer, yaitu dengan menggunakan fasilitas Docker:
+```bash
+docker-compose up rbac-db -d
+```
+*(Perintah ini hanya akan menyalakan database di *background* pada port 5432, tanpa menyalakan aplikasi versi Docker).*
+
+### 5. Jalankan Aplikasi
 Tersedia *script* cepat di *root* direktori untuk menjalankan aplikasi secara langsung:
 - Menjalankan Backend: `npm run dev:backend` (Akses di http://localhost:3030)
 - Menjalankan Frontend: `npm run dev:web` (Akses di http://localhost:3001)
 
 ---
 
-## CI/CD & Docker Deployment (Panel Komodo)
+## 🚀 Panduan Deployment ke VPS (Panel Komodo)
 
-Repositori ini sudah terintegrasi secara penuh dengan **GitHub Actions** dan **Panel Komodo** untuk keperluan *Automated Deployment*.
+Repositori ini sudah dirancang sempurna untuk *Automated Deployment* menggunakan kombinasi **GitHub Actions** dan **Panel Komodo**. 
 
-1. **Pemisahan Pipeline**: Proses *build* (*Continuous Integration*) telah dipisah antara *frontend* dan *backend* melalui file `.github/workflows/deploy.yml` dan `deploy-web.yml`. Apabila ada perubahan di folder `apps/web`, maka hanya *Image* frontend yang akan dibangun, dan sebaliknya.
-2. **GitHub Container Registry (GHCR)**: Semua *Image* Docker diproses (di-*build*) menggunakan server GitHub Actions, lalu disimpan di dalam *GitHub Packages (ghcr.io)*. 
-3. **Docker Compose**: Pada tahap produksi (Server VPS), sistem *deployment* menggunakan `docker-compose.yml` yang akan langsung melakukan *pull Image* dari GHCR. Dengan demikian, VPS Anda tidak perlu melakukan proses *compile* yang berat (seperti npm install atau prisma generate), membuat server tetap sangat ringan dan stabil.
+**Konsep Arsitektur (Sesuai Standar Industri):**
+1. **GitHub Actions (Sebagai "Pemasak")**: Memisahkan *pipeline build* antara *frontend* dan *backend* (menggunakan `deploy.yml` & `deploy-web.yml`). Server GitHub akan bekerja keras melakukan kompilasi kodenya menjadi *Image* Docker, lalu menyimpannya di GHCR (GitHub Packages).
+2. **Panel Komodo (Sebagai "Penyaji")**: VPS Anda sama sekali **TIDAK** melakukan proses *build*. Melalui instruksi di `docker-compose.yml`, VPS hanya perlu melakukan *pull* (mengunduh) *Image* yang sudah matang dari GHCR. Hal ini menjamin beban CPU/RAM VPS Anda tetap sangat ringan dan stabil dari ancaman *crash*.
+
+**Langkah-Langkah Praktis Setup di Komodo (Untuk Mentor/Admin):**
+1. **Tambahkan Repo**: Buka Panel Komodo -> Menu **Repos** -> Masukkan URL GitHub repositori ini. *(Jika repo private, masukkan Personal Access Token di kolom password).*
+2. **Buat Stack Baru**: Masuk ke menu **Stacks** -> *Create Stack* -> Beri nama bebas (misal: `zafi-app-monorepo`).
+3. **Hubungkan ke Git**: Pada bagian *Choose Mode*, pilih **Git Repo**. Pilih repo GitHub ini, isi *branch* dengan `main`, dan letak file konfigurasi dengan `docker-compose.yml`.
+4. **Penting! (Konfigurasi `.env`)**: File `docker-compose.yml` telah diinstruksikan untuk membaca rahasia dari `apps/backend/.env`. Pastikan Anda sudah membuat file ini secara manual di direktori VPS Anda, atau menyuntikkan *Environment Variables*-nya langsung melalui UI Panel Komodo.
+5. **Dapatkan Webhook**: Setelah Stack disimpan (*Save*), *scroll* ke paling bawah halaman untuk menemukan dan menyalin **URL Webhook** (serta *Secret* jika ada).
+6. **Pasang Webhook di GitHub**: Masukkan URL tadi ke pengaturan repositori GitHub Anda di menu **Settings -> Secrets and variables -> Actions** dengan nama `KOMODO_WEBHOOK_URL` dan `KOMODO_WEBHOOK_SECRET`. 
+7. **Beri Izin Akses Upload**: Tambahkan satu rahasia lagi bernama `GH_PAT` (Berisi *GitHub Personal Access Token* *Classic* dengan centang `write:packages` dan `repo`) agar mesin GitHub bisa mengunggah *Image* ke GHCR.
 
 ---
 
