@@ -6,65 +6,50 @@ Sistem ini dirancang menggunakan arsitektur berlapis yang kokoh dengan **NestJS*
 
 ---
 
-## Struktur Proyek
+## Struktur Proyek (NPM Workspace Monorepo)
 
-Proyek ini menggunakan struktur monorepo sederhana yang terbagi menjadi dua bagian utama:
-1. **Backend (`/`)**: Berisi core API NestJS, integrasi AI, integrasi Telegram/WhatsApp, dan manajemen database Prisma.
-2. **Frontend (`/ui`)**: Berisi aplikasi dashboard berbasis **Next.js** (Tailwind CSS & Shadcn UI) untuk memonitor percakapan AI, mengatur properti, dan manajemen agen/RBAC.
-
----
-
-## Fitur Utama
-
-### 1. AI Customer Service Agent (Luna)
-- **Multi-Channel**: Berjalan otomatis di Telegram dan WhatsApp (menggunakan WAHA).
-- **RAG Knowledge Base**: AI merespon berdasarkan database pintar yang bisa di-*update* secara dinamis melalui Google Sheets atau file lokal.
-- **Image Handling**: AI dapat mendeteksi properti yang diminta dan otomatis mengirimkan denah / foto wujud rumah langsung ke *customer* lengkap dengan *caption* teks.
-
-### 2. Role-Based Access Control (RBAC) 
-- Sistem manajemen akses pengguna yang granular (Super Admin, Admin, Agent).
-- Keamanan tinggi dengan *Mass Assignment Protection*, *Cryptographic Credential Hashing* (Bcrypt), dan JWT Authentication.
-- Perlindungan *Brute Force* (Rate Limiting).
-
-### 3. Ekosistem Frontend (Next.js)
-- Dashboard pemantauan *real-time* untuk seluruh aktivitas chat AI.
-- Manajemen properti, input *knowledge base*, dan CRM *(Customer Relationship Management)*.
-- Desain antarmuka modern yang estetik menggunakan *glassmorphism* dan *dark mode*.
+Proyek ini telah dikonfigurasi ulang menjadi sebuah arsitektur *Monorepo* modern menggunakan NPM Workspaces:
+1. **`apps/backend`**: Berisi core API NestJS, integrasi AI, integrasi Telegram/WhatsApp, dan manajemen database Prisma (Port 3030).
+2. **`apps/web`**: Berisi aplikasi dashboard berbasis **Next.js** (Tailwind CSS & Shadcn UI) untuk memonitor percakapan AI dan mengatur properti (Port 3001).
 
 ---
 
-## Panduan Instalasi (Development)
+## Panduan Instalasi & Menjalankan Lokal
 
-Berikut adalah panduan lengkap menjalankan proyek ini di mesin lokal:
+Karena ini adalah sistem *Monorepo*, Anda tidak perlu masuk ke folder satu-per-satu. Semua dapat dikendalikan dari *root* folder:
 
-### A. Persiapan Backend (NestJS)
-1. **Install Dependensi:**
-   ```bash
-   npm install
-   ```
-2. **Pengaturan Lingkungan (.env):**
-   Pastikan Anda telah mengisi file `.env` dengan kredensial yang tepat (seperti `DATABASE_URL`, `OPENAI_API_KEY`, dan `TELEGRAM_BOT_TOKEN`).
-3. **Migrasi Database:**
-   ```bash
-   npx prisma db push
-   ```
-4. **Jalankan Server Backend:**
-   ```bash
-   npm run start:dev
-   ```
-   *Backend akan berjalan di `http://localhost:3000`*
+### 1. Install Dependensi
+```bash
+npm install
+```
+*(Perintah ini akan secara otomatis meng-install dependensi untuk Backend dan Web sekaligus)*
 
-### B. Persiapan Frontend (Next.js)
-1. **Masuk ke folder UI dan install dependensi:**
-   ```bash
-   cd ui
-   npm install
-   ```
-2. **Jalankan Server Frontend:**
-   ```bash
-   npm run dev
-   ```
-   *Frontend akan berjalan di `http://localhost:3001`*
+### 2. Pengaturan Lingkungan (.env)
+Pastikan Anda telah mengisi file `.env` di folder `apps/backend/` dengan benar.
+
+### 3. Generate Prisma & Migrasi Database
+Masuk sebentar ke backend untuk setup database:
+```bash
+cd apps/backend
+npx prisma generate
+npx prisma db push
+cd ../..
+```
+
+### 4. Jalankan Aplikasi
+Tersedia *script* cepat di *root* direktori untuk menjalankan aplikasi secara langsung:
+- Menjalankan Backend: `npm run dev:backend` (Akses di http://localhost:3030)
+- Menjalankan Frontend: `npm run dev:web` (Akses di http://localhost:3001)
+
+---
+
+## CI/CD & Docker Deployment (Panel Komodo)
+
+Repositori ini sudah terintegrasi secara penuh dengan **GitHub Actions** dan **Panel Komodo** untuk keperluan *Automated Deployment*.
+
+1. **Pemisahan Pipeline**: Proses *build* (*Continuous Integration*) telah dipisah antara *frontend* dan *backend* melalui file `.github/workflows/deploy.yml` dan `deploy-web.yml`. Apabila ada perubahan di folder `apps/web`, maka hanya *Image* frontend yang akan dibangun, dan sebaliknya.
+2. **GitHub Container Registry (GHCR)**: Semua *Image* Docker diproses (di-*build*) menggunakan server GitHub Actions, lalu disimpan di dalam *GitHub Packages (ghcr.io)*. 
+3. **Docker Compose**: Pada tahap produksi (Server VPS), sistem *deployment* menggunakan `docker-compose.yml` yang akan langsung melakukan *pull Image* dari GHCR. Dengan demikian, VPS Anda tidak perlu melakukan proses *compile* yang berat (seperti npm install atau prisma generate), membuat server tetap sangat ringan dan stabil.
 
 ---
 
@@ -72,17 +57,8 @@ Berikut adalah panduan lengkap menjalankan proyek ini di mesin lokal:
 
 Untuk mempermudah sinkronisasi data antar *developer*, Anda dapat menggunakan *script* bawaan:
 
-- **Ekspor Database**:
-  ```bash
-  node scripts/export-db.js
-  ```
-  *(Akan menghasilkan file `database-backup.json` / `.sql`)*
-
-- **Impor Database**:
-  ```bash
-  node scripts/import-db.js
-  ```
-  *(Memasukkan seluruh data, termasuk embedding vektor AI ke lokal Anda)*
+- **Ekspor Database**: `node apps/backend/scripts/export-db.js`
+- **Impor Database**: `node apps/backend/scripts/import-db.js`
 
 ---
 
