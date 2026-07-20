@@ -6,9 +6,10 @@
     "apps/*"
   ],
   "scripts": {
-    "dev:backend": "npm run start:dev -w rbac-service",
-    "dev:web": "npm run dev -w nextjs_tailwind_shadcn_ts",
+    "build": "npm run build -ws",
     "build:backend": "npm run build -w rbac-service",
-    "build:web": "npm run build -w nextjs_tailwind_shadcn_ts"
+    "build:web": "npm run build -w nextjs_tailwind_shadcn_ts",
+    "dev:backend": "npm run start:dev -w rbac-service",
+    "dev:web": "npm run dev -w nextjs_tailwind_shadcn_ts"
   }
 }
