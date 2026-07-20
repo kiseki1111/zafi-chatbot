@@ -11,5 +11,6 @@
     "build:web": "npm run build -w nextjs_tailwind_shadcn_ts",
     "dev:backend": "npm run start:dev -w rbac-service",
     "dev:web": "npm run dev -w nextjs_tailwind_shadcn_ts"
+    "prisma:generate": "npm run prisma:generate -w rbac-service"
   }
 }
