@@ -47,6 +47,13 @@ jobs:
             type=raw,value=latest
             type=sha
 
+      - name: Debug Web Build (Log output)
+        if: matrix.name == 'web'
+        run: |
+          npm ci
+          npm run build -w nextjs_tailwind_shadcn_ts
+
+
       - name: Build & Push
         uses: docker/build-push-action@v6
         with:
