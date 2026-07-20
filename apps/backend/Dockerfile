@@ -31,6 +31,10 @@ RUN npm run build
 #############################
 FROM node:22-alpine AS production
 
+LABEL org.opencontainers.image.source="https://github.com/sisfoku/iqbal-backend"
+LABEL org.opencontainers.image.description="Iqbal Backend API"
+LABEL org.opencontainers.image.licenses="MIT"
+
 WORKDIR /app
 
 ENV NODE_ENV=production
