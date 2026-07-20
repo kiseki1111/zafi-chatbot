@@ -50,7 +50,7 @@ jobs:
       - name: Debug Web Build (Log output)
         if: matrix.name == 'web'
         run: |
-          npm ci
+          npm install
           npm run build -w nextjs_tailwind_shadcn_ts
 
 
