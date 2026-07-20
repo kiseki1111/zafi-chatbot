@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
   },
   reactStrictMode: false,
   async rewrites() {
-    const backendUrl = process.env.BACKEND_URL || "http://localhost:3000";
+    const backendUrl = process.env.BACKEND_URL || "http://localhost:3030";
     return [
       {
         source: "/api/v1/waha/:path*",
