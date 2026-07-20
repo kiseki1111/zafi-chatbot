@@ -23,11 +23,11 @@ jobs:
       matrix:
         include:
           - name: backend
-            dockerfile: Dockerfile.backend
+            file: Dockerfile.backend
             image: ghcr.io/sisfoku/iqbal-backend
 
           - name: web
-            dockerfile: Dockerfile.web
+            file: Dockerfile.web
             image: ghcr.io/sisfoku/iqbal-web
 
     steps:
