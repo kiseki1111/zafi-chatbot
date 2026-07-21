@@ -1,9 +1,12 @@
 # syntax=docker/dockerfile:1.7
 
+# =======================================================
+# STAGE 1: Install All Dependencies (Development + Production)
+# =======================================================
 FROM node:22-alpine AS deps
-
 WORKDIR /workspace
 
+# Salin manifest workspaces untuk instalasi tersentralisasi
 COPY package*.json ./
 COPY apps/backend/package.json apps/backend/package.json
 COPY apps/web/package.json apps/web/package.json
@@ -11,31 +14,48 @@ COPY apps/web/package.json apps/web/package.json
 RUN --mount=type=cache,target=/root/.npm \
     npm ci
 
-#########################################################
-
+# =======================================================
+# STAGE 2: App Builder & Prisma Client Isolation
+# =======================================================
 FROM deps AS builder
-
 WORKDIR /workspace
-
 COPY . .
 
-RUN npm run prisma:generate -w rbac-service
-RUN npm run build -w rbac-service
+# 1. Jalankan generate & build di lingkungan yang memiliki Prisma CLI lengkap
+RUN npm run prisma:generate
+RUN npm run build:backend
 
-#########################################################
+# 2. Amankan folder biner generator .prisma sebelum pruning menghapusnya
+RUN cp -R node_modules/.prisma /tmp/.prisma
 
+# 3. Buang devDependencies untuk memangkas ukuran image produksi
+RUN npm prune --production
+
+# 4. Kembalikan folder biner .prisma yang diamankan ke dalam node_modules produksi
+RUN mkdir -p node_modules/.prisma && cp -R /tmp/.prisma/* node_modules/.prisma/
+
+# =======================================================
+# STAGE 3: Minimalist Production Runner
+# =======================================================
 FROM node:22-alpine AS runner
-
 WORKDIR /app
 
 ENV NODE_ENV=production
 
+# Pasang mesin OpenSSL yang dibutuhkan oleh Prisma Engine di ekosistem Alpine
+RUN apk add --no-cache openssl
+
+# Salin ekosistem manifes root
+COPY --from=builder /workspace/package*.json ./
 COPY --from=builder /workspace/node_modules ./node_modules
-COPY --from=builder /workspace/apps/backend/dist ./dist
+
+# Salin kode program produksi rbac-service dari output monorepo workspaces
+COPY --from=builder /workspace/dist/apps/backend ./dist
 COPY --from=builder /workspace/apps/backend/public ./public
-COPY --from=builder /workspace/apps/backend/package.json ./package.json
+COPY --from=builder /workspace/apps/backend/package.json ./apps/backend/package.json
 COPY --from=builder /workspace/apps/backend/src/infrastructure/prisma ./src/infrastructure/prisma
 
 EXPOSE 3030
 
-CMD ["node","dist/src/main.js"]
+# Jalankan biner langsung dari pemetaan folder root /app/dist/main.js
+CMD ["node", "dist/main.js"]
