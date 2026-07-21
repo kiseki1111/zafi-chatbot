@@ -33,20 +33,23 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-# 1. Salin manifes utama dan node_modules monorepo utuh dari stage builder
-COPY --from=builder /workspace/package*.json ./
-# Salin node_modules root
-COPY --from=builder /workspace/node_modules ./node_modules
+# Pasang OpenSSL yang wajib ada untuk mesin biner Prisma Runtime di Alpine
+RUN apk add --no-cache openssl
 
-# COPY --from=builder /workspace/apps/backend/node_modules ./apps/backend/node_modules
+# Jalankan instalasi dependensi KHUSUS produksi langsung di lingkungan runner
+COPY package*.json ./
+COPY apps/backend/package.json apps/backend/package.json
+COPY apps/web/package.json apps/web/package.json
 
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --omit=dev
+
+# Salin folder hasil build (dist) dan kode source prisma secara utuh dari stage builder
 COPY --from=builder /workspace/apps/backend/dist ./dist
 COPY --from=builder /workspace/apps/backend/public ./public
-# COPY --from=builder /workspace/apps/backend/package.json ./package.json
-COPY --from=builder /workspace/apps/backend/package.json ./apps/backend/package.json
 COPY --from=builder /workspace/apps/backend/src/infrastructure/prisma ./src/infrastructure/prisma
 
 EXPOSE 3030
 
-# CMD ["node","dist/src/main.js"]
-CMD ["node","dist/main.js"]
+# Eksekusi file utama yang dipastikan berada di /app/dist/src/main.js sesuai tumpukan log error
+CMD ["node", "dist/src/main.js"]
