@@ -3,7 +3,7 @@ services:
     image: ghcr.io/sisfoku/iqbal-backend:${IMAGE_TAG:-latest}
     container_name: iqbal-backend
     env_file:
-      - ./apps/backend/.env
+      - .env
     restart: unless-stopped
 
     ports:
