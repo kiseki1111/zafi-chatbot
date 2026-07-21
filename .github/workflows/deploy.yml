@@ -25,7 +25,6 @@ jobs:
           - name: backend
             dockerfile: Dockerfile.backend
             image: ghcr.io/sisfoku/iqbal-backend
-
           - name: web
             dockerfile: Dockerfile.web
             image: ghcr.io/sisfoku/iqbal-web
