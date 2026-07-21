@@ -16,15 +16,10 @@ FROM deps AS builder
 WORKDIR /workspace
 COPY . .
 
-# RUN npm run prisma:generate -w rbac-service
-# RUN npm run build -w rbac-service
+RUN npm run prisma:generate -w rbac-service
+RUN npm run build -w rbac-service
 
-# Generate Client dan Build dilakukan di sini menggunakan script package.json root Anda
-RUN npm run prisma:generate
-RUN npm run build:backend
-
-# Buang devDependencies untuk menghemat ruang produksi
-RUN npm prune --production
+RUN npm prune --omit=dev
 
 #########################################################
 
@@ -34,18 +29,13 @@ WORKDIR /app
 ENV NODE_ENV=production
 RUN apk add --no-cache openssl
 
-# 1. Salin berkas manifes workspaces & node_modules produksi hasil filter builder
-COPY --from=builder /workspace/package*.json ./
 COPY --from=builder /workspace/node_modules ./node_modules
-
-# 2. Salin folder biner .prisma yang sudah sukses di-generate dari STAGE BUILDER
-COPY --from=builder /workspace/node_modules/.prisma ./node_modules/.prisma
-
-# 3. Salin folder distribusi (dist) hasil dari build:backend monorepo yang berada di root dist/apps/backend
 COPY --from=builder /workspace/apps/backend/dist ./dist
 COPY --from=builder /workspace/apps/backend/public ./public
-COPY --from=builder /workspace/apps/backend/package.json ./package.json
 COPY --from=builder /workspace/apps/backend/src/infrastructure/prisma ./src/infrastructure/prisma
+COPY --from=builder /workspace/apps/backend/package.json ./package.json
+COPY --from=builder /workspace/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /workspace/node_modules/@prisma ./node_modules/@prisma
 
 EXPOSE 3030
 
