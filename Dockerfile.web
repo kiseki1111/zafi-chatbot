@@ -38,4 +38,4 @@ COPY --from=builder /workspace/apps/web/public ./public
 
 EXPOSE 3001
 
-CMD ["node","server.js"]
+CMD ["node","apps/web/server.js"]
