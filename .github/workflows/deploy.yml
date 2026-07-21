@@ -63,11 +63,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-           # Ubah dua baris ini ke mode inline untuk membuang cache korup lama
-           # cache-from: type=gha
-           # cache-to: type=gha,mode=max
-           cache-from: type=inline           
-           cache-to: type=inline
+          cache-from: type=inline
+          cache-to: type=inline
 
   deploy:
     needs: build
