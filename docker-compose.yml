@@ -7,7 +7,7 @@ services:
     restart: unless-stopped
 
     ports:
-      - "3030:3030"
+      - "3045:3030"
 
     networks:
       - backend
@@ -21,7 +21,7 @@ services:
       - backend
 
     environment:
-      BACKEND_URL: http://backend:3030
+      BACKEND_URL: http://backend:3045
 
     ports:
       - "3001:3001"
