@@ -8,48 +8,34 @@ COPY package*.json ./
 COPY apps/backend/package.json apps/backend/package.json
 COPY apps/web/package.json apps/web/package.json
 
-# Jalankan instalasi bersih dependensi monorepo
 RUN --mount=type=cache,target=/root/.npm \
     npm ci
 
 #########################################################
 
 FROM deps AS builder
+
 WORKDIR /workspace
+
 COPY . .
 
-# Generate Client dan compile aplikasi backend via workspaces
 RUN npm run prisma:generate -w rbac-service
 RUN npm run build -w rbac-service
-
-# Buang devDependencies untuk hemat ruang produksi
-# RUN npm prune --production
-
 
 #########################################################
 
 FROM node:22-alpine AS runner
+
 WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Pasang OpenSSL yang wajib ada untuk mesin biner Prisma Runtime di Alpine
-RUN apk add --no-cache openssl
-
-# Jalankan instalasi dependensi KHUSUS produksi langsung di lingkungan runner
-COPY package*.json ./
-COPY apps/backend/package.json apps/backend/package.json
-COPY apps/web/package.json apps/web/package.json
-
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci --omit=dev
-
-# Salin folder hasil build (dist) dan kode source prisma secara utuh dari stage builder
+COPY --from=builder /workspace/node_modules ./node_modules
 COPY --from=builder /workspace/apps/backend/dist ./dist
 COPY --from=builder /workspace/apps/backend/public ./public
+COPY --from=builder /workspace/apps/backend/package.json ./package.json
 COPY --from=builder /workspace/apps/backend/src/infrastructure/prisma ./src/infrastructure/prisma
 
 EXPOSE 3030
 
-# Eksekusi file utama yang dipastikan berada di /app/dist/src/main.js sesuai tumpukan log error
-CMD ["node", "dist/src/main.js"]
+CMD ["node","dist/src/main.js"]
