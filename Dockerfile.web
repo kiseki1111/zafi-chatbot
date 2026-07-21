@@ -32,23 +32,10 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-#COPY --from=builder /workspace/apps/web/.next/standalone ./
-#COPY --from=builder /workspace/apps/web/.next/standalone/apps/web/server.js ./server.js
-#COPY --from=builder /workspace/apps/web/.next/static ./.next/static
-#COPY --from=builder /workspace/apps/web/public ./public
-
-#COPY --from=builder /workspace/apps/web/.next/standalone/apps/web/server.js ./server.js
-#COPY --from=builder /workspace/apps/web/.next/standalone/node_modules ./node_modules
-#COPY --from=builder /workspace/apps/web/.next/standalone/package.json ./package.json
-#COPY --from=builder /workspace/apps/web/.next/static ./apps/web/.next/static
-#COPY --from=builder /workspace/apps/web/public ./apps/web/public
-
-# PERBAIKAN STRUKTUR JALUR STANDALONE MONOREPO NEXT.JS:
-# =======================================================
-# 1. Salin seluruh isi folder standalone tingkat root monorepo (termasuk server.js & node_modules utama)
+# 1. Salin seluruh arsitektur standalone monorepo hasil build Next.js
 COPY --from=builder /workspace/apps/web/.next/standalone ./
 
-# 2. Salin aset statis Next.js ke folder sub-apps web yang sesuai agar desain tidak pecah
+# 2. Salin aset statis ke folder sub-app agar styling css tidak hilang
 COPY --from=builder /workspace/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /workspace/apps/web/public ./apps/web/public
 
@@ -56,4 +43,4 @@ EXPOSE 3001
 #yang lama
 #CMD ["node","apps/web/server.js"]
 
-CMD ["node","server.js"]
+CMD ["node", "apps/web/server.js"]
