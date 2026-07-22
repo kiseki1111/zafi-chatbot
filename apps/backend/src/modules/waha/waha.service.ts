@@ -53,7 +53,7 @@ export class WahaService {
     }
   }
 
-  async startSession(sessionName: string, webhookUrl?: string, channelAccountId?: string): Promise<any> {
+  async startSession(sessionName: string, webhookUrls?: string | string[], channelAccountId?: string): Promise<any> {
     try {
       if (channelAccountId) {
         await this.prisma.whatsappInstance.upsert({
@@ -65,24 +65,26 @@ export class WahaService {
 
       const payload: any = { name: sessionName };
       
-      if (webhookUrl) {
-        let finalWebhookUrl = webhookUrl.trim();
-        if (!finalWebhookUrl.endsWith('/api/v1/waha/webhook')) {
-           finalWebhookUrl = finalWebhookUrl.replace(/\/$/, '') + '/api/v1/waha/webhook';
-        }
+      if (webhookUrls) {
+        const urls = Array.isArray(webhookUrls) ? webhookUrls : [webhookUrls];
+        const formattedUrls = urls.map(url => {
+           let finalUrl = url.trim();
+           if (!finalUrl.endsWith('/api/v1/waha/webhook')) {
+              finalUrl = finalUrl.replace(/\/$/, '') + '/api/v1/waha/webhook';
+           }
+           return finalUrl;
+        });
         
         payload.config = {
-          webhooks: [
-            {
-              url: finalWebhookUrl,
+          webhooks: formattedUrls.map(url => ({
+              url: url,
               events: ['message', 'message.any', 'session.status'],
               retries: {
                 delaySeconds: 10,
                 attempts: 15,
                 policy: 'fixed'
               }
-            },
-          ],
+          }))
         };
       }
 

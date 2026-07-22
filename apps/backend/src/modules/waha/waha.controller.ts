@@ -29,12 +29,20 @@ export class WahaController {
   @Post('instances')
   async createInstance(@Body('name') name: string, @Body('webhookUrl') webhookUrl?: string, @Body('channelAccountId') channelAccountId?: string) {
     try {
-      let finalWebhookUrl = process.env.WEBHOOK_URL || webhookUrl;
-      // Jika URL kosong atau nyasar ke localhost, paksa tembak ke iqbal-backend (internal Docker network)
-      if (!finalWebhookUrl || finalWebhookUrl.includes('localhost') || finalWebhookUrl.includes('127.0.0.1')) {
-         finalWebhookUrl = 'http://iqbal-backend:3030/api/v1/waha/webhook';
+      let webhooks: string[] = [];
+      
+      if (process.env.WEBHOOK_URL) {
+         webhooks.push(process.env.WEBHOOK_URL);
+         this.logger.log(`[WAHA] Mendaftarkan Webhook dari ENV: ${process.env.WEBHOOK_URL}`);
+      } else if (webhookUrl && !webhookUrl.includes('localhost') && !webhookUrl.includes('127.0.0.1')) {
+         webhooks.push(webhookUrl);
+         this.logger.log(`[WAHA] Mendaftarkan Webhook dari UI: ${webhookUrl}`);
+      } else {
+         webhooks.push('http://iqbal-backend:3030/api/v1/waha/webhook');
+         webhooks.push('http://103.30.195.145:3030/api/v1/waha/webhook');
+         this.logger.log(`[WAHA] Fallback aktif! Mendaftarkan Dual-Webhook sekaligus: Internal (iqbal-backend) & Publik (103.30.195.145)`);
       }
-      return await this.wahaService.startSession(name, finalWebhookUrl, channelAccountId);
+      return await this.wahaService.startSession(name, webhooks, channelAccountId);
     } catch (error) {
       if (error.response?.status === 422) {
          this.logger.warn(`Session ${name} already exists or is invalid.`);
