@@ -29,7 +29,11 @@ export class WahaController {
   @Post('instances')
   async createInstance(@Body('name') name: string, @Body('webhookUrl') webhookUrl?: string, @Body('channelAccountId') channelAccountId?: string) {
     try {
-      const finalWebhookUrl = process.env.WEBHOOK_URL || webhookUrl;
+      let finalWebhookUrl = process.env.WEBHOOK_URL || webhookUrl;
+      // Jika URL kosong atau nyasar ke localhost, paksa tembak ke iqbal-backend (internal Docker network)
+      if (!finalWebhookUrl || finalWebhookUrl.includes('localhost') || finalWebhookUrl.includes('127.0.0.1')) {
+         finalWebhookUrl = 'http://iqbal-backend:3030/api/v1/waha/webhook';
+      }
       return await this.wahaService.startSession(name, finalWebhookUrl, channelAccountId);
     } catch (error) {
       if (error.response?.status === 422) {
@@ -167,7 +171,7 @@ export class WahaController {
       const text = message?.body;
       const mediaUrl = message?.mediaUrl; // Mock CLI image passing
       const timestamp = message?.timestamp ? new Date(message.timestamp * 1000).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
-      this.logger.log(`\n[WAHA PESAN BARU] Waktu: ${timestamp} | Dari: ${sender} | Isi: "${text}"\n`);
+      this.logger.log(`\n[WAHA PESAN BARU - WHATSAPP] Waktu: ${timestamp} | Dari: ${sender} | Isi: "${text}"\n`);
     } else {
       this.logger.log(`Received WAHA webhook event: ${payload?.event}`);
     }

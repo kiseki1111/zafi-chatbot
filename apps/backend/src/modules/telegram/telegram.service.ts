@@ -237,7 +237,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     const text = msg.text;
     const msgId = msg.message_id.toString();
 
-    this.logger.log(`\n[CS BOT] Dari: ${chatId} (${senderName}) | Isi: "${text}"\n`);
+    this.logger.log(`\n[CS BOT - TELEGRAM] Dari: ${chatId} (${senderName}) | Isi: "${text}"\n`);
 
     try {
       // 1. Upsert Contact
