@@ -11,7 +11,7 @@ const nextConfig: any = {
   },
   reactStrictMode: false,
   async rewrites() {
-    const backendUrl = process.env.BACKEND_URL ?? "http://localhost:3030";
+    const backendUrl = process.env.BACKEND_URL ?? "http://iqbal-backend:3030";
     return [
       {
         source: "/api/v1/waha/:path*",
