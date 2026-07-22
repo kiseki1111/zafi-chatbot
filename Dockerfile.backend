@@ -26,8 +26,32 @@ COPY . .
 RUN npm run prisma:generate -w rbac-service
 RUN npm run build -w rbac-service
 
-# Hapus devDependencies
+####################################################
+# DEBUG SEBELUM PRUNE
+####################################################
+RUN echo "===== BEFORE PRUNE ====="
+
+RUN ls -lah node_modules
+
+RUN ls -lah node_modules/@nestjs || true
+
+RUN npm ls @nestjs/core || true
+
+####################################################
+# PRUNE
+####################################################
 RUN npm prune --omit=dev
+
+####################################################
+# DEBUG SESUDAH PRUNE
+####################################################
+RUN echo "===== AFTER PRUNE ====="
+
+RUN ls -lah node_modules
+
+RUN ls -lah node_modules/@nestjs || true
+
+RUN npm ls @nestjs/core || true
 
 ############################
 # Runner
@@ -40,10 +64,8 @@ ENV NODE_ENV=production
 
 RUN apk add --no-cache openssl
 
-# copy production node_modules
 COPY --from=builder /workspace/node_modules ./node_modules
 
-# copy hasil build
 COPY --from=builder /workspace/apps/backend/dist ./dist
 COPY --from=builder /workspace/apps/backend/public ./public
 COPY --from=builder /workspace/apps/backend/src/infrastructure/prisma ./src/infrastructure/prisma
