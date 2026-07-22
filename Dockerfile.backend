@@ -26,6 +26,15 @@ COPY . .
 RUN npm run prisma:generate -w rbac-service
 RUN npm run build -w rbac-service
 
+RUN echo "===== ROOT ====="
+RUN ls -lah /workspace/node_modules
+
+RUN echo "===== BACKEND ====="
+RUN ls -lah /workspace/apps/backend/node_modules || true
+
+RUN echo "===== NEST ====="
+RUN ls -lah /workspace/apps/backend/node_modules/@nestjs || true
+
 ####################################################
 # DEBUG SEBELUM PRUNE
 ####################################################
