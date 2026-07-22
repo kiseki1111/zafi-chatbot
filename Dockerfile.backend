@@ -22,6 +22,7 @@ COPY . .
 
 RUN npm run prisma:generate -w rbac-service
 RUN npm run build -w rbac-service
+RUN mkdir -p /workspace/apps/backend/node_modules
 
 #########################################################
 
