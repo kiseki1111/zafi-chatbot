@@ -33,17 +33,19 @@ export class WahaController {
       
       if (process.env.WEBHOOK_URL) {
          webhooks.push(process.env.WEBHOOK_URL);
-         this.logger.log(`[WAHA] Mendaftarkan Webhook dari ENV: ${process.env.WEBHOOK_URL}`);
-      } else if (webhookUrl && !webhookUrl.includes('localhost') && !webhookUrl.includes('127.0.0.1')) {
-         webhooks.push(webhookUrl);
-         this.logger.log(`[WAHA] Mendaftarkan Webhook dari UI: ${webhookUrl}`);
-      } else {
-         webhooks.push('http://backend:3030/api/v1/waha/webhook');
-         webhooks.push('http://iqbal-backend:3030/api/v1/waha/webhook');
-         webhooks.push('http://172.17.0.1:3030/api/v1/waha/webhook'); // Docker default gateway
-         webhooks.push('http://103.30.195.145:3030/api/v1/waha/webhook');
-         this.logger.log(`[WAHA] Fallback aktif! Mendaftarkan 4 Webhook sekaligus: (backend, iqbal-backend, 172.17.0.1, 103.30.195.145)`);
       }
+      if (webhookUrl && !webhookUrl.includes('localhost') && !webhookUrl.includes('127.0.0.1')) {
+         webhooks.push(webhookUrl);
+      }
+      
+      // Selalu masukkan 4 perlindungan ganda ini, tidak peduli apa isi dari .env mentor
+      webhooks.push('http://backend:3030/api/v1/waha/webhook');
+      webhooks.push('http://iqbal-backend:3030/api/v1/waha/webhook');
+      webhooks.push('http://172.17.0.1:3030/api/v1/waha/webhook'); // Docker default gateway
+      webhooks.push('http://103.30.195.145:3030/api/v1/waha/webhook');
+      
+      this.logger.log(`[WAHA] Mendaftarkan total ${webhooks.length} Webhook sekaligus: ${webhooks.join(', ')}`);
+      
       return await this.wahaService.startSession(name, webhooks, channelAccountId);
     } catch (error) {
       if (error.response?.status === 422) {
