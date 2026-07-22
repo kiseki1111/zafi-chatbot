@@ -34,6 +34,15 @@ RUN ls -lah /workspace/apps/backend/node_modules || true
 
 RUN echo "===== NEST ====="
 RUN ls -lah /workspace/apps/backend/node_modules/@nestjs || true
+RUN echo "===== BACKEND NODE_MODULES ====="
+
+RUN ls -lah apps/backend
+
+RUN ls -lah apps/backend/node_modules || true
+
+RUN ls -lah apps/backend/node_modules/@nestjs || true
+
+RUN npm root -w rbac-service
 
 ####################################################
 # DEBUG SEBELUM PRUNE
