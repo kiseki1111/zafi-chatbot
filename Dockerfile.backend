@@ -44,4 +44,4 @@ COPY --from=builder /workspace/apps/backend/src/infrastructure/prisma ./src/infr
 
 EXPOSE 3030
 
-CMD ["node","dist/src/main.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy --schema=src/infrastructure/prisma/schema.prisma && node dist/src/main.js"]
