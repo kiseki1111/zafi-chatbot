@@ -7,7 +7,6 @@ FROM node:22-alpine AS deps
 
 WORKDIR /workspace
 
-# hanya file yang mempengaruhi dependency
 COPY package.json .
 COPY package-lock.json .
 
@@ -24,35 +23,26 @@ FROM deps AS builder
 
 WORKDIR /workspace
 
-# copy seluruh source
 COPY . .
+
+RUN npm run prisma:generate -w rbac-service
+RUN npm run build -w rbac-service
+
+############################
+# Production Dependencies
+############################
+FROM builder AS prod-deps
+
+WORKDIR /workspace
+
+RUN npm prune --omit=dev
 
 ####################################################
 # DEBUG
 ####################################################
-RUN echo "===== FIND NEST ====="
-RUN find /workspace -name "@nestjs" -type d
+RUN echo "===== AFTER PRUNE ====="
 
-RUN echo "===== FIND PRISMA ====="
-RUN find /workspace -name "@prisma" -type d
-
-RUN echo "===== INSTALL STRATEGY ====="
-RUN npm config get install-strategy
-
-RUN echo "===== NPM ROOT ====="
-RUN npm root -w rbac-service
-
-####################################################
-# BUILD
-####################################################
-RUN npm run prisma:generate -w rbac-service
-
-RUN npm run build -w rbac-service
-
-####################################################
-# PRUNE
-####################################################
-RUN npm prune --omit=dev
+RUN find /workspace/apps/backend/node_modules -maxdepth 2 -type d | sort
 
 ############################
 # Runner
@@ -65,7 +55,7 @@ ENV NODE_ENV=production
 
 RUN apk add --no-cache openssl
 
-COPY --from=builder /workspace/node_modules ./node_modules
+COPY --from=prod-deps /workspace/apps/backend/node_modules ./node_modules
 
 COPY --from=builder /workspace/apps/backend/dist ./dist
 COPY --from=builder /workspace/apps/backend/public ./public
