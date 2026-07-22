@@ -7,7 +7,10 @@ FROM node:22-alpine AS deps
 
 WORKDIR /workspace
 
-COPY package*.json ./
+# hanya file yang mempengaruhi dependency
+COPY package.json .
+COPY package-lock.json .
+
 COPY apps/backend/package.json apps/backend/package.json
 COPY apps/web/package.json apps/web/package.json
 
@@ -21,55 +24,35 @@ FROM deps AS builder
 
 WORKDIR /workspace
 
+# copy seluruh source
 COPY . .
 
-RUN npm run prisma:generate -w rbac-service
-RUN npm run build -w rbac-service
+####################################################
+# DEBUG
+####################################################
+RUN echo "===== FIND NEST ====="
+RUN find /workspace -name "@nestjs" -type d
 
-RUN echo "===== ROOT ====="
-RUN ls -lah /workspace/node_modules
+RUN echo "===== FIND PRISMA ====="
+RUN find /workspace -name "@prisma" -type d
 
-RUN echo "===== BACKEND ====="
-RUN ls -lah /workspace/apps/backend/node_modules || true
+RUN echo "===== INSTALL STRATEGY ====="
+RUN npm config get install-strategy
 
-RUN echo "===== NEST ====="
-RUN ls -lah /workspace/apps/backend/node_modules/@nestjs || true
-RUN echo "===== BACKEND NODE_MODULES ====="
-
-RUN ls -lah apps/backend
-
-RUN ls -lah apps/backend/node_modules || true
-
-RUN ls -lah apps/backend/node_modules/@nestjs || true
-
+RUN echo "===== NPM ROOT ====="
 RUN npm root -w rbac-service
 
 ####################################################
-# DEBUG SEBELUM PRUNE
+# BUILD
 ####################################################
-RUN echo "===== BEFORE PRUNE ====="
+RUN npm run prisma:generate -w rbac-service
 
-RUN ls -lah node_modules
-
-RUN ls -lah node_modules/@nestjs || true
-
-RUN npm ls @nestjs/core || true
+RUN npm run build -w rbac-service
 
 ####################################################
 # PRUNE
 ####################################################
 RUN npm prune --omit=dev
-
-####################################################
-# DEBUG SESUDAH PRUNE
-####################################################
-RUN echo "===== AFTER PRUNE ====="
-
-RUN ls -lah node_modules
-
-RUN ls -lah node_modules/@nestjs || true
-
-RUN npm ls @nestjs/core || true
 
 ############################
 # Runner
