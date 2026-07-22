@@ -281,7 +281,8 @@ function WahaTab() {
       const res = await fetch(`/api/v1/channel-accounts${divQuery}`);
       if (res.ok) {
         const data = await res.json();
-        setChannels(data.data || data);
+        const arr = data?.data || data;
+        setChannels(Array.isArray(arr) ? arr : []);
       }
     } catch (e) {
       toast({ title: "Error", description: "Gagal mengambil data channel", variant: "destructive" });
@@ -296,7 +297,8 @@ function WahaTab() {
       const res = await fetch('/api/v1/channel-accounts/divisions');
       if (res.ok) {
         const data = await res.json();
-        setDivisions(data.data || data);
+        const arr = data?.data || data;
+        setDivisions(Array.isArray(arr) ? arr : []);
       }
     } catch (e) {
       console.error(e);
