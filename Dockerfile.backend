@@ -1,5 +1,8 @@
 # syntax=docker/dockerfile:1.7
 
+###############################
+# Dependencies
+###############################
 FROM node:22-alpine AS deps
 
 WORKDIR /workspace
@@ -11,8 +14,9 @@ COPY apps/web/package.json apps/web/package.json
 RUN --mount=type=cache,target=/root/.npm \
     npm ci
 
-#########################################################
-
+###############################
+# Builder
+###############################
 FROM deps AS builder
 
 WORKDIR /workspace
@@ -22,18 +26,35 @@ COPY . .
 RUN npm run prisma:generate -w rbac-service
 RUN npm run build -w rbac-service
 
-#########################################################
+###############################
+# Production Dependencies
+###############################
+FROM node:22-alpine AS prod-deps
 
-FROM node:22-alpine AS runner
+WORKDIR /workspace
 
+COPY package*.json ./
+COPY apps/backend/package.json apps/backend/package.json
+COPY apps/web/package.json apps/web/package.json
+
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --omit=dev
+
+###############################
+# Runner
+###############################
+FROM node:22-alpine
 WORKDIR /app
-
 ENV NODE_ENV=production
+RUN apk add --no-cache openssl
+# production node_modules
+COPY --from=prod-deps /workspace/node_modules ./node_modules
 
-COPY --from=builder /workspace/node_modules ./node_modules
+# hasil build
 COPY --from=builder /workspace/apps/backend/dist ./dist
+
 COPY --from=builder /workspace/apps/backend/public ./public
-COPY --from=builder /workspace/apps/backend/package.json ./package.json
+
 COPY --from=builder /workspace/apps/backend/src/infrastructure/prisma ./src/infrastructure/prisma
 
 EXPOSE 3030
