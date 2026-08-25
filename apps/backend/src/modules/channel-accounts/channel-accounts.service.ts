@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../infrastructure/prisma/prisma.service';
+import { PrismaService } from '../../core/prisma/prisma.service';
 import { CreateChannelAccountDto } from './dto/create-channel-account.dto';
 import { UpdateChannelAccountDto } from './dto/update-channel-account.dto';
 

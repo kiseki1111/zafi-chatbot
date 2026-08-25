@@ -12,10 +12,11 @@ interface AuthState {
   isAuthenticated: boolean;
   authView: AuthView;
   setAuthView: (v: AuthView) => void;
-  login: (email: string, password: string) => { ok: boolean; message?: string };
+  login: (email: string, password: string) => Promise<{ ok: boolean; message?: string }>;
   loginAs: (role: Role) => void;
-  googleLogin: (idToken: string) => Promise<{ ok: boolean; message?: string }>;
-  register: (data: { name: string; email: string; phone: string; password: string }) => { ok: boolean; message?: string };
+
+  register: (data: { name: string; email: string; phone: string; password: string }) => Promise<{ ok: boolean; message?: string }>;
+  updateUser: (data: Partial<User>) => void;
   logout: () => void;
 }
 
@@ -26,22 +27,35 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       authView: "login",
       setAuthView: (v) => set({ authView: v }),
-      login: (email, password) => {
-        // Mock fallback login for development
-        if (email && password.length >= 4) {
+      login: async (email, password) => {
+        try {
+          const response = await fetch('/api/v1/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, passwordPlain: password }),
+          });
+          const result = await response.json();
+          
+          if (!response.ok) {
+            return { ok: false, message: result.message || "Email atau password salah." };
+          }
+          
+          const responseData = result.data || result;
           const user: User = {
-            id: "u-guest",
-            name: email.split("@")[0] || "Pengguna",
-            email,
-            role: "superadmin",
+            id: responseData.user.id,
+            name: responseData.user.name || responseData.user.email.split("@")[0],
+            email: responseData.user.email,
+            role: responseData.user.roles?.[0] || "owner",
             status: "active",
-            createdAt: "2024-01-01",
+            createdAt: new Date().toISOString().slice(0, 10),
             lastLogin: new Date().toISOString().slice(0, 16).replace("T", " "),
+            tenantId: responseData.user.tenantId || null,
           };
           set({ user, isAuthenticated: true, authView: "login" });
           return { ok: true };
+        } catch (error) {
+          return { ok: false, message: "Terjadi kesalahan jaringan." };
         }
-        return { ok: false, message: "Email atau password salah." };
       },
       loginAs: (role: Role) => {
         const user: User = {
@@ -52,56 +66,55 @@ export const useAuthStore = create<AuthState>()(
           status: "active",
           createdAt: "2024-01-01",
           lastLogin: new Date().toISOString().slice(0, 16).replace("T", " "),
+          tenantId: "t-123", // Dummy tenant
         };
         set({ user, isAuthenticated: true });
       },
-      googleLogin: async (idToken: string) => {
+
+      register: async (data) => {
+        if (!data.email.includes("@")) return { ok: false, message: "Email tidak valid." };
+        if (data.password.length < 6) return { ok: false, message: "Password minimal 6 karakter." };
+        
         try {
-          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"}/api/v1/auth/google`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ idToken })
+          const response = await fetch('/api/v1/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: data.name,
+              email: data.email,
+              phone: data.phone,
+              passwordPlain: data.password,
+            }),
           });
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            return { ok: false, message: err.message || "Gagal login dengan Google" };
+          const result = await response.json();
+          
+          if (!response.ok) {
+            return { ok: false, message: result.message || "Pendaftaran gagal." };
           }
-          const responseData = await res.json();
-          const data = responseData.data || responseData; // Handle both wrapped and unwrapped just in case
+          
+          const responseData = result.data || result;
           const user: User = {
-            id: data.user.id,
-            name: data.user.name,
-            email: data.user.email,
-            role: (data.user.roles && data.user.roles.length > 0) ? data.user.roles[0].toLowerCase() : "operator", 
+            id: responseData.user.id,
+            name: responseData.user.name,
+            email: responseData.user.email,
+            phone: data.phone,
+            role: responseData.user.roles?.[0] || "owner",
             status: "active",
             createdAt: new Date().toISOString().slice(0, 10),
-            lastLogin: new Date().toISOString().slice(0, 16).replace("T", " ")
+            lastLogin: new Date().toISOString().slice(0, 16).replace("T", " "),
+            tenantId: responseData.user.tenantId || null,
           };
-          // Access tokens could be saved here in localStorage
-          localStorage.setItem("access_token", data.accessToken);
-          localStorage.setItem("refresh_token", data.refreshToken);
-          set({ user, isAuthenticated: true, authView: "login" });
+          set({ user, isAuthenticated: true });
           return { ok: true };
         } catch (error) {
-          console.error(error);
           return { ok: false, message: "Terjadi kesalahan jaringan." };
         }
       },
-      register: (data) => {
-        if (!data.email.includes("@")) return { ok: false, message: "Email tidak valid." };
-        if (data.password.length < 6) return { ok: false, message: "Password minimal 6 karakter." };
-        const user: User = {
-          id: "u-" + Date.now(),
-          name: data.name,
-          email: data.email,
-          phone: data.phone,
-          role: "operator",
-          status: "active",
-          createdAt: new Date().toISOString().slice(0, 10),
-          lastLogin: new Date().toISOString().slice(0, 16).replace("T", " "),
-        };
-        set({ user, isAuthenticated: true });
-        return { ok: true };
+      updateUser: (data) => {
+        const currentUser = get().user;
+        if (currentUser) {
+          set({ user: { ...currentUser, ...data } });
+        }
       },
       logout: () => set({ user: null, isAuthenticated: false, authView: "login" }),
     }),

@@ -17,7 +17,7 @@ exports.WahaService = void 0;
 const common_1 = require("@nestjs/common");
 const axios_1 = __importDefault(require("axios"));
 const config_1 = require("@nestjs/config");
-const prisma_service_1 = require("../../infrastructure/prisma/prisma.service");
+const prisma_service_1 = require("../../core/prisma/prisma.service");
 let WahaService = WahaService_1 = class WahaService {
     configService;
     prisma;
@@ -54,7 +54,7 @@ let WahaService = WahaService_1 = class WahaService {
             this.logger.debug(`Could not send typing presence for ${sessionName}. Error: ${error.message}`);
         }
     }
-    async startSession(sessionName, webhookUrl, channelAccountId) {
+    async startSession(sessionName, webhookUrls, channelAccountId) {
         try {
             if (channelAccountId) {
                 await this.prisma.whatsappInstance.upsert({
@@ -64,23 +64,25 @@ let WahaService = WahaService_1 = class WahaService {
                 });
             }
             const payload = { name: sessionName };
-            if (webhookUrl) {
-                let finalWebhookUrl = webhookUrl.trim();
-                if (!finalWebhookUrl.endsWith('/api/v1/waha/webhook')) {
-                    finalWebhookUrl = finalWebhookUrl.replace(/\/$/, '') + '/api/v1/waha/webhook';
-                }
+            if (webhookUrls) {
+                const urls = Array.isArray(webhookUrls) ? webhookUrls : [webhookUrls];
+                const formattedUrls = urls.map(url => {
+                    let finalUrl = url.trim();
+                    if (!finalUrl.endsWith('/api/v1/waha/webhook')) {
+                        finalUrl = finalUrl.replace(/\/$/, '') + '/api/v1/waha/webhook';
+                    }
+                    return finalUrl;
+                });
                 payload.config = {
-                    webhooks: [
-                        {
-                            url: finalWebhookUrl,
-                            events: ['message', 'message.any', 'session.status'],
-                            retries: {
-                                delaySeconds: 10,
-                                attempts: 15,
-                                policy: 'fixed'
-                            }
-                        },
-                    ],
+                    webhooks: formattedUrls.map(url => ({
+                        url: url,
+                        events: ['message', 'message.any', 'session.status'],
+                        retries: {
+                            delaySeconds: 10,
+                            attempts: 15,
+                            policy: 'fixed'
+                        }
+                    }))
                 };
             }
             payload.config = payload.config || {};
@@ -135,17 +137,6 @@ let WahaService = WahaService_1 = class WahaService {
                 });
                 return { ...ws, dbStats: instance };
             }));
-            const activeNames = wahaSessions.map((s) => s.name);
-            const offlineInstances = await this.prisma.whatsappInstance.findMany({
-                where: { instanceName: { notIn: activeNames } }
-            });
-            for (const offline of offlineInstances) {
-                mergedSessions.push({
-                    name: offline.instanceName,
-                    status: 'STOPPED',
-                    dbStats: offline
-                });
-            }
             return mergedSessions;
         }
         catch (error) {

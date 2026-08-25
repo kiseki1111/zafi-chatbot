@@ -11,27 +11,25 @@ import { ROLES, ROLE_THEME } from "@/lib/rbac";
 import type { Role } from "@/lib/types";
 import { AuthShell, PasswordInput } from "./auth-shell";
 import { DEMO_ACCOUNTS } from "@/lib/mock-data";
-import { GoogleLogin } from '@react-oauth/google';
+
 
 export function LoginForm() {
-  const { login, loginAs, googleLogin, setAuthView } = useAuthStore();
+  const { login, loginAs, setAuthView } = useAuthStore();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      const res = login(email, password);
-      setLoading(false);
-      if (!res.ok) {
-        toast({ title: "Login gagal", description: res.message, variant: "destructive" });
-      } else {
-        toast({ title: "Selamat datang!", description: "Anda berhasil masuk." });
-      }
-    }, 600);
+    const res = await login(email, password);
+    setLoading(false);
+    if (!res.ok) {
+      toast({ title: "Login gagal", description: res.message, variant: "destructive" });
+    } else {
+      toast({ title: "Selamat datang!", description: "Anda berhasil masuk." });
+    }
   };
 
   const quick = (role: Role) => {
@@ -46,7 +44,7 @@ export function LoginForm() {
   return (
     <AuthShell
       title="Masuk ke akun Anda"
-      subtitle="Kelola chatbot, leads, dan transaksi properti Anda dalam satu tempat."
+      subtitle="Kelola asisten AI, knowledge base, dan pantau percakapan Anda."
       footer={
         <>
           Belum punya akun?{" "}
@@ -81,10 +79,8 @@ export function LoginForm() {
             </button>
           </div>
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <div className="pl-9">
-              <PasswordInput id="password" value={password} onChange={setPassword} placeholder="••••••••" autoComplete="current-password" />
-            </div>
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10 pointer-events-none" />
+            <PasswordInput id="password" value={password} onChange={setPassword} placeholder="••••••••" autoComplete="current-password" className="pl-9" />
           </div>
         </div>
 
@@ -98,41 +94,7 @@ export function LoginForm() {
         </Button>
       </form>
 
-      <div className="mt-6">
-        <div className="relative mb-4">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-background px-2 text-muted-foreground">Atau masuk dengan</span>
-          </div>
-        </div>
 
-        <div className="flex justify-center">
-          <GoogleLogin
-            onSuccess={async (credentialResponse) => {
-              if (credentialResponse.credential) {
-                setLoading(true);
-                const res = await googleLogin(credentialResponse.credential);
-                setLoading(false);
-                if (!res.ok) {
-                  toast({ title: "Login Google gagal", description: res.message, variant: "destructive" });
-                } else {
-                  toast({ title: "Berhasil", description: "Login Google sukses!" });
-                }
-              }
-            }}
-            onError={() => {
-              toast({ title: "Gagal", description: "Login Google dibatalkan atau gagal.", variant: "destructive" });
-            }}
-            useOneTap
-            shape="rectangular"
-            theme="outline"
-            text="signin_with"
-            size="large"
-          />
-        </div>
-      </div>
 
       <div className="mt-8">
         <div className="relative">
@@ -143,26 +105,16 @@ export function LoginForm() {
             <span className="bg-background px-2 text-muted-foreground">Login cepat (Demo)</span>
           </div>
         </div>
-        
-          <div className="grid grid-cols-3 gap-2 mt-4">
-            {ROLES.map((r) => {
-              const theme = ROLE_THEME[r] || { bg: "bg-muted", ring: "ring-muted", color: "text-foreground" };
-              return (
-                <button
-                  key={r}
-                  onClick={() => quick(r)}
-                  disabled={loading}
-                  className={`rounded-lg border p-2.5 text-center transition-all hover:shadow-sm hover:-translate-y-0.5 disabled:opacity-50 ${theme.bg} ${theme.ring} ring-1`}
-                >
-                  <div className={`text-xs font-bold capitalize ${theme.color}`}>{r}</div>
-                </button>
-              );
-            })}
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => quick("owner")}
+              disabled={loading}
+              className="w-full rounded-lg border p-2.5 text-center transition-all hover:shadow-sm hover:-translate-y-0.5 disabled:opacity-50 bg-emerald-50 text-emerald-700 ring-emerald-200 ring-1"
+            >
+              <div className="text-sm font-bold capitalize">Login sebagai Admin</div>
+            </button>
           </div>
-        
-        <p className="text-[11px] text-muted-foreground mt-4 text-center">
-          Atau gunakan sembarang email & password untuk login sebagai Operator
-        </p>
       </div>
     </AuthShell>
   );

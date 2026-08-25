@@ -9,13 +9,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.OnboardingModule = void 0;
 const common_1 = require("@nestjs/common");
 const onboarding_service_1 = require("./onboarding.service");
-const knowledge_module_1 = require("../knowledge/knowledge.module");
+const knowledge_ingest_module_1 = require("../../features/knowledge-ingest/knowledge-ingest.module");
 let OnboardingModule = class OnboardingModule {
 };
 exports.OnboardingModule = OnboardingModule;
 exports.OnboardingModule = OnboardingModule = __decorate([
     (0, common_1.Module)({
-        imports: [(0, common_1.forwardRef)(() => knowledge_module_1.KnowledgeModule)],
+        imports: [(0, common_1.forwardRef)(() => knowledge_ingest_module_1.KnowledgeIngestModule)],
         providers: [onboarding_service_1.OnboardingService],
         exports: [onboarding_service_1.OnboardingService]
     })

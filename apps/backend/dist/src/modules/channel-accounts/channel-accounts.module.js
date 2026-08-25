@@ -10,7 +10,7 @@ exports.ChannelAccountsModule = void 0;
 const common_1 = require("@nestjs/common");
 const channel_accounts_service_1 = require("./channel-accounts.service");
 const channel_accounts_controller_1 = require("./channel-accounts.controller");
-const prisma_service_1 = require("../../infrastructure/prisma/prisma.service");
+const prisma_service_1 = require("../../core/prisma/prisma.service");
 let ChannelAccountsModule = class ChannelAccountsModule {
 };
 exports.ChannelAccountsModule = ChannelAccountsModule;

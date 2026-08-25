@@ -1,6 +1,6 @@
-import { PrismaService } from '../../infrastructure/prisma/prisma.service';
+import { PrismaService } from '../../core/prisma/prisma.service';
 import { OpenAI } from 'openai';
-import { DataAgentService } from '../knowledge/data-agent.service';
+import { DataAgentService } from '../../features/knowledge-ingest/data-agent.service';
 export declare class OnboardingService {
     private prisma;
     private injectedOpenai;

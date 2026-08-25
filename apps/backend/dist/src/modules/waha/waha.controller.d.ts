@@ -1,20 +1,13 @@
 import { WahaService } from './waha.service';
-import { PrismaService } from '../../infrastructure/prisma/prisma.service';
-import { AiService } from '../ai/ai.service';
-import { DesignFlowService } from '../telegram/design/design-flow.service';
-import { DesignSessionService } from '../telegram/design/design-session.service';
+import { PrismaService } from '../../core/prisma/prisma.service';
+import { OmnichannelQueueService } from '../../core/omnichannel/omnichannel-queue.service';
 export declare class WahaController {
     private readonly wahaService;
     private readonly prisma;
-    private readonly aiService;
-    private readonly designFlowService;
-    private readonly designSessionService;
+    private readonly omnichannelQueue;
     private readonly logger;
-    private messageBuffer;
-    private processingQueue;
-    private isProcessingQueue;
     private cliOutputQueue;
-    constructor(wahaService: WahaService, prisma: PrismaService, aiService: AiService, designFlowService: DesignFlowService, designSessionService: DesignSessionService);
+    constructor(wahaService: WahaService, prisma: PrismaService, omnichannelQueue: OmnichannelQueueService);
     createInstance(name: string, webhookUrl?: string, channelAccountId?: string): Promise<any>;
     stopInstance(id: string): Promise<any>;
     logoutInstance(id: string): Promise<any>;
@@ -41,5 +34,4 @@ export declare class WahaController {
     handleWebhook(payload: any): Promise<{
         status: string;
     }>;
-    private processQueue;
 }

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Mail, Lock, User, Phone } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
+import { useAppStore } from "@/lib/app-store";
 import { AuthShell, PasswordInput } from "./auth-shell";
 
 export function RegisterForm() {
@@ -18,25 +19,27 @@ export function RegisterForm() {
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm({ ...form, [k]: e.target.value });
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (form.password !== form.confirm) {
       toast({ title: "Password tidak cocok", description: "Konfirmasi password harus sama.", variant: "destructive" });
       return;
     }
     setLoading(true);
-    setTimeout(() => {
-      const res = register({ name: form.name, email: form.email, phone: form.phone, password: form.password });
-      setLoading(false);
-      if (!res.ok) toast({ title: "Pendaftaran gagal", description: res.message, variant: "destructive" });
-      else toast({ title: "Akun dibuat!", description: "Selamat datang di PropertiKu Agent." });
-    }, 700);
+    const res = await register({ name: form.name, email: form.email, phone: form.phone, password: form.password });
+    setLoading(false);
+    if (!res.ok) {
+      toast({ title: "Pendaftaran gagal", description: res.message, variant: "destructive" });
+    } else {
+      toast({ title: "Akun dibuat!", description: "Silakan lengkapi profil toko Anda." });
+      useAppStore.getState().setView("onboarding");
+    }
   };
 
   return (
     <AuthShell
       title="Buat akun baru"
-      subtitle="Daftar untuk mulai mengelola asisten properti AI Anda."
+      subtitle="Mulai kelola asisten AI dan knowledge base Anda dalam hitungan menit."
       footer={
         <>
           Sudah punya akun?{" "}
@@ -73,27 +76,23 @@ export function RegisterForm() {
         <div className="space-y-1.5">
           <Label htmlFor="password">Password</Label>
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <div className="pl-9">
-              <PasswordInput id="password" value={form.password} onChange={(v) => setForm({ ...form, password: v })} placeholder="Min. 6 karakter" autoComplete="new-password" />
-            </div>
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10 pointer-events-none" />
+            <PasswordInput id="password" value={form.password} onChange={(v) => setForm({ ...form, password: v })} placeholder="••••••••" autoComplete="new-password" className="pl-9" />
           </div>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="confirm">Konfirmasi Password</Label>
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <div className="pl-9">
-              <PasswordInput id="confirm" value={form.confirm} onChange={(v) => setForm({ ...form, confirm: v })} placeholder="Ulangi password" autoComplete="new-password" />
-            </div>
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10 pointer-events-none" />
+            <PasswordInput id="confirm" value={form.confirm} onChange={(v) => setForm({ ...form, confirm: v })} placeholder="Ulangi password" autoComplete="new-password" className="pl-9" />
           </div>
         </div>
 
         <div className="flex items-start gap-2">
           <input id="terms" type="checkbox" className="h-4 w-4 mt-0.5 rounded border-input accent-emerald-600" required />
           <Label htmlFor="terms" className="text-xs font-normal cursor-pointer leading-relaxed text-muted-foreground">
-            Saya menyetujui <span className="text-emerald-600 hover:underline cursor-pointer">Syarat & Ketentuan</span> serta{" "}
-            <span className="text-emerald-600 hover:underline cursor-pointer">Kebijakan Privasi</span> PropertiKu Agent.
+            Saya menyetujui <span className="text-emerald-600 hover:underline cursor-pointer">Syarat & Ketentuan</span> dan{" "}
+            <span className="text-emerald-600 hover:underline cursor-pointer">Kebijakan Privasi</span> Chatbot Manager.
           </Label>
         </div>
 

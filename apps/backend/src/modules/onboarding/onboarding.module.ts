@@ -1,9 +1,9 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { OnboardingService } from './onboarding.service';
-import { KnowledgeModule } from '../knowledge/knowledge.module';
+import { KnowledgeIngestModule } from '../../features/knowledge-ingest/knowledge-ingest.module';
 
 @Module({
-  imports: [forwardRef(() => KnowledgeModule)],
+  imports: [forwardRef(() => KnowledgeIngestModule)],
   providers: [OnboardingService],
   exports: [OnboardingService]
 })

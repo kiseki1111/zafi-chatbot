@@ -8,18 +8,19 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.KnowledgeModule = void 0;
 const common_1 = require("@nestjs/common");
-const knowledge_service_1 = require("./knowledge.service");
 const knowledge_controller_1 = require("./knowledge.controller");
-const rag_service_1 = require("./rag.service");
-const data_agent_service_1 = require("./data-agent.service");
+const knowledge_service_1 = require("./knowledge.service");
+const prisma_module_1 = require("../../core/prisma/prisma.module");
+const openai_module_1 = require("../../core/openai/openai.module");
 let KnowledgeModule = class KnowledgeModule {
 };
 exports.KnowledgeModule = KnowledgeModule;
 exports.KnowledgeModule = KnowledgeModule = __decorate([
     (0, common_1.Module)({
-        providers: [knowledge_service_1.KnowledgeService, rag_service_1.RagService, data_agent_service_1.DataAgentService],
+        imports: [prisma_module_1.PrismaModule, openai_module_1.OpenAiModule],
         controllers: [knowledge_controller_1.KnowledgeController],
-        exports: [rag_service_1.RagService, knowledge_service_1.KnowledgeService, data_agent_service_1.DataAgentService]
+        providers: [knowledge_service_1.KnowledgeService],
+        exports: [knowledge_service_1.KnowledgeService],
     })
 ], KnowledgeModule);
 //# sourceMappingURL=knowledge.module.js.map

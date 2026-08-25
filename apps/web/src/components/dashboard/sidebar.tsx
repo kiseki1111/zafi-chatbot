@@ -15,8 +15,9 @@ export function Sidebar() {
   const { view, setView, setSidebarOpen } = useAppStore();
 
   if (!user) return null;
-  const items = menuForRole(user.role);
-  const theme = ROLE_THEME[user.role];
+  const safeRole = (user.role || "operator").toLowerCase() as any;
+  const items = menuForRole(safeRole) || [];
+  const theme = ROLE_THEME[safeRole] || { bg: "bg-muted", color: "text-foreground", ring: "ring-muted" };
 
   const go = (v: ViewKey) => setView(v);
 
@@ -24,12 +25,12 @@ export function Sidebar() {
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       {/* Brand */}
       <div className="flex items-center gap-2.5 px-5 h-16 border-b border-sidebar-border shrink-0">
-        <div className="grid place-items-center h-9 w-9 rounded-lg bg-emerald-600 text-white shadow-sm">
+        <div className="grid place-items-center h-9 w-9 rounded-lg bg-emerald-600 text-white shadow-sm shrink-0">
           <Building2 className="h-5 w-5" />
         </div>
         <div className="min-w-0">
-          <p className="font-bold text-sm leading-tight truncate">UMKM Assistant</p>
-          <p className="text-[10px] text-muted-foreground truncate">AI · WhatsApp Bot</p>
+          <p className="font-bold text-sm leading-tight truncate">Chatbot Manager</p>
+          <p className="text-[10px] text-muted-foreground truncate">Asisten AI WhatsApp</p>
         </div>
         <Button
           variant="ghost"
@@ -77,7 +78,7 @@ export function Sidebar() {
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold truncate leading-tight">{user.name}</p>
             <p className={cn("text-[10px] font-medium uppercase", theme.color)}>
-              {ROLE_LABELS[user.role]}
+              {ROLE_LABELS[safeRole] || "Pengguna"}
             </p>
           </div>
           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={logout} title="Keluar">

@@ -29,14 +29,15 @@ export function Topbar() {
   const [notifOpen, setNotifOpen] = useState(false);
 
   if (!user) return null;
-  const themeColors = ROLE_THEME[user.role];
+  const safeRole = (user.role || "operator").toLowerCase() as any;
+  const themeColors = ROLE_THEME[safeRole] || { bg: "bg-muted", color: "text-foreground", ring: "ring-muted" };
   const meta = VIEW_TITLES[view];
 
   const notifications = [
     { id: 1, title: "5 pesan baru dari Siti Aminah", time: "2 mnt lalu", type: "chat" },
-    { id: 2, title: "Order ORD-2025-0005 butuh tindak lanjut", time: "15 mnt lalu", type: "order" },
+    { id: 2, title: "Pesanan ORD-2025-0005 butuh tindak lanjut", time: "15 mnt lalu", type: "order" },
     { id: 3, title: "Kampanye 'Promo Rumah Cibaduyut' aktif", time: "1 jam lalu", type: "marketing" },
-    { id: 4, title: "Invoice INV-2025-0006 jatuh tempo", time: "3 jam lalu", type: "finance" },
+    { id: 4, title: "Tagihan INV-2025-0006 jatuh tempo", time: "3 jam lalu", type: "finance" },
   ];
 
   return (
@@ -60,7 +61,7 @@ export function Topbar() {
         {/* Search */}
         <div className="relative ml-auto hidden md:block w-64 lg:w-80">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Cari kontak, properti, order…" className="pl-9 h-9 bg-muted/50 border-transparent focus-visible:bg-background" />
+          <Input placeholder="Cari kontak, produk, pesanan..." className="pl-9 h-9 bg-muted/50 border-transparent focus-visible:bg-background" />
         </div>
 
         {/* Theme toggle */}
@@ -110,7 +111,7 @@ export function Topbar() {
               </Avatar>
               <div className="hidden lg:block text-left">
                 <p className="text-xs font-semibold leading-tight max-w-[120px] truncate">{user.name}</p>
-                <p className="text-[10px] text-muted-foreground">{ROLE_LABELS[user.role]}</p>
+                <p className="text-[10px] text-muted-foreground">{ROLE_LABELS[safeRole] || "Pengguna"}</p>
               </div>
               <ChevronDown className="h-3.5 w-3.5 text-muted-foreground hidden lg:block" />
             </button>
@@ -119,7 +120,7 @@ export function Topbar() {
             <div className="px-2 py-1.5">
               <p className="text-sm font-semibold">{user.name}</p>
               <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-              <Badge variant="outline" className={cn("mt-1.5 text-[10px]", themeColors.color, themeColors.bg)}>{ROLE_LABELS[user.role]}</Badge>
+              <Badge variant="outline" className={cn("mt-1.5 text-[10px]", themeColors.color, themeColors.bg)}>{ROLE_LABELS[safeRole] || "Pengguna"}</Badge>
             </div>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => setView("settings")}>

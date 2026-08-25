@@ -1,4 +1,4 @@
-import { PrismaService } from '../../infrastructure/prisma/prisma.service';
+import { PrismaService } from '../../core/prisma/prisma.service';
 import { CreateChannelAccountDto } from './dto/create-channel-account.dto';
 import { UpdateChannelAccountDto } from './dto/update-channel-account.dto';
 export declare class ChannelAccountsService {
@@ -6,22 +6,23 @@ export declare class ChannelAccountsService {
     constructor(prisma: PrismaService);
     create(createChannelAccountDto: CreateChannelAccountDto): Promise<{
         id: string;
-        createdAt: Date;
-        updatedAt: Date;
         name: string;
         isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
         description: string | null;
         platform: string;
     }>;
     findAll(): Promise<({
         whatsappInstances: {
+            status: string;
             id: string;
             createdAt: Date;
             updatedAt: Date;
-            status: string;
-            channelAccountId: string | null;
-            instanceName: string;
+            tenantId: string | null;
             phone: string | null;
+            instanceName: string;
+            channelAccountId: string | null;
             profileName: string | null;
             profilePicture: string | null;
             qrCode: string | null;
@@ -34,22 +35,23 @@ export declare class ChannelAccountsService {
         }[];
     } & {
         id: string;
-        createdAt: Date;
-        updatedAt: Date;
         name: string;
         isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
         description: string | null;
         platform: string;
     })[]>;
     findOne(id: string): Promise<({
         whatsappInstances: {
+            status: string;
             id: string;
             createdAt: Date;
             updatedAt: Date;
-            status: string;
-            channelAccountId: string | null;
-            instanceName: string;
+            tenantId: string | null;
             phone: string | null;
+            instanceName: string;
+            channelAccountId: string | null;
             profileName: string | null;
             profilePicture: string | null;
             qrCode: string | null;
@@ -62,28 +64,28 @@ export declare class ChannelAccountsService {
         }[];
     } & {
         id: string;
-        createdAt: Date;
-        updatedAt: Date;
         name: string;
         isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
         description: string | null;
         platform: string;
     }) | null>;
     update(id: string, updateChannelAccountDto: UpdateChannelAccountDto): Promise<{
         id: string;
-        createdAt: Date;
-        updatedAt: Date;
         name: string;
         isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
         description: string | null;
         platform: string;
     }>;
     remove(id: string): Promise<{
         id: string;
-        createdAt: Date;
-        updatedAt: Date;
         name: string;
         isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
         description: string | null;
         platform: string;
     }>;

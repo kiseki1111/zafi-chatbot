@@ -514,7 +514,9 @@ export function ChatbotPage() {
            console.warn("Instances API did not return an array:", data);
            return;
          }
-         const mapped = sessionsData.map((d: any) => ({ id: d.name, name: d.name, status: d.status?.toLowerCase() || 'stopped' }));
+         const mapped = sessionsData
+           .filter((d: any) => d.status?.toLowerCase() === 'working')
+           .map((d: any) => ({ id: d.name, name: d.name, status: d.status?.toLowerCase() || 'stopped' }));
          setSessions(mapped);
       }).catch(console.error);
   }, []);
@@ -564,17 +566,22 @@ export function ChatbotPage() {
         console.warn("Chats API did not return an array:", data);
         return;
       }
-      const mappedContacts: Contact[] = chatsData.map((c: any) => ({
-        id: c.id,
-        name: c.contactName || c.contactNumber,
-        phone: c.contactNumber,
-        stage: c.status === 'OPEN' ? 'lead' : 'customer',
-        tags: [],
-        assignedTo: c.assignedTo?.name,
-        unread: c.unreadCount,
-        lastMessage: c.messages?.[0]?.content,
-        lastMessageAt: new Date(c.lastMessageAt).toLocaleTimeString(),
-      }));
+      const mappedContacts: Contact[] = chatsData.map((c: any) => {
+        const rawName = c.contactName || c.contactNumber || "";
+        const cleanName = rawName.split('@')[0];
+        const cleanPhone = (c.contactNumber || "").split('@')[0];
+        return {
+          id: c.id,
+          name: cleanName,
+          phone: cleanPhone,
+          stage: c.status === 'OPEN' ? 'lead' : 'customer',
+          tags: [],
+          assignedTo: c.assignedTo?.name,
+          unread: c.unreadCount,
+          lastMessage: c.messages?.[0]?.content,
+          lastMessageAt: new Date(c.lastMessageAt).toLocaleTimeString(),
+        };
+      });
       setContacts(mappedContacts);
       if (!activeId && mappedContacts.length > 0) {
          setActiveId(mappedContacts.find((c) => c.unread > 0)?.id ?? mappedContacts[0].id);
@@ -829,7 +836,33 @@ export function ChatbotPage() {
   ) : null;
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-6.5rem)] lg:h-[calc(100dvh-7.5rem)] gap-3">
+    <div className="flex flex-col h-[calc(100dvh-6.5rem)] lg:h-[calc(100dvh-5rem)] gap-3">
+      {/* Page header — slim, consistent with other pages */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-600 to-green-700 px-6 py-4 text-white shadow-xl shrink-0">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=%2260%22 height=%2260%22 viewBox=%220 0 60 60%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cg fill=%22none%22 fill-rule=%22evenodd%22%3E%3Cg fill=%22%23ffffff%22 fill-opacity=%220.05%22%3E%3Cpath d=%22M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')]" />
+        <div className="relative flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-white/20 p-2.5 backdrop-blur-sm">
+              <MessageCircle className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold tracking-tight">Bot WhatsApp</h1>
+              <p className="text-xs text-emerald-100">Kelola percakapan &amp; pantau status koneksi agent.</p>
+            </div>
+          </div>
+          <div className="hidden sm:flex items-center gap-3 text-xs text-emerald-100">
+            <span className="flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
+              {contacts.length} kontak
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-white/60" />
+              {messagesToday} pesan
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* ===== Top bar ===== */}
       <Card className="px-3 py-2.5">
         <div className="flex items-center gap-2 flex-wrap">
@@ -1101,19 +1134,6 @@ export function ChatbotPage() {
           )}
         </Card>
 
-        {/* ----- Right: contact info (desktop) ----- */}
-        <Card className="hidden lg:flex w-72 shrink-0 flex-col overflow-hidden min-h-0">
-          {activeContact ? (
-            infoPanel
-          ) : (
-            <div className="flex-1 grid place-items-center p-6 text-center">
-              <div className="text-sm text-muted-foreground">
-                <Info className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                Detail kontak akan muncul di sini.
-              </div>
-            </div>
-          )}
-        </Card>
       </div>
 
       {/* ----- Mobile info sheet ----- */}

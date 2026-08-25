@@ -17,32 +17,34 @@ exports.WahaController = void 0;
 const common_1 = require("@nestjs/common");
 const throttler_1 = require("@nestjs/throttler");
 const waha_service_1 = require("./waha.service");
-const prisma_service_1 = require("../../infrastructure/prisma/prisma.service");
-const ai_service_1 = require("../ai/ai.service");
-const design_flow_service_1 = require("../telegram/design/design-flow.service");
-const design_session_service_1 = require("../telegram/design/design-session.service");
+const prisma_service_1 = require("../../core/prisma/prisma.service");
+const omnichannel_queue_service_1 = require("../../core/omnichannel/omnichannel-queue.service");
 let WahaController = WahaController_1 = class WahaController {
     wahaService;
     prisma;
-    aiService;
-    designFlowService;
-    designSessionService;
+    omnichannelQueue;
     logger = new common_1.Logger(WahaController_1.name);
-    messageBuffer = new Map();
-    processingQueue = [];
-    isProcessingQueue = false;
     cliOutputQueue = [];
-    constructor(wahaService, prisma, aiService, designFlowService, designSessionService) {
+    constructor(wahaService, prisma, omnichannelQueue) {
         this.wahaService = wahaService;
         this.prisma = prisma;
-        this.aiService = aiService;
-        this.designFlowService = designFlowService;
-        this.designSessionService = designSessionService;
+        this.omnichannelQueue = omnichannelQueue;
     }
     async createInstance(name, webhookUrl, channelAccountId) {
         try {
-            const finalWebhookUrl = process.env.WEBHOOK_URL || webhookUrl;
-            return await this.wahaService.startSession(name, finalWebhookUrl, channelAccountId);
+            let webhooks = [];
+            if (process.env.WEBHOOK_URL) {
+                webhooks.push(process.env.WEBHOOK_URL);
+            }
+            if (webhookUrl && !webhookUrl.includes('localhost') && !webhookUrl.includes('127.0.0.1')) {
+                webhooks.push(webhookUrl);
+            }
+            webhooks.push('http://backend:3030/api/v1/waha/webhook');
+            webhooks.push('http://iqbal-backend:3030/api/v1/waha/webhook');
+            webhooks.push('http://172.17.0.1:3030/api/v1/waha/webhook');
+            webhooks.push('http://103.30.195.145:3030/api/v1/waha/webhook');
+            this.logger.log(`[WAHA] Mendaftarkan total ${webhooks.length} Webhook sekaligus: ${webhooks.join(', ')}`);
+            return await this.wahaService.startSession(name, webhooks, channelAccountId);
         }
         catch (error) {
             if (error.response?.status === 422) {
@@ -149,7 +151,7 @@ let WahaController = WahaController_1 = class WahaController {
             const text = message?.body;
             const mediaUrl = message?.mediaUrl;
             const timestamp = message?.timestamp ? new Date(message.timestamp * 1000).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
-            this.logger.log(`\n[WAHA PESAN BARU] Waktu: ${timestamp} | Dari: ${sender} | Isi: "${text}"\n`);
+            this.logger.log(`\n[WAHA PESAN BARU - WHATSAPP] Waktu: ${timestamp} | Dari: ${sender} | Isi: "${text}"\n`);
         }
         else {
             this.logger.log(`Received WAHA webhook event: ${payload?.event}`);
@@ -233,7 +235,7 @@ let WahaController = WahaController_1 = class WahaController {
                 }
             }
             if ((payload.event === 'message' || payload.event === 'message.any') && !message.fromMe) {
-                let text = message.body?.trim();
+                let text = message.body?.trim() || '';
                 let quotedText = '';
                 try {
                     if (message.hasQuotedMsg) {
@@ -248,35 +250,63 @@ let WahaController = WahaController_1 = class WahaController {
                     text = `[Membalas pesan: "${quotedText}"]\n\n${text}`;
                 }
                 const sender = message.from;
-                const msgId = message.id?._serialized || message.id || 'unknown';
-                const mediaUrl = message.mediaUrl;
-                if (text || mediaUrl) {
-                    const bufferKey = `${sessionName}_${sender}`;
-                    let buffered = this.messageBuffer.get(bufferKey);
-                    if (!buffered) {
-                        buffered = { texts: [], mediaUrls: [], msgIds: new Set(), timer: setTimeout(() => { }, 0) };
-                        this.messageBuffer.set(bufferKey, buffered);
-                    }
-                    if (!buffered.msgIds.has(msgId)) {
-                        clearTimeout(buffered.timer);
-                        if (text)
-                            buffered.texts.push(text);
-                        if (mediaUrl)
-                            buffered.mediaUrls.push(mediaUrl);
-                        buffered.msgIds.add(msgId);
-                        const debounceMs = sessionName === 'CLI_TEST_SESSION' ? 0 : 10000;
-                        buffered.timer = setTimeout(() => {
-                            const currentBuffer = this.messageBuffer.get(bufferKey);
-                            if (currentBuffer) {
-                                const combinedText = currentBuffer.texts.join('\n');
-                                const mediaUrls = [...currentBuffer.mediaUrls];
-                                this.processingQueue.push({ sessionName, sender, combinedText, mediaUrls });
-                                this.messageBuffer.delete(bufferKey);
-                                this.logger.debug(`[Debounce] Queueing message from ${sender}. Queue length: ${this.processingQueue.length}`);
-                                this.processQueue();
+                const mediaUrls = message.mediaUrl ? [message.mediaUrl] : [];
+                if (text || mediaUrls.length > 0) {
+                    const incomingMessage = {
+                        senderId: sender,
+                        text: text,
+                        mediaUrls: mediaUrls,
+                        provider: 'WAHA',
+                        sessionName: sessionName,
+                        replyCallback: async (reply) => {
+                            if (reply.text && reply.text.length > 0) {
+                                if (sessionName === 'CLI_TEST_SESSION') {
+                                    this.cliOutputQueue.push({ type: 'text', text: `[Waha Bot]: ${reply.text}` });
+                                }
+                                else {
+                                    await this.wahaService.sendMessage(sessionName, sender, reply.text);
+                                }
                             }
-                        }, debounceMs);
-                    }
+                            if (reply.order) {
+                                const instance = await this.prisma.whatsappInstance.findUnique({ where: { instanceName: sessionName } });
+                                if (instance?.tenantId) {
+                                    const tenant = await this.prisma.tenant.findUnique({ where: { id: instance.tenantId } });
+                                    await this.prisma.salesRecord.create({
+                                        data: {
+                                            receiptNumber: `INV-${Date.now()}`,
+                                            tenantId: instance.tenantId,
+                                            quantity: reply.order.quantity || 1,
+                                            totalPrice: reply.order.totalPrice || 0,
+                                            customerName: reply.order.customerName || 'Pelanggan WA',
+                                            notes: reply.order.notes || '',
+                                            source: 'WAHA',
+                                            attributes: reply.order
+                                        }
+                                    }).catch(e => this.logger.warn(`Order save failed: ${e.message}`));
+                                    if (tenant?.ownerChatId) {
+                                        const notifText = `🔥 *Pesanan Baru Masuk!*\n\nDari: ${reply.order.customerName || 'Pelanggan'}\nItem: ${reply.order.items || '-'}\nTotal: Rp${reply.order.totalPrice || 0}\n\nKetik "proses pesanan ini" jika sudah siap.`;
+                                        if (sessionName === 'CLI_TEST_SESSION') {
+                                            this.cliOutputQueue.push({ type: 'text', text: `[NOTIF OWNER]: ${notifText}` });
+                                        }
+                                        else {
+                                            await this.wahaService.sendMessage(sessionName, tenant.ownerChatId, notifText);
+                                        }
+                                    }
+                                }
+                            }
+                            if (reply.images && reply.images.length > 0) {
+                                for (const img of reply.images) {
+                                    if (sessionName === 'CLI_TEST_SESSION') {
+                                        this.cliOutputQueue.push({ type: 'image', text: `[Waha Bot img] URL: ${img.url}, Caption: ${img.caption}` });
+                                    }
+                                    else {
+                                        await this.wahaService.sendImage(sessionName, sender, img.url, img.caption || '');
+                                    }
+                                }
+                            }
+                        }
+                    };
+                    this.omnichannelQueue.enqueue(incomingMessage);
                 }
             }
         }
@@ -310,153 +340,6 @@ let WahaController = WahaController_1 = class WahaController {
             }
         }
         return { status: 'success' };
-    }
-    async processQueue() {
-        if (this.isProcessingQueue)
-            return;
-        this.isProcessingQueue = true;
-        while (this.processingQueue.length > 0) {
-            const task = this.processingQueue.shift();
-            if (!task)
-                continue;
-            const { sessionName, sender, combinedText, mediaUrls } = task;
-            try {
-                const instanceData = await this.prisma.whatsappInstance.findUnique({
-                    where: { instanceName: sessionName },
-                    include: { channelAccount: true }
-                });
-                const isMarketingChannel = instanceData?.channelAccount?.name?.toLowerCase().includes('marketing') || sessionName === 'CLI_TEST_SESSION';
-                const mockBot = {
-                    sendMessage: async (chatId, text, options) => {
-                        this.logger.log(`\n================================`);
-                        this.logger.log(`[Omnichannel Bridge] Telegram Bot mengirim TEKS ke WAHA:`);
-                        this.logger.log(text);
-                        this.logger.log(`================================\n`);
-                        if (sessionName !== 'CLI_TEST_SESSION') {
-                            await this.wahaService.sendMessage(sessionName, chatId, text);
-                        }
-                        else {
-                            this.cliOutputQueue.push({ type: 'text', text: `[Design Bot]: ${text}` });
-                        }
-                    },
-                    sendPhoto: async (chatId, photo, options) => {
-                        this.logger.log(`\n================================`);
-                        this.logger.log(`[Omnichannel Bridge] Telegram Bot mengirim GAMBAR ke WAHA.`);
-                        this.logger.log(`Caption: ${options?.caption || '(Tanpa Caption)'}`);
-                        this.logger.log(`================================\n`);
-                        let photoData = photo;
-                        if (Buffer.isBuffer(photo)) {
-                            photoData = `data:image/jpeg;base64,${photo.toString('base64')}`;
-                        }
-                        if (sessionName !== 'CLI_TEST_SESSION') {
-                            await this.wahaService.sendImage(sessionName, chatId, photoData, options?.caption || '');
-                        }
-                        else {
-                            const photoDataStr = typeof photoData === 'string' ? photoData : '[Buffer]';
-                            this.cliOutputQueue.push({ type: 'image', text: `[Design Bot mengirim GAMBAR]\nCaption: ${options?.caption || '(Tanpa Caption)'}\nData/URL: ${photoDataStr.substring(0, 50)}...` });
-                        }
-                    },
-                    getFileLink: async (fileId) => {
-                        return fileId;
-                    }
-                };
-                const mockPhoto = mediaUrls.length > 0 ? [{ file_id: mediaUrls[0] }] : undefined;
-                const mockMsg = {
-                    chat: { id: sender },
-                    text: combinedText,
-                    photo: mockPhoto
-                };
-                const activeDesignSession = await this.designSessionService.getSession(sender);
-                const hasActiveSession = activeDesignSession && !this.designSessionService.isExpired(activeDesignSession) && activeDesignSession.step !== 'selesai';
-                let intent = 'CS';
-                const overrideIntent = 'CS';
-                if (overrideIntent === 'DESIGN') {
-                    this.logger.log(`[Omnichannel] Routing ${sender} to DESIGN Bot`);
-                    if (!hasActiveSession) {
-                        await this.designSessionService.createSession(sender);
-                    }
-                    await this.designFlowService.handle(mockBot, mockMsg);
-                }
-                else {
-                    this.logger.log(`[Omnichannel] Routing ${sender} to CS Bot (Luna)`);
-                    const contact = await this.prisma.contact.findUnique({ where: { phone: sender } });
-                    const conversation = contact ? await this.prisma.conversation.findUnique({
-                        where: { instanceName_contactId: { instanceName: sessionName, contactId: contact.id } }
-                    }) : null;
-                    let chatHistory = [];
-                    if (conversation) {
-                        chatHistory = await this.prisma.message.findMany({
-                            where: { conversationId: conversation.id },
-                            orderBy: { createdAt: 'desc' },
-                            take: 10
-                        });
-                        chatHistory.reverse();
-                    }
-                    const aiResponse = await this.aiService.generateLunaResponse(combinedText, sender, chatHistory);
-                    const imageTagRegex = /\[GAMBAR:\s*([^\]]+)\]\s*(https?:\/\/[^\s]+)/gi;
-                    const extractedImages = [];
-                    let match;
-                    while ((match = imageTagRegex.exec(aiResponse)) !== null) {
-                        let url = match[2];
-                        const gdriveMatch = /https:\/\/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/i.exec(url);
-                        if (gdriveMatch) {
-                            url = `https://drive.google.com/uc?export=download&id=${gdriveMatch[1]}`;
-                        }
-                        extractedImages.push({ caption: match[1].trim(), url: url, rawText: match[0] });
-                    }
-                    const fallbackExtensionRegex = /https?:\/\/[^\s]+\.(?:jpg|jpeg|png|webp|gif)/gi;
-                    while ((match = fallbackExtensionRegex.exec(aiResponse)) !== null) {
-                        if (!extractedImages.find(img => img.rawText.includes(match[0]))) {
-                            extractedImages.push({ caption: 'Gambar Properti Zafy', url: match[0], rawText: match[0] });
-                        }
-                    }
-                    let cleanText = aiResponse;
-                    for (const img of extractedImages) {
-                        cleanText = cleanText.replace(img.rawText, '');
-                    }
-                    cleanText = cleanText.replace(/URL:\s*/gi, '');
-                    cleanText = cleanText.replace(/^\s*\d+\.\s*[^:\n]+:?\s*$/gm, '');
-                    cleanText = cleanText.replace(/\n{3,}/g, '\n\n').trim();
-                    if (extractedImages.length > 0) {
-                        this.logger.log(`\n================================`);
-                        this.logger.log(`[Omnichannel Bridge] CS Bot mengirim ${extractedImages.length} GAMBAR ke WAHA.`);
-                        this.logger.log(`================================\n`);
-                        if (sessionName !== 'CLI_TEST_SESSION') {
-                            if (cleanText.length > 5) {
-                                await this.wahaService.sendMessage(sessionName, sender, cleanText);
-                            }
-                            for (const img of extractedImages) {
-                                await this.wahaService.sendImage(sessionName, sender, img.url, img.caption);
-                            }
-                        }
-                        else {
-                            if (cleanText.length > 5) {
-                                this.cliOutputQueue.push({ type: 'text', text: `[Zafi Property]: ${cleanText}` });
-                            }
-                            for (const img of extractedImages) {
-                                this.cliOutputQueue.push({ type: 'image', text: `[Zafi Property mengirim GAMBAR]\nCaption: ${img.caption}\nURL: ${img.url}` });
-                            }
-                        }
-                    }
-                    else {
-                        this.logger.log(`\n================================`);
-                        this.logger.log(`[Omnichannel Bridge] CS Bot mengirim TEKS ke WAHA:`);
-                        this.logger.log(cleanText);
-                        this.logger.log(`================================\n`);
-                        if (sessionName !== 'CLI_TEST_SESSION') {
-                            await this.wahaService.sendMessage(sessionName, sender, cleanText);
-                        }
-                        else {
-                            this.cliOutputQueue.push({ type: 'text', text: `[Zafy Property]: ${cleanText}` });
-                        }
-                    }
-                }
-            }
-            catch (error) {
-                this.logger.error(`Failed to process queue task for ${sender}: ${error.message}`);
-            }
-        }
-        this.isProcessingQueue = false;
     }
 };
 exports.WahaController = WahaController;
@@ -539,8 +422,6 @@ exports.WahaController = WahaController = WahaController_1 = __decorate([
     (0, common_1.Controller)('api/v1/waha'),
     __metadata("design:paramtypes", [waha_service_1.WahaService,
         prisma_service_1.PrismaService,
-        ai_service_1.AiService,
-        design_flow_service_1.DesignFlowService,
-        design_session_service_1.DesignSessionService])
+        omnichannel_queue_service_1.OmnichannelQueueService])
 ], WahaController);
 //# sourceMappingURL=waha.controller.js.map

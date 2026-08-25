@@ -1,9 +1,9 @@
 import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
-import { PrismaService } from '../../infrastructure/prisma/prisma.service';
+import { PrismaService } from '../../core/prisma/prisma.service';
 import { OnboardingState } from './onboarding-states';
-import { OPENAI_CLIENT } from '../../infrastructure/openai/openai.module';
+import { OPENAI_CLIENT } from '../../core/openai/openai.module';
 import { OpenAI } from 'openai';
-import { DataAgentService } from '../knowledge/data-agent.service';
+import { DataAgentService } from '../../features/knowledge-ingest/data-agent.service';
 
 @Injectable()
 export class OnboardingService {

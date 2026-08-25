@@ -2,8 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const core_1 = require("@nestjs/core");
 const app_module_1 = require("./app.module");
-const prisma_service_1 = require("./infrastructure/prisma/prisma.service");
-const data_agent_service_1 = require("./modules/knowledge/data-agent.service");
+const prisma_service_1 = require("./core/prisma/prisma.service");
+const data_agent_service_1 = require("./features/knowledge-ingest/data-agent.service");
 const extraKnowledge = `
 Data Jawaban
 - Syarat umur pengajuan minimal berapa ? Jawab : WNI Umur Minimal 18 Tahun

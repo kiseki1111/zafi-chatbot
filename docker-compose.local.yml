@@ -1,0 +1,27 @@
+services:
+  rbac-db:
+    image: pgvector/pgvector:pg15
+    container_name: rbac-service-postgres
+    restart: always
+
+    environment:
+      POSTGRES_USER: ${DATABASE_USER:-postgres}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-secret_password}
+      POSTGRES_DB: ${DATABASE_NAME:-rbac_api_db}
+
+    ports:
+      - "127.0.0.1:5432:5432"
+
+    volumes:
+      - rbac_postgres_data:/var/lib/postgresql/data
+    
+    networks:
+      - backend
+
+volumes:
+  rbac_postgres_data:
+    driver: local
+
+networks:
+  backend:
+    driver: bridge

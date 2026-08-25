@@ -15,10 +15,10 @@ var OnboardingService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.OnboardingService = void 0;
 const common_1 = require("@nestjs/common");
-const prisma_service_1 = require("../../infrastructure/prisma/prisma.service");
+const prisma_service_1 = require("../../core/prisma/prisma.service");
 const onboarding_states_1 = require("./onboarding-states");
-const openai_module_1 = require("../../infrastructure/openai/openai.module");
-const data_agent_service_1 = require("../knowledge/data-agent.service");
+const openai_module_1 = require("../../core/openai/openai.module");
+const data_agent_service_1 = require("../../features/knowledge-ingest/data-agent.service");
 let OnboardingService = OnboardingService_1 = class OnboardingService {
     prisma;
     injectedOpenai;

@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PermissionsGuard = void 0;
 const common_1 = require("@nestjs/common");
 const core_1 = require("@nestjs/core");
-const prisma_service_1 = require("../../infrastructure/prisma/prisma.service");
+const prisma_service_1 = require("../../core/prisma/prisma.service");
 const permissions_decorator_1 = require("../decorators/permissions.decorator");
 let PermissionsGuard = class PermissionsGuard {
     reflector;

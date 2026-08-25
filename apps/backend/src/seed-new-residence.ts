@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { PrismaService } from './infrastructure/prisma/prisma.service';
-import { DataAgentService } from './modules/knowledge/data-agent.service';
+import { PrismaService } from './core/prisma/prisma.service';
+import { DataAgentService } from './features/knowledge-ingest/data-agent.service';
 import { Logger } from '@nestjs/common';
 
 const griyaAmanah40 = `

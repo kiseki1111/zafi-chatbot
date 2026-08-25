@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../../infrastructure/prisma/prisma.service';
+import { PrismaService } from '../../core/prisma/prisma.service';
 
 @Injectable()
 export class WahaService {
@@ -149,20 +149,7 @@ export class WahaService {
          return { ...ws, dbStats: instance };
       }));
 
-      // Find offline instances
-      const activeNames = wahaSessions.map((s: any) => s.name);
-      const offlineInstances = await this.prisma.whatsappInstance.findMany({
-         where: { instanceName: { notIn: activeNames } }
-      });
-      
-      for(const offline of offlineInstances) {
-         mergedSessions.push({
-            name: offline.instanceName,
-            status: 'STOPPED',
-            dbStats: offline
-         });
-      }
-
+      // Returning only active WAHA sessions with their DB stats
       return mergedSessions;
     } catch (error) {
       this.logger.error(`Failed to get sessions: ${error.message}`);

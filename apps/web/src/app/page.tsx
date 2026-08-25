@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, Suspense } from "react";
 import { useAuthStore } from "@/lib/auth-store";
 import { useAppStore } from "@/lib/app-store";
 import { LoginForm } from "@/components/auth/login-form";
@@ -25,5 +25,9 @@ export default function Home() {
     return <LoginForm />;
   }
 
-  return <DashboardShell />;
+  return (
+    <Suspense fallback={<div>Loading dashboard...</div>}>
+      <DashboardShell />
+    </Suspense>
+  );
 }

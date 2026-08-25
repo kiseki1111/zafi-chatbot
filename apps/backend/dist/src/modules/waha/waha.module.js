@@ -10,15 +10,14 @@ exports.WahaModule = void 0;
 const common_1 = require("@nestjs/common");
 const waha_service_1 = require("./waha.service");
 const waha_controller_1 = require("./waha.controller");
-const prisma_module_1 = require("../../infrastructure/prisma/prisma.module");
-const ai_module_1 = require("../ai/ai.module");
-const telegram_module_1 = require("../telegram/telegram.module");
+const prisma_module_1 = require("../../core/prisma/prisma.module");
+const omnichannel_module_1 = require("../../core/omnichannel/omnichannel.module");
 let WahaModule = class WahaModule {
 };
 exports.WahaModule = WahaModule;
 exports.WahaModule = WahaModule = __decorate([
     (0, common_1.Module)({
-        imports: [prisma_module_1.PrismaModule, ai_module_1.AiModule, telegram_module_1.TelegramModule],
+        imports: [prisma_module_1.PrismaModule, omnichannel_module_1.OmnichannelModule],
         providers: [waha_service_1.WahaService],
         controllers: [waha_controller_1.WahaController],
         exports: [waha_service_1.WahaService],

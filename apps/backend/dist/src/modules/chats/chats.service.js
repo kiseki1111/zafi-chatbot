@@ -11,7 +11,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ChatsService = void 0;
 const common_1 = require("@nestjs/common");
-const prisma_service_1 = require("../../infrastructure/prisma/prisma.service");
+const prisma_service_1 = require("../../core/prisma/prisma.service");
 let ChatsService = class ChatsService {
     prisma;
     constructor(prisma) {
@@ -33,11 +33,21 @@ let ChatsService = class ChatsService {
                 },
             },
         });
-        return conversations.map(c => ({
-            ...c,
-            contactName: c.contact?.name,
-            contactNumber: c.contact?.phone
-        }));
+        return conversations.map(c => {
+            let realPhone = c.contact?.phone;
+            if (realPhone && realPhone.endsWith('@lid') && c.messages && c.messages.length > 0) {
+                const msg = c.messages[0];
+                const meta = msg.metadata;
+                if (meta?._data?.key?.remoteJidAlt) {
+                    realPhone = meta._data.key.remoteJidAlt;
+                }
+            }
+            return {
+                ...c,
+                contactName: c.contact?.name,
+                contactNumber: realPhone
+            };
+        });
     }
     async getMessages(conversationId, skip = 0, take = 20) {
         const conversation = await this.prisma.conversation.findUnique({ where: { id: conversationId } });

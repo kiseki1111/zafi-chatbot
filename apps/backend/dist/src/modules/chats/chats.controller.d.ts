@@ -6,36 +6,36 @@ export declare class ChatsController {
         contactName: string;
         contactNumber: string;
         contact: {
+            status: string;
             id: string;
+            name: string;
+            email: string | null;
             createdAt: Date;
             updatedAt: Date;
-            name: string;
-            status: string;
-            email: string | null;
             phone: string;
         };
         messages: {
-            id: string;
-            content: string;
-            metadata: import("@prisma/client/runtime/library").JsonValue | null;
-            createdAt: Date;
             status: string;
+            id: string;
+            createdAt: Date;
+            metadata: import("@prisma/client/runtime/library").JsonValue | null;
+            content: string;
             wahaMessageId: string | null;
-            senderType: string;
-            messageType: string;
             conversationId: string;
+            senderType: string;
             senderId: string | null;
+            messageType: string;
         }[];
         assignedTo: {
             id: string;
             name: string | null;
             email: string;
         } | null;
+        status: string;
         id: string;
         createdAt: Date;
-        status: string;
-        instanceName: string;
         contactId: string;
+        instanceName: string;
         unreadCount: number;
         assignedToId: string | null;
         lastMessageAt: Date;
@@ -46,15 +46,15 @@ export declare class ChatsController {
             name: string | null;
         } | null;
     } & {
-        id: string;
-        content: string;
-        metadata: import("@prisma/client/runtime/library").JsonValue | null;
-        createdAt: Date;
         status: string;
+        id: string;
+        createdAt: Date;
+        metadata: import("@prisma/client/runtime/library").JsonValue | null;
+        content: string;
         wahaMessageId: string | null;
-        senderType: string;
-        messageType: string;
         conversationId: string;
+        senderType: string;
         senderId: string | null;
+        messageType: string;
     })[]>;
 }

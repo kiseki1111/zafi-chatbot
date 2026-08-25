@@ -24,29 +24,28 @@ export function AuthShell({
             <Building2 className="h-6 w-6" />
           </div>
           <div>
-            <p className="text-lg font-bold leading-tight">PropertiKu Agent</p>
+            <p className="text-lg font-bold leading-tight">Chatbot Manager</p>
             <p className="text-xs text-emerald-100/80">AI Assistant · WhatsApp Waha</p>
           </div>
         </div>
 
         <div className="relative z-10 space-y-6 max-w-md">
           <h2 className="text-3xl font-bold leading-tight">
-            Otomatiskan penjualan properti Anda lewat WhatsApp
+            Kelola Asisten AI WhatsApp Anda dengan Mudah
           </h2>
           <p className="text-emerald-50/90 text-sm leading-relaxed">
-            Chatbot cerdas yang membalas calon pembeli 24/7, mengelola leads, kampanye
-            marketing, hingga closing — semua dalam satu dasbor.
+            Dasbor pusat untuk mengatur perilaku chatbot, mengelola knowledge base, memantau sesi WhatsApp, dan melihat metrik secara real-time.
           </p>
           <div className="grid grid-cols-2 gap-3 pt-2">
-            <Feature icon={<MessageCircle className="h-4 w-4" />} title="Chatbot AI" desc="Auto-reply 24/7" />
-            <Feature icon={<Users className="h-4 w-4" />} title="CRM Leads" desc="Kelola prospek" />
-            <Feature icon={<TrendingUp className="h-4 w-4" />} title="Marketing" desc="Broadcast WA" />
-            <Feature icon={<ShieldCheck className="h-4 w-4" />} title="RBAC" desc="6 level akses" />
+            <Feature icon={<MessageCircle className="h-4 w-4" />} title="Chatbot AI" desc="Auto-reply pintar 24/7" />
+            <Feature icon={<Building2 className="h-4 w-4" />} title="Knowledge Base" desc="Pusat data referensi AI" />
+            <Feature icon={<ShieldCheck className="h-4 w-4" />} title="WA Sessions" desc="Pantau koneksi perangkat" />
+            <Feature icon={<TrendingUp className="h-4 w-4" />} title="Analytics" desc="Metrik & laporan percakapan" />
           </div>
         </div>
 
         <p className="relative z-10 text-xs text-emerald-100/70">
-          © 2025 PropertiKu Agent. Ditenagai oleh Waha WhatsApp API.
+          © 2025 Chatbot Manager. Ditenagai oleh Waha WhatsApp API.
         </p>
       </div>
 
@@ -56,7 +55,7 @@ export function AuthShell({
           <div className="grid place-items-center h-9 w-9 rounded-lg bg-emerald-600 text-white">
             <Building2 className="h-5 w-5" />
           </div>
-          <p className="font-bold">PropertiKu Agent</p>
+          <p className="font-bold">Chatbot Manager</p>
         </div>
         <div className="flex-1 flex items-center justify-center p-6 sm:p-10">
           <div className="w-full max-w-md">
@@ -89,12 +88,14 @@ export function PasswordInput({
   placeholder,
   id,
   autoComplete,
+  className = "",
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   id?: string;
   autoComplete?: string;
+  className?: string;
 }) {
   const [show, setShow] = useState(false);
   return (
@@ -106,7 +107,7 @@ export function PasswordInput({
         autoComplete={autoComplete}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="flex h-10 w-full rounded-md border border-input bg-background px-3 pr-10 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        className={`flex h-10 w-full rounded-md border border-input bg-background px-3 pr-10 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
       />
       <button
         type="button"

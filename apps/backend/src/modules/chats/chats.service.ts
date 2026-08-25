@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../infrastructure/prisma/prisma.service';
+import { PrismaService } from '../../core/prisma/prisma.service';
 
 @Injectable()
 export class ChatsService {
@@ -22,11 +22,21 @@ export class ChatsService {
       },
     });
 
-    return conversations.map(c => ({
-      ...c,
-      contactName: c.contact?.name,
-      contactNumber: c.contact?.phone
-    }));
+    return conversations.map(c => {
+      let realPhone = c.contact?.phone;
+      if (realPhone && realPhone.endsWith('@lid') && c.messages && c.messages.length > 0) {
+        const msg = c.messages[0];
+        const meta = msg.metadata as any;
+        if (meta?._data?.key?.remoteJidAlt) {
+           realPhone = meta._data.key.remoteJidAlt;
+        }
+      }
+      return {
+        ...c,
+        contactName: c.contact?.name,
+        contactNumber: realPhone
+      };
+    });
   }
 
   async getMessages(conversationId: string, skip: number = 0, take: number = 20) {

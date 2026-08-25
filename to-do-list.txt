@@ -1,0 +1,20 @@
+1. fitur buat filter pesan kek mana yang sebaiknya dihandle oleh owner 
+
+Daftar Fitur Lanjutan (Advanced) yang Sangat Berguna (High ROI, Low Code)      
+  Sebagai developer, fokuslah pada fitur yang punya dampak bisnis besar bagi UMKM    
+  tapi arsitekturnya mudah dibuat. Ini daftarnya:
+
+  1. Pengecekan Stok di Awal (Pencegahan Preventif)
+  Daripada repot ngebatalin pesanan, bekali Bot CS dengan fungsi
+  cekStok(namaBarang). Jadi sebelum Bot CS mengiyakan pesanan Budi, bot akan
+  ngecek database. Kalau stok di database 0, Bot CS langsung membalas: "Waduh Kak,   
+  dimsumnya kebetulan lagi kosong nih. Mau ganti menu lain?".
+  2. Fitur "Pause/Takeover" Otomatis (Wajib Ada!)
+  Kadang pelanggan komplain marah-marah dan Owner harus turun tangan balas chat      
+  sendiri (lewat WA Web atau Web Dashboard).
+  Fiturnya: Jika sistem mendeteksi ada pesan WA yang dikirim langsung oleh
+  Owner/Admin ke pelanggan, Bot CS otomatis masuk mode "Tidur" selama 1 jam untuk    
+  pelanggan tersebut. Ini mencegah Bot dan Owner "berebut" membalas chat pelanggan   
+  yang sama.
+
+  

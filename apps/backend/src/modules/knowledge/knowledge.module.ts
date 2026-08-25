@@ -1,12 +1,14 @@
 import { Module } from '@nestjs/common';
-import { KnowledgeService } from './knowledge.service';
 import { KnowledgeController } from './knowledge.controller';
-import { RagService } from './rag.service';
-import { DataAgentService } from './data-agent.service';
+import { KnowledgeService } from './knowledge.service';
+import { PrismaModule } from '../../core/prisma/prisma.module';
+// OpenAiModule is global, no need to import unless required. Let's import just in case if it's not global everywhere.
+import { OpenAiModule } from '../../core/openai/openai.module';
 
 @Module({
-  providers: [KnowledgeService, RagService, DataAgentService],
+  imports: [PrismaModule, OpenAiModule],
   controllers: [KnowledgeController],
-  exports: [RagService, KnowledgeService, DataAgentService]
+  providers: [KnowledgeService],
+  exports: [KnowledgeService],
 })
 export class KnowledgeModule {}

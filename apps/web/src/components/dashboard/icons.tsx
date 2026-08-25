@@ -2,16 +2,16 @@
 
 import {
   LayoutDashboard, MessageCircle, Users, Building2, ShoppingBag,
-  Megaphone, Wallet, ShieldCheck, Settings,
-  Bookmark, Calculator, Layers, Smartphone, BarChart, type LucideIcon,
+  Megaphone, Wallet, ShieldCheck, Settings, Package, Brain, Receipt,
+  Bookmark, Calculator, Layers, Smartphone, BarChart, LineChart, Book, type LucideIcon,
 } from "lucide-react";
 import type { ViewKey } from "@/lib/types";
 
 const ICONS: Record<string, LucideIcon> = {
-  LayoutDashboard, MessageCircle, Users, Building2, ShoppingBag,
+  LayoutDashboard, MessageCircle, Users, Building2, ShoppingBag, Package, Brain, Receipt,
   Megaphone, Wallet, ShieldCheck, Settings,
   Bookmark, UsersGroup: Users, Calculator, LayersLinked: Layers, 
-  DeviceMobile: Smartphone, ChartBar: BarChart,
+  DeviceMobile: Smartphone, Smartphone, ChartBar: BarChart, LineChart, Book,
 };
 
 export function ViewIcon({ name, className }: { name: string; className?: string }) {
@@ -20,19 +20,9 @@ export function ViewIcon({ name, className }: { name: string; className?: string
 }
 
 export const VIEW_TITLES: Record<ViewKey, { title: string; desc: string }> = {
-  overview: { title: "Dashboard", desc: "Ringkasan performa bisnis properti Anda" },
-  chatbot: { title: "Chatbot WhatsApp", desc: "Kelola percakapan & sesi WhatsApp via Waha" },
-  contacts: { title: "Kontak & Leads", desc: "CRM calon pembeli dan penjual properti" },
-  properties: { title: "Properti", desc: "Daftar listing properti yang dikelola" },
-  orders: { title: "Order", desc: "Transaksi jual-beli dan sewa properti" },
-  marketing: { title: "Marketing", desc: "Kampanye broadcast & template pesan" },
-  finance: { title: "Keuangan", desc: "Faktur, pembayaran, dan arus kas" },
-  users: { title: "Manajemen Pengguna", desc: "Kelola pengguna & hak akses (RBAC)" },
-  settings: { title: "Pengaturan", desc: "Konfigurasi akun, integrasi & preferensi" },
-  booking: { title: "Data Booking", desc: "Kelola transaksi booking dan DP" },
-  sales: { title: "Manajemen Tim Sales", desc: "Pantau performa tim sales" },
-  kpr: { title: "Simulasi KPR", desc: "Hitung estimasi cicilan KPR" },
-  listing: { title: "Listing Proyek & Produk", desc: "Katalog properti dan academy" },
-  social: { title: "Media Sosial", desc: "Manajemen ads dan auto posting" },
-  reports: { title: "Laporan & Analytics", desc: "Analisis performa bisnis" },
+  overview: { title: "Dashboard", desc: "Ringkasan performa asisten AI Anda" },
+  chatbot: { title: "Bot WhatsApp", desc: "Koneksi & sesi WhatsApp" },
+  knowledge: { title: "Knowledge Base", desc: "Kelola informasi yang diketahui oleh bot" },
+  settings: { title: "Pengaturan", desc: "Konfigurasi akun, identitas bot, dan fallback contact" },
+  onboarding: { title: "Onboarding", desc: "Selesaikan pengaturan toko Anda" },
 };

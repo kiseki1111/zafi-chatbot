@@ -14,18 +14,21 @@ const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const core_1 = require("@nestjs/core");
 const throttler_1 = require("@nestjs/throttler");
-const users_module_1 = require("./modules/users/users.module");
-const auth_module_1 = require("./modules/auth/auth.module");
-const prisma_module_1 = require("./infrastructure/prisma/prisma.module");
+const users_module_1 = require("./features/web-dashboard/users/users.module");
+const auth_module_1 = require("./features/web-dashboard/auth/auth.module");
+const tenant_module_1 = require("./features/web-dashboard/tenant/tenant.module");
+const prisma_module_1 = require("./core/prisma/prisma.module");
 const channel_accounts_module_1 = require("./modules/channel-accounts/channel-accounts.module");
 const waha_module_1 = require("./modules/waha/waha.module");
 const chats_module_1 = require("./modules/chats/chats.module");
-const telegram_module_1 = require("./modules/telegram/telegram.module");
 const jwt_config_1 = __importDefault(require("./config/jwt.config"));
-const ai_module_1 = require("./modules/ai/ai.module");
-const knowledge_module_1 = require("./modules/knowledge/knowledge.module");
+const knowledge_ingest_module_1 = require("./features/knowledge-ingest/knowledge-ingest.module");
 const app_controller_1 = require("./app.controller");
-const openai_module_1 = require("./infrastructure/openai/openai.module");
+const openai_module_1 = require("./core/openai/openai.module");
+const omnichannel_module_1 = require("./core/omnichannel/omnichannel.module");
+const agent_assistant_module_1 = require("./features/agent-assistant/agent-assistant.module");
+const simulator_module_1 = require("./features/simulator/simulator.module");
+const knowledge_module_1 = require("./modules/knowledge/knowledge.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -43,13 +46,16 @@ exports.AppModule = AppModule = __decorate([
             prisma_module_1.PrismaModule,
             users_module_1.UsersModule,
             auth_module_1.AuthModule,
+            tenant_module_1.TenantModule,
             channel_accounts_module_1.ChannelAccountsModule,
             waha_module_1.WahaModule,
             chats_module_1.ChatsModule,
-            ai_module_1.AiModule,
-            knowledge_module_1.KnowledgeModule,
-            telegram_module_1.TelegramModule,
+            knowledge_ingest_module_1.KnowledgeIngestModule,
             openai_module_1.OpenAiModule,
+            omnichannel_module_1.OmnichannelModule,
+            agent_assistant_module_1.AgentAssistantModule,
+            simulator_module_1.SimulatorModule,
+            knowledge_module_1.KnowledgeModule,
         ],
         controllers: [app_controller_1.AppController],
         providers: [

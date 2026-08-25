@@ -1,5 +1,5 @@
 // ===== Core Auth & RBAC =====
-export type Role = "superadmin" | "operator" | "user";
+export type Role = "owner" | "superadmin" | "admin" | "manager" | "operator" | "marketing" | "keuangan";
 
 export interface User {
   id: string;
@@ -12,24 +12,15 @@ export interface User {
   createdAt: string;
   lastLogin?: string;
   division?: string;
+  tenantId?: string | null;
 }
 
 export type ViewKey =
   | "overview"
   | "chatbot"
-  | "contacts"
-  | "properties"
-  | "orders"
-  | "marketing"
-  | "finance"
-  | "users"
+  | "knowledge"
   | "settings"
-  | "booking"
-  | "sales"
-  | "kpr"
-  | "listing"
-  | "social"
-  | "reports";
+  | "onboarding";
 
 // ===== WhatsApp / Chatbot =====
 export type ChatSessionStatus = "connected" | "disconnected" | "connecting";

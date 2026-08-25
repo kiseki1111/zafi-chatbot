@@ -47,7 +47,10 @@ async function bootstrap() {
   app.useGlobalInterceptors(new TransformInterceptor());
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  const port = process.env.PORT || configService.get<number>('app.port') || 3000;
+  const port = process.env.PORT;
+  if (!port) {
+    throw new Error("PORT environment variable is not set!");
+  }
   await app.listen(port);
 }
-bootstrap();
+bootstrap(); 

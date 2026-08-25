@@ -10,7 +10,7 @@ COPY apps/web/package.json apps/web/package.json
 
 # Workaround for npm optional dependency bug in monorepo
 RUN --mount=type=cache,target=/root/.npm \
-    rm -f package-lock.json && npm install
+    rm -f package-lock.json && npm install --legacy-peer-deps
 
 #########################################################
 
@@ -40,8 +40,8 @@ COPY --from=builder /workspace/apps/backend/node_modules ./apps/backend/node_mod
 COPY --from=builder /workspace/apps/backend/dist ./dist
 COPY --from=builder /workspace/apps/backend/public ./public
 COPY --from=builder /workspace/apps/backend/package.json ./package.json
-COPY --from=builder /workspace/apps/backend/src/infrastructure/prisma ./src/infrastructure/prisma
+COPY --from=builder /workspace/apps/backend/src/core/prisma ./src/core/prisma
 
 EXPOSE 3030
 
-CMD ["sh", "-c", "npx prisma db push --schema=src/infrastructure/prisma/schema.prisma --accept-data-loss && node dist/src/main.js"]
+CMD ["sh", "-c", "npx prisma db push --schema=src/core/prisma/schema.prisma --accept-data-loss && node dist/src/main.js"]

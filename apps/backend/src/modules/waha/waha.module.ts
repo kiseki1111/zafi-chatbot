@@ -1,12 +1,11 @@
 import { Module } from '@nestjs/common';
 import { WahaService } from './waha.service';
 import { WahaController } from './waha.controller';
-import { PrismaModule } from '../../infrastructure/prisma/prisma.module';
-import { AiModule } from '../ai/ai.module';
-import { TelegramModule } from '../telegram/telegram.module';
+import { PrismaModule } from '../../core/prisma/prisma.module';
+import { OmnichannelModule } from '../../core/omnichannel/omnichannel.module';
 
 @Module({
-  imports: [PrismaModule, AiModule, TelegramModule],
+  imports: [PrismaModule, OmnichannelModule],
   providers: [WahaService],
   controllers: [WahaController],
   exports: [WahaService],
