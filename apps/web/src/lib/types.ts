@@ -19,8 +19,7 @@ export type ViewKey =
   | "overview"
   | "chatbot"
   | "knowledge"
-  | "settings"
-  | "onboarding";
+  | "settings";
 
 // ===== WhatsApp / Chatbot =====
 export type ChatSessionStatus = "connected" | "disconnected" | "connecting";

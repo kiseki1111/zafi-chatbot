@@ -24,5 +24,4 @@ export const VIEW_TITLES: Record<ViewKey, { title: string; desc: string }> = {
   chatbot: { title: "Bot WhatsApp", desc: "Koneksi & sesi WhatsApp" },
   knowledge: { title: "Knowledge Base", desc: "Kelola informasi yang diketahui oleh bot" },
   settings: { title: "Pengaturan", desc: "Konfigurasi akun, identitas bot, dan fallback contact" },
-  onboarding: { title: "Onboarding", desc: "Selesaikan pengaturan toko Anda" },
 };

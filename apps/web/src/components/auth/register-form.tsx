@@ -31,8 +31,8 @@ export function RegisterForm() {
     if (!res.ok) {
       toast({ title: "Pendaftaran gagal", description: res.message, variant: "destructive" });
     } else {
-      toast({ title: "Akun dibuat!", description: "Silakan lengkapi profil toko Anda." });
-      useAppStore.getState().setView("onboarding");
+      toast({ title: "Akun dibuat!", description: "Selamat datang di Chatbot Manager." });
+      useAppStore.getState().setView("overview");
     }
   };
 
