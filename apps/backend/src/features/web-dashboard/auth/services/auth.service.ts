@@ -91,7 +91,7 @@ export class AuthService {
         return {
             accessToken,
             refreshToken: refreshTokenPlain,
-            user: { id: user.id, email: user.email, name: user.name, roles: userRolesArray, division: null }
+            user: { id: user.id, email: user.email, name: user.name, roles: userRolesArray, division: null, tenantId: user.tenantId }
         };
     }
 
@@ -161,7 +161,7 @@ export class AuthService {
         return {
             accessToken,
             refreshToken: refreshTokenPlain,
-            user: { id: user.id, email: user.email, name: user.name, roles: userRolesArray, division: null }
+            user: { id: user.id, email: user.email, name: user.name, roles: userRolesArray, division: null, tenantId: user.tenantId }
         };
     }
 
