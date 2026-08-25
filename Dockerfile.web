@@ -20,7 +20,7 @@ WORKDIR /workspace
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV BACKEND_URL=http://localhost:3030
+ENV BACKEND_URL=http://backend:3030
 
 RUN npm run build -w nextjs_tailwind_shadcn_ts
 
