@@ -44,12 +44,7 @@ jobs:
             type=raw,value=latest
             type=sha
 
-      - name: Debug Web Build (Log output)
-        if: matrix.name == 'web'
-        run: |
-          rm -f package-lock.json
-          npm install --legacy-peer-deps
-          npm run build -w nextjs_tailwind_shadcn_ts
+
 
       - name: Build & Push 
         uses: docker/build-push-action@v6
