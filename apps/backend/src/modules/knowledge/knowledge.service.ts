@@ -67,24 +67,15 @@ export class KnowledgeService {
   }
 
   async createText(tenantId: string, title: string, content: string) {
-    const embedding = await this.getEmbedding(content);
     const id = uuidv4();
     const metadataStr = JSON.stringify({ title, type: 'text' });
-    const embeddingStr = `[${embedding.join(',')}]`;
 
     try {
-      // 1. Insert into source of truth (knowledge_base)
+      // Insert into source of truth (knowledge_base) without embedding
       await this.prisma.$executeRawUnsafe(
-        `INSERT INTO "knowledge_base" (id, content, metadata, tenant_id, embedding, created_at, updated_at) 
-         VALUES ($1, $2, $3::jsonb, $4, $5::vector, NOW(), NOW())`,
-        id, content, metadataStr, tenantId, embeddingStr
-      );
-
-      // 2. Insert into search table (vector_knowledge)
-      await this.prisma.$executeRawUnsafe(
-        `INSERT INTO "vector_knowledge" (id, title, content, metadata, tenant_id, embedding, created_at, updated_at) 
-         VALUES ($1, $2, $3, $4::jsonb, $5, $6::vector, NOW(), NOW())`,
-        id, title, content, metadataStr, tenantId, embeddingStr
+        `INSERT INTO "knowledge_base" (id, content, metadata, tenant_id, created_at, updated_at) 
+         VALUES ($1, $2, $3::jsonb, $4, NOW(), NOW())`,
+        id, content, metadataStr, tenantId
       );
     } catch (error: any) {
       console.error('DB Insert Error:', error);
@@ -122,24 +113,15 @@ export class KnowledgeService {
     const content = await this.processFile(file);
     const finalTitle = title || file.originalname;
     
-    const embedding = await this.getEmbedding(content);
     const id = uuidv4();
     const metadataStr = JSON.stringify({ title: finalTitle, type: 'file', filename: file.originalname });
-    const embeddingStr = `[${embedding.join(',')}]`;
 
     try {
       // 1. Insert into source of truth (knowledge_base)
       await this.prisma.$executeRawUnsafe(
-        `INSERT INTO "knowledge_base" (id, content, metadata, tenant_id, embedding, created_at, updated_at) 
-         VALUES ($1, $2, $3::jsonb, $4, $5::vector, NOW(), NOW())`,
-        id, content, metadataStr, tenantId, embeddingStr
-      );
-
-      // 2. Insert into search table (vector_knowledge)
-      await this.prisma.$executeRawUnsafe(
-        `INSERT INTO "vector_knowledge" (id, title, content, metadata, tenant_id, embedding, created_at, updated_at) 
-         VALUES ($1, $2, $3, $4::jsonb, $5, $6::vector, NOW(), NOW())`,
-        id, finalTitle, content, metadataStr, tenantId, embeddingStr
+        `INSERT INTO "knowledge_base" (id, content, metadata, tenant_id, created_at, updated_at) 
+         VALUES ($1, $2, $3::jsonb, $4, NOW(), NOW())`,
+        id, content, metadataStr, tenantId
       );
     } catch (error: any) {
       console.error('DB Insert Error:', error);
@@ -151,9 +133,6 @@ export class KnowledgeService {
 
   async update(id: string, tenantId: string, title: string, content: string) {
     const item = await this.findOne(id, tenantId); // ensure it exists
-
-    const embedding = await this.getEmbedding(content);
-    const embeddingStr = `[${embedding.join(',')}]`;
     
     // Merge existing metadata with new title
     const existingMetadata = (item.metadata as any) || {};
@@ -162,17 +141,9 @@ export class KnowledgeService {
     // 1. Update source of truth
     await this.prisma.$executeRawUnsafe(
       `UPDATE "knowledge_base" 
-       SET content = $1, metadata = $2::jsonb, embedding = $3::vector, updated_at = NOW() 
-       WHERE id = $4 AND tenant_id = $5`,
-      content, metadataStr, embeddingStr, id, tenantId
-    );
-
-    // 2. Update search table
-    await this.prisma.$executeRawUnsafe(
-      `UPDATE "vector_knowledge" 
-       SET title = $1, content = $2, metadata = $3::jsonb, embedding = $4::vector, updated_at = NOW() 
-       WHERE id = $5 AND tenant_id = $6`,
-      title, content, metadataStr, embeddingStr, id, tenantId
+       SET content = $1, metadata = $2::jsonb, updated_at = NOW() 
+       WHERE id = $3 AND tenant_id = $4`,
+      content, metadataStr, id, tenantId
     );
 
     return this.findOne(id, tenantId);
@@ -184,10 +155,7 @@ export class KnowledgeService {
     await this.prisma.knowledgeBase.deleteMany({
       where: { id, tenantId },
     });
-    
-    await this.prisma.vectorKnowledge.deleteMany({
-      where: { id, tenantId },
-    });
+
     
     return { success: true };
   }

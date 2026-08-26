@@ -39,42 +39,22 @@ export class AgentSharedService {
   }
 
   /**
-   * 2. Mencari informasi relevan dari vector_knowledge (RAG).
+   * 2. Mengambil informasi dari knowledge_base (Bukan vector/RAG lagi).
    */
   async retrieveRelevantKnowledge(query: string, tenantId: string): Promise<string> {
-    if (!this.openai) {
-       return 'Sistem AI sedang tidak tersedia.';
-    }
-
     try {
-      // 1. Generate embedding for query
-      const embeddingResponse = await this.openai.embeddings.create({
-        model: 'text-embedding-3-small',
-        input: query,
-        encoding_format: 'float',
+      // 1. Ambil semua knowledge dari tenant ini
+      const knowledges = await this.prisma.knowledgeBase.findMany({
+        where: { tenantId },
+        take: 50,
       });
-      const embedding = embeddingResponse.data[0].embedding;
-      const vectorString = `[${embedding.join(',')}]`;
 
-      // 2. Search pgvector
-      const results = await this.prisma.$queryRawUnsafe<any[]>(`
-        SELECT 
-          content,
-          1 - (embedding <=> $1::vector) as similarity
-        FROM vector_knowledge
-        WHERE tenant_id = $2
-        ORDER BY embedding <=> $1::vector
-        LIMIT 5
-      `, vectorString, tenantId);
-
-      // Filter similarity if needed, e.g., similarity > 0.3
-      const filtered = results.filter(r => r.similarity > 0.3);
-      
-      if (filtered.length === 0) {
+      if (knowledges.length === 0) {
         return '';
       }
 
-      return filtered.map(r => r.content).join('\\n\\n');
+      // Gabungkan semua isi knowledge menjadi satu teks (sebagai konteks LLM)
+      return knowledges.map(k => k.content).join('\\n\\n');
     } catch (e) {
       this.logger.error(`Error retrieving relevant knowledge: ${e.message}`);
       return '';
