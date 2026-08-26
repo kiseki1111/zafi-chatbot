@@ -211,6 +211,33 @@ function KoneksiWATab() {
     }
   };
 
+  const handleAddChannel = async () => {
+    const channelName = prompt("Masukkan nama channel (contoh: Customer Service):");
+    if (!channelName) return;
+    try {
+      await fetch('/api/v1/channel-accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: channelName })
+      });
+      alert("Channel berhasil ditambahkan!");
+      fetchChannels();
+    } catch (e) {
+      alert("Gagal menambahkan channel");
+    }
+  };
+
+  const handleDeleteChannel = async (channelId: string) => {
+    if (!confirm("Yakin ingin menghapus channel ini secara permanen? Semua sesi di dalamnya akan terpengaruh.")) return;
+    try {
+      await fetch(`/api/v1/channel-accounts/${channelId}`, { method: 'DELETE' });
+      alert("Channel berhasil dihapus!");
+      fetchChannels();
+    } catch (e) {
+      alert("Gagal menghapus channel");
+    }
+  };
+
   const handleScanQR = async (sessionName: string) => {
     try {
       const res = await fetch(`/api/v1/waha/instances/${sessionName}/qr`);
@@ -249,7 +276,7 @@ function KoneksiWATab() {
             <CardTitle className="text-base">Channel WhatsApp</CardTitle>
             <CardDescription className="text-xs">Daftar Channel & Sesi Bot (Difilter berdasarkan divisi)</CardDescription>
           </div>
-          <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => alert('Fitur tambah channel akan segera hadir')}>
+          <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleAddChannel}>
             <Plus className="h-4 w-4 mr-2" /> Tambah Channel
           </Button>
         </CardHeader>
@@ -266,7 +293,7 @@ function KoneksiWATab() {
                   <Button onClick={() => handleStartSession(channel.id)} variant="outline" size="sm" className="h-8 text-xs font-medium border-emerald-100 text-slate-700">
                     <Smartphone className="h-3 w-3 mr-1.5" /> Tambah Sesi
                   </Button>
-                  <Button variant="outline" size="icon" className="h-8 w-8 text-rose-500 border-rose-200 hover:bg-rose-50">
+                  <Button onClick={() => handleDeleteChannel(channel.id)} variant="outline" size="icon" className="h-8 w-8 text-rose-500 border-rose-200 hover:bg-rose-50">
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
