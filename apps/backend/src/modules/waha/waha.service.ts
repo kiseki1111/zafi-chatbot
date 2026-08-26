@@ -55,15 +55,25 @@ export class WahaService {
 
   async startSession(sessionName: string, webhookUrls?: string | string[], channelAccountId?: string, tenantId?: string): Promise<any> {
     try {
-      if (channelAccountId || tenantId) {
-        await this.prisma.whatsappInstance.upsert({
-          where: { instanceName: sessionName },
-          update: { channelAccountId, tenantId },
-          create: { instanceName: sessionName, channelAccountId, tenantId, status: 'STOPPED' }
-        });
+      // Selalu upsert ke database agar sesi selalu tercatat
+      // Verify tenantId exists if provided
+      let validTenantId: string | undefined = tenantId;
+      if (tenantId) {
+        const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } }).catch(() => null);
+        if (!tenant) {
+          this.logger.warn(`Tenant ${tenantId} not found, creating instance without tenant association`);
+          validTenantId = undefined;
+        }
       }
 
+      await this.prisma.whatsappInstance.upsert({
+        where: { instanceName: sessionName },
+        update: { channelAccountId: channelAccountId || null, tenantId: validTenantId || null },
+        create: { instanceName: sessionName, channelAccountId: channelAccountId || null, tenantId: validTenantId || null, status: 'STOPPED' }
+      });
+
       const payload: any = { name: sessionName };
+
       
       if (webhookUrls) {
         const urls = Array.isArray(webhookUrls) ? webhookUrls : [webhookUrls];

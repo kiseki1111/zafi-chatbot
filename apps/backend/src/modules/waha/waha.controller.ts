@@ -77,6 +77,24 @@ export class WahaController {
     return this.wahaService.getSessions();
   }
 
+  // Endpoint baru: ambil langsung dari database (bukan dari WAHA API)
+  // Opsional: filter by tenantId jika diberikan
+  @SkipThrottle()
+  @Get('instances/db')
+  async getInstancesFromDb(@Req() req: any) {
+    // Coba ambil tenantId dari query param atau dari user session
+    let tenantId = req.query?.tenantId || req.user?.tenantId;
+
+    // Jika ada tenantId, filter hanya instance untuk tenant tersebut
+    // Jika tidak ada, kembalikan semua instance (untuk backward compatibility)
+    const where = tenantId ? { tenantId } : {};
+
+    return this.prisma.whatsappInstance.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   @SkipThrottle()
   @Get('instances/:id/qr')
   async getQrCode(@Param('id') id: string, @Res() res: any) {
