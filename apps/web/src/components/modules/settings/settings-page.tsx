@@ -265,16 +265,7 @@ function KoneksiWATab() {
 
   return (
     <>
-      <Card className="shadow-sm relative">
-        {/* QR Code overlay */}
-        {qrCodeData && (
-          <div className="absolute inset-0 bg-white/95 z-10 flex flex-col items-center justify-center rounded-xl backdrop-blur-sm">
-            <h3 className="font-bold text-lg mb-1">Scan QR Code</h3>
-            <p className="text-sm text-muted-foreground mb-4">Chatbot: <span className="font-medium text-slate-700">{qrCodeData.id}</span></p>
-            <img src={qrCodeData.url} alt="QR Code" className="w-64 h-64 border-4 border-emerald-500 rounded-xl shadow-lg" />
-            <Button onClick={() => setQrCodeData(null)} className="mt-6 bg-slate-800 text-white">Tutup</Button>
-          </div>
-        )}
+      <Card className="shadow-sm">
 
         <CardHeader className="flex flex-row items-center justify-between pb-4 border-b mb-4">
           <div>
@@ -404,6 +395,29 @@ function KoneksiWATab() {
             <Button variant="destructive" onClick={handleDelete} disabled={isDeleteLoading}>
               {isDeleteLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Ya, Hapus
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Scan QR Code */}
+      <Dialog open={!!qrCodeData} onOpenChange={(open) => !open && setQrCodeData(null)}>
+        <DialogContent className="sm:max-w-[380px]">
+          <DialogHeader>
+            <DialogTitle>Scan QR Code</DialogTitle>
+            <DialogDescription>
+              Chatbot: <span className="font-medium text-slate-700">{qrCodeData?.id}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center justify-center py-4">
+            {qrCodeData && (
+              <img src={qrCodeData.url} alt="QR Code" className="w-48 h-48 border-4 border-emerald-500 rounded-lg shadow-lg" />
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground text-center">Buka WhatsApp di ponsel Anda dan scan QR code ini</p>
+          <DialogFooter>
+            <Button onClick={() => setQrCodeData(null)} className="w-full bg-slate-800 text-white">
+              Selesai
             </Button>
           </DialogFooter>
         </DialogContent>
