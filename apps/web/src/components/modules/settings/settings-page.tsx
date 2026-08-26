@@ -186,7 +186,7 @@ function KoneksiWATab() {
       // Ambil langsung dari database (bukan dari WAHA API yang bisa offline)
       const res = await fetch('/api/v1/waha/instances/db');
       const data = await res.json();
-      setInstances(Array.isArray(data) ? data : []);
+      setInstances(Array.isArray(data?.data) ? data.data : []);
     } catch (e) {
       console.error(e);
       toast.error("Gagal mengambil data chatbot");
