@@ -30,7 +30,7 @@ let WahaController = WahaController_1 = class WahaController {
         this.prisma = prisma;
         this.omnichannelQueue = omnichannelQueue;
     }
-    async createInstance(name, webhookUrl, channelAccountId) {
+    async createInstance(name, webhookUrl, channelAccountId, tenantId) {
         try {
             let webhooks = [];
             if (process.env.WEBHOOK_URL) {
@@ -44,7 +44,7 @@ let WahaController = WahaController_1 = class WahaController {
             webhooks.push('http://172.17.0.1:3030/api/v1/waha/webhook');
             webhooks.push('http://103.30.195.145:3030/api/v1/waha/webhook');
             this.logger.log(`[WAHA] Mendaftarkan total ${webhooks.length} Webhook sekaligus: ${webhooks.join(', ')}`);
-            return await this.wahaService.startSession(name, webhooks, channelAccountId);
+            return await this.wahaService.startSession(name, webhooks, channelAccountId, tenantId);
         }
         catch (error) {
             if (error.response?.status === 422) {
@@ -72,6 +72,14 @@ let WahaController = WahaController_1 = class WahaController {
     }
     async getInstances() {
         return this.wahaService.getSessions();
+    }
+    async getInstancesFromDb(req) {
+        let tenantId = req.query?.tenantId || req.user?.tenantId;
+        const where = tenantId ? { tenantId } : {};
+        return this.prisma.whatsappInstance.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+        });
     }
     async getQrCode(id, res) {
         try {
@@ -348,8 +356,9 @@ __decorate([
     __param(0, (0, common_1.Body)('name')),
     __param(1, (0, common_1.Body)('webhookUrl')),
     __param(2, (0, common_1.Body)('channelAccountId')),
+    __param(3, (0, common_1.Body)('tenantId')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, String]),
+    __metadata("design:paramtypes", [String, String, String, String]),
     __metadata("design:returntype", Promise)
 ], WahaController.prototype, "createInstance", null);
 __decorate([
@@ -380,6 +389,14 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
 ], WahaController.prototype, "getInstances", null);
+__decorate([
+    (0, throttler_1.SkipThrottle)(),
+    (0, common_1.Get)('instances/db'),
+    __param(0, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], WahaController.prototype, "getInstancesFromDb", null);
 __decorate([
     (0, throttler_1.SkipThrottle)(),
     (0, common_1.Get)('instances/:id/qr'),

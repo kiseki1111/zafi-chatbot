@@ -17,6 +17,7 @@ export declare class AuthService {
             name: string | null;
             roles: string[];
             division: null;
+            tenantId: string | null;
         };
     }>;
     register(dto: RegisterDto, ipAddress: string, userAgent: string): Promise<{
@@ -28,6 +29,7 @@ export declare class AuthService {
             name: string | null;
             roles: string[];
             division: null;
+            tenantId: string | null;
         };
     }>;
     refreshTokens(userId: string, refreshTokenPlain: string): Promise<{

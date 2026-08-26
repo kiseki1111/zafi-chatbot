@@ -54,15 +54,21 @@ let WahaService = WahaService_1 = class WahaService {
             this.logger.debug(`Could not send typing presence for ${sessionName}. Error: ${error.message}`);
         }
     }
-    async startSession(sessionName, webhookUrls, channelAccountId) {
+    async startSession(sessionName, webhookUrls, channelAccountId, tenantId) {
         try {
-            if (channelAccountId) {
-                await this.prisma.whatsappInstance.upsert({
-                    where: { instanceName: sessionName },
-                    update: { channelAccountId },
-                    create: { instanceName: sessionName, channelAccountId, status: 'STOPPED' }
-                });
+            let validTenantId = tenantId;
+            if (tenantId) {
+                const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } }).catch(() => null);
+                if (!tenant) {
+                    this.logger.warn(`Tenant ${tenantId} not found, creating instance without tenant association`);
+                    validTenantId = undefined;
+                }
             }
+            await this.prisma.whatsappInstance.upsert({
+                where: { instanceName: sessionName },
+                update: { channelAccountId: channelAccountId || null, tenantId: validTenantId || null },
+                create: { instanceName: sessionName, channelAccountId: channelAccountId || null, tenantId: validTenantId || null, status: 'STOPPED' }
+            });
             const payload = { name: sessionName };
             if (webhookUrls) {
                 const urls = Array.isArray(webhookUrls) ? webhookUrls : [webhookUrls];

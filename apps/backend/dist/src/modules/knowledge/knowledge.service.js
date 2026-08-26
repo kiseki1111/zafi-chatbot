@@ -110,15 +110,11 @@ let KnowledgeService = class KnowledgeService {
         }
     }
     async createText(tenantId, title, content) {
-        const embedding = await this.getEmbedding(content);
         const id = (0, uuid_1.v4)();
         const metadataStr = JSON.stringify({ title, type: 'text' });
-        const embeddingStr = `[${embedding.join(',')}]`;
         try {
-            await this.prisma.$executeRawUnsafe(`INSERT INTO "knowledge_base" (id, content, metadata, tenant_id, embedding, created_at, updated_at) 
-         VALUES ($1, $2, $3::jsonb, $4, $5::vector, NOW(), NOW())`, id, content, metadataStr, tenantId, embeddingStr);
-            await this.prisma.$executeRawUnsafe(`INSERT INTO "vector_knowledge" (id, title, content, metadata, tenant_id, embedding, created_at, updated_at) 
-         VALUES ($1, $2, $3, $4::jsonb, $5, $6::vector, NOW(), NOW())`, id, title, content, metadataStr, tenantId, embeddingStr);
+            await this.prisma.$executeRawUnsafe(`INSERT INTO "knowledge_base" (id, content, metadata, tenant_id, created_at, updated_at) 
+         VALUES ($1, $2, $3::jsonb, $4, NOW(), NOW())`, id, content, metadataStr, tenantId);
         }
         catch (error) {
             console.error('DB Insert Error:', error);
@@ -153,15 +149,11 @@ let KnowledgeService = class KnowledgeService {
     async createFile(tenantId, file, title) {
         const content = await this.processFile(file);
         const finalTitle = title || file.originalname;
-        const embedding = await this.getEmbedding(content);
         const id = (0, uuid_1.v4)();
         const metadataStr = JSON.stringify({ title: finalTitle, type: 'file', filename: file.originalname });
-        const embeddingStr = `[${embedding.join(',')}]`;
         try {
-            await this.prisma.$executeRawUnsafe(`INSERT INTO "knowledge_base" (id, content, metadata, tenant_id, embedding, created_at, updated_at) 
-         VALUES ($1, $2, $3::jsonb, $4, $5::vector, NOW(), NOW())`, id, content, metadataStr, tenantId, embeddingStr);
-            await this.prisma.$executeRawUnsafe(`INSERT INTO "vector_knowledge" (id, title, content, metadata, tenant_id, embedding, created_at, updated_at) 
-         VALUES ($1, $2, $3, $4::jsonb, $5, $6::vector, NOW(), NOW())`, id, finalTitle, content, metadataStr, tenantId, embeddingStr);
+            await this.prisma.$executeRawUnsafe(`INSERT INTO "knowledge_base" (id, content, metadata, tenant_id, created_at, updated_at) 
+         VALUES ($1, $2, $3::jsonb, $4, NOW(), NOW())`, id, content, metadataStr, tenantId);
         }
         catch (error) {
             console.error('DB Insert Error:', error);
@@ -171,24 +163,16 @@ let KnowledgeService = class KnowledgeService {
     }
     async update(id, tenantId, title, content) {
         const item = await this.findOne(id, tenantId);
-        const embedding = await this.getEmbedding(content);
-        const embeddingStr = `[${embedding.join(',')}]`;
         const existingMetadata = item.metadata || {};
         const metadataStr = JSON.stringify({ ...existingMetadata, title });
         await this.prisma.$executeRawUnsafe(`UPDATE "knowledge_base" 
-       SET content = $1, metadata = $2::jsonb, embedding = $3::vector, updated_at = NOW() 
-       WHERE id = $4 AND tenant_id = $5`, content, metadataStr, embeddingStr, id, tenantId);
-        await this.prisma.$executeRawUnsafe(`UPDATE "vector_knowledge" 
-       SET title = $1, content = $2, metadata = $3::jsonb, embedding = $4::vector, updated_at = NOW() 
-       WHERE id = $5 AND tenant_id = $6`, title, content, metadataStr, embeddingStr, id, tenantId);
+       SET content = $1, metadata = $2::jsonb, updated_at = NOW() 
+       WHERE id = $3 AND tenant_id = $4`, content, metadataStr, id, tenantId);
         return this.findOne(id, tenantId);
     }
     async remove(id, tenantId) {
         await this.findOne(id, tenantId);
         await this.prisma.knowledgeBase.deleteMany({
-            where: { id, tenantId },
-        });
-        await this.prisma.vectorKnowledge.deleteMany({
             where: { id, tenantId },
         });
         return { success: true };

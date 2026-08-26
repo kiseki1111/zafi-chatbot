@@ -11,7 +11,7 @@ export declare class WahaService {
     private randomDelay;
     private adaptiveWpmDelay;
     sendTypingPresence(sessionName: string, chatId: string): Promise<void>;
-    startSession(sessionName: string, webhookUrls?: string | string[], channelAccountId?: string): Promise<any>;
+    startSession(sessionName: string, webhookUrls?: string | string[], channelAccountId?: string, tenantId?: string): Promise<any>;
     getSessions(): Promise<any>;
     sendMessage(sessionName: string, chatId: string, text: string): Promise<any>;
     sendImage(sessionName: string, chatId: string, imageUrl: string, caption?: string): Promise<any>;

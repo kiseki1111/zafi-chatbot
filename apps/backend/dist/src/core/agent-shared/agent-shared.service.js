@@ -47,31 +47,15 @@ let AgentSharedService = AgentSharedService_1 = class AgentSharedService {
         }
     }
     async retrieveRelevantKnowledge(query, tenantId) {
-        if (!this.openai) {
-            return 'Sistem AI sedang tidak tersedia.';
-        }
         try {
-            const embeddingResponse = await this.openai.embeddings.create({
-                model: 'text-embedding-3-small',
-                input: query,
-                encoding_format: 'float',
+            const knowledges = await this.prisma.knowledgeBase.findMany({
+                where: { tenantId },
+                take: 50,
             });
-            const embedding = embeddingResponse.data[0].embedding;
-            const vectorString = `[${embedding.join(',')}]`;
-            const results = await this.prisma.$queryRawUnsafe(`
-        SELECT 
-          content,
-          1 - (embedding <=> $1::vector) as similarity
-        FROM vector_knowledge
-        WHERE tenant_id = $2
-        ORDER BY embedding <=> $1::vector
-        LIMIT 5
-      `, vectorString, tenantId);
-            const filtered = results.filter(r => r.similarity > 0.3);
-            if (filtered.length === 0) {
+            if (knowledges.length === 0) {
                 return '';
             }
-            return filtered.map(r => r.content).join('\\n\\n');
+            return knowledges.map(k => k.content).join('\\n\\n');
         }
         catch (e) {
             this.logger.error(`Error retrieving relevant knowledge: ${e.message}`);

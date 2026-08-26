@@ -13,6 +13,7 @@ export declare class AuthController {
             name: string | null;
             roles: string[];
             division: null;
+            tenantId: string | null;
         };
     }>;
     register(registerDto: RegisterDto, ip: string, userAgent: string): Promise<{
@@ -24,6 +25,7 @@ export declare class AuthController {
             name: string | null;
             roles: string[];
             division: null;
+            tenantId: string | null;
         };
     }>;
     logout(req: any): Promise<{

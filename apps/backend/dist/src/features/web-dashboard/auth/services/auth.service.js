@@ -112,7 +112,7 @@ let AuthService = class AuthService {
         return {
             accessToken,
             refreshToken: refreshTokenPlain,
-            user: { id: user.id, email: user.email, name: user.name, roles: userRolesArray, division: null }
+            user: { id: user.id, email: user.email, name: user.name, roles: userRolesArray, division: null, tenantId: user.tenantId }
         };
     }
     async register(dto, ipAddress, userAgent) {
@@ -170,7 +170,7 @@ let AuthService = class AuthService {
         return {
             accessToken,
             refreshToken: refreshTokenPlain,
-            user: { id: user.id, email: user.email, name: user.name, roles: userRolesArray, division: null }
+            user: { id: user.id, email: user.email, name: user.name, roles: userRolesArray, division: null, tenantId: user.tenantId }
         };
     }
     async refreshTokens(userId, refreshTokenPlain) {
