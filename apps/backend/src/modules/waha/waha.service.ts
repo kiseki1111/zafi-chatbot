@@ -53,13 +53,13 @@ export class WahaService {
     }
   }
 
-  async startSession(sessionName: string, webhookUrls?: string | string[], channelAccountId?: string): Promise<any> {
+  async startSession(sessionName: string, webhookUrls?: string | string[], channelAccountId?: string, tenantId?: string): Promise<any> {
     try {
-      if (channelAccountId) {
+      if (channelAccountId || tenantId) {
         await this.prisma.whatsappInstance.upsert({
           where: { instanceName: sessionName },
-          update: { channelAccountId },
-          create: { instanceName: sessionName, channelAccountId, status: 'STOPPED' }
+          update: { channelAccountId, tenantId },
+          create: { instanceName: sessionName, channelAccountId, tenantId, status: 'STOPPED' }
         });
       }
 

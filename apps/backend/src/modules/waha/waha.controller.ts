@@ -21,7 +21,7 @@ export class WahaController {
   ) {}
 
   @Post('instances')
-  async createInstance(@Body('name') name: string, @Body('webhookUrl') webhookUrl?: string, @Body('channelAccountId') channelAccountId?: string) {
+  async createInstance(@Body('name') name: string, @Body('webhookUrl') webhookUrl?: string, @Body('channelAccountId') channelAccountId?: string, @Body('tenantId') tenantId?: string) {
     try {
       let webhooks: string[] = [];
       
@@ -40,7 +40,7 @@ export class WahaController {
       
       this.logger.log(`[WAHA] Mendaftarkan total ${webhooks.length} Webhook sekaligus: ${webhooks.join(', ')}`);
       
-      return await this.wahaService.startSession(name, webhooks, channelAccountId);
+      return await this.wahaService.startSession(name, webhooks, channelAccountId, tenantId);
     } catch (error) {
       if (error.response?.status === 422) {
          this.logger.warn(`Session ${name} already exists or is invalid.`);

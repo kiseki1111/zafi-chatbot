@@ -163,132 +163,158 @@ function BotSettingsTab() {
 }
 
 function KoneksiWATab() {
+  const { user } = useAuthStore();
+  const [channels, setChannels] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [qrCodeData, setQrCodeData] = React.useState<{id: string, url: string} | null>(null);
+
+  const fetchChannels = async () => {
+    try {
+      const res = await fetch('/api/v1/channel-accounts');
+      const data = await res.json();
+      setChannels(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error(e);
+    }
+    setLoading(false);
+  };
+
+  React.useEffect(() => {
+    fetchChannels();
+  }, []);
+
+  const handleStartSession = async (channelId: string) => {
+    const sessionName = prompt("Masukkan nama sesi (tanpa spasi):");
+    if (!sessionName) return;
+    try {
+      await fetch('/api/v1/waha/instances', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: sessionName, channelAccountId: channelId, tenantId: user?.tenantId })
+      });
+      alert("Sesi berhasil dibuat! Silakan Scan QR setelah status berubah menjadi STOPPED/STARTING");
+      fetchChannels();
+    } catch (e) {
+      alert("Gagal membuat sesi");
+    }
+  };
+
+  const handleStopSession = async (sessionName: string) => {
+    if (!confirm("Yakin ingin memutus koneksi sesi ini?")) return;
+    try {
+      await fetch(`/api/v1/waha/instances/${sessionName}/logout`, { method: 'POST' });
+      await fetch(`/api/v1/waha/instances/${sessionName}`, { method: 'DELETE' });
+      alert("Sesi berhasil dihapus");
+      fetchChannels();
+    } catch (e) {
+      alert("Gagal menghapus sesi");
+    }
+  };
+
+  const handleScanQR = async (sessionName: string) => {
+    try {
+      const res = await fetch(`/api/v1/waha/instances/${sessionName}/qr`);
+      if (res.ok) {
+        const blob = await res.blob();
+        setQrCodeData({ id: sessionName, url: URL.createObjectURL(blob) });
+      } else {
+        // If QR is not ready, start the session first
+        await fetch(`/api/v1/waha/instances`, {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({ name: sessionName, tenantId: user?.tenantId })
+        });
+        alert("Sesi sedang dimulai, silakan tunggu beberapa detik lalu klik Scan QR lagi.");
+      }
+    } catch (e) {
+      alert("Gagal mengambil QR Code");
+    }
+  };
+
+  if (loading) {
+    return <div className="p-8 flex justify-center"><Loader2 className="animate-spin text-emerald-600" /></div>;
+  }
+
   return (
-    <Card className="shadow-sm">
+    <Card className="shadow-sm relative">
+        {qrCodeData && (
+          <div className="absolute inset-0 bg-white/90 z-10 flex flex-col items-center justify-center rounded-xl backdrop-blur-sm">
+            <h3 className="font-bold text-lg mb-4">Scan QR Code untuk {qrCodeData.id}</h3>
+            <img src={qrCodeData.url} alt="QR Code" className="w-64 h-64 border-4 border-emerald-500 rounded-xl shadow-lg" />
+            <Button onClick={() => setQrCodeData(null)} className="mt-6 bg-slate-800 text-white">Tutup</Button>
+          </div>
+        )}
         <CardHeader className="flex flex-row items-center justify-between pb-4 border-b mb-4">
           <div>
             <CardTitle className="text-base">Channel WhatsApp</CardTitle>
             <CardDescription className="text-xs">Daftar Channel & Sesi Bot (Difilter berdasarkan divisi)</CardDescription>
           </div>
-          <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
+          <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => alert('Fitur tambah channel akan segera hadir')}>
             <Plus className="h-4 w-4 mr-2" /> Tambah Channel
           </Button>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Telegram Div */}
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <div>
-                <h3 className="font-semibold text-sm">Telegram Development</h3>
-                <p className="text-xs text-muted-foreground">Platform: TELEGRAM</p>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="h-8 text-xs font-medium border-rose-100 text-slate-700">
-                  <Smartphone className="h-3 w-3 mr-1.5" /> Tambah Sesi
-                </Button>
-                <Button variant="outline" size="icon" className="h-8 w-8 text-rose-500 border-rose-200 hover:bg-rose-50">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-            
-            <div className="border rounded-lg p-3 flex items-center justify-between shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <div className="h-10 w-10 bg-emerald-50 text-emerald-500 rounded-lg flex items-center justify-center border border-emerald-100">
-                    <Smartphone className="h-5 w-5" />
-                  </div>
-                  <div className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-emerald-500 border-2 border-white"></div>
+          {channels.map((channel, i) => (
+            <div key={channel.id} className="space-y-3">
+              {i > 0 && <div className="border-t border-dashed border-slate-200 my-4" />}
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="font-semibold text-sm">{channel.name}</h3>
+                  <p className="text-xs text-muted-foreground">Platform: {channel.platform}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-sm">telegram-dev-bot</span>
-                  <span className="px-2 py-0.5 rounded-full border border-emerald-200 text-emerald-600 text-[10px] font-medium bg-emerald-50/50">Online</span>
+                <div className="flex gap-2">
+                  <Button onClick={() => handleStartSession(channel.id)} variant="outline" size="sm" className="h-8 text-xs font-medium border-emerald-100 text-slate-700">
+                    <Smartphone className="h-3 w-3 mr-1.5" /> Tambah Sesi
+                  </Button>
+                  <Button variant="outline" size="icon" className="h-8 w-8 text-rose-500 border-rose-200 hover:bg-rose-50">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" className="h-8 text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700 font-medium">
-                  <Power className="h-3 w-3 mr-1.5" /> Putus
-                </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <MoreVertical className="h-4 w-4 text-slate-500" />
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t border-dashed border-slate-200 my-4" />
-
-          {/* WhatsApp Div */}
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <div>
-                <h3 className="font-semibold text-sm">bot-cs</h3>
-                <p className="text-xs text-muted-foreground">Platform: WHATSAPP</p>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="h-8 text-xs font-medium border-rose-100 text-slate-700">
-                  <Smartphone className="h-3 w-3 mr-1.5" /> Tambah Sesi
-                </Button>
-                <Button variant="outline" size="icon" className="h-8 w-8 text-rose-500 border-rose-200 hover:bg-rose-50">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-            
-            <div className="space-y-3">
-              {/* Sesi 1: Online */}
-              <div className="border rounded-lg p-3 flex items-center justify-between shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <div className="h-10 w-10 bg-emerald-50 text-emerald-500 rounded-lg flex items-center justify-center border border-emerald-100">
-                      <Smartphone className="h-5 w-5" />
+              
+              <div className="space-y-3">
+                {channel.whatsappInstances?.map((instance: any) => (
+                  <div key={instance.id} className="border rounded-lg p-3 flex items-center justify-between shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <div className="h-10 w-10 bg-emerald-50 text-emerald-500 rounded-lg flex items-center justify-center border border-emerald-100">
+                          <Smartphone className="h-5 w-5" />
+                        </div>
+                        <div className={`absolute -bottom-1 -right-1 h-3 w-3 rounded-full border-2 border-white ${instance.status === 'WORKING' ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm">{instance.instanceName}</span>
+                        <span className={`px-2 py-0.5 rounded-full border text-[10px] font-medium ${instance.status === 'WORKING' ? 'border-emerald-200 text-emerald-600 bg-emerald-50/50' : 'border-rose-200 text-rose-600 bg-rose-50/50'}`}>
+                          {instance.status}
+                        </span>
+                      </div>
                     </div>
-                    <div className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-emerald-500 border-2 border-white"></div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm">zafi-cs</span>
-                    <span className="px-2 py-0.5 rounded-full border border-emerald-200 text-emerald-600 text-[10px] font-medium bg-emerald-50/50">Online</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" className="h-8 text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700 font-medium">
-                    <Power className="h-3 w-3 mr-1.5" /> Putus
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <MoreVertical className="h-4 w-4 text-slate-500" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Sesi 2: Offline */}
-              <div className="border rounded-lg p-3 flex items-center justify-between shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <div className="h-10 w-10 bg-emerald-50 text-emerald-500 rounded-lg flex items-center justify-center border border-emerald-100">
-                      <Smartphone className="h-5 w-5" />
+                    <div className="flex items-center gap-2">
+                      {instance.status !== 'WORKING' && (
+                        <Button onClick={() => handleScanQR(instance.instanceName)} variant="outline" size="sm" className="h-8 font-medium border-slate-200 text-slate-700 hover:bg-slate-50">
+                          <QrCode className="h-3 w-3 mr-1.5" /> Scan QR
+                        </Button>
+                      )}
+                      <Button onClick={() => handleStopSession(instance.instanceName)} variant="outline" size="sm" className="h-8 text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700 font-medium">
+                        <Power className="h-3 w-3 mr-1.5" /> Hapus
+                      </Button>
                     </div>
-                    <div className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-rose-500 border-2 border-white"></div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm">zafi-cs-agent</span>
-                    <span className="px-2 py-0.5 rounded-full border border-rose-200 text-rose-600 text-[10px] font-medium bg-rose-50/50">Offline</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" className="h-8 font-medium border-slate-200 text-slate-700 hover:bg-slate-50">
-                    <QrCode className="h-3 w-3 mr-1.5" /> Scan QR
-                  </Button>
-                  <Button size="sm" className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white font-medium">
-                    <Power className="h-3 w-3 mr-1.5" /> Sambung
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <MoreVertical className="h-4 w-4 text-slate-500" />
-                  </Button>
-                </div>
+                ))}
+                {(!channel.whatsappInstances || channel.whatsappInstances.length === 0) && (
+                  <div className="text-xs text-muted-foreground text-center py-2 bg-slate-50 rounded-lg border border-dashed">Belum ada sesi di channel ini</div>
+                )}
               </div>
             </div>
-          </div>
+          ))}
+          
+          {channels.length === 0 && (
+            <div className="text-center py-10 text-muted-foreground text-sm">
+              Belum ada channel terdaftar.
+            </div>
+          )}
         </CardContent>
       </Card>
   );
 }
+
