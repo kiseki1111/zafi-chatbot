@@ -31,23 +31,23 @@ export class KnowledgeService {
   }
 
   async findOne(id: string, tenantId: string) {
-    const item = await this.prisma.vectorKnowledge.findFirst({
-      where: { id, tenantId },
-      select: {
-        id: true,
-        title: true,
-        content: true,
-        metadata: true,
-        tenantId: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+    const item = await this.prisma.knowledgeBase.findFirst({
+      where: { id, tenantId }
     });
 
     if (!item) {
       throw new NotFoundException('Knowledge not found');
     }
-    return item;
+    // Extract title from metadata for response
+    return {
+      id: item.id,
+      title: (item.metadata as any)?.title || 'Untitled',
+      content: item.content,
+      metadata: item.metadata,
+      tenantId: item.tenantId,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt
+    };
   }
 
   private async getEmbedding(text: string): Promise<number[]> {
