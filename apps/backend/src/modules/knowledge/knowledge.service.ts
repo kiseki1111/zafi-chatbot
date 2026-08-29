@@ -14,20 +14,20 @@ export class KnowledgeService {
   ) {}
 
   async findAll(tenantId: string) {
-    // We cannot select 'embedding' through prisma client because it's Unsupported.
-    return this.prisma.vectorKnowledge.findMany({
+    const items = await this.prisma.knowledgeBase.findMany({
       where: { tenantId },
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        title: true,
-        content: true,
-        metadata: true,
-        tenantId: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      orderBy: { createdAt: 'desc' }
     });
+    // Extract title from metadata for response
+    return items.map(item => ({
+      id: item.id,
+      title: (item.metadata as any)?.title || 'Untitled',
+      content: item.content,
+      metadata: item.metadata,
+      tenantId: item.tenantId,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt
+    }));
   }
 
   async findOne(id: string, tenantId: string) {
@@ -67,22 +67,19 @@ export class KnowledgeService {
   }
 
   async createText(tenantId: string, title: string, content: string) {
-    const id = uuidv4();
-    const metadataStr = JSON.stringify({ title, type: 'text' });
-
     try {
-      // Insert into source of truth (knowledge_base) without embedding
-      await this.prisma.$executeRawUnsafe(
-        `INSERT INTO "knowledge_base" (id, content, metadata, tenant_id, created_at, updated_at) 
-         VALUES ($1, $2, $3::jsonb, $4, NOW(), NOW())`,
-        id, content, metadataStr, tenantId
-      );
+      const result = await this.prisma.knowledgeBase.create({
+        data: {
+          content,
+          tenantId,
+          metadata: { title, type: 'text' }
+        }
+      });
+      return { id: result.id, title, content, metadata: result.metadata, tenantId, createdAt: result.createdAt, updatedAt: result.updatedAt };
     } catch (error: any) {
       console.error('DB Insert Error:', error);
       throw new BadRequestException('Database insert failed: ' + error.message);
     }
-
-    return this.findOne(id, tenantId);
   }
 
   async processFile(file: Express.Multer.File) {
@@ -112,23 +109,20 @@ export class KnowledgeService {
   async createFile(tenantId: string, file: Express.Multer.File, title?: string) {
     const content = await this.processFile(file);
     const finalTitle = title || file.originalname;
-    
-    const id = uuidv4();
-    const metadataStr = JSON.stringify({ title: finalTitle, type: 'file', filename: file.originalname });
 
     try {
-      // 1. Insert into source of truth (knowledge_base)
-      await this.prisma.$executeRawUnsafe(
-        `INSERT INTO "knowledge_base" (id, content, metadata, tenant_id, created_at, updated_at) 
-         VALUES ($1, $2, $3::jsonb, $4, NOW(), NOW())`,
-        id, content, metadataStr, tenantId
-      );
+      const result = await this.prisma.knowledgeBase.create({
+        data: {
+          content,
+          tenantId,
+          metadata: { title: finalTitle, type: 'file', filename: file.originalname }
+        }
+      });
+      return { id: result.id, title: finalTitle, content, metadata: result.metadata, tenantId, createdAt: result.createdAt, updatedAt: result.updatedAt };
     } catch (error: any) {
       console.error('DB Insert Error:', error);
       throw new BadRequestException('Database insert failed: ' + error.message);
     }
-
-    return this.findOne(id, tenantId);
   }
 
   async update(id: string, tenantId: string, title: string, content: string) {
