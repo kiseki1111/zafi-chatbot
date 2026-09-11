@@ -6,9 +6,6 @@ services:
       - .env
     restart: unless-stopped
 
-    ports:
-      - "3030:3030"
-
     network_mode: host
 
     dns:
@@ -24,7 +21,7 @@ services:
       - backend
 
     environment:
-      BACKEND_URL: http://localhost:3030
+      BACKEND_URL: http://backend:3030
 
     ports:
       - "3001:3001"
