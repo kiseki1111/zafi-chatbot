@@ -43,4 +43,4 @@ COPY --from=builder /workspace/apps/backend/src/core/prisma ./src/core/prisma
 
 EXPOSE 3030
 
-CMD ["sh", "-c", "npx prisma db push --schema=src/core/prisma/schema.prisma --accept-data-loss && node dist/src/main.js"]
+CMD ["sh", "-c", "npx prisma db push --schema=src/core/prisma/schema.prisma --accept-data-loss && node dist/main.js"]
