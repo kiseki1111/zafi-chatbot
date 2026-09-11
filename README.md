@@ -77,12 +77,4 @@ Untuk mempermudah sinkronisasi data antar *developer*, Anda dapat menggunakan *s
 - **Impor Database**: `node apps/backend/scripts/import-db.js`
 
 ---
-
-## Kredensial Bawaan (Super Admin)
-   
-Gunakan akun ini untuk masuk ke dalam Dashboard Frontend pertama kali:
-- **Email:** superadmin@gmail.com
-- **Password:** rahasia123
-
----
 *Dibuat oleh Tim Pengembang PropertiKu | 2026*

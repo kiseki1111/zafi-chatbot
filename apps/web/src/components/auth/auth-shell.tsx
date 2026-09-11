@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Building2, MessageCircle, ShieldCheck, TrendingUp, Users } from "lucide-react";
+import { Building2, MessageCircle, ShieldCheck, TrendingUp, Users, Eye, EyeOff } from "lucide-react";
 
 export function AuthShell({
   title,
@@ -112,11 +112,11 @@ export function PasswordInput({
       <button
         type="button"
         onClick={() => setShow((s) => !s)}
-        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
         tabIndex={-1}
-        aria-label="Toggle password visibility"
+        aria-label={show ? "Sembunyikan password" : "Tampilkan password"}
       >
-        {show ? "🙈" : "👁️"}
+        {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
       </button>
     </div>
   );

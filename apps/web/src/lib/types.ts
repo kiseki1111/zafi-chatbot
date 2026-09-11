@@ -17,9 +17,42 @@ export interface User {
 
 export type ViewKey =
   | "overview"
+  | "availability"
   | "chatbot"
   | "knowledge"
+  | "followup"
   | "settings";
+
+// ===== Resource & Availability (Generic Units / Slots) =====
+export type ResourceStatus = "AVAILABLE" | "BOOKED" | "OCCUPIED" | "MAINTENANCE";
+
+export interface ResourceItem {
+  id: string;
+  groupId: string;
+  code: string; // Misal: "Blok A-01", "Blok B-05"
+  name?: string; // Nama blok / keterangan
+  houseType?: string; // Tipe rumah: "36/72", "45/90", dll
+  status: ResourceStatus;
+  capacity?: number;
+  price?: number;
+  notes?: string;
+  customerName?: string;
+  customerPhone?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ResourceGroup {
+  id: string;
+  name: string; // Misal: "Cluster Grand Harmoni", "Bus Eksekutif 01", "Lantai 1 Utama"
+  category?: string; // "properti", "transport", "resto", "lainnya"
+  description?: string;
+  siteplanImage?: string; // URL layout denah (opsional)
+  tenantId?: string;
+  items: ResourceItem[];
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 // ===== WhatsApp / Chatbot =====
 export type ChatSessionStatus = "connected" | "disconnected" | "connecting";

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Building2, LogOut, ChevronLeft } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { useAppStore } from "@/lib/app-store";
@@ -9,10 +10,14 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ViewIcon } from "./icons";
 import type { ViewKey } from "@/lib/types";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 
 export function Sidebar() {
   const { user, logout } = useAuthStore();
   const { view, setView, setSidebarOpen } = useAppStore();
+  const [isLogoutOpen, setIsLogoutOpen] = useState(false);
 
   if (!user) return null;
   const safeRole = (user.role || "operator").toLowerCase() as any;
@@ -43,19 +48,19 @@ export function Sidebar() {
       </div>
 
       {/* Nav */}
-      <ScrollArea className="flex-1 px-3 py-4">
+      <ScrollArea className="flex-1 px-3 py-3">
         <nav className="space-y-1">
-          <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Menu Utama
-          </p>
           {items.map((item) => {
             const active = view === item.key;
             return (
               <button
                 key={item.key}
-                onClick={() => go(item.key)}
+                onClick={() => {
+                  go(item.key);
+                  setSidebarOpen(false);
+                }}
                 className={cn(
-                  "w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all group",
+                  "w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all text-left",
                   active
                     ? "bg-emerald-600 text-white shadow-sm"
                     : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
@@ -81,11 +86,35 @@ export function Sidebar() {
               {ROLE_LABELS[safeRole] || "Pengguna"}
             </p>
           </div>
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={logout} title="Keluar">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+            onClick={() => setIsLogoutOpen(true)}
+            title="Keluar"
+          >
             <LogOut className="h-4 w-4" />
           </Button>
         </div>
       </div>
+
+      {/* Modal Konfirmasi Logout */}
+      <Dialog open={isLogoutOpen} onOpenChange={setIsLogoutOpen}>
+        <DialogContent className="sm:max-w-[380px]">
+          <DialogHeader>
+            <DialogTitle>Konfirmasi Keluar</DialogTitle>
+            <DialogDescription>
+              Apakah Anda yakin ingin keluar dari akun <strong>{user.name}</strong>?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0 pt-2">
+            <Button variant="outline" onClick={() => setIsLogoutOpen(false)}>Batal</Button>
+            <Button variant="destructive" onClick={() => { setIsLogoutOpen(false); logout(); }}>
+              Ya, Keluar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

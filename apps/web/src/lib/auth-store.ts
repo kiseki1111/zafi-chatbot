@@ -3,7 +3,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { User, Role } from "./types";
-import { DEMO_ACCOUNTS } from "./mock-data";
 
 type AuthView = "login" | "register" | "forgot";
 

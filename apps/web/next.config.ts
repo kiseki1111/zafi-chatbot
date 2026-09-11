@@ -58,6 +58,22 @@ const nextConfig: any = {
         source: "/api/v1/knowledge/:path*",
         destination: `${backendUrl}/api/v1/knowledge/:path*`,
       },
+      {
+        source: "/api/v1/availability",
+        destination: `${backendUrl}/api/v1/availability`,
+      },
+      {
+        source: "/api/v1/availability/:path*",
+        destination: `${backendUrl}/api/v1/availability/:path*`,
+      },
+      {
+        source: "/api/v1/followup",
+        destination: `${backendUrl}/api/v1/followup`,
+      },
+      {
+        source: "/api/v1/followup/:path*",
+        destination: `${backendUrl}/api/v1/followup/:path*`,
+      },
     ];
   },
 };

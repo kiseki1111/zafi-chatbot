@@ -5,8 +5,10 @@ import { useAuthStore } from "@/lib/auth-store";
 import { toast } from "sonner";
 import {
   Loader2, Plus, Trash2, Pencil, FileText, AlignLeft,
-  BookOpen, Upload, X, Check, Brain
+  BookOpen, Upload, X, Check, Brain, AlertTriangle
 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 const API_BASE = "/api/v1";
 
@@ -148,15 +150,18 @@ export function KnowledgePage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Hapus knowledge ini? Data tidak bisa dikembalikan.")) return;
+  const [itemToDelete, setItemToDelete] = useState<{ id: string; title: string } | null>(null);
+
+  const confirmDelete = async () => {
+    if (!itemToDelete) return;
     try {
-      const res = await fetch(`${API_BASE}/knowledge/${id}?tenantId=${tenantId}`, {
+      const res = await fetch(`${API_BASE}/knowledge/${itemToDelete.id}?tenantId=${tenantId}`, {
         method: "DELETE",
       });
       if (!res.ok) throw new Error();
       toast.success("Knowledge berhasil dihapus");
-      setItems(prev => prev.filter(i => i.id !== id));
+      setItems(prev => prev.filter(i => i.id !== itemToDelete.id));
+      setItemToDelete(null);
     } catch {
       toast.error("Gagal menghapus knowledge");
     }
@@ -286,7 +291,7 @@ export function KnowledgePage() {
                       day: "numeric", month: "short", year: "numeric"
                     })}
                   </span>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={() => openEdit(item)}
                       className="rounded-lg bg-white/80 dark:bg-black/30 p-2 text-foreground hover:bg-white hover:text-emerald-600 transition backdrop-blur-sm"
@@ -295,7 +300,7 @@ export function KnowledgePage() {
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
                     <button
-                      onClick={() => handleDelete(item.id)}
+                      onClick={() => setItemToDelete({ id: item.id, title: item.title })}
                       className="rounded-lg bg-white/80 dark:bg-black/30 p-2 text-foreground hover:bg-red-50 hover:text-red-600 transition backdrop-blur-sm"
                       title="Hapus"
                     >
@@ -444,6 +449,26 @@ export function KnowledgePage() {
           </div>
         </div>
       )}
+
+      {/* Modal Konfirmasi Hapus Knowledge */}
+      <Dialog open={!!itemToDelete} onOpenChange={(open) => { if (!open) setItemToDelete(null); }}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" /> Hapus Data Knowledge
+            </DialogTitle>
+            <DialogDescription className="pt-2 text-sm text-foreground/80 leading-relaxed">
+              Apakah Anda yakin ingin menghapus knowledge <strong>"{itemToDelete?.title}"</strong>? Referensi ini tidak akan digunakan lagi oleh AI Chatbot.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setItemToDelete(null)}>Batal</Button>
+            <Button variant="destructive" onClick={confirmDelete}>
+              Ya, Hapus
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

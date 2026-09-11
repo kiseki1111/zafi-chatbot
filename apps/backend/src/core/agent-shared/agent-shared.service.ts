@@ -54,7 +54,7 @@ export class AgentSharedService {
       }
 
       // Gabungkan semua isi knowledge menjadi satu teks (sebagai konteks LLM)
-      return knowledges.map(k => k.content).join('\\n\\n');
+      return knowledges.map(k => k.content).join('\n\n');
     } catch (e) {
       this.logger.error(`Error retrieving relevant knowledge: ${e.message}`);
       return '';
@@ -62,20 +62,55 @@ export class AgentSharedService {
   }
 
   /**
-   * 3. Meminta klarifikasi dari user alih-alih berhalusinasi.
+   * 2b. Mengambil data ketersediaan unit/plansite dari database untuk konteks AI (Read-Only).
    */
-  async generateClarification(ambiguousText: string, missingInfo: string[]): Promise<string> {
-    const prompt = `User saying: "${ambiguousText}"
-We are missing the following information to proceed: ${missingInfo.join(', ')}
+  async getAvailabilityContext(tenantId: string): Promise<string> {
+    try {
+      const groups = await this.prisma.resourceGroup.findMany({
+        where: tenantId ? { tenantId } : {},
+        include: {
+          items: {
+            orderBy: { code: 'asc' },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
 
-Please generate a polite, short, and natural clarification question in Indonesian asking the user to provide the missing information. 
-Do not use Markdown. Keep it conversational.`;
+      if (!groups || groups.length === 0) {
+        return '';
+      }
 
-    return this.callLLM(prompt, 'You are a helpful customer service assistant.');
+      const summaries = groups.map((g) => {
+        const total = g.items.length;
+        const available = g.items.filter((i) => i.status === 'AVAILABLE').length;
+        const booked = g.items.filter((i) => i.status === 'BOOKED').length;
+        const occupied = g.items.filter((i) => i.status === 'OCCUPIED').length;
+
+        const itemList = g.items
+          .map((i) => {
+            const typeStr = i.houseType ? ` (Tipe ${i.houseType})` : '';
+            const priceStr = i.price ? ` - Rp ${Number(i.price).toLocaleString('id-ID')}` : '';
+            let statusLabel = 'UNIT READY (Hijau - Tersedia)';
+            if (i.status === 'BOOKED') statusLabel = 'PROSES BANK (Orange - Sedang proses KPR/Bank)';
+            if (i.status === 'OCCUPIED') statusLabel = 'SUDAH TERJUAL (Merah)';
+            if (i.status === 'MAINTENANCE') statusLabel = 'RUMAH CONTOH (Abu Hitam)';
+
+            return `  * ${i.code}${typeStr}: ${statusLabel}${priceStr}`;
+          })
+          .join('\n');
+
+        return `Perumahan: "${g.name}" (Total ${total} Unit | Unit Ready: ${available} | Proses Bank: ${booked} | Sudah Terjual: ${occupied})\nDaftar Unit/Blok:\n${itemList}`;
+      });
+
+      return summaries.join('\n\n');
+    } catch (e: any) {
+      this.logger.error(`Error fetching availability context: ${e.message}`);
+      return '';
+    }
   }
 
   /**
-   * 4. Wrapper tunggal untuk memanggil OpenAI.
+   * Wrapper tunggal untuk memanggil OpenAI.
    */
   async callLLM(prompt: string, systemPrompt: string, requireJson: boolean = false): Promise<string> {
     if (!this.openai) {
@@ -160,31 +195,6 @@ Do not use Markdown. Keep it conversational.`;
     } catch (e) {
       this.logger.error(`Error analyzing image: ${e}`);
       return '';
-    }
-  }
-
-  /**
-   * 5. Deteksi intent dari ucapan user.
-   */
-  async detectIntent(userText: string): Promise<string> {
-    const systemPrompt = `You are an intent detection engine. 
-Classify the user's text into exactly ONE of the following categories:
-- DESIGN: user wants to make a poster, brochure, or graphic design.
-- INGEST: user wants to save product info, price, or knowledge base.
-- CATALOG: user wants to see the list of all products or house types.
-- CS: user is asking a general question, asking for a specific price, chatting, or anything else.
-
-Respond with ONLY the category word.`;
-
-    try {
-      const result = await this.callLLM(userText, systemPrompt, false);
-      const cleanResult = result.trim().toUpperCase();
-      if (['DESIGN', 'INGEST', 'CATALOG', 'CS'].includes(cleanResult)) {
-        return cleanResult;
-      }
-      return 'CS'; // Default fallback
-    } catch (e) {
-      return 'CS'; // Default fallback
     }
   }
 }

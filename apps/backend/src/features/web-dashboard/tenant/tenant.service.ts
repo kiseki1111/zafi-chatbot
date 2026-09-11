@@ -50,19 +50,34 @@ export class TenantService {
         
         const omsetHariIni = salesRecords.reduce((total, record) => total + Number(record.totalPrice), 0);
 
-        // Chat metrics
-        const totalChats = await this.prisma.message.count({ where: { status: 'SENT' } });
+        // Chat metrics — query through instanceName since Message/Conversation don't have tenantId
+        const instances = await this.prisma.whatsappInstance.findMany({
+            where: { tenantId },
+            select: { instanceName: true }
+        });
+        const instanceNames = instances.map(i => i.instanceName);
+        const instanceFilter = instanceNames.length > 0 ? { conversation: { instanceName: { in: instanceNames } } } : {};
+        const instanceFilterConv = instanceNames.length > 0 ? { instanceName: { in: instanceNames } } : {};
 
-        // Revenue trend (last 7 days - simple dummy approach but structure is ready)
-        const revenueTrend = [
-            { label: "Sen", value: 0 },
-            { label: "Sel", value: 1200000 },
-            { label: "Rab", value: 0 },
-            { label: "Kam", value: omsetHariIni },
-            { label: "Jum", value: 0 },
-            { label: "Sab", value: 0 },
-            { label: "Min", value: 0 },
-        ];
+        const totalMessages = await this.prisma.message.count({ where: instanceFilter });
+        const botMessages = await this.prisma.message.count({ where: { ...instanceFilter, senderType: 'bot' } });
+        const totalChats = await this.prisma.conversation.count({ where: instanceFilterConv });
+
+        // Revenue trend (last 7 days — real data)
+        const dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+        const revenueTrend: { label: string; value: number }[] = [];
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            d.setHours(0, 0, 0, 0);
+            const nextDay = new Date(d);
+            nextDay.setDate(nextDay.getDate() + 1);
+            const daySales = await this.prisma.salesRecord.findMany({
+                where: { tenantId, soldAt: { gte: d, lt: nextDay } }
+            });
+            const dayTotal = daySales.reduce((sum, r) => sum + Number(r.totalPrice), 0);
+            revenueTrend.push({ label: dayNames[d.getDay()], value: dayTotal });
+        }
 
         // Basic Insight
         const topProduct = await this.prisma.product.findFirst({
@@ -79,17 +94,19 @@ export class TenantService {
                 omsetHariIni,
                 salesCountToday: salesRecords.length,
                 totalChats,
-                botSuccessRate: 94 // Dummy logic
+                totalMessages,
+                botMessages,
+                botSuccessRate: totalMessages > 0 ? Math.round((botMessages / totalMessages) * 100) : 0,
             },
             revenueTrend,
             insights: {
-                topProduct: topProduct?.name || 'Produk A',
+                topProduct: topProduct?.name || '-',
                 topProductStock: topProduct?.stock || 0
             }
         };
     }
 
-    async updateTenantSettings(userId: string, data: { agentName?: string; agentTone?: string; phone?: string; greetingMsg?: string; ownerChatId?: string }) {
+    async updateTenantSettings(userId: string, data: { agentName?: string; agentTone?: string; phone?: string; greetingMsg?: string; ownerChatId?: string; systemPrompt?: string; operatingHours?: string; address?: string }) {
         if (userId.includes('@')) {
             const owner = await this.prisma.user.findUnique({ where: { email: userId }});
             if (owner) userId = owner.id;
@@ -120,11 +137,19 @@ export class TenantService {
         if (!user || !user.tenantId) throw new NotFoundException('Tenant not found');
         const tenantId = user.tenantId;
 
-        // KPI
-        const pesanMasuk = 15; // Placeholder
-        const dibalasBot = 14; // Placeholder
+        // KPI — real data, query through instanceName
+        const instances = await this.prisma.whatsappInstance.findMany({
+            where: { tenantId },
+            select: { instanceName: true }
+        });
+        const instanceNames = instances.map(i => i.instanceName);
+        const instanceFilter = instanceNames.length > 0 ? { conversation: { instanceName: { in: instanceNames } } } : {};
+        const instanceFilterConv = instanceNames.length > 0 ? { instanceName: { in: instanceNames } } : {};
+
+        const pesanMasuk = await this.prisma.message.count({ where: { ...instanceFilter, senderType: { not: 'bot' } } });
+        const dibalasBot = await this.prisma.message.count({ where: { ...instanceFilter, senderType: 'bot' } });
         const pesananViaBot = await this.prisma.salesRecord.count({ where: { tenantId, source: 'BOT_CS' } });
-        const pelangganBaru = 5; // Placeholder
+        const pelangganBaru = await this.prisma.contact.count({ where: { createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } } });
 
         // 5 Pesanan Terakhir
         const recentSales = await this.prisma.salesRecord.findMany({
@@ -133,16 +158,20 @@ export class TenantService {
             take: 5
         });
 
-        // Tren 7 hari (simplified dummy-like for now, but real structure)
-        const trenPesan = [
-            { label: "Sen", masuk: 10 },
-            { label: "Sel", masuk: 20 },
-            { label: "Rab", masuk: 15 },
-            { label: "Kam", masuk: pesanMasuk },
-            { label: "Jum", masuk: 0 },
-            { label: "Sab", masuk: 0 },
-            { label: "Min", masuk: 0 },
-        ];
+        // Tren 7 hari — real data
+        const dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+        const trenPesan: { label: string; masuk: number }[] = [];
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            d.setHours(0, 0, 0, 0);
+            const nextDay = new Date(d);
+            nextDay.setDate(nextDay.getDate() + 1);
+            const count = await this.prisma.message.count({
+                where: { ...instanceFilter, createdAt: { gte: d, lt: nextDay } }
+            });
+            trenPesan.push({ label: dayNames[d.getDay()], masuk: count });
+        }
 
         return {
             kpi: {

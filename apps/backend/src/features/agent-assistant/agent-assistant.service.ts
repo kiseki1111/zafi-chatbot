@@ -4,7 +4,6 @@ import { RagService } from '../knowledge-ingest/rag.service';
 import { OPENAI_CLIENT } from '../../core/openai/openai.module';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { AgentSharedService } from '../../core/agent-shared/agent-shared.service';
-import { IngestionRouterService } from '../knowledge-ingest/services/ingestion-router.service';
 import { DataAgentService } from '../knowledge-ingest/data-agent.service';
 
 @Injectable()
@@ -18,36 +17,10 @@ export class AgentAssistantService {
     @Inject(OPENAI_CLIENT) private injectedOpenai: OpenAI | null,
     private prisma: PrismaService,
     private readonly agentSharedService: AgentSharedService,
-    @Inject(forwardRef(() => IngestionRouterService))
-    private ingestionRouterService: IngestionRouterService,
     @Inject(forwardRef(() => DataAgentService))
     private dataAgentService: DataAgentService,
   ) {
     this.openai = this.injectedOpenai;
-  }
-
-  async detectOwnerIntent(message: string, mediaUrls?: string[]): Promise<'INGEST_KNOWLEDGE' | 'GENERAL_ASSISTANT'> {
-    let text = message;
-    if (mediaUrls && mediaUrls.length > 0) {
-        this.logger.log(`[AGENT-ASSISTANT] Menganalisis gambar dari owner...`);
-        const imgDesc = await this.agentSharedService.analyzeImage(mediaUrls[0], "Jika ini adalah nota/struk, sebutkan barang apa yang terjual dan berapa jumlahnya. Jika ini foto barang, sebutkan nama barangnya.");
-        text += `\n[Owner melampirkan gambar: ${imgDesc}]`;
-    }
-
-    const systemPrompt = `You are an intent router for a business owner's personal assistant bot.
-Classify their intent into exactly ONE of the following categories:
-- INGEST_KNOWLEDGE: If the user wants to add, insert, save, upload, or remember NEW information, bulk products, or new rules to the database from scratch.
-- GENERAL_ASSISTANT: For ALL other requests, including modifying/updating existing data, deleting products, asking questions, giving commands, reporting sales, or chatting.
-
-Respond with ONLY the category word: INGEST_KNOWLEDGE or GENERAL_ASSISTANT.`;
-
-    try {
-      const intent = await this.agentSharedService.callLLM(`The owner sent a message: "${message}"`, systemPrompt);
-      const cleanIntent = intent.trim().toUpperCase();
-      return cleanIntent === 'INGEST_KNOWLEDGE' ? 'INGEST_KNOWLEDGE' : 'GENERAL_ASSISTANT';
-    } catch (e) {
-      return 'GENERAL_ASSISTANT';
-    }
   }
 
   async chatWithOwnerAssistant(text: string, tenantId?: string, chatId: string = 'default', onChunk?: (chunk: string) => void): Promise<string> {

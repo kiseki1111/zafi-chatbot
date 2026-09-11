@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -13,35 +12,68 @@ import {
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Menu, Search, Bell, Sun, Moon, LogOut, User as UserIcon,
-  Settings as SettingsIcon, HelpCircle, ChevronDown, Download,
+  Menu, Bell, Sun, Moon, LogOut, User as UserIcon,
+  Settings as SettingsIcon, ChevronDown, AlertTriangle, QrCode,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { useAppStore } from "@/lib/app-store";
 import { ROLE_LABELS, ROLE_THEME } from "@/lib/rbac";
-import { VIEW_TITLES } from "./icons";
 import { cn } from "@/lib/utils";
 import { Sidebar } from "./sidebar";
 
 export function Topbar() {
   const { user, logout } = useAuthStore();
   const { view, setView, sidebarOpen, setSidebarOpen, theme, toggleTheme } = useAppStore();
-  const [notifOpen, setNotifOpen] = useState(false);
+  const [offlineInstances, setOfflineInstances] = useState<{ instanceName: string; status: string }[]>([]);
+
+  useEffect(() => {
+    if (!user?.tenantId) return;
+    const checkInstances = async () => {
+      try {
+        const res = await fetch(`/api/v1/waha/instances/db?tenantId=${user.tenantId}`);
+        if (res.ok) {
+          const data = await res.json();
+          const items = Array.isArray(data) ? data : data?.data || [];
+          const disconnected = items.filter((i: any) => i.status !== "WORKING");
+          setOfflineInstances(disconnected);
+        }
+      } catch (err) {
+        // silent fail on network
+      }
+    };
+    checkInstances();
+    const interval = setInterval(checkInstances, 15000);
+    return () => clearInterval(interval);
+  }, [user?.tenantId]);
 
   if (!user) return null;
   const safeRole = (user.role || "operator").toLowerCase() as any;
   const themeColors = ROLE_THEME[safeRole] || { bg: "bg-muted", color: "text-foreground", ring: "ring-muted" };
-  const meta = VIEW_TITLES[view];
-
-  const notifications = [
-    { id: 1, title: "5 pesan baru dari Siti Aminah", time: "2 mnt lalu", type: "chat" },
-    { id: 2, title: "Pesanan ORD-2025-0005 butuh tindak lanjut", time: "15 mnt lalu", type: "order" },
-    { id: 3, title: "Kampanye 'Promo Rumah Cibaduyut' aktif", time: "1 jam lalu", type: "marketing" },
-    { id: 4, title: "Tagihan INV-2025-0006 jatuh tempo", time: "3 jam lalu", type: "finance" },
-  ];
 
   return (
-    <header className="sticky top-0 z-30 h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <>
+      {offlineInstances.length > 0 && (
+        <div className="bg-amber-500 text-amber-950 px-4 py-2 text-xs font-medium flex items-center justify-between border-b border-amber-600/20 shadow-sm transition-all animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-950 animate-pulse" />
+            <span>
+              Perhatian: Ada <strong>{offlineInstances.length} nomor WhatsApp</strong> (<em>{offlineInstances.map(i => i.instanceName).join(', ')}</em>) yang terputus atau perlu login / scan QR ulang agar fitur bot & follow-up berjalan normal.
+            </span>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-[11px] bg-white hover:bg-amber-50 border-amber-600/30 text-amber-950 font-semibold shrink-0 ml-4 gap-1.5 shadow-none"
+            onClick={() => {
+              window.history.pushState({}, '', '?view=settings&tab=koneksi');
+              setView("settings");
+            }}
+          >
+            <QrCode className="h-3 w-3" /> Hubungkan Sekarang
+          </Button>
+        </div>
+      )}
+      <header className="sticky top-0 z-30 h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex items-center gap-3 h-full px-4 lg:px-6">
         {/* Mobile menu */}
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
@@ -58,47 +90,10 @@ export function Topbar() {
 
         {/* Title removed per user request */}
 
-        {/* Search */}
-        <div className="relative ml-auto hidden md:block w-64 lg:w-80">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Cari kontak, produk, pesanan..." className="pl-9 h-9 bg-muted/50 border-transparent focus-visible:bg-background" />
-        </div>
-
         {/* Theme toggle */}
         <Button variant="ghost" size="icon" className="h-9 w-9 ml-auto md:ml-0" onClick={toggleTheme} title="Ganti tema">
           {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
         </Button>
-
-        {/* Download buttons removed per user request */}
-
-        {/* Notifications */}
-        <DropdownMenu open={notifOpen} onOpenChange={setNotifOpen}>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-9 w-9 relative" title="Notifikasi">
-              <Bell className="h-4 w-4" />
-              <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-background" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel className="flex items-center justify-between">
-              <span>Notifikasi</span>
-              <Badge variant="secondary" className="text-[10px]">{notifications.length} baru</Badge>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <div className="max-h-80 overflow-y-auto">
-              {notifications.map((n) => (
-                <DropdownMenuItem key={n.id} className="flex-col items-start py-2.5 cursor-pointer">
-                  <p className="text-sm font-medium leading-snug">{n.title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{n.time}</p>
-                </DropdownMenuItem>
-              ))}
-            </div>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="justify-center text-sm text-emerald-600 cursor-pointer">
-              Lihat semua notifikasi
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
 
         {/* User menu */}
         <DropdownMenu>
@@ -129,9 +124,6 @@ export function Topbar() {
             <DropdownMenuItem onClick={() => setView("settings")}>
               <SettingsIcon className="h-4 w-4" /> Pengaturan
             </DropdownMenuItem>
-            <DropdownMenuItem>
-              <HelpCircle className="h-4 w-4" /> Bantuan
-            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={logout}>
               <LogOut className="h-4 w-4" /> Keluar
@@ -140,5 +132,6 @@ export function Topbar() {
         </DropdownMenu>
       </div>
     </header>
+    </>
   );
 }

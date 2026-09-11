@@ -39,43 +39,6 @@ export class RagService {
   }
 
   /**
-   * Mengambil daftar SEMUA produk dari database SQL secara langsung (Bypass RAG).
-   * Digunakan saat pengguna memiliki intent "LIST_ALL" (sebutkan semua produk).
-   */
-  async getCatalogContext(tenantId?: string): Promise<string> {
-    try {
-      const products = await this.prisma.product.findMany({
-        where: tenantId ? { tenantId } : undefined,
-        select: { name: true, price: true, category: true, description: true, imageUrl: true, stock: true, attributes: true }
-      });
-
-      if (!products || products.length === 0) {
-        return 'Sistem Informasi: Saat ini belum ada produk yang terdaftar di database kami.';
-      }
-
-      let catalogText = '--- DAFTAR SEMUA PRODUK KAMI ---\n';
-      products.forEach((p, idx) => {
-        let variantStr = `Stok Utama di DB: ${p.stock}`;
-        if (p.attributes && typeof p.attributes === 'object' && 'variants' in p.attributes) {
-          const variants = (p.attributes as any).variants;
-          const varDetails = Object.entries(variants).map(([k, v]) => `${k} sisa ${v}`).join(', ');
-          variantStr += ` | Detail Varian: ${varDetails}`;
-        }
-        
-        catalogText += `${idx + 1}. ${p.name} (Kategori: ${p.category}) - Harga: Rp ${p.price} - ${variantStr}\n`;
-        if (p.description) catalogText += `  Deskripsi: ${p.description}\n`;
-        if (p.imageUrl) catalogText += `  [GAMBAR: ${p.name}] ${p.imageUrl}\n`;
-      });
-      catalogText += '\n(Informasi Sistem untuk AI: Berikan daftar singkat di atas kepada pelanggan. Jangan jelaskan semuanya panjang lebar secara otomatis, cukup sebutkan namanya dan minta pelanggan memilih jika ingin tahu detail lebih lanjut.)';
-
-      return catalogText;
-    } catch (error) {
-      this.logger.error(`Error fetching catalog context: ${error.message}`);
-      return '';
-    }
-  }
-
-  /**
    * Mengambil konteks dari tabel VectorKnowledge menggunakan pencarian semantik (Vector Similarity Search)
    * Ini meminimalkan penggunaan token karena hanya mengambil Top K konteks yang paling relevan.
    */

@@ -13,8 +13,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 const Loading = () => <div className="p-8 space-y-4"><Skeleton className="h-8 w-64" /><Skeleton className="h-[400px] w-full" /></div>;
 
 const OverviewPage = dynamic(() => import("@/components/modules/overview/overview-page").then(mod => mod.OverviewPage), { loading: Loading });
+const AvailabilityPage = dynamic(() => import("./views/availability-view").then(mod => mod.AvailabilityView), { loading: Loading });
 const ChatbotPage = dynamic(() => import("@/components/modules/chatbot/chatbot-page").then(mod => mod.ChatbotPage), { loading: Loading });
 const KnowledgePage = dynamic(() => import("@/components/modules/knowledge/knowledge-page").then(mod => mod.KnowledgePage), { loading: Loading });
+const FollowupPage = dynamic(() => import("@/components/modules/followup/followup-page").then(mod => mod.FollowupPage), { loading: Loading });
 const SettingsPage = dynamic(() => import("@/components/modules/settings/settings-page").then(mod => mod.SettingsPage), { loading: Loading });
 
 
@@ -67,10 +69,11 @@ export function DashboardShell() {
   const render = () => {
     switch (view as ViewKey) {
       case "overview": return <OverviewPage />;
+      case "availability": return <AvailabilityPage />;
       case "chatbot": return <ChatbotPage />;
       case "knowledge": return <KnowledgePage />;
+      case "followup": return <FollowupPage />;
       case "settings": return <SettingsPage />;
-
 
       default: return <OverviewPage />;
     }

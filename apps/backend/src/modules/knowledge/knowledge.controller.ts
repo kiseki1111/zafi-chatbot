@@ -1,16 +1,17 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, UseInterceptors, UploadedFile, Req, BadRequestException } from '@nestjs/common';
 import { KnowledgeService } from './knowledge.service';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { DataAgentService } from '../../features/knowledge-ingest/data-agent.service';
 
 @Controller('api/v1/knowledge')
 export class KnowledgeController {
-  constructor(private readonly knowledgeService: KnowledgeService) {}
+  constructor(
+    private readonly knowledgeService: KnowledgeService,
+    private readonly dataAgentService: DataAgentService,
+  ) {}
 
   @Get()
   async findAll(@Req() req: any) {
-    // Assuming tenantId is attached to the request by some auth middleware
-    // If not, we might need a query param or default tenant.
-    // For now, let's use a dummy or get it from req.user
     const tenantId = req.user?.tenantId || req.query.tenantId;
     if (!tenantId) {
       throw new BadRequestException('tenantId is required');
@@ -48,5 +49,10 @@ export class KnowledgeController {
     const tenantId = req.user?.tenantId || req.query.tenantId;
     if (!tenantId) throw new BadRequestException('tenantId is required');
     return this.knowledgeService.remove(id, tenantId);
+  }
+
+  @Post('sync-vector')
+  async syncVectorKnowledge() {
+    return this.dataAgentService.syncKnowledgeBase();
   }
 }

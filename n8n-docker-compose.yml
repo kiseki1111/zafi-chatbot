@@ -1,0 +1,44 @@
+# ==============================================================================
+# CARA PENGGUNAAN DI PANEL KOMODO:
+# 1. Buka Komodo Panel -> Masuk menu "Stacks" -> Klik "Create Stack"
+# 2. Beri nama: n8n-stack
+# 3. Pilih mode: "Compose File" (Raw text)
+# 4. Copy-paste isi konfigurasi di bawah ini
+# 5. Sesuaikan N8N_HOST dan WEBHOOK_URL (gunakan IP VPS atau domain Anda)
+# 6. Klik "Deploy"
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      # --- Konfigurasi URL Publik ---
+      # Ganti dengan IP VPS (misal: 123.45.67.89) atau Domain Anda (misal: n8n.domain.com)
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http                  # Ubah ke 'https' jika sudah pasang domain & SSL
+      - WEBHOOK_URL=http://localhost:5678/ # Ganti 'localhost' dengan IP VPS atau Domain
+      
+      # --- Pengaturan Sistem & Waktu ---
+      - NODE_ENV=production
+      - GENERIC_TIMEZONE=Asia/Jakarta
+      - TZ=Asia/Jakarta
+      
+      # --- Eksekusi & Keamanan ---
+      - EXECUTIONS_DATA_SAVE_ON_ERROR=all
+      - EXECUTIONS_DATA_SAVE_ON_SUCCESS=all
+      - EXECUTIONS_DATA_MAX_AGE=168        # Bersihkan log eksekusi setelah 7 hari (hemat disk)
+      - N8N_DEFAULT_BINARY_DATA_MODE=filesystem
+    volumes:
+      # Data alur kerja, kredensial, dan konfigurasi tersimpan aman di volume ini
+      - n8n_data:/home/node/.n8n
+
+volumes:
+  n8n_data:
+    name: n8n_storage_data

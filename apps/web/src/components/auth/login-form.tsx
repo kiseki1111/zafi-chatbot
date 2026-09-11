@@ -7,10 +7,8 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Building2, Loader2, Mail, Lock } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
-import { ROLES, ROLE_THEME } from "@/lib/rbac";
 import type { Role } from "@/lib/types";
 import { AuthShell, PasswordInput } from "./auth-shell";
-import { DEMO_ACCOUNTS } from "@/lib/mock-data";
 
 
 export function LoginForm() {

@@ -7,15 +7,26 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Bot, Save, Smartphone, User, ShieldCheck, Loader2, Plug, Wifi, Plus, Trash2, Power, MoreVertical, QrCode } from "lucide-react";
+import { Bot, Save, Smartphone, ShieldCheck, Loader2, Plus, Trash2, QrCode } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 
-export function SettingsPage() {
+export function SettingsPage({ defaultTab = "bot" }: { defaultTab?: string }) {
+  const [activeTab, setActiveTab] = React.useState(defaultTab);
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tabParam = urlParams.get("tab");
+      if (tabParam === "koneksi" || tabParam === "bot") {
+        setActiveTab(tabParam);
+      }
+    }
+  }, []);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -34,7 +45,7 @@ export function SettingsPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="bot" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-2 md:w-[400px]">
           <TabsTrigger value="bot">
             <Bot className="h-4 w-4 mr-1.5" /> Identitas Asisten
@@ -59,11 +70,16 @@ function BotSettingsTab() {
   const { user } = useAuthStore();
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
+  const [showPrompt, setShowPrompt] = React.useState(false);
   
   const [settings, setSettings] = React.useState({
     agentName: "Luna",
     phone: "",
     agentTone: "ramah dan profesional",
+    operatingHours: "",
+    address: "",
+    greetingMsg: "",
+    systemPrompt: "",
   });
 
   React.useEffect(() => {
@@ -76,6 +92,10 @@ function BotSettingsTab() {
             agentName: data.tenant.agentName || "Luna",
             phone: data.tenant.phone || "",
             agentTone: data.tenant.agentTone || "ramah dan profesional",
+            operatingHours: data.tenant.operatingHours || "",
+            address: data.tenant.address || "",
+            greetingMsg: data.tenant.greetingMsg || "",
+            systemPrompt: data.tenant.systemPrompt || "",
           });
         }
       } catch (e) {
@@ -94,9 +114,9 @@ function BotSettingsTab() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(settings)
       });
-      alert("Pengaturan asisten berhasil disimpan!");
+      toast.success("Pengaturan asisten berhasil disimpan!");
     } catch(e) {
-      alert("Gagal menyimpan pengaturan");
+      toast.error("Gagal menyimpan pengaturan");
     }
     setSaving(false);
   }
@@ -108,50 +128,112 @@ function BotSettingsTab() {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader className="pb-3 border-b mb-4">
-          <div className="flex justify-between items-center">
+          <CardHeader className="pb-3 border-b mb-4">
             <div>
               <CardTitle className="text-lg">Identitas Asisten Bot (Menjawab Pesan)</CardTitle>
               <CardDescription>Atur nama, gaya bahasa, dan perilaku asisten saat membalas pesan masuk.</CardDescription>
             </div>
-            <div className="flex items-center gap-2">
-              <Label htmlFor="bot-active" className="text-sm font-medium text-emerald-700">Aktifkan Asisten</Label>
-              <Switch id="bot-active" defaultChecked />
-            </div>
-          </div>
-        </CardHeader>
+          </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid gap-6 md:grid-cols-2">
             <div className="space-y-4">
               <div className="space-y-1.5">
-                <Label>Nama Panggilan Asisten</Label>
+                <Label htmlFor="agentName">Nama Panggilan Asisten</Label>
                 <Input 
+                  id="agentName"
                   value={settings.agentName} 
                   onChange={e => setSettings({...settings, agentName: e.target.value})} 
                 />
                 <p className="text-[10px] text-muted-foreground">Pengguna akan disapa oleh nama ini.</p>
               </div>
               <div className="space-y-1.5">
-                <Label>Nomor WA Cadangan / Pengalihan (Admin)</Label>
+                <Label htmlFor="agentPhone">Nomor WA Cadangan / Pengalihan (Admin)</Label>
                 <Input 
+                  id="agentPhone"
                   value={settings.phone} 
                   onChange={e => setSettings({...settings, phone: e.target.value})} 
                 />
                 <p className="text-[10px] text-muted-foreground">Jika asisten kebingungan, nomor ini akan diberikan ke pengguna.</p>
               </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="operatingHours">Jam Operasional</Label>
+                <Input 
+                  id="operatingHours"
+                  placeholder="Contoh: Senin-Jumat 09:00-17:00"
+                  value={settings.operatingHours} 
+                  onChange={e => setSettings({...settings, operatingHours: e.target.value})} 
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="storeAddress">Alamat Toko</Label>
+                <Input 
+                  id="storeAddress"
+                  value={settings.address} 
+                  onChange={e => setSettings({...settings, address: e.target.value})} 
+                />
+              </div>
             </div>
             <div className="space-y-4">
               <div className="space-y-1.5">
-                <Label>Gaya Bahasa / Karakter Asisten</Label>
+                <Label htmlFor="agentTone">Gaya Bahasa / Karakter Asisten</Label>
                 <Textarea 
+                  id="agentTone"
                   className="min-h-[100px] text-sm" 
                   value={settings.agentTone} 
                   onChange={e => setSettings({...settings, agentTone: e.target.value})}
                 />
                 <p className="text-[10px] text-muted-foreground">Petunjuk cara asisten berbicara ke pengguna.</p>
               </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="greetingMsg">Sapaan Awal (Greeting)</Label>
+                <Textarea 
+                  id="greetingMsg"
+                  className="min-h-[60px] text-sm" 
+                  placeholder="Contoh: Halo! Selamat datang di toko kami. Ada yang bisa dibantu?"
+                  value={settings.greetingMsg} 
+                  onChange={e => setSettings({...settings, greetingMsg: e.target.value})}
+                />
+                <p className="text-[10px] text-muted-foreground">Pesan sapaan pertama saat pelanggan menghubungi.</p>
+              </div>
             </div>
           </div>
+
+          {/* System Prompt Editor */}
+          <div className="border rounded-xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowPrompt(!showPrompt)}
+              className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium hover:bg-muted/50 transition-colors"
+            >
+              <span className="flex items-center gap-2">
+                <span className="text-lg">🛠</span> System Prompt Asisten
+              </span>
+              <span className="text-xs text-muted-foreground">{showPrompt ? "Sembunyikan" : "Klik untuk edit"}</span>
+            </button>
+            {showPrompt && (
+              <div className="px-4 pb-4 space-y-2 border-t">
+                <p className="text-[11px] text-muted-foreground pt-3">
+                  Ini adalah instruksi utama yang menentukan bagaimana AI berperilaku. Variabel otomatis: {"{agentName}"}, {"{tenantName}"}, {"{botTone}"}, {"{currentTime}"}, {"{operatingHours}"}, {"{storeAddress}"}, {"{fallbackContact}"}
+                </p>
+                <Textarea
+                  className="min-h-[300px] text-xs font-mono leading-relaxed"
+                  value={settings.systemPrompt}
+                  onChange={e => setSettings({...settings, systemPrompt: e.target.value})}
+                  placeholder="Kosongkan untuk menggunakan prompt default sistem..."
+                />
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSettings({...settings, systemPrompt: ""})}
+                  >
+                    Reset ke Default
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="flex justify-end pt-4 border-t">
             <Button onClick={handleSave} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700 text-white">
               {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} 

@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -49,20 +48,11 @@ import {
   BatteryLow,
   Zap,
   MessageCircle,
-  FileText,
-  Crown,
-  ShoppingCart,
   ChevronLeft,
   Plus,
   UserCheck,
   Sparkles,
 } from "lucide-react";
-import {
-  CONTACTS,
-  CHAT_MESSAGES,
-  WA_SESSIONS,
-  MESSAGE_TEMPLATES,
-} from "@/lib/mock-data";
 import type {
   Contact,
   ChatMessage,
@@ -446,32 +436,6 @@ function ContactInfoPanel({
 
           <Separator />
 
-          {/* Quick actions */}
-          <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Aksi Cepat</Label>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full justify-start"
-            >
-              <ShoppingCart className="h-4 w-4 text-emerald-600" /> Buat Order
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full justify-start"
-            >
-              <FileText className="h-4 w-4 text-teal-600" /> Kirim Detail Properti
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full justify-start"
-            >
-              <Crown className="h-4 w-4 text-amber-500" /> Tandai VIP
-            </Button>
-          </div>
-
           <Separator />
 
           {/* Notes */}
@@ -527,8 +491,7 @@ export function ChatbotPage() {
   );
   const isConnected = activeSession?.status === "working";
 
-  // AI toggles
-  const [aiActive, setAiActive] = useState(true);
+  // AI toggle for suggested replies
   const [aiSuggest, setAiSuggest] = useState(true);
 
   // Contacts / Conversations

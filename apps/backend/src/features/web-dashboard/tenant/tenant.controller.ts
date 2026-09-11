@@ -18,7 +18,7 @@ export class TenantController {
     @Patch(':userId/settings')
     async updateSettings(
         @Param('userId') userId: string,
-        @Body() body: { agentName?: string; agentTone?: string; phone?: string; greetingMsg?: string; ownerChatId?: string }
+        @Body() body: { agentName?: string; agentTone?: string; phone?: string; greetingMsg?: string; ownerChatId?: string; systemPrompt?: string; operatingHours?: string; address?: string }
     ) {
         return this.tenantService.updateTenantSettings(userId, body);
     }

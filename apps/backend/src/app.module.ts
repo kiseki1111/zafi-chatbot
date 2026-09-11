@@ -2,15 +2,14 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { UsersModule } from './features/web-dashboard/users/users.module';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './features/web-dashboard/auth/auth.module';
 import { TenantModule } from './features/web-dashboard/tenant/tenant.module';
 import { PrismaModule } from './core/prisma/prisma.module';
-import { ChannelAccountsModule } from './modules/channel-accounts/channel-accounts.module';
 import { WahaModule } from './modules/waha/waha.module';
 import { ChatsModule } from './modules/chats/chats.module';
-import jwtConfig from './config/jwt.config'; // Pastikan file konfigurasi JWT terdaftar
-
+import { FollowUpModule } from './modules/waha/follow-up/follow-up.module';
+import jwtConfig from './config/jwt.config';
 
 import { KnowledgeIngestModule } from './features/knowledge-ingest/knowledge-ingest.module';
 import { AppController } from './app.controller';
@@ -19,31 +18,32 @@ import { OmnichannelModule } from './core/omnichannel/omnichannel.module';
 import { AgentAssistantModule } from './features/agent-assistant/agent-assistant.module';
 import { SimulatorModule } from './features/simulator/simulator.module';
 import { KnowledgeModule } from './modules/knowledge/knowledge.module';
+import { AvailabilityModule } from './modules/availability/availability.module';
 
 @Module({
   imports: [
-    // Mendaftarkan konfigurasi terpusat secara global
     ConfigModule.forRoot({
       isGlobal: true,
       load: [jwtConfig],
     }),
     ThrottlerModule.forRoot([{
-      ttl: 900000, // 15 menit dalam satuan milidetik (15 * 60 * 1000)
-      limit: 3000,  // maksimal 3000 request
+      ttl: 900000,
+      limit: 3000,
     }]),
+    ScheduleModule.forRoot(),
     PrismaModule,
-    UsersModule,
     AuthModule,
     TenantModule,
-    ChannelAccountsModule,
     WahaModule,
     ChatsModule,
+    FollowUpModule,
     KnowledgeIngestModule,
     OpenAiModule,
     OmnichannelModule,
     AgentAssistantModule,
     SimulatorModule,
     KnowledgeModule,
+    AvailabilityModule,
   ],
   controllers: [AppController],
   providers: [
