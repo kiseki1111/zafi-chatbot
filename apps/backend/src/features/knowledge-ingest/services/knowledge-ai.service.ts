@@ -16,15 +16,22 @@ export class KnowledgeAiService {
   private openai: OpenAI;
 
   constructor(private readonly configService: ConfigService) {
+    const apiKey = this.configService.get<string>('OPENROUTER_API_KEY') 
+                || this.configService.get<string>('OPENAI_API_KEY');
+    const baseURL = this.configService.get<string>('OPENROUTER_API_KEY') 
+                  ? 'https://openrouter.ai/api/v1' 
+                  : undefined;
+    
     this.openai = new OpenAI({
-      apiKey: this.configService.get<string>('OPENAI_API_KEY'),
+      apiKey,
+      baseURL,
     });
   }
 
   async cleanTextToJSON(rawText: string): Promise<TextExtractionResult> {
     try {
       const response = await this.openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: this.configService.get<string>('OPENAI_MODEL') || "deepseek/deepseek-v4-flash-0731",
         messages: [
           {
             role: "system",

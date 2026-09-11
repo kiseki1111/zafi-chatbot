@@ -1,20 +1,24 @@
 import { Injectable, InternalServerErrorException, Logger, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../core/prisma/prisma.service';
-import { OPENAI_CLIENT } from '../../core/openai/openai.module';
+import { OPENAI_CLIENT, EMBEDDING_MODEL } from '../../core/openai/openai.module';
 import { OpenAI } from 'openai';
 
 @Injectable()
 export class RagService {
   private openai: OpenAI | null;
+  private embeddingModel: string;
   private readonly logger = new Logger(RagService.name);
 
   constructor(
     private configService: ConfigService,
     private prisma: PrismaService,
     @Inject(OPENAI_CLIENT) private injectedOpenai: OpenAI | null,
+    @Inject(EMBEDDING_MODEL) private injectedEmbeddingModel: string,
   ) {
     this.openai = this.injectedOpenai;
+    this.embeddingModel = this.injectedEmbeddingModel;
+    this.logger.log(`[RAG] Using embedding model: ${this.embeddingModel}`);
   }
 
   /**
@@ -27,7 +31,7 @@ export class RagService {
 
     try {
       const response = await this.openai.embeddings.create({
-        model: 'text-embedding-3-small', // Highly efficient embedding model
+        model: this.embeddingModel,
         input: text,
       });
 

@@ -1,18 +1,22 @@
 import { Injectable, Logger, Inject, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { OPENAI_CLIENT } from '../openai/openai.module';
+import { OPENAI_CLIENT, OPENAI_MODEL } from '../openai/openai.module';
 import { OpenAI } from 'openai';
 
 @Injectable()
 export class AgentSharedService {
   private readonly logger = new Logger(AgentSharedService.name);
   private openai: OpenAI | null;
+  private model: string;
 
   constructor(
     private readonly prisma: PrismaService,
     @Inject(OPENAI_CLIENT) private readonly injectedOpenai: OpenAI | null,
+    @Inject(OPENAI_MODEL) private readonly injectedModel: string,
   ) {
     this.openai = this.injectedOpenai;
+    this.model = this.injectedModel;
+    this.logger.log(`[AgentShared] Using model: ${this.model}`);
   }
 
   /**
@@ -119,7 +123,7 @@ export class AgentSharedService {
 
     try {
       const response = await this.openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: this.model,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: prompt }
@@ -150,7 +154,7 @@ export class AgentSharedService {
 
     try {
       const stream = await this.openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: this.model,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: prompt }
@@ -179,7 +183,7 @@ export class AgentSharedService {
     if (!this.openai) return '';
     try {
       const response = await this.openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: this.model,
         messages: [
           {
             role: 'user',

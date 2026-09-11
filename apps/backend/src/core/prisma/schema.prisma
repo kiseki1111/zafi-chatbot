@@ -336,7 +336,7 @@ model Product {
 
   // Untuk keperluan RAG (CS Agent)
   embeddingText String?                      @db.Text
-  embedding     Unsupported("vector(1536)")?
+  embedding     Unsupported("vector(4096)")?
 
   tenantId String? @map("tenant_id")
   tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -378,7 +378,7 @@ model SalesRecord {
 model KnowledgeBase {
   id        String                       @id @default(uuid())
   content   String                       @db.Text
-  embedding Unsupported("vector(1536)")?
+  embedding Unsupported("vector(4096)")?
   metadata  Json?
   tenantId  String?                      @map("tenant_id")
   tenant    Tenant?                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -393,7 +393,7 @@ model VectorKnowledge {
   title     String                       @db.VarChar(255)
   content   String                       @db.Text
   metadata  Json?                        @default("{}")
-  embedding Unsupported("vector(1536)")?
+  embedding Unsupported("vector(4096)")?
   tenantId  String?                      @map("tenant_id")
   tenant    Tenant?                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   createdAt DateTime                     @default(now()) @map("created_at")

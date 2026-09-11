@@ -1,7 +1,7 @@
 import { Injectable, InternalServerErrorException, forwardRef, Inject, Logger } from '@nestjs/common';
 import { OpenAI } from 'openai';
 import { RagService } from '../knowledge-ingest/rag.service';
-import { OPENAI_CLIENT } from '../../core/openai/openai.module';
+import { OPENAI_CLIENT, OPENAI_MODEL } from '../../core/openai/openai.module';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { AgentSharedService } from '../../core/agent-shared/agent-shared.service';
 import { DataAgentService } from '../knowledge-ingest/data-agent.service';
@@ -9,18 +9,21 @@ import { DataAgentService } from '../knowledge-ingest/data-agent.service';
 @Injectable()
 export class AgentAssistantService {
   private openai: OpenAI | null;
+  private model: string;
   private readonly logger = new Logger(AgentAssistantService.name);
 
   constructor(
     @Inject(forwardRef(() => RagService))
     private ragService: RagService,
     @Inject(OPENAI_CLIENT) private injectedOpenai: OpenAI | null,
+    @Inject(OPENAI_MODEL) private injectedModel: string,
     private prisma: PrismaService,
     private readonly agentSharedService: AgentSharedService,
     @Inject(forwardRef(() => DataAgentService))
     private dataAgentService: DataAgentService,
   ) {
     this.openai = this.injectedOpenai;
+    this.model = this.injectedModel;
   }
 
   async chatWithOwnerAssistant(text: string, tenantId?: string, chatId: string = 'default', onChunk?: (chunk: string) => void): Promise<string> {
@@ -300,7 +303,7 @@ ${context ? context : 'Tidak ada data spesifik yang ditemukan di database untuk 
 
       if (onChunk) {
          const streamResponse = await this.openai.chat.completions.create({
-            model: 'gpt-4o-mini',
+            model: this.model,
             messages,
             tools: tools as any,
             tool_choice: 'auto',
@@ -348,7 +351,7 @@ ${context ? context : 'Tidak ada data spesifik yang ditemukan di database untuk 
          }
       } else {
           let response = await this.openai.chat.completions.create({
-            model: 'gpt-4o-mini',
+            model: this.model,
             messages,
             tools: tools as any,
             tool_choice: 'auto',
@@ -753,7 +756,7 @@ ${context ? context : 'Tidak ada data spesifik yang ditemukan di database untuk 
         
         if (onChunk) {
             const streamResponse2 = await this.openai.chat.completions.create({
-              model: 'gpt-4o-mini',
+              model: this.model,
               messages,
               temperature: 0.7,
               stream: true
@@ -769,7 +772,7 @@ ${context ? context : 'Tidak ada data spesifik yang ditemukan di database untuk 
             responseMessage.content = fullText2;
         } else {
             let response = await this.openai.chat.completions.create({
-              model: 'gpt-4o-mini',
+              model: this.model,
               messages,
               temperature: 0.7,
             });
