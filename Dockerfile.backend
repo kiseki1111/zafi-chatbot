@@ -32,8 +32,8 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Install necessary OS libraries for sharp and prisma
-RUN apk add --no-cache openssl libc6-compat
+# Install necessary OS libraries for sharp and prisma + CA certificates
+RUN apk add --no-cache openssl libc6-compat ca-certificates && update-ca-certificates
 
 COPY --from=builder /workspace/node_modules ./node_modules
 COPY --from=builder /workspace/apps/backend/node_modules ./apps/backend/node_modules
