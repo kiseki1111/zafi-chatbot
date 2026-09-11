@@ -12,6 +12,10 @@ services:
     networks:
       - backend
 
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+
   web:
     image: ghcr.io/sisfoku/iqbal-web:${IMAGE_TAG:-latest}
     container_name: iqbal-web
