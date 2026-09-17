@@ -1026,25 +1026,21 @@ export function ChatbotPage() {
   ) : null;
 
   return (
-    <div className="flex flex-col flex-1 h-full min-h-0 gap-2">
+    <div className="flex flex-col flex-1 h-full min-h-0 gap-1.5">
       {/* ===== Top Bar Ringkas & Terpadu ===== */}
-      <Card className="px-3 py-2 shrink-0 shadow-xs border-muted/70">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2.5">
-            <div className="h-7 w-7 rounded-lg bg-emerald-600 text-white grid place-items-center shadow-xs">
-              <MessageCircle className="h-4 w-4" />
+      <Card className="px-2 py-1.5 shrink-0 shadow-xs border-muted/70">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <div className="h-6 w-6 rounded-md bg-emerald-600 text-white grid place-items-center">
+              <MessageCircle className="h-3.5 w-3.5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-sm leading-none">Live Chat &amp; WA Bot</span>
-                {isConnected && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded-full">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    Online
-                  </span>
-                )}
-              </div>
-            </div>
+            <span className="font-bold text-sm leading-none">Live Chat &amp; WA Bot</span>
+            {isConnected && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded-full">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Online
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
@@ -1107,30 +1103,30 @@ export function ChatbotPage() {
       </Card>
 
       {/* ===== Main 3-column ===== */}
-      <div className="flex-1 flex gap-3 min-h-0">
+      <div className="flex-1 flex gap-2 min-h-0">
         {/* ----- Left: contact list ----- */}
         <Card
           className={cn(
-            "w-full md:w-80 shrink-0 flex flex-col min-h-0 overflow-hidden",
+            "w-full md:w-72 shrink-0 flex flex-col min-h-0 overflow-hidden",
             // On mobile hide when a conversation is shown
             mobileShowList || !activeId ? "flex" : "hidden md:flex",
           )}
         >
-          <div className="p-3 space-y-3 border-b">
+          <div className="p-2.5 space-y-2 border-b">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Cari nama atau nomor…"
-                className="pl-8 h-9"
+                className="pl-8 h-8"
               />
             </div>
             <Tabs
               value={filter}
               onValueChange={(v) => setFilter(v as typeof filter)}
             >
-              <TabsList className="w-full grid grid-cols-2 h-8">
+              <TabsList className="w-full grid grid-cols-2 h-7">
                 <TabsTrigger value="all" className="text-xs">
                   Semua
                 </TabsTrigger>

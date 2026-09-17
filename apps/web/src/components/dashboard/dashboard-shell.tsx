@@ -108,7 +108,7 @@ export function DashboardShell() {
         {user.tenantId && <Topbar />}
         <main className={cn(
           "flex-1 overflow-x-hidden",
-          view === "chatbot" ? "p-2 lg:p-3 overflow-hidden flex flex-col" : "p-4 lg:p-6 overflow-y-auto"
+          view === "chatbot" ? "p-1 lg:p-1.5 overflow-hidden flex flex-col" : "p-4 lg:p-6 overflow-y-auto"
         )}>
           {render()}
         </main>
