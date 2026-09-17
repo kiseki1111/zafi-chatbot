@@ -105,7 +105,10 @@ export function DashboardShell() {
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {user.tenantId && <Topbar />}
-        <main className="flex-1 p-4 lg:p-6 overflow-y-auto overflow-x-hidden">
+        <main className={cn(
+          "flex-1 overflow-x-hidden",
+          view === "chatbot" ? "p-2 lg:p-3 overflow-hidden flex flex-col" : "p-4 lg:p-6 overflow-y-auto"
+        )}>
           {render()}
         </main>
       </div>

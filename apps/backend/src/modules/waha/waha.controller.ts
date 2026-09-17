@@ -292,8 +292,8 @@ export class WahaController {
         );
     }
 
-    // Process message events
-    if (payload?.event === 'message' || payload?.event === 'message.any') {
+    // Process message events: Gunakan HANYA event 'message' agar tidak dobel dengan 'message.any'
+    if (payload?.event === 'message') {
       const message = payload.payload;
       const sessionName = payload.session;
 
@@ -417,11 +417,8 @@ export class WahaController {
         }
       }
 
-      // Send to Omnichannel Queue
-      if (
-        (payload.event === 'message' || payload.event === 'message.any') &&
-        !message.fromMe
-      ) {
+      // Send to Omnichannel Queue (Hanya event 'message' agar AI tidak membalas 2x)
+      if (payload.event === 'message' && !message.fromMe) {
         let text = message.body?.trim() || '';
 
         let quotedText = '';
