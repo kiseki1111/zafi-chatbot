@@ -1182,38 +1182,38 @@ export function ChatbotPage() {
             </div>
           ) : activeContact ? (
             <>
-              {/* Conversation header */}
-              <div className="flex items-center gap-3 p-3 border-b">
+              {/* Conversation header - Compact */}
+              <div className="flex items-center gap-2.5 px-3 py-1.5 border-b shrink-0 bg-background/95">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="md:hidden h-8 w-8 shrink-0"
+                  className="md:hidden h-7 w-7 shrink-0"
                   onClick={() => setMobileShowList(true)}
                   aria-label="Kembali ke daftar"
                 >
-                  <ChevronLeft className="h-5 w-5" />
+                  <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <Avatar className="h-9 w-9 shrink-0">
-                  <AvatarFallback className="text-xs bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300">
+                <Avatar className="h-7 w-7 shrink-0">
+                  <AvatarFallback className="text-[11px] bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300">
                     {initials(activeContact.name)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-semibold text-sm truncate">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="font-semibold text-xs truncate leading-tight">
                       {activeContact.name}
                     </p>
                     <Badge
                       variant="secondary"
                       className={cn(
-                        "text-[10px]",
+                        "text-[9px] px-1 py-0 h-4",
                         STAGE_META[activeContact.stage].badge,
                       )}
                     >
                       {STAGE_META[activeContact.stage].label}
                     </Badge>
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[10px] text-muted-foreground leading-tight">
                     +{activeContact.phone}
                     {activeContact.tags.length > 0 && (
                       <span className="ml-1">
@@ -1227,7 +1227,7 @@ export function ChatbotPage() {
                     variant={activeContact.mode === "human" ? "default" : "outline"}
                     size="sm"
                     className={cn(
-                      "h-8 text-xs gap-1.5",
+                      "h-7 px-2 text-[11px] gap-1",
                       activeContact.mode === "human"
                         ? "bg-blue-600 hover:bg-blue-700 text-white"
                         : "border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40",
@@ -1235,24 +1235,24 @@ export function ChatbotPage() {
                     onClick={toggleTakeover}
                     disabled={takingOver}
                   >
-                    <UserCog className="h-3.5 w-3.5" />
+                    <UserCog className="h-3 w-3" />
                     {takingOver
-                      ? "Memproses..."
+                      ? "..."
                       : activeContact.mode === "human"
                         ? "Lepas ke Bot"
                         : "Ambil Alih"}
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Telepon">
-                    <Phone className="h-4 w-4" />
+                  <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Telepon">
+                    <Phone className="h-3.5 w-3.5" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 lg:hidden"
+                    className="h-7 w-7 lg:hidden"
                     onClick={() => setInfoOpenMobile(true)}
                     aria-label="Info kontak"
                   >
-                    <Info className="h-4 w-4" />
+                    <Info className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               </div>
@@ -1294,24 +1294,24 @@ export function ChatbotPage() {
                 </ScrollArea>
               </div>
 
-              {/* Chat Input Area */}
-              <div className="p-3 border-t bg-background space-y-2">
+              {/* Chat Input Area - Compact */}
+              <div className="px-3 py-1.5 border-t bg-background shrink-0 space-y-1">
                 {imagePreview && (
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/60 text-xs">
-                    <ImageIcon className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <div className="flex items-center gap-2 p-1.5 rounded-lg bg-muted/60 text-xs">
+                    <ImageIcon className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
                     <span className="truncate flex-1 font-medium">{imagePreview.name}</span>
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-5 w-5"
+                      className="h-4 w-4"
                       onClick={() => setImagePreview(null)}
                     >
                       <X className="h-3 w-3" />
                     </Button>
                   </div>
                 )}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <input
                     type="file"
                     ref={imageInputRef}
@@ -1323,7 +1323,7 @@ export function ChatbotPage() {
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
+                    className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
                     onClick={() => imageInputRef.current?.click()}
                     title="Kirim gambar"
                   >
@@ -1339,18 +1339,14 @@ export function ChatbotPage() {
                         sendMessage(input);
                       }
                     }}
-                    placeholder={
-                      activeContact.mode === "human"
-                        ? "Ketik pesan / tempel screenshot (Ctrl+V)..."
-                        : "Ketik pesan / tempel screenshot (Ctrl+V)..."
-                    }
-                    className="h-9 text-sm"
+                    placeholder="Ketik pesan / tempel screenshot (Ctrl+V)..."
+                    className="h-8 text-xs"
                   />
                   <Button
                     type="button"
                     size="icon"
                     className={cn(
-                      "h-9 w-9 shrink-0 text-white",
+                      "h-8 w-8 shrink-0 text-white",
                       activeContact.mode === "human"
                         ? "bg-blue-600 hover:bg-blue-700"
                         : "bg-emerald-600 hover:bg-emerald-700",
@@ -1359,7 +1355,7 @@ export function ChatbotPage() {
                     disabled={!input.trim() && !imagePreview}
                     title="Kirim pesan"
                   >
-                    <Send className="h-4 w-4" />
+                    <Send className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               </div>
