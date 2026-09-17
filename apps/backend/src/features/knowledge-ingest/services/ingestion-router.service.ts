@@ -28,18 +28,24 @@ export class IngestionRouterService {
     mimeType: string,
     buffer: Buffer | null,
     text: string | null,
-    tenantId: string | null
+    tenantId: string | null,
   ): Promise<string> {
-    this.logger.log(`[ROUTER] Menerima request proses dengan tipe: ${mimeType}`);
+    this.logger.log(
+      `[ROUTER] Menerima request proses dengan tipe: ${mimeType}`,
+    );
 
     if (mimeType.includes('audio') || mimeType.includes('voice')) {
-      this.logger.log(`[ROUTER] Tipe tidak didukung (Audio/Voice). Menolak request.`);
-      return "Mohon maaf Bapak/Ibu, saat ini saya belum bisa membaca link web atau mendengarkan suara. Boleh tolong dikirimkan screenshot katalognya atau ketik harganya langsung?";
+      this.logger.log(
+        `[ROUTER] Tipe tidak didukung (Audio/Voice). Menolak request.`,
+      );
+      return 'Mohon maaf Bapak/Ibu, saat ini saya belum bisa membaca link web atau mendengarkan suara. Boleh tolong dikirimkan screenshot katalognya atau ketik harganya langsung?';
     }
 
     if (text && text.match(/https?:\/\/[^\s]+/)) {
-       this.logger.log(`[ROUTER] Tipe tidak didukung (Link Web). Menolak request.`);
-       return "Mohon maaf Bapak/Ibu, saat ini saya belum bisa membaca link web atau mendengarkan suara. Boleh tolong dikirimkan screenshot katalognya atau ketik harganya langsung?";
+      this.logger.log(
+        `[ROUTER] Tipe tidak didukung (Link Web). Menolak request.`,
+      );
+      return 'Mohon maaf Bapak/Ibu, saat ini saya belum bisa membaca link web atau mendengarkan suara. Boleh tolong dikirimkan screenshot katalognya atau ketik harganya langsung?';
     }
 
     let products: ExtractedProductDto[] = [];
@@ -48,7 +54,12 @@ export class IngestionRouterService {
 
     try {
       this.logger.log(`[ROUTER] Memulai proses ekstraksi data...`);
-      if (mimeType.includes('spreadsheet') || mimeType.includes('excel') || mimeType.includes('csv') || mimeType.includes('sheet')) {
+      if (
+        mimeType.includes('spreadsheet') ||
+        mimeType.includes('excel') ||
+        mimeType.includes('csv') ||
+        mimeType.includes('sheet')
+      ) {
         this.logger.log(`[ROUTER] Mengeksekusi ExcelParser...`);
         try {
           products = await this.excelParser.parseBuffer(buffer!);
@@ -63,14 +74,22 @@ export class IngestionRouterService {
         } catch (e) {
           throw new Error('File parse error: Dokumen PDF gagal dibaca');
         }
-        this.logger.log(`[ROUTER] Teks Mentah dari PDF berhasil diekstrak (Panjang: ${rawText.length}). Memulai pembersihan AI...`);
+        this.logger.log(
+          `[ROUTER] Teks Mentah dari PDF berhasil diekstrak (Panjang: ${rawText.length}). Memulai pembersihan AI...`,
+        );
         const result = await this.knowledgeAiService.cleanTextToJSON(rawText);
         if (result.intent === 'small_talk') return result.replyMessage;
-        if (result.intent === 'ingestion_knowledge' || result.intent === 'ingestion_mixed') {
+        if (
+          result.intent === 'ingestion_knowledge' ||
+          result.intent === 'ingestion_mixed'
+        ) {
           isKnowledge = true;
           knowledgeChunks = result.knowledge_chunks;
         }
-        if (result.intent === 'ingestion_product' || result.intent === 'ingestion_mixed') {
+        if (
+          result.intent === 'ingestion_product' ||
+          result.intent === 'ingestion_mixed'
+        ) {
           products = result.products;
         }
       } else if (mimeType.includes('word') || mimeType.includes('docx')) {
@@ -81,50 +100,70 @@ export class IngestionRouterService {
         } catch (e) {
           throw new Error('File parse error: Dokumen Word gagal dibaca');
         }
-        this.logger.log(`[ROUTER] Teks Mentah dari DOCX berhasil diekstrak (Panjang: ${rawText.length}). Memulai pembersihan AI...`);
+        this.logger.log(
+          `[ROUTER] Teks Mentah dari DOCX berhasil diekstrak (Panjang: ${rawText.length}). Memulai pembersihan AI...`,
+        );
         const result = await this.knowledgeAiService.cleanTextToJSON(rawText);
         if (result.intent === 'small_talk') return result.replyMessage;
-        if (result.intent === 'ingestion_knowledge' || result.intent === 'ingestion_mixed') {
+        if (
+          result.intent === 'ingestion_knowledge' ||
+          result.intent === 'ingestion_mixed'
+        ) {
           isKnowledge = true;
           knowledgeChunks = result.knowledge_chunks;
         }
-        if (result.intent === 'ingestion_product' || result.intent === 'ingestion_mixed') {
+        if (
+          result.intent === 'ingestion_product' ||
+          result.intent === 'ingestion_mixed'
+        ) {
           products = result.products;
         }
       } else if (mimeType.includes('image')) {
         this.logger.log(`[ROUTER] Mengeksekusi ImageParser (Vision AI)...`);
         products = await this.imageParser.parseImage(buffer!);
       } else if (text) {
-        this.logger.log(`[ROUTER] Mengeksekusi KnowledgeAiService (Text AI)...`);
+        this.logger.log(
+          `[ROUTER] Mengeksekusi KnowledgeAiService (Text AI)...`,
+        );
         const result = await this.knowledgeAiService.cleanTextToJSON(text);
         if (result.intent === 'small_talk') return result.replyMessage;
-        if (result.intent === 'ingestion_knowledge' || result.intent === 'ingestion_mixed') {
+        if (
+          result.intent === 'ingestion_knowledge' ||
+          result.intent === 'ingestion_mixed'
+        ) {
           isKnowledge = true;
           knowledgeChunks = result.knowledge_chunks;
         }
-        if (result.intent === 'ingestion_product' || result.intent === 'ingestion_mixed') {
+        if (
+          result.intent === 'ingestion_product' ||
+          result.intent === 'ingestion_mixed'
+        ) {
           products = result.products;
         }
       }
 
       this.logger.log(`[ROUTER] Proses ekstraksi selesai.`);
-      
+
       let activeTenantId = tenantId;
       if (!activeTenantId) {
-          const firstTenant = await this.prisma.tenant.findFirst();
-          if (firstTenant) activeTenantId = firstTenant.id;
+        const firstTenant = await this.prisma.tenant.findFirst();
+        if (firstTenant) activeTenantId = firstTenant.id;
       }
 
       if (isKnowledge && knowledgeChunks.length > 0) {
-        this.logger.log(`[ROUTER] Ditemukan ${knowledgeChunks.length} knowledge chunks.`);
+        this.logger.log(
+          `[ROUTER] Ditemukan ${knowledgeChunks.length} knowledge chunks.`,
+        );
         if (activeTenantId) {
-          const dataToInsert = knowledgeChunks.map(chunk => ({
+          const dataToInsert = knowledgeChunks.map((chunk) => ({
             content: chunk,
-            tenantId: activeTenantId!
+            tenantId: activeTenantId,
           }));
           await this.prisma.knowledgeBase.createMany({ data: dataToInsert });
-          this.logger.log(`[ROUTER] Data sukses disimpan permanen ke database.`);
-          
+          this.logger.log(
+            `[ROUTER] Data sukses disimpan permanen ke database.`,
+          );
+
           // Sinkronisasi Vector (Agar AI CS tahu data baru ini)
           await this.dataAgentService.syncKnowledgeBase(activeTenantId);
         }
@@ -132,63 +171,75 @@ export class IngestionRouterService {
 
       if (products.length > 0) {
         this.logger.log(`[ROUTER] Ditemukan ${products.length} produk.`);
-        this.logger.log(`[ROUTER] Hasil JSON Ekstraksi:\n${JSON.stringify(products, null, 2)}`);
-        
+        this.logger.log(
+          `[ROUTER] Hasil JSON Ekstraksi:\n${JSON.stringify(products, null, 2)}`,
+        );
+
         if (activeTenantId) {
-            const dataToInsert = products.map(p => {
-                let attrsObj: any = {};
-                if (Array.isArray(p.attributes)) {
-                    p.attributes.forEach((attr: any) => {
-                        if (attr.key && attr.value) attrsObj[attr.key] = attr.value;
-                    });
-                } else if (typeof p.attributes === 'object' && p.attributes !== null) {
-                    attrsObj = p.attributes;
-                }
-
-                let calculatedStock = 0;
-                if (attrsObj && attrsObj.variants) {
-                    for (const key in attrsObj.variants) {
-                        calculatedStock += (Number(attrsObj.variants[key]) || 0);
-                    }
-                } else if (attrsObj && (attrsObj.stock !== undefined || attrsObj.stok !== undefined)) {
-                    calculatedStock = Number(attrsObj.stock || attrsObj.stok) || 0;
-                }
-
-                return {
-                    name: p.nama,
-                    price: p.harga,
-                    description: p.deskripsi,
-                    attributes: attrsObj,
-                    stock: calculatedStock,
-                    category: 'Katalog AI',
-                    tenantId: activeTenantId!
-                };
-            });
-            
-            // Deduplikasi Cerdas: Upsert berdasarkan nama (case-insensitive) dan tenantId
-            for (const p of dataToInsert) {
-                const existing = await this.prisma.product.findFirst({
-                    where: { 
-                        tenantId: activeTenantId, 
-                        name: { equals: p.name, mode: 'insensitive' }
-                    }
-                });
-                
-                if (existing) {
-                    await this.prisma.product.update({
-                        where: { id: existing.id },
-                        data: p
-                    });
-                } else {
-                    await this.prisma.product.create({ data: p });
-                }
+          const dataToInsert = products.map((p) => {
+            let attrsObj: any = {};
+            if (Array.isArray(p.attributes)) {
+              p.attributes.forEach((attr: any) => {
+                if (attr.key && attr.value) attrsObj[attr.key] = attr.value;
+              });
+            } else if (
+              typeof p.attributes === 'object' &&
+              p.attributes !== null
+            ) {
+              attrsObj = p.attributes;
             }
-            this.logger.log(`[ROUTER] Data sukses disimpan/diperbarui permanen ke database.`);
-            
-            // Sinkronisasi Vector (Agar AI CS tahu data baru ini)
-            await this.dataAgentService.syncKnowledgeBase(activeTenantId);
+
+            let calculatedStock = 0;
+            if (attrsObj && attrsObj.variants) {
+              for (const key in attrsObj.variants) {
+                calculatedStock += Number(attrsObj.variants[key]) || 0;
+              }
+            } else if (
+              attrsObj &&
+              (attrsObj.stock !== undefined || attrsObj.stok !== undefined)
+            ) {
+              calculatedStock = Number(attrsObj.stock || attrsObj.stok) || 0;
+            }
+
+            return {
+              name: p.nama,
+              price: p.harga,
+              description: p.deskripsi,
+              attributes: attrsObj,
+              stock: calculatedStock,
+              category: 'Katalog AI',
+              tenantId: activeTenantId,
+            };
+          });
+
+          // Deduplikasi Cerdas: Upsert berdasarkan nama (case-insensitive) dan tenantId
+          for (const p of dataToInsert) {
+            const existing = await this.prisma.product.findFirst({
+              where: {
+                tenantId: activeTenantId,
+                name: { equals: p.name, mode: 'insensitive' },
+              },
+            });
+
+            if (existing) {
+              await this.prisma.product.update({
+                where: { id: existing.id },
+                data: p,
+              });
+            } else {
+              await this.prisma.product.create({ data: p });
+            }
+          }
+          this.logger.log(
+            `[ROUTER] Data sukses disimpan/diperbarui permanen ke database.`,
+          );
+
+          // Sinkronisasi Vector (Agar AI CS tahu data baru ini)
+          await this.dataAgentService.syncKnowledgeBase(activeTenantId);
         } else {
-            this.logger.warn(`[ROUTER] Tidak ada TenantID yang aktif. Data tidak disimpan.`);
+          this.logger.warn(
+            `[ROUTER] Tidak ada TenantID yang aktif. Data tidak disimpan.`,
+          );
         }
       }
 
@@ -199,14 +250,18 @@ export class IngestionRouterService {
       if (products.length > 0) {
         reply += `Berhasil mengekstrak dan menyimpan permanen ${products.length} produk:\n\n`;
         products.forEach((p, index) => {
-            let attrCount = 0;
-            if (p.attributes) {
-                if (Array.isArray(p.attributes)) attrCount = p.attributes.length;
-                else if (typeof p.attributes === 'object') attrCount = Object.keys(p.attributes).length;
-            }
-            const hasDesc = p.deskripsi ? 'berikut dengan deskripsi' : 'tanpa deskripsi';
-            const hasAttr = attrCount > 0 ? ` & ${attrCount} info atribut pelengkap` : '';
-            reply += `${index + 1}. *${p.nama}* (Rp ${p.harga})\n   (Tersimpan ${hasDesc}${hasAttr})\n`;
+          let attrCount = 0;
+          if (p.attributes) {
+            if (Array.isArray(p.attributes)) attrCount = p.attributes.length;
+            else if (typeof p.attributes === 'object')
+              attrCount = Object.keys(p.attributes).length;
+          }
+          const hasDesc = p.deskripsi
+            ? 'berikut dengan deskripsi'
+            : 'tanpa deskripsi';
+          const hasAttr =
+            attrCount > 0 ? ` & ${attrCount} info atribut pelengkap` : '';
+          reply += `${index + 1}. *${p.nama}* (Rp ${p.harga})\n   (Tersimpan ${hasDesc}${hasAttr})\n`;
         });
       }
 
@@ -214,16 +269,19 @@ export class IngestionRouterService {
         reply += `\nLangkah selanjutnya: Apakah ada hal lain yang ingin disesuaikan, atau mau langsung testing bot CS?`;
         return reply;
       } else {
-        return "Mohon maaf, saya tidak menemukan data produk atau aturan yang valid dari pesan/file tersebut.";
+        return 'Mohon maaf, saya tidak menemukan data produk atau aturan yang valid dari pesan/file tersebut.';
       }
     } catch (e: any) {
-      this.logger.error(`Error processing ingestion: ${e.message || e}`, e.stack);
-      
+      this.logger.error(
+        `Error processing ingestion: ${e.message || e}`,
+        e.stack,
+      );
+
       if (e.message?.includes('File parse error:')) {
         return `Maaf, saya gagal membaca file yang dikirim (${e.message.split('File parse error:')[1].trim()}). Tolong pastikan format file sudah benar dan tidak rusak/corrupt.`;
       }
-      
-      return "Mohon maaf, terjadi kesalahan saat memproses data Anda. Tolong coba lagi atau hubungi tim support.";
+
+      return 'Mohon maaf, terjadi kesalahan saat memproses data Anda. Tolong coba lagi atau hubungi tim support.';
     }
   }
 }

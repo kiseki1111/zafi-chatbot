@@ -11,8 +11,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Bot, Save, Smartphone, ShieldCheck, Loader2, Plus, Trash2, QrCode } from "lucide-react";
+import { Bot, Save, Smartphone, ShieldCheck, Loader2, Plus, Trash2, QrCode, Palette } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
+import { WarnaWebsiteTab } from "./color-tab";
 
 export function SettingsPage({ defaultTab = "bot" }: { defaultTab?: string }) {
   const [activeTab, setActiveTab] = React.useState(defaultTab);
@@ -46,12 +47,15 @@ export function SettingsPage({ defaultTab = "bot" }: { defaultTab?: string }) {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2 md:w-[400px]">
+        <TabsList className="grid w-full grid-cols-3 md:w-[600px]">
           <TabsTrigger value="bot">
             <Bot className="h-4 w-4 mr-1.5" /> Identitas Asisten
           </TabsTrigger>
           <TabsTrigger value="koneksi">
             <Smartphone className="h-4 w-4 mr-1.5" /> Koneksi WA
+          </TabsTrigger>
+          <TabsTrigger value="warna">
+            <Palette className="h-4 w-4 mr-1.5" /> Warna Website
           </TabsTrigger>
         </TabsList>
 
@@ -60,6 +64,9 @@ export function SettingsPage({ defaultTab = "bot" }: { defaultTab?: string }) {
         </TabsContent>
         <TabsContent value="koneksi">
           <KoneksiWATab />
+        </TabsContent>
+        <TabsContent value="warna">
+          <WarnaWebsiteTab />
         </TabsContent>
       </Tabs>
     </div>
@@ -85,7 +92,7 @@ function BotSettingsTab() {
   React.useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(`/api/v1/tenant/${user?.id || 'demo'}/dashboard`);
+        const res = await fetch(`/api/v1/tenant/${user?.tenantId || user?.id || 'demo'}/dashboard`);
         const data = await res.json();
         if (data && data.tenant) {
           setSettings({

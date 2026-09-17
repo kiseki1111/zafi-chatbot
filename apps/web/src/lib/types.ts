@@ -1,5 +1,5 @@
 // ===== Core Auth & RBAC =====
-export type Role = "owner" | "superadmin" | "admin" | "manager" | "operator" | "marketing" | "keuangan";
+export type Role = "superadmin" | "manager" | "administrator";
 
 export interface User {
   id: string;
@@ -17,11 +17,14 @@ export interface User {
 
 export type ViewKey =
   | "overview"
+  | "clients"
   | "availability"
+  | "bus_layout"
   | "chatbot"
   | "knowledge"
   | "followup"
-  | "settings";
+  | "settings"
+  | "crm";
 
 // ===== Resource & Availability (Generic Units / Slots) =====
 export type ResourceStatus = "AVAILABLE" | "BOOKED" | "OCCUPIED" | "MAINTENANCE";
@@ -67,6 +70,9 @@ export interface ChatMessage {
   status: MessageStatus;
   timestamp: string;
   isAI?: boolean;
+  mediaUrl?: string;
+  messageType?: string;
+  senderName?: string;
 }
 
 export interface Contact {
@@ -80,8 +86,10 @@ export interface Contact {
   unread: number;
   stage: "lead" | "prospect" | "negotiation" | "customer";
   assignedTo?: string;
+  assignedToName?: string;
   propertyInterest?: string;
   instanceName?: string;
+  mode?: "bot" | "human";
 }
 
 export interface WhatsAppSession {

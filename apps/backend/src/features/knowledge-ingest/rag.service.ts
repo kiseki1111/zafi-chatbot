@@ -1,7 +1,15 @@
-import { Injectable, InternalServerErrorException, Logger, Inject } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  Inject,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../core/prisma/prisma.service';
-import { OPENAI_CLIENT, EMBEDDING_MODEL } from '../../core/openai/openai.module';
+import {
+  OPENAI_CLIENT,
+  EMBEDDING_MODEL,
+} from '../../core/openai/openai.module';
 import { OpenAI } from 'openai';
 
 @Injectable()
@@ -26,7 +34,9 @@ export class RagService {
    */
   async generateEmbedding(text: string): Promise<number[]> {
     if (!this.openai) {
-      throw new InternalServerErrorException('OpenAI client is not initialized');
+      throw new InternalServerErrorException(
+        'OpenAI client is not initialized',
+      );
     }
 
     try {
@@ -46,7 +56,11 @@ export class RagService {
    * Mengambil konteks dari tabel VectorKnowledge menggunakan pencarian semantik (Vector Similarity Search)
    * Ini meminimalkan penggunaan token karena hanya mengambil Top K konteks yang paling relevan.
    */
-  async searchRelevantContext(query: string, topK: number = 10, tenantId?: string): Promise<string> {
+  async searchRelevantContext(
+    query: string,
+    topK: number = 10,
+    tenantId?: string,
+  ): Promise<string> {
     try {
       // 1. Generate embedding dari pertanyaan user
       const queryEmbedding = await this.generateEmbedding(query);
@@ -56,7 +70,7 @@ export class RagService {
       // Jika tenantId diberikan, filter hanya untuk tenant tersebut.
       let results: any[];
       if (tenantId) {
-         results = await this.prisma.$queryRaw<any[]>`
+        results = await this.prisma.$queryRaw<any[]>`
            SELECT id, title, content, 
                   1 - (embedding <=> ${vectorString}::vector) AS similarity
            FROM vector_knowledge
@@ -65,7 +79,7 @@ export class RagService {
            LIMIT ${topK};
          `;
       } else {
-         results = await this.prisma.$queryRaw<any[]>`
+        results = await this.prisma.$queryRaw<any[]>`
            SELECT id, title, content, 
                   1 - (embedding <=> ${vectorString}::vector) AS similarity
            FROM vector_knowledge
@@ -80,7 +94,7 @@ export class RagService {
 
       // 3. Filter similarity yang terlalu rendah jika perlu
       const threshold = 0.4;
-      const relevantResults = results.filter(r => r.similarity >= threshold);
+      const relevantResults = results.filter((r) => r.similarity >= threshold);
 
       if (relevantResults.length === 0) {
         return '';
@@ -93,7 +107,9 @@ export class RagService {
 
       return contextBlocks.join('\n\n');
     } catch (error) {
-      this.logger.error(`Error fetching relevant context via pgvector: ${error.message}`);
+      this.logger.error(
+        `Error fetching relevant context via pgvector: ${error.message}`,
+      );
       return '';
     }
   }

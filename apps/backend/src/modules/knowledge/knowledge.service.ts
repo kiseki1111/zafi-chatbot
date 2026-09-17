@@ -1,4 +1,9 @@
-import { Injectable, Inject, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { OPENAI_CLIENT } from '../../core/openai/openai.module';
 import { OpenAI } from 'openai';
@@ -18,23 +23,23 @@ export class KnowledgeService {
   async findAll(tenantId: string) {
     const items = await this.prisma.knowledgeBase.findMany({
       where: { tenantId },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
     // Extract title from metadata for response
-    return items.map(item => ({
+    return items.map((item) => ({
       id: item.id,
       title: (item.metadata as any)?.title || 'Untitled',
       content: item.content,
       metadata: item.metadata,
       tenantId: item.tenantId,
       createdAt: item.createdAt,
-      updatedAt: item.updatedAt
+      updatedAt: item.updatedAt,
     }));
   }
 
   async findOne(id: string, tenantId: string) {
     const item = await this.prisma.knowledgeBase.findFirst({
-      where: { id, tenantId }
+      where: { id, tenantId },
     });
 
     if (!item) {
@@ -48,7 +53,7 @@ export class KnowledgeService {
       metadata: item.metadata,
       tenantId: item.tenantId,
       createdAt: item.createdAt,
-      updatedAt: item.updatedAt
+      updatedAt: item.updatedAt,
     };
   }
 
@@ -58,12 +63,22 @@ export class KnowledgeService {
         data: {
           content,
           tenantId,
-          metadata: { title, type: 'text' }
-        }
+          metadata: { title, type: 'text' },
+        },
       });
       // Sync to vector DB so agent can use it immediately
-      await this.dataAgentService.syncKnowledgeBase(tenantId).catch(e => console.warn('Knowledge sync warning:', e.message));
-      return { id: result.id, title, content, metadata: result.metadata, tenantId, createdAt: result.createdAt, updatedAt: result.updatedAt };
+      await this.dataAgentService
+        .syncKnowledgeBase(tenantId)
+        .catch((e) => console.warn('Knowledge sync warning:', e.message));
+      return {
+        id: result.id,
+        title,
+        content,
+        metadata: result.metadata,
+        tenantId,
+        createdAt: result.createdAt,
+        updatedAt: result.updatedAt,
+      };
     } catch (error: any) {
       console.error('DB Insert Error:', error);
       throw new BadRequestException('Database insert failed: ' + error.message);
@@ -84,17 +99,24 @@ export class KnowledgeService {
     } else if (ext === 'txt') {
       content = file.buffer.toString('utf8');
     } else {
-      throw new BadRequestException('Unsupported file format. Use PDF, DOCX, or TXT.');
+      throw new BadRequestException(
+        'Unsupported file format. Use PDF, DOCX, or TXT.',
+      );
     }
 
     // Basic cleanup
     content = content.replace(/\n+/g, '\n').trim();
-    if (!content) throw new BadRequestException('Could not extract text from file');
-    
+    if (!content)
+      throw new BadRequestException('Could not extract text from file');
+
     return content;
   }
 
-  async createFile(tenantId: string, file: Express.Multer.File, title?: string) {
+  async createFile(
+    tenantId: string,
+    file: Express.Multer.File,
+    title?: string,
+  ) {
     const content = await this.processFile(file);
     const finalTitle = title || file.originalname;
 
@@ -103,12 +125,26 @@ export class KnowledgeService {
         data: {
           content,
           tenantId,
-          metadata: { title: finalTitle, type: 'file', filename: file.originalname }
-        }
+          metadata: {
+            title: finalTitle,
+            type: 'file',
+            filename: file.originalname,
+          },
+        },
       });
       // Sync to vector DB so agent can use it immediately
-      await this.dataAgentService.syncKnowledgeBase(tenantId).catch(e => console.warn('Knowledge sync warning:', e.message));
-      return { id: result.id, title: finalTitle, content, metadata: result.metadata, tenantId, createdAt: result.createdAt, updatedAt: result.updatedAt };
+      await this.dataAgentService
+        .syncKnowledgeBase(tenantId)
+        .catch((e) => console.warn('Knowledge sync warning:', e.message));
+      return {
+        id: result.id,
+        title: finalTitle,
+        content,
+        metadata: result.metadata,
+        tenantId,
+        createdAt: result.createdAt,
+        updatedAt: result.updatedAt,
+      };
     } catch (error: any) {
       console.error('DB Insert Error:', error);
       throw new BadRequestException('Database insert failed: ' + error.message);
@@ -127,23 +163,27 @@ export class KnowledgeService {
       `UPDATE "knowledge_base"
        SET content = $1, metadata = $2::jsonb, updated_at = NOW()
        WHERE id = $3 AND tenant_id = $4`,
-      content, metadataStr, id, tenantId
+      content,
+      metadataStr,
+      id,
+      tenantId,
     );
 
     // Sync to vector DB so agent gets updated knowledge
-    await this.dataAgentService.syncKnowledgeBase(tenantId).catch(e => console.warn('Knowledge sync warning:', e.message));
+    await this.dataAgentService
+      .syncKnowledgeBase(tenantId)
+      .catch((e) => console.warn('Knowledge sync warning:', e.message));
 
     return this.findOne(id, tenantId);
   }
 
   async remove(id: string, tenantId: string) {
     await this.findOne(id, tenantId); // ensure it exists
-    
+
     await this.prisma.knowledgeBase.deleteMany({
       where: { id, tenantId },
     });
 
-    
     return { success: true };
   }
 }

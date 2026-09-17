@@ -4,7 +4,11 @@ import OpenAI from 'openai';
 import { ExtractedProductDto } from '../dto/extracted-product.dto';
 
 export interface TextExtractionResult {
-  intent: 'small_talk' | 'ingestion_product' | 'ingestion_knowledge' | 'ingestion_mixed';
+  intent:
+    | 'small_talk'
+    | 'ingestion_product'
+    | 'ingestion_knowledge'
+    | 'ingestion_mixed';
   replyMessage: string;
   products: ExtractedProductDto[];
   knowledge_chunks: string[];
@@ -16,12 +20,13 @@ export class KnowledgeAiService {
   private openai: OpenAI;
 
   constructor(private readonly configService: ConfigService) {
-    const apiKey = this.configService.get<string>('OPENROUTER_API_KEY') 
-                || this.configService.get<string>('OPENAI_API_KEY');
-    const baseURL = this.configService.get<string>('OPENROUTER_API_KEY') 
-                  ? 'https://openrouter.ai/api/v1' 
-                  : undefined;
-    
+    const apiKey =
+      this.configService.get<string>('OPENROUTER_API_KEY') ||
+      this.configService.get<string>('OPENAI_API_KEY');
+    const baseURL = this.configService.get<string>('OPENROUTER_API_KEY')
+      ? 'https://openrouter.ai/api/v1'
+      : undefined;
+
     this.openai = new OpenAI({
       apiKey,
       baseURL,
@@ -31,83 +36,119 @@ export class KnowledgeAiService {
   async cleanTextToJSON(rawText: string): Promise<TextExtractionResult> {
     try {
       const response = await this.openai.chat.completions.create({
-        model: this.configService.get<string>('OPENAI_MODEL') || "deepseek/deepseek-v4-flash-0731",
+        model:
+          this.configService.get<string>('OPENAI_MODEL') ||
+          'deepseek/deepseek-v4-flash-0731',
         messages: [
           {
-            role: "system",
-            content: "Anda adalah asisten data untuk UMKM. Anda harus membedakan apakah pengguna sedang melakukan percakapan santai, memberikan data produk katalog, atau memberikan informasi umum seputar toko."
+            role: 'system',
+            content:
+              'Anda adalah asisten data untuk UMKM. Anda harus membedakan apakah pengguna sedang melakukan percakapan santai, memberikan data produk katalog, atau memberikan informasi umum seputar toko.',
           },
           {
-            role: "user",
+            role: 'user',
             content: `Kategorikan teks berikut ke dalam salah satu dari 4 intent:
 1. 'small_talk': Jika percakapan biasa (sapaan, pertanyaan), isi 'replyMessage' dan kosongkan array lainnya.
 2. 'ingestion_product': Jika teks murni daftar produk (ada nama, harga), isi 'products' dan kosongkan lainnya.
 3. 'ingestion_knowledge': Jika teks murni informasi toko (alamat, jam buka, aturan), isi 'knowledge_chunks' dan kosongkan yang lain.
 4. 'ingestion_mixed': Jika teks campur antara info produk DAN info toko (misal: "Kita buka jam 9, jual sepatu harga 100rb"), ekstrak keduanya dan isi array 'products' SERTA 'knowledge_chunks'.
 
-TEKS:\n${rawText}`
+TEKS:\n${rawText}`,
           },
         ],
         response_format: {
-          type: "json_schema",
+          type: 'json_schema',
           json_schema: {
-            name: "extracted_products",
+            name: 'extracted_products',
             schema: {
-              type: "object",
+              type: 'object',
               properties: {
-                intent: { type: "string", enum: ["small_talk", "ingestion_product", "ingestion_knowledge", "ingestion_mixed"] },
-                replyMessage: { type: "string" },
+                intent: {
+                  type: 'string',
+                  enum: [
+                    'small_talk',
+                    'ingestion_product',
+                    'ingestion_knowledge',
+                    'ingestion_mixed',
+                  ],
+                },
+                replyMessage: { type: 'string' },
                 knowledge_chunks: {
-                  type: "array",
-                  items: { type: "string" }
+                  type: 'array',
+                  items: { type: 'string' },
                 },
                 products: {
-                  type: "array",
+                  type: 'array',
                   items: {
-                    type: "object",
+                    type: 'object',
                     properties: {
-                      nama: { type: "string" },
-                      harga: { type: "number" },
-                      deskripsi: { type: "string" },
+                      nama: { type: 'string' },
+                      harga: { type: 'number' },
+                      deskripsi: { type: 'string' },
                       attributes: {
-                        type: "array",
-                        description: "Data variatif/spesifik produk. Misal ukuran, warna, level pedas. Ekstrak sebagai key-value.",
+                        type: 'array',
+                        description:
+                          'Data variatif/spesifik produk. Misal ukuran, warna, level pedas. Ekstrak sebagai key-value.',
                         items: {
-                          type: "object",
+                          type: 'object',
                           properties: {
-                            key: { type: "string", description: "Nama atribut (misal: 'ukuran', 'warna', 'level_pedas')" },
-                            value: { type: "string", description: "Nilai atribut (misal: 'S, M, L', 'Merah', '1-5')" }
+                            key: {
+                              type: 'string',
+                              description:
+                                "Nama atribut (misal: 'ukuran', 'warna', 'level_pedas')",
+                            },
+                            value: {
+                              type: 'string',
+                              description:
+                                "Nilai atribut (misal: 'S, M, L', 'Merah', '1-5')",
+                            },
                           },
-                          required: ["key", "value"],
-                          additionalProperties: false
-                        }
-                      }
+                          required: ['key', 'value'],
+                          additionalProperties: false,
+                        },
+                      },
                     },
-                    required: ["nama", "harga", "deskripsi", "attributes"],
-                    additionalProperties: false
-                  }
-                }
+                    required: ['nama', 'harga', 'deskripsi', 'attributes'],
+                    additionalProperties: false,
+                  },
+                },
               },
-              required: ["intent", "replyMessage", "knowledge_chunks", "products"],
-              additionalProperties: false
+              required: [
+                'intent',
+                'replyMessage',
+                'knowledge_chunks',
+                'products',
+              ],
+              additionalProperties: false,
             },
-            strict: true
-          }
-        }
+            strict: true,
+          },
+        },
       });
 
       const jsonStr = response.choices[0].message.content;
-      if (!jsonStr) return { intent: 'small_talk', replyMessage: "Maaf, saya tidak mengerti maksud Anda.", products: [], knowledge_chunks: [] };
+      if (!jsonStr)
+        return {
+          intent: 'small_talk',
+          replyMessage: 'Maaf, saya tidak mengerti maksud Anda.',
+          products: [],
+          knowledge_chunks: [],
+        };
       const parsed = JSON.parse(jsonStr);
       return {
         intent: parsed.intent || 'small_talk',
         replyMessage: parsed.replyMessage || '',
         products: parsed.products || [],
-        knowledge_chunks: parsed.knowledge_chunks || []
+        knowledge_chunks: parsed.knowledge_chunks || [],
       };
     } catch (e) {
       this.logger.error(`Gagal membersihkan teks via AI: ${e.message}`);
-      return { intent: 'small_talk', replyMessage: "Maaf, terjadi kesalahan saat memproses pesan Anda.", products: [], knowledge_chunks: [] };
+      return {
+        intent: 'small_talk',
+        replyMessage: 'Maaf, terjadi kesalahan saat memproses pesan Anda.',
+        products: [],
+        knowledge_chunks: [],
+      };
     }
   }
 }

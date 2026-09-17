@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
-import { IncomingMessage, AgentResponse } from '../../core/omnichannel/interfaces/incoming-message.interface';
+import {
+  IncomingMessage,
+  AgentResponse,
+} from '../../core/omnichannel/interfaces/incoming-message.interface';
 import { AgentSharedService } from '../../core/agent-shared/agent-shared.service';
 
 @Injectable()
@@ -60,7 +63,10 @@ WAJIB MERESPON DALAM FORMAT JSON BERIKUT:
     private readonly agentSharedService: AgentSharedService,
   ) {}
 
-  private resolvePrompt(template: string, vars: Record<string, string>): string {
+  private resolvePrompt(
+    template: string,
+    vars: Record<string, string>,
+  ): string {
     let result = template;
     for (const [key, value] of Object.entries(vars)) {
       result = result.replaceAll(`{${key}}`, value);
@@ -68,79 +74,119 @@ WAJIB MERESPON DALAM FORMAT JSON BERIKUT:
     return result;
   }
 
-  async handleMessage(message: IncomingMessage, onChunk?: (chunk: string) => void): Promise<AgentResponse> {
-    const { senderId, sessionName, mediaUrls, tenantId: messageTenantId } = message;
+  async handleMessage(
+    message: IncomingMessage,
+    onChunk?: (chunk: string) => void,
+  ): Promise<AgentResponse> {
+    const {
+      senderId,
+      sessionName,
+      mediaUrls,
+      tenantId: messageTenantId,
+    } = message;
     let text = message.text || '';
     const effectiveSessionName = sessionName || 'unknown-session';
 
     // S-CS2: Handle image by converting to text via Vision AI
     if (mediaUrls && mediaUrls.length > 0) {
-        this.logger.log(`[CS-BOT] Menganalisis ${mediaUrls.length} gambar...`);
-        const imgDesc = await this.agentSharedService.analyzeImage(mediaUrls[0], "Deskripsikan barang apa ini. Sebutkan merk, model, dan warna jika terlihat jelas.");
-        text += `\n[Gambar dikirim oleh pelanggan: ${imgDesc}]`;
+      this.logger.log(`[CS-BOT] Menganalisis ${mediaUrls.length} gambar...`);
+      const imgDesc = await this.agentSharedService.analyzeImage(
+        mediaUrls[0],
+        'Deskripsikan barang apa ini. Sebutkan merk, model, dan warna jika terlihat jelas.',
+      );
+      text += `\n[Gambar dikirim oleh pelanggan: ${imgDesc}]`;
     }
 
     // 1. Ambil History menggunakan utilitas terpusat
-    const recentMessages = await this.agentSharedService.getRecentContext(senderId, effectiveSessionName, 8);
-    
+    const recentMessages = await this.agentSharedService.getRecentContext(
+      senderId,
+      effectiveSessionName,
+      8,
+    );
+
     // SANITASI: Hapus pesan halusinasi example.com
-    const cleanHistory = recentMessages.filter(msg => {
-        if (msg.senderType === 'bot' && msg.content && msg.content.includes('example.com')) {
-            return false;
-        }
-        return true;
+    const cleanHistory = recentMessages.filter((msg) => {
+      if (
+        msg.senderType === 'bot' &&
+        msg.content &&
+        msg.content.includes('example.com')
+      ) {
+        return false;
+      }
+      return true;
     });
 
-    const chatHistoryText = cleanHistory.map(m => 
-      `${m.senderType === 'bot' ? 'CS' : 'Customer'}: ${m.content}`
-    ).join('\n');
+    const chatHistoryText = cleanHistory
+      .map((m) => `${m.senderType === 'bot' ? 'CS' : 'Customer'}: ${m.content}`)
+      .join('\n');
 
     const instance = await this.prisma.whatsappInstance.findUnique({
       where: { instanceName: effectiveSessionName },
-      include: { tenant: true }
+      include: { tenant: true },
     });
     const tenantId = messageTenantId || instance?.tenantId || '';
 
     if (!tenantId) {
-       return { text: "Maaf, nomor bot ini belum terhubung dengan toko manapun.", images: [] };
+      return {
+        text: 'Maaf, nomor bot ini belum terhubung dengan toko manapun.',
+        images: [],
+      };
     }
 
     // 2. Rewrite Query & Detect Catalog Intent (Optional, for now just use standard RAG)
-    let context = await this.agentSharedService.retrieveRelevantKnowledge(text, tenantId);
+    let context = await this.agentSharedService.retrieveRelevantKnowledge(
+      text,
+      tenantId,
+    );
 
     // PLANSITE: Real-time unit availability context
-    const availabilityContext = await this.agentSharedService.getAvailabilityContext(tenantId);
+    const availabilityContext =
+      await this.agentSharedService.getAvailabilityContext(tenantId);
     if (availabilityContext) {
       context += `\n\n=== DATA PLANSITE & KETERSEDIAAN UNIT PERUMAHAN (REAL-TIME DATABASE) ===\n${availabilityContext}\n===================================================================`;
     }
 
     // S-CS3: Real-time stock check bypass
     const lowerText = text.toLowerCase();
-    if (lowerText.includes('stok') || lowerText.includes('sisa') || lowerText.includes('masih ada') || lowerText.includes('ready')) {
-        const products = await this.prisma.product.findMany({
-            where: { tenantId },
-            take: 20
-        });
-        const stockInfo = products.map(p => `- ${p.name}: Sisa stok ${p.stock}`).join('\n');
-        context += `\n\n=== INFO STOK REAL-TIME SAAT INI (PENTING) ===\n${stockInfo}`;
+    if (
+      lowerText.includes('stok') ||
+      lowerText.includes('sisa') ||
+      lowerText.includes('masih ada') ||
+      lowerText.includes('ready')
+    ) {
+      const products = await this.prisma.product.findMany({
+        where: { tenantId },
+        take: 20,
+      });
+      const stockInfo = products
+        .map((p) => `- ${p.name}: Sisa stok ${p.stock}`)
+        .join('\n');
+      context += `\n\n=== INFO STOK REAL-TIME SAAT INI (PENTING) ===\n${stockInfo}`;
     }
 
     // Fetch Tenant Config
     let tenantConfig: any = null;
     if (tenantId) {
-      tenantConfig = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+      tenantConfig = await this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+      });
     }
-    
+
     const agentName = tenantConfig?.agentName || 'Luna';
     const botTone = tenantConfig?.agentTone || 'ramah dan profesional';
     const tenantName = tenantConfig?.name || 'Perusahaan Kami';
 
-    const fallbackContact = tenantConfig?.phone ? `di nomor WA: ${tenantConfig.phone}` : 'langsung ke tim marketing kami';
+    const fallbackContact = tenantConfig?.phone
+      ? `di nomor WA: ${tenantConfig.phone}`
+      : 'langsung ke tim marketing kami';
     const operatingHours = tenantConfig?.operatingHours || 'Setiap Hari';
     const storeAddress = tenantConfig?.address || 'Hanya Online';
-    const currentTime = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
+    const currentTime = new Date().toLocaleString('id-ID', {
+      timeZone: 'Asia/Jakarta',
+    });
 
-    const promptTemplate = tenantConfig?.systemPrompt || this.DEFAULT_SYSTEM_PROMPT;
+    const promptTemplate =
+      tenantConfig?.systemPrompt || this.DEFAULT_SYSTEM_PROMPT;
     let systemPrompt = this.resolvePrompt(promptTemplate, {
       agentName,
       tenantName,
@@ -166,31 +212,44 @@ Pesan Masuk Saat Ini dari Customer:
 Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format JSON yang diminta.`;
 
     try {
-        let rawResponse = '';
-        if (onChunk) {
-            rawResponse = await this.agentSharedService.callLLMStream(fullPrompt, systemPrompt, true, onChunk);
-        } else {
-            rawResponse = await this.agentSharedService.callLLM(fullPrompt, systemPrompt, true);
-        }
-        
-        const parsed = JSON.parse(rawResponse);
-        
-        let aiText = parsed.text || '';
-        aiText = aiText.replace(/[*~`]/g, '');
-        
-        const aiImages = Array.isArray(parsed.images) ? parsed.images.filter((img: any) => img && img.url && !img.url.includes('example.com')) : [];
-        const order = parsed.order || null;
-        return {
-            text: aiText,
-            images: aiImages,
-            order: order
-        };
+      let rawResponse = '';
+      if (onChunk) {
+        rawResponse = await this.agentSharedService.callLLMStream(
+          fullPrompt,
+          systemPrompt,
+          true,
+          onChunk,
+        );
+      } else {
+        rawResponse = await this.agentSharedService.callLLM(
+          fullPrompt,
+          systemPrompt,
+          true,
+        );
+      }
+
+      const parsed = JSON.parse(rawResponse);
+
+      let aiText = parsed.text || '';
+      aiText = aiText.replace(/[*~`]/g, '');
+
+      const aiImages = Array.isArray(parsed.images)
+        ? parsed.images.filter(
+            (img: any) => img && img.url && !img.url.includes('example.com'),
+          )
+        : [];
+      const order = parsed.order || null;
+      return {
+        text: aiText,
+        images: aiImages,
+        order: order,
+      };
     } catch (e) {
-        this.logger.error(`Error parsing LLM JSON: ${e.message}`);
-        return {
-            text: "Maaf, sistem sedang sibuk. Silakan coba lagi nanti.",
-            images: []
-        };
+      this.logger.error(`Error parsing LLM JSON: ${e.message}`);
+      return {
+        text: 'Maaf, sistem sedang sibuk. Silakan coba lagi nanti.',
+        images: [],
+      };
     }
   }
 }

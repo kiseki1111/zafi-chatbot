@@ -9,10 +9,7 @@ const nextConfig: any = {
 
   reactStrictMode: false,
   async rewrites() {
-    const backendUrl = process.env.BACKEND_URL;
-    if (!backendUrl) {
-      throw new Error("BACKEND_URL environment variable is not set!");
-    }
+    const backendUrl = process.env.BACKEND_URL || "http://127.0.0.1:3005";
     return [
       {
         source: "/api/v1/auth/:path*",
@@ -73,6 +70,14 @@ const nextConfig: any = {
       {
         source: "/api/v1/followup/:path*",
         destination: `${backendUrl}/api/v1/followup/:path*`,
+      },
+      {
+        source: "/api/v1/contacts",
+        destination: `${backendUrl}/api/v1/contacts`,
+      },
+      {
+        source: "/api/v1/contacts/:path*",
+        destination: `${backendUrl}/api/v1/contacts/:path*`,
       },
     ];
   },

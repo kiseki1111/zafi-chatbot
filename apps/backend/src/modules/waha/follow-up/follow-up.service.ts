@@ -27,12 +27,14 @@ export class FollowUpService {
     return config;
   }
 
-  async updateConfig(data: Partial<{
-    isEnabled: boolean;
-    scheduleTime: string;
-    inactivityHours: number;
-    followUpPrompt: string;
-  }>) {
+  async updateConfig(
+    data: Partial<{
+      isEnabled: boolean;
+      scheduleTime: string;
+      inactivityHours: number;
+      followUpPrompt: string;
+    }>,
+  ) {
     const existing = await this.prisma.followUpConfig.findFirst();
     if (existing) {
       return this.prisma.followUpConfig.update({
@@ -174,21 +176,29 @@ Bahasa: Indonesia. Maksimal 2 emoji. Tanpa markdown.`;
     }
 
     const inactiveContacts = await this.getInactiveContacts(instanceName);
-    this.logger.log(`Found ${inactiveContacts.length} inactive contacts for follow-up`);
-    this.logger.debug(`Inactive contacts: ${JSON.stringify(inactiveContacts.map(c => c.contactPhone))}`);
+    this.logger.log(
+      `Found ${inactiveContacts.length} inactive contacts for follow-up`,
+    );
+    this.logger.debug(
+      `Inactive contacts: ${JSON.stringify(inactiveContacts.map((c) => c.contactPhone))}`,
+    );
 
     let sent = 0;
     let errors = 0;
 
     for (const contact of inactiveContacts) {
-      this.logger.log(`Processing follow-up for ${contact.contactPhone} on ${contact.instanceName}`);
+      this.logger.log(
+        `Processing follow-up for ${contact.contactPhone} on ${contact.instanceName}`,
+      );
       const message = await this.generateFollowUpMessage(
         contact.contactPhone,
         contact.instanceName,
       );
 
       if (message) {
-        this.logger.log(`Generated follow-up for ${contact.contactPhone}: "${message.substring(0, 50)}..."`);
+        this.logger.log(
+          `Generated follow-up for ${contact.contactPhone}: "${message.substring(0, 50)}..."`,
+        );
         const result = await this.sendFollowUp(
           contact.contactPhone,
           contact.instanceName,

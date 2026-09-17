@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Put, Query, Body, Logger } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Query,
+  Body,
+  Logger,
+} from '@nestjs/common';
 import { FollowUpService } from './follow-up.service';
 
 @Controller('api/v1/followup')
@@ -13,12 +21,15 @@ export class FollowUpController {
   }
 
   @Put('config')
-  async updateConfig(@Body() data: {
-    isEnabled?: boolean;
-    scheduleTime?: string;
-    inactivityHours?: number;
-    followUpPrompt?: string;
-  }) {
+  async updateConfig(
+    @Body()
+    data: {
+      isEnabled?: boolean;
+      scheduleTime?: string;
+      inactivityHours?: number;
+      followUpPrompt?: string;
+    },
+  ) {
     return this.followUpService.updateConfig(data);
   }
 
@@ -33,10 +44,7 @@ export class FollowUpController {
   }
 
   @Get('history')
-  async getHistory(
-    @Query('skip') skip?: number,
-    @Query('take') take?: number,
-  ) {
+  async getHistory(@Query('skip') skip?: number, @Query('take') take?: number) {
     return this.followUpService.getHistory(
       parseInt(String(skip || 0)),
       parseInt(String(take || 50)),

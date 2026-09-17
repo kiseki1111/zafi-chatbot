@@ -3,7 +3,11 @@
 /node_modules
 /build
 apps/backend/dist
+apps/backend/node_modules
 apps/web/.next
+apps/web/node_modules
+*.tsbuildinfo
+*.db
 
 # Logs
 logs
@@ -20,6 +24,9 @@ lerna-debug.log*
 # Tests
 /coverage
 /.nyc_output
+
+# Assets & Temp Media
+apps/image/
 
 # IDEs and editors
 /.idea

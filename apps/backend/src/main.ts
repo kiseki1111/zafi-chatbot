@@ -10,26 +10,34 @@ import helmet from 'helmet';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  
+
   // Serve static assets from 'public' folder
   app.useStaticAssets(join(__dirname, '..', 'public'));
   const configService = app.get(ConfigService);
 
   // 1. Mengaktifkan HTTP Security Headers sesuai panduan halaman 38
   const isSecurityBypass = process.env.SECURITY_BYPASS_MODE === 'true';
-  
+
   if (isSecurityBypass) {
-    console.warn('⚠️  SECURITY BYPASS MODE IS ACTIVE: Helmet strict mode disabled');
-    app.use(helmet({
-      contentSecurityPolicy: false,
-      crossOriginEmbedderPolicy: false,
-    }));
+    console.warn(
+      '⚠️  SECURITY BYPASS MODE IS ACTIVE: Helmet strict mode disabled',
+    );
+    app.use(
+      helmet({
+        contentSecurityPolicy: false,
+        crossOriginEmbedderPolicy: false,
+      }),
+    );
   } else {
     app.use(helmet());
   }
   // 2. Mengaktifkan CORS Whitelist ketat sesuai Security Checklist
   app.enableCors({
-    origin: ['http://localhost:3000', 'http://localhost:3001', 'https://app.zafiproperti.com'], // Sesuaikan dengan domain frontend resmi
+    origin: [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'https://app.zafiproperti.com',
+    ], // Sesuaikan dengan domain frontend resmi
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     credentials: true,
   });
@@ -49,7 +57,7 @@ async function bootstrap() {
 
   const port = process.env.PORT;
   if (!port) {
-    throw new Error("PORT environment variable is not set!");
+    throw new Error('PORT environment variable is not set!');
   }
   await app.listen(port);
 }

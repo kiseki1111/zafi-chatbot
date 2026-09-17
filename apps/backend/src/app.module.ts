@@ -19,6 +19,7 @@ import { AgentAssistantModule } from './features/agent-assistant/agent-assistant
 import { SimulatorModule } from './features/simulator/simulator.module';
 import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 import { AvailabilityModule } from './modules/availability/availability.module';
+import { ContactsModule } from './modules/contacts/contacts.module';
 
 @Module({
   imports: [
@@ -26,16 +27,19 @@ import { AvailabilityModule } from './modules/availability/availability.module';
       isGlobal: true,
       load: [jwtConfig],
     }),
-    ThrottlerModule.forRoot([{
-      ttl: 900000,
-      limit: 3000,
-    }]),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 900000,
+        limit: 3000,
+      },
+    ]),
     ScheduleModule.forRoot(),
     PrismaModule,
     AuthModule,
     TenantModule,
     WahaModule,
     ChatsModule,
+    ContactsModule,
     FollowUpModule,
     KnowledgeIngestModule,
     OpenAiModule,
@@ -53,4 +57,4 @@ import { AvailabilityModule } from './modules/availability/availability.module';
     },
   ],
 })
-export class AppModule { }
+export class AppModule {}

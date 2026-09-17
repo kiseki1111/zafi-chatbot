@@ -13,6 +13,8 @@ interface AuthState {
   setAuthView: (v: AuthView) => void;
   login: (email: string, password: string) => Promise<{ ok: boolean; message?: string }>;
   loginAs: (role: Role) => void;
+  loginAsPreset: (preset: "superadmin" | "zafi" | "bus") => void;
+  loginAsTenant: (user: User) => void;
 
   register: (data: { name: string; email: string; phone: string; password: string }) => Promise<{ ok: boolean; message?: string }>;
   updateUser: (data: Partial<User>) => void;
@@ -44,7 +46,7 @@ export const useAuthStore = create<AuthState>()(
             id: responseData.user.id,
             name: responseData.user.name || responseData.user.email.split("@")[0],
             email: responseData.user.email,
-            role: responseData.user.roles?.[0] || "owner",
+            role: responseData.user.roles?.[0] || "manager",
             status: "active",
             createdAt: new Date().toISOString().slice(0, 10),
             lastLogin: new Date().toISOString().slice(0, 16).replace("T", " "),
@@ -57,17 +59,70 @@ export const useAuthStore = create<AuthState>()(
         }
       },
       loginAs: (role: Role) => {
+        let name = "Demo Administrator";
+        let email = "admin@demo.id";
+        if (role === "superadmin") {
+          name = "Superadmin Master";
+          email = "superadmin@propertiku.id";
+        } else if (role === "manager") {
+          name = "Demo Manager";
+          email = "manager@demo.id";
+        }
+
         const user: User = {
           id: "u-" + role,
-          name: role === "superadmin" ? "Superadmin Global" : `Demo ${role}`,
-          email: `${role}@umkm.id`,
+          name,
+          email,
           role,
           status: "active",
           createdAt: "2024-01-01",
           lastLogin: new Date().toISOString().slice(0, 16).replace("T", " "),
-          tenantId: "t-123", // Dummy tenant
+          tenantId: role === "superadmin" ? null : "t-123",
         };
         set({ user, isAuthenticated: true });
+      },
+
+      loginAsPreset: (preset: "superadmin" | "zafi" | "bus") => {
+        let user: User;
+        if (preset === "superadmin") {
+          user = {
+            id: "u-superadmin",
+            name: "Super Admin Master",
+            email: "superadmin@propertiku.id",
+            role: "superadmin",
+            status: "active",
+            createdAt: "2024-01-01",
+            lastLogin: new Date().toISOString().slice(0, 16).replace("T", " "),
+            tenantId: null,
+          };
+        } else if (preset === "zafi") {
+          user = {
+            id: "54bcc682-7ae9-497f-97da-3e41ba1b2ee5", // Real ID in DB
+            name: "Zafi Property Manager",
+            email: "zafi@properti.com",
+            role: "manager",
+            status: "active",
+            createdAt: "2024-01-01",
+            lastLogin: new Date().toISOString().slice(0, 16).replace("T", " "),
+            tenantId: "4a023464-c66a-4edf-8926-9a08a05ea221",
+          };
+        } else {
+          user = {
+            id: "b4700199-d96c-49f6-97c5-c915b5430367", // Real ID in DB
+            name: "Manager Nusantara Bus",
+            email: "manager@nusantarabus.com",
+            role: "manager",
+            status: "active",
+            createdAt: "2024-01-01",
+            lastLogin: new Date().toISOString().slice(0, 16).replace("T", " "),
+            tenantId: "5d85136d-d79b-4b63-8a80-013a49a8b1c0",
+          };
+        }
+        set({ user, isAuthenticated: true });
+      },
+
+      loginAsTenant: (tenantUser: User) => {
+        set({ user: tenantUser, isAuthenticated: true, authView: "login" });
       },
 
       register: async (data) => {
@@ -97,7 +152,7 @@ export const useAuthStore = create<AuthState>()(
             name: responseData.user.name,
             email: responseData.user.email,
             phone: data.phone,
-            role: responseData.user.roles?.[0] || "owner",
+            role: responseData.user.roles?.[0] || "manager",
             status: "active",
             createdAt: new Date().toISOString().slice(0, 10),
             lastLogin: new Date().toISOString().slice(0, 16).replace("T", " "),

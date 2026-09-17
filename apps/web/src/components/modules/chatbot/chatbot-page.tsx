@@ -28,6 +28,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -52,6 +59,8 @@ import {
   Plus,
   UserCheck,
   Sparkles,
+  UserCog,
+  Image as ImageIcon,
 } from "lucide-react";
 import type {
   Contact,
@@ -172,6 +181,7 @@ function MessageBubble({
   contactName: string;
 }) {
   const isOut = msg.direction === "out";
+  const isImage = msg.messageType === "image" && msg.mediaUrl;
   return (
     <div
       className={cn(
@@ -206,7 +216,20 @@ function MessageBubble({
             <Bot className="h-3 w-3" /> AI
           </div>
         )}
-        <p className="whitespace-pre-wrap break-words">{msg.text}</p>
+        {msg.senderName && !msg.isAI && isOut && (
+          <div className="mb-1 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold bg-white/20 text-white">
+            <UserCog className="h-3 w-3" /> {msg.senderName}
+          </div>
+        )}
+        {isImage ? (
+          <img
+            src={msg.mediaUrl}
+            alt={msg.text || "gambar"}
+            className="rounded-lg max-w-full max-h-64 object-cover mb-1"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          />
+        ) : null}
+        {msg.text && <p className="whitespace-pre-wrap break-words">{msg.text}</p>}
         <div
           className={cn(
             "mt-1 flex items-center gap-1 justify-end text-[10px]",
@@ -263,19 +286,28 @@ function ContactListItem({
           title={stage.label}
         />
       </div>
-      <div className="min-w-0 flex-1 flex flex-col justify-center">
-        <div className="grid grid-cols-[1fr_auto] items-center gap-2">
-          <p className="text-sm font-medium truncate">{contact.name}</p>
-          <span className="text-[10px] text-muted-foreground">
-            {contact.lastMessageAt}
-          </span>
-        </div>
-        <p className="text-xs text-muted-foreground truncate mt-0.5">
-          {contact.lastMessage}
-        </p>
-        {contact.tags.length > 0 && (
+        <div className="min-w-0 flex-1 flex flex-col justify-center">
+          <div className="grid grid-cols-[1fr_auto] items-center gap-2">
+            <p className="text-sm font-medium truncate">{contact.name}</p>
+            <span className="text-[10px] text-muted-foreground">
+              {contact.lastMessageAt}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground truncate mt-0.5">
+            {contact.lastMessage}
+          </p>
           <div className="flex flex-wrap gap-1 mt-1">
-            {contact.tags.slice(0, 3).map((t) => (
+            {contact.mode === "human" ? (
+              <span className="inline-flex items-center rounded px-1 py-0 text-[9px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 gap-0.5">
+                <UserCog className="h-2.5 w-2.5" />
+                {contact.assignedToName ? contact.assignedToName : "Admin"}
+              </span>
+            ) : (
+              <span className="inline-flex items-center rounded px-1 py-0 text-[9px] font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 gap-0.5">
+                <Bot className="h-2.5 w-2.5" /> Bot
+              </span>
+            )}
+            {contact.tags.slice(0, 2).map((t) => (
               <span
                 key={t}
                 className={cn(
@@ -287,8 +319,7 @@ function ContactListItem({
               </span>
             ))}
           </div>
-        )}
-      </div>
+        </div>
     </div>
   );
 }
@@ -474,15 +505,25 @@ export function ChatbotPage() {
          if (data && data.data && Array.isArray(data.data)) {
            sessionsData = data.data;
          }
-         if (!Array.isArray(sessionsData)) {
-           console.warn("Instances API did not return an array:", data);
-           return;
+         let mapped: any[] = [];
+         if (Array.isArray(sessionsData)) {
+           mapped = sessionsData
+             .filter((d: any) => d.status?.toLowerCase() === 'working')
+             .map((d: any) => ({ id: d.name, name: d.name, status: d.status?.toLowerCase() || 'stopped' }));
          }
-         const mapped = sessionsData
-           .filter((d: any) => d.status?.toLowerCase() === 'working')
-           .map((d: any) => ({ id: d.name, name: d.name, status: d.status?.toLowerCase() || 'stopped' }));
+         // Selalu sediakan Sesi Dev Simulator untuk testing lokal
+         if (!mapped.some((m) => m.id === "dev-session")) {
+           mapped.push({ id: "dev-session", name: "Sesi Simulasi (Dev)", status: "working" });
+         }
          setSessions(mapped);
-      }).catch(console.error);
+         if (!sessionId && mapped.length > 0) {
+           setSessionId(mapped[0].id);
+         }
+      }).catch(() => {
+        const fallback = [{ id: "dev-session", name: "Sesi Simulasi (Dev)", status: "working" }];
+        setSessions(fallback);
+        if (!sessionId) setSessionId("dev-session");
+      });
   }, []);
 
   const activeSession = useMemo(
@@ -512,8 +553,32 @@ export function ChatbotPage() {
   const [infoOpenMobile, setInfoOpenMobile] = useState(false);
   const [newTag, setNewTag] = useState("");
   const [notes, setNotes] = useState<Record<string, string>>({});
-
   const [mobileShowList, setMobileShowList] = useState(false);
+
+  // Takeover state
+  const [takingOver, setTakingOver] = useState(false);
+  const [imagePreview, setImagePreview] = useState<{ base64: string; mimeType: string; name: string } | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
+  // Real WAHA Tester modal state
+  const [isWahaTestModalOpen, setIsWahaTestModalOpen] = useState(false);
+  const [wahaTestLoading, setWahaTestLoading] = useState(false);
+  const [wahaTestResult, setWahaTestResult] = useState<any>(null);
+  const [wahaTestForm, setWahaTestForm] = useState({
+    sessionName: "Zafi-CS",
+    chatId: "6281234567890",
+    text: "Halo, ini pesan test simulasi WAHA",
+    imageUrl: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&auto=format&fit=crop",
+  });
+
+  // Mock incoming simulator modal state
+  const [isSimModalOpen, setIsSimModalOpen] = useState(false);
+  const [simForm, setSimForm] = useState({
+    phone: "628987654321",
+    name: "Calon Pembeli Properti",
+    text: "Halo admin, apakah unit ini masih tersedia?",
+    imageUrl: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&auto=format&fit=crop",
+  });
 
   // Fetch Conversations
   const fetchConversations = async () => {
@@ -539,7 +604,9 @@ export function ChatbotPage() {
           phone: cleanPhone,
           stage: c.status === 'OPEN' ? 'lead' : 'customer',
           tags: [],
-          assignedTo: c.assignedTo?.name,
+          assignedTo: c.assignedTo?.id,
+          assignedToName: c.assignedTo?.name,
+          mode: c.mode || 'bot',
           unread: c.unreadCount,
           lastMessage: c.messages?.[0]?.content,
           lastMessageAt: new Date(c.lastMessageAt).toLocaleTimeString(),
@@ -579,6 +646,9 @@ export function ChatbotPage() {
         status: m.status?.toLowerCase() || 'sent',
         timestamp: new Date(m.createdAt).toLocaleTimeString(),
         isAI: m.senderType === 'bot' || m.senderType === 'ai',
+        senderName: m.senderType === 'agent' ? (m.sender?.name || 'Admin') : undefined,
+        messageType: m.messageType?.toLowerCase(),
+        mediaUrl: (m.metadata as any)?.mediaUrl || (m.metadata as any)?.url,
       }));
       
       if (reset) {
@@ -632,6 +702,9 @@ export function ChatbotPage() {
               status: m.status?.toLowerCase() || 'sent',
               timestamp: new Date(m.createdAt).toLocaleTimeString(),
               isAI: m.senderType === 'bot' || m.senderType === 'ai',
+              senderName: m.senderType === 'agent' ? (m.sender?.name || 'Admin') : undefined,
+              messageType: m.messageType?.toLowerCase(),
+              mediaUrl: (m.metadata as any)?.mediaUrl || (m.metadata as any)?.url,
             }));
             setMessages(prev => {
                if (skip <= 20) return mappedMsgs;
@@ -715,12 +788,113 @@ export function ChatbotPage() {
     setMobileShowList(false);
   }
 
-  // Send a message
+  // Toggle Takeover / Release
+  async function toggleTakeover() {
+    if (!activeId || !activeContact) return;
+    setTakingOver(true);
+    const isHuman = activeContact.mode === "human";
+    const endpoint = `/api/v1/chats/${activeId}/${isHuman ? "release" : "takeover"}`;
+    try {
+      const res = await fetch(endpoint, { method: "POST" });
+      if (res.ok) {
+        setContacts((prev) =>
+          prev.map((c) =>
+            c.id === activeId
+              ? {
+                  ...c,
+                  mode: isHuman ? "bot" : "human",
+                  assignedToName: isHuman ? undefined : me,
+                }
+              : c,
+          ),
+        );
+      }
+    } catch (e) {
+      console.error("Gagal toggle takeover", e);
+    } finally {
+      setTakingOver(false);
+    }
+  }
+
+  // Handle image selection
+  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    processImageFile(file);
+    e.target.value = "";
+  }
+
+  // Process image file (from input or clipboard)
+  function processImageFile(file: File) {
+    if (!file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64 = result.split(",")[1];
+      setImagePreview({ base64, mimeType: file.type, name: file.name || "screenshot.png" });
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // Clipboard Paste handler (for screenshots / Ctrl+V)
+  function handlePaste(e: React.ClipboardEvent) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith("image/")) {
+        const file = items[i].getAsFile();
+        if (file) {
+          e.preventDefault();
+          processImageFile(file);
+          break;
+        }
+      }
+    }
+  }
+
+  // Send a message (text and/or image)
   async function sendMessage(text: string) {
     const trimmed = text.trim();
-    if (!trimmed || !activeId || !sessionId || !activeContact) return;
-    
-    // Optimistic UI
+    if ((!trimmed && !imagePreview) || !activeId || !sessionId || !activeContact) return;
+
+    const isHuman = activeContact.mode === "human";
+
+    if (imagePreview) {
+      const tempId = "temp-img-" + Date.now();
+      const newMsg: ChatMessage = {
+        id: tempId,
+        contactId: activeId,
+        direction: "out",
+        text: trimmed,
+        status: "sent",
+        timestamp: new Date().toLocaleTimeString(),
+        isAI: false,
+        senderName: me,
+        messageType: "image",
+        mediaUrl: `data:${imagePreview.mimeType};base64,${imagePreview.base64}`,
+      };
+      setMessages((prev) => [...prev, newMsg]);
+      const currentPreview = imagePreview;
+      setImagePreview(null);
+      setInput("");
+
+      try {
+        await fetch(`/api/v1/chats/${activeId}/send-image`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            base64: currentPreview.base64,
+            mimeType: currentPreview.mimeType,
+            caption: trimmed || undefined,
+          }),
+        });
+      } catch (e) {
+        console.error("Failed to send image", e);
+      }
+      return;
+    }
+
+    // Text message
     const tempId = "temp-" + Date.now();
     const newMsg: ChatMessage = {
       id: tempId,
@@ -730,19 +904,72 @@ export function ChatbotPage() {
       status: "sent",
       timestamp: new Date().toLocaleTimeString(),
       isAI: false,
+      senderName: isHuman ? me : undefined,
     };
     setMessages((prev) => [...prev, newMsg]);
     setInput("");
-    
+
     try {
-      await fetch(`/api/v1/waha/instances/${sessionId}/send`, {
+      const url = isHuman
+        ? `/api/v1/chats/${activeId}/send`
+        : `/api/v1/waha/instances/${sessionId}/send`;
+      const body = isHuman
+        ? JSON.stringify({ text: trimmed })
+        : JSON.stringify({ chatId: activeContact.phone, text: trimmed });
+
+      await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+    } catch (e) {
+      console.error("Failed to send message", e);
+    }
+  }
+
+  // Trigger Mock Customer Incoming Message (for offline/testing)
+  async function triggerSimCustomer() {
+    try {
+      await fetch('/api/v1/chats/mock-customer-incoming', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chatId: activeContact.phone, text: trimmed })
+        body: JSON.stringify({
+          phone: simForm.phone,
+          name: simForm.name,
+          text: simForm.text,
+          imageUrl: simForm.imageUrl || undefined,
+          instanceName: sessionId || 'dev-session',
+        }),
       });
-      // Polling will update the status to SENT/DELIVERED
+      setIsSimModalOpen(false);
+      await fetchConversations();
+      if (activeId) fetchMessages(true);
     } catch (e) {
-       console.error("Failed to send message", e);
+      console.error("Gagal kirim simulasi pelanggan", e);
+    }
+  }
+
+  // Trigger Real WAHA Send Test
+  async function triggerRealWahaTest() {
+    setWahaTestLoading(true);
+    setWahaTestResult(null);
+    try {
+      const res = await fetch('/api/v1/chats/test-real-waha', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionName: wahaTestForm.sessionName,
+          chatId: wahaTestForm.chatId,
+          text: wahaTestForm.text,
+          imageUrl: wahaTestForm.imageUrl || undefined,
+        }),
+      });
+      const data = await res.json();
+      setWahaTestResult(data.data || data);
+    } catch (e: any) {
+      setWahaTestResult({ sendSuccess: false, error: e.message });
+    } finally {
+      setWahaTestLoading(false);
     }
   }
 
@@ -883,7 +1110,26 @@ export function ChatbotPage() {
             </span>
           )}
 
-          <div className="ml-auto flex items-center gap-3 flex-wrap">
+          <div className="ml-auto flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsWahaTestModalOpen(true)}
+              className="h-8 text-xs gap-1.5 border-dashed border-emerald-600 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
+            >
+              <Zap className="h-3.5 w-3.5 text-emerald-600" />
+              Test Kirim WAHA Real
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsSimModalOpen(true)}
+              className="h-8 text-xs gap-1.5 border-dashed border-indigo-500 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:text-indigo-300"
+            >
+              <Sparkles className="h-3.5 w-3.5 text-indigo-600" />
+              Simulasi Pesan Customer (Test Foto/Text)
+            </Button>
+
             {/* Inline stats */}
             <div className="hidden md:flex items-center gap-3 text-xs">
               <span className="inline-flex items-center gap-1 text-muted-foreground">
@@ -1024,6 +1270,25 @@ export function ChatbotPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
+                  <Button
+                    variant={activeContact.mode === "human" ? "default" : "outline"}
+                    size="sm"
+                    className={cn(
+                      "h-8 text-xs gap-1.5",
+                      activeContact.mode === "human"
+                        ? "bg-blue-600 hover:bg-blue-700 text-white"
+                        : "border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40",
+                    )}
+                    onClick={toggleTakeover}
+                    disabled={takingOver}
+                  >
+                    <UserCog className="h-3.5 w-3.5" />
+                    {takingOver
+                      ? "Memproses..."
+                      : activeContact.mode === "human"
+                        ? "Lepas ke Bot"
+                        : "Ambil Alih"}
+                  </Button>
                   <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Telepon">
                     <Phone className="h-4 w-4" />
                   </Button>
@@ -1075,6 +1340,76 @@ export function ChatbotPage() {
                   </div>
                 </ScrollArea>
               </div>
+
+              {/* Chat Input Area */}
+              <div className="p-3 border-t bg-background space-y-2">
+                {imagePreview && (
+                  <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/60 text-xs">
+                    <ImageIcon className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span className="truncate flex-1 font-medium">{imagePreview.name}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5"
+                      onClick={() => setImagePreview(null)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    ref={imageInputRef}
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageSelect}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
+                    onClick={() => imageInputRef.current?.click()}
+                    title="Kirim gambar"
+                  >
+                    <ImageIcon className="h-4 w-4" />
+                  </Button>
+                  <Input
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onPaste={handlePaste}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        sendMessage(input);
+                      }
+                    }}
+                    placeholder={
+                      activeContact.mode === "human"
+                        ? "Ketik pesan / tempel screenshot (Ctrl+V)..."
+                        : "Ketik pesan / tempel screenshot (Ctrl+V)..."
+                    }
+                    className="h-9 text-sm"
+                  />
+                  <Button
+                    type="button"
+                    size="icon"
+                    className={cn(
+                      "h-9 w-9 shrink-0 text-white",
+                      activeContact.mode === "human"
+                        ? "bg-blue-600 hover:bg-blue-700"
+                        : "bg-emerald-600 hover:bg-emerald-700",
+                    )}
+                    onClick={() => sendMessage(input)}
+                    disabled={!input.trim() && !imagePreview}
+                    title="Kirim pesan"
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
             </>
           ) : (
             // Empty state
@@ -1108,6 +1443,157 @@ export function ChatbotPage() {
           {activeContact && infoPanel}
         </SheetContent>
       </Sheet>
+
+      {/* ----- Simulator Modal ----- */}
+      <Dialog open={isSimModalOpen} onOpenChange={setIsSimModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-indigo-600" />
+              Simulasi Pesan Customer (Testing)
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-xs">
+            <div>
+              <Label className="font-medium">Nomor WhatsApp Pengirim</Label>
+              <Input
+                value={simForm.phone}
+                onChange={(e) => setSimForm({ ...simForm, phone: e.target.value })}
+                className="h-8 mt-1 font-mono"
+              />
+            </div>
+            <div>
+              <Label className="font-medium">Nama Pengirim</Label>
+              <Input
+                value={simForm.name}
+                onChange={(e) => setSimForm({ ...simForm, name: e.target.value })}
+                className="h-8 mt-1"
+              />
+            </div>
+            <div>
+              <Label className="font-medium">Teks Pesan</Label>
+              <Input
+                value={simForm.text}
+                onChange={(e) => setSimForm({ ...simForm, text: e.target.value })}
+                className="h-8 mt-1"
+              />
+            </div>
+            <div>
+              <Label className="font-medium">URL Foto / Gambar (Opsional)</Label>
+              <Input
+                value={simForm.imageUrl}
+                onChange={(e) => setSimForm({ ...simForm, imageUrl: e.target.value })}
+                placeholder="https://..."
+                className="h-8 mt-1"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Kirim foto untuk mengetes fitur terima gambar dari customer di chat bubble.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setIsSimModalOpen(false)}>
+              Batal
+            </Button>
+            <Button size="sm" onClick={triggerSimCustomer} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+              Kirim Sebagai Pelanggan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ----- Real WAHA Tester Modal ----- */}
+      <Dialog open={isWahaTestModalOpen} onOpenChange={setIsWahaTestModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-emerald-600" />
+              Test API WAHA Real (Kirim Text &amp; Gambar)
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-xs">
+            <p className="text-muted-foreground text-[11px]">
+              Tembak langsung ke server WAHA (103.30.195.145:3060) untuk memverifikasi apakah sesi aktif dan pesan/gambar berhasil dikirim.
+            </p>
+            <div>
+              <Label className="font-medium">Nama Sesi WAHA</Label>
+              <Input
+                value={wahaTestForm.sessionName}
+                onChange={(e) => setWahaTestForm({ ...wahaTestForm, sessionName: e.target.value })}
+                placeholder="Zafi-CS"
+                className="h-8 mt-1 font-mono"
+              />
+            </div>
+            <div>
+              <Label className="font-medium">Nomor WhatsApp Tujuan</Label>
+              <Input
+                value={wahaTestForm.chatId}
+                onChange={(e) => setWahaTestForm({ ...wahaTestForm, chatId: e.target.value })}
+                placeholder="6281234567890"
+                className="h-8 mt-1 font-mono"
+              />
+            </div>
+            <div>
+              <Label className="font-medium">Teks Pesan</Label>
+              <Input
+                value={wahaTestForm.text}
+                onChange={(e) => setWahaTestForm({ ...wahaTestForm, text: e.target.value })}
+                className="h-8 mt-1"
+              />
+            </div>
+            <div>
+              <Label className="font-medium">URL Gambar (Opsional)</Label>
+              <Input
+                value={wahaTestForm.imageUrl}
+                onChange={(e) => setWahaTestForm({ ...wahaTestForm, imageUrl: e.target.value })}
+                placeholder="https://..."
+                className="h-8 mt-1"
+              />
+            </div>
+
+            {/* Hasil Eksekusi Test */}
+            {wahaTestResult && (
+              <div className={cn(
+                "p-3 rounded-lg border text-xs font-mono space-y-1 mt-2",
+                wahaTestResult.sendSuccess
+                  ? "bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-200"
+                  : "bg-rose-50 border-rose-200 text-rose-900 dark:bg-rose-950/30 dark:border-rose-800 dark:text-rose-200"
+              )}>
+                <div className="flex items-center gap-1.5 font-bold">
+                  <span>{wahaTestResult.sendSuccess ? "✓ Berhasil Dikirim ke WAHA" : "✗ Gagal Dikirim ke WAHA"}</span>
+                </div>
+                <div className="text-[10px] space-y-0.5">
+                  <p>Status Sesi: {wahaTestResult.wahaSessionStatus}</p>
+                  <p>Target: {wahaTestResult.targetChatId}</p>
+                  {wahaTestResult.error && (
+                    <p className="text-rose-600 dark:text-rose-400 font-sans">
+                      Error: {typeof wahaTestResult.error === 'object' ? JSON.stringify(wahaTestResult.error) : wahaTestResult.error}
+                    </p>
+                  )}
+                  {wahaTestResult.response && (
+                    <p className="opacity-80 truncate">
+                      Respon: {JSON.stringify(wahaTestResult.response)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setIsWahaTestModalOpen(false)}>
+              Tutup
+            </Button>
+            <Button
+              size="sm"
+              onClick={triggerRealWahaTest}
+              disabled={wahaTestLoading}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
+            >
+              {wahaTestLoading ? "Mengirim..." : "Tembak WAHA API"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,4 +1,9 @@
-import { Injectable, Logger, Inject, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  Inject,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { OPENAI_CLIENT, OPENAI_MODEL } from '../openai/openai.module';
 import { OpenAI } from 'openai';
@@ -22,22 +27,28 @@ export class AgentSharedService {
   /**
    * 1. Mengambil N chat terakhir untuk short-term memory LLM.
    */
-  async getRecentContext(chatId: string, instanceName: string, limit: number = 6) {
+  async getRecentContext(
+    chatId: string,
+    instanceName: string,
+    limit: number = 6,
+  ) {
     try {
       const messages = await this.prisma.message.findMany({
         where: {
           conversation: {
             contact: { phone: chatId },
-            instanceName: instanceName
-          }
+            instanceName: instanceName,
+          },
         },
         orderBy: { createdAt: 'desc' },
-        take: limit
+        take: limit,
       });
 
       return messages.reverse();
     } catch (e) {
-      this.logger.error(`Error fetching recent context for ${chatId}: ${e.message}`);
+      this.logger.error(
+        `Error fetching recent context for ${chatId}: ${e.message}`,
+      );
       return [];
     }
   }
@@ -45,7 +56,10 @@ export class AgentSharedService {
   /**
    * 2. Mengambil informasi dari knowledge_base (Bukan vector/RAG lagi).
    */
-  async retrieveRelevantKnowledge(query: string, tenantId: string): Promise<string> {
+  async retrieveRelevantKnowledge(
+    query: string,
+    tenantId: string,
+  ): Promise<string> {
     try {
       // 1. Ambil semua knowledge dari tenant ini
       const knowledges = await this.prisma.knowledgeBase.findMany({
@@ -58,7 +72,7 @@ export class AgentSharedService {
       }
 
       // Gabungkan semua isi knowledge menjadi satu teks (sebagai konteks LLM)
-      return knowledges.map(k => k.content).join('\n\n');
+      return knowledges.map((k) => k.content).join('\n\n');
     } catch (e) {
       this.logger.error(`Error retrieving relevant knowledge: ${e.message}`);
       return '';
@@ -86,18 +100,24 @@ export class AgentSharedService {
 
       const summaries = groups.map((g) => {
         const total = g.items.length;
-        const available = g.items.filter((i) => i.status === 'AVAILABLE').length;
+        const available = g.items.filter(
+          (i) => i.status === 'AVAILABLE',
+        ).length;
         const booked = g.items.filter((i) => i.status === 'BOOKED').length;
         const occupied = g.items.filter((i) => i.status === 'OCCUPIED').length;
 
         const itemList = g.items
           .map((i) => {
             const typeStr = i.houseType ? ` (Tipe ${i.houseType})` : '';
-            const priceStr = i.price ? ` - Rp ${Number(i.price).toLocaleString('id-ID')}` : '';
+            const priceStr = i.price
+              ? ` - Rp ${Number(i.price).toLocaleString('id-ID')}`
+              : '';
             let statusLabel = 'UNIT READY (Hijau - Tersedia)';
-            if (i.status === 'BOOKED') statusLabel = 'PROSES BANK (Orange - Sedang proses KPR/Bank)';
+            if (i.status === 'BOOKED')
+              statusLabel = 'PROSES BANK (Orange - Sedang proses KPR/Bank)';
             if (i.status === 'OCCUPIED') statusLabel = 'SUDAH TERJUAL (Merah)';
-            if (i.status === 'MAINTENANCE') statusLabel = 'RUMAH CONTOH (Abu Hitam)';
+            if (i.status === 'MAINTENANCE')
+              statusLabel = 'RUMAH CONTOH (Abu Hitam)';
 
             return `  * ${i.code}${typeStr}: ${statusLabel}${priceStr}`;
           })
@@ -116,9 +136,15 @@ export class AgentSharedService {
   /**
    * Wrapper tunggal untuk memanggil OpenAI.
    */
-  async callLLM(prompt: string, systemPrompt: string, requireJson: boolean = false): Promise<string> {
+  async callLLM(
+    prompt: string,
+    systemPrompt: string,
+    requireJson: boolean = false,
+  ): Promise<string> {
     if (!this.openai) {
-      throw new InternalServerErrorException('OPENAI_API_KEY is not configured');
+      throw new InternalServerErrorException(
+        'OPENAI_API_KEY is not configured',
+      );
     }
 
     try {
@@ -126,16 +152,20 @@ export class AgentSharedService {
         model: this.model,
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: prompt }
+          { role: 'user', content: prompt },
         ],
         temperature: 0.7,
-        response_format: requireJson ? { type: 'json_object' } : { type: 'text' }
+        response_format: requireJson
+          ? { type: 'json_object' }
+          : { type: 'text' },
       });
 
       return response.choices[0].message?.content || '';
     } catch (error) {
       this.logger.error('Error in LLM call:', error);
-      throw new InternalServerErrorException('Failed to generate response from LLM');
+      throw new InternalServerErrorException(
+        'Failed to generate response from LLM',
+      );
     }
   }
 
@@ -143,13 +173,15 @@ export class AgentSharedService {
    * 4b. Wrapper untuk memanggil OpenAI secara streaming.
    */
   async callLLMStream(
-    prompt: string, 
-    systemPrompt: string, 
+    prompt: string,
+    systemPrompt: string,
     requireJson: boolean = false,
-    onChunk: (chunk: string) => void
+    onChunk: (chunk: string) => void,
   ): Promise<string> {
     if (!this.openai) {
-      throw new InternalServerErrorException('OPENAI_API_KEY is not configured');
+      throw new InternalServerErrorException(
+        'OPENAI_API_KEY is not configured',
+      );
     }
 
     try {
@@ -157,11 +189,13 @@ export class AgentSharedService {
         model: this.model,
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: prompt }
+          { role: 'user', content: prompt },
         ],
         temperature: 0.7,
-        response_format: requireJson ? { type: 'json_object' } : { type: 'text' },
-        stream: true
+        response_format: requireJson
+          ? { type: 'json_object' }
+          : { type: 'text' },
+        stream: true,
       });
 
       let fullContent = '';
@@ -175,11 +209,16 @@ export class AgentSharedService {
       return fullContent;
     } catch (error) {
       this.logger.error('Error in LLM stream call:', error);
-      throw new InternalServerErrorException('Failed to generate stream response from LLM');
+      throw new InternalServerErrorException(
+        'Failed to generate stream response from LLM',
+      );
     }
   }
 
-  async analyzeImage(mediaUrl: string, prompt: string = "Deskripsikan apa isi gambar ini dengan singkat dan jelas, fokus pada nama produk, merk, jumlah, atau informasi harga jika ada."): Promise<string> {
+  async analyzeImage(
+    mediaUrl: string,
+    prompt: string = 'Deskripsikan apa isi gambar ini dengan singkat dan jelas, fokus pada nama produk, merk, jumlah, atau informasi harga jika ada.',
+  ): Promise<string> {
     if (!this.openai) return '';
     try {
       const response = await this.openai.chat.completions.create({
@@ -189,9 +228,9 @@ export class AgentSharedService {
             role: 'user',
             content: [
               { type: 'text', text: prompt },
-              { type: 'image_url', image_url: { url: mediaUrl } }
-            ] as any // type override for openai array content
-          }
+              { type: 'image_url', image_url: { url: mediaUrl } },
+            ] as any, // type override for openai array content
+          },
         ],
         max_tokens: 300,
       });

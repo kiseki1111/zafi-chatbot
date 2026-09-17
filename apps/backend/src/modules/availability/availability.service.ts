@@ -9,7 +9,9 @@ export class AvailabilityService {
     try {
       let filterWhere: any = {};
       if (tenantId) {
-        const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+        const tenant = await this.prisma.tenant.findUnique({
+          where: { id: tenantId },
+        });
         if (tenant) {
           filterWhere = { tenantId: tenant.id };
         }
@@ -30,11 +32,21 @@ export class AvailabilityService {
     }
   }
 
-  async createGroup(tenantId: string, data: { name: string; category?: string; description?: string; siteplanImage?: string }) {
+  async createGroup(
+    tenantId: string,
+    data: {
+      name: string;
+      category?: string;
+      description?: string;
+      siteplanImage?: string;
+    },
+  ) {
     try {
       let validTenantId: string | null = null;
       if (tenantId) {
-        const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+        const tenant = await this.prisma.tenant.findUnique({
+          where: { id: tenantId },
+        });
         if (tenant) {
           validTenantId = tenant.id;
         }
@@ -56,7 +68,15 @@ export class AvailabilityService {
     }
   }
 
-  async updateGroup(id: string, data: { name?: string; category?: string; description?: string; siteplanImage?: string }) {
+  async updateGroup(
+    id: string,
+    data: {
+      name?: string;
+      category?: string;
+      description?: string;
+      siteplanImage?: string;
+    },
+  ) {
     return this.prisma.resourceGroup.update({
       where: { id },
       data,
@@ -70,7 +90,20 @@ export class AvailabilityService {
     });
   }
 
-  async addItem(groupId: string, data: { code: string; name?: string; houseType?: string; status?: string; price?: number; capacity?: number; notes?: string; customerName?: string; customerPhone?: string }) {
+  async addItem(
+    groupId: string,
+    data: {
+      code: string;
+      name?: string;
+      houseType?: string;
+      status?: string;
+      price?: number;
+      capacity?: number;
+      notes?: string;
+      customerName?: string;
+      customerPhone?: string;
+    },
+  ) {
     return this.prisma.resourceItem.create({
       data: {
         groupId,
@@ -87,7 +120,14 @@ export class AvailabilityService {
     });
   }
 
-  async addBatchItems(groupId: string, prefix: string, startNumber: number, endNumber: number, houseType?: string, price?: number) {
+  async addBatchItems(
+    groupId: string,
+    prefix: string,
+    startNumber: number,
+    endNumber: number,
+    houseType?: string,
+    price?: number,
+  ) {
     const itemsData: any[] = [];
     for (let i = startNumber; i <= endNumber; i++) {
       const code = `${prefix}${i < 10 ? '0' + i : i}`;
@@ -107,7 +147,20 @@ export class AvailabilityService {
     });
   }
 
-  async updateItem(id: string, data: { code?: string; name?: string; houseType?: string; status?: string; price?: number; capacity?: number; notes?: string; customerName?: string; customerPhone?: string }) {
+  async updateItem(
+    id: string,
+    data: {
+      code?: string;
+      name?: string;
+      houseType?: string;
+      status?: string;
+      price?: number;
+      capacity?: number;
+      notes?: string;
+      customerName?: string;
+      customerPhone?: string;
+    },
+  ) {
     return this.prisma.resourceItem.update({
       where: { id },
       data,

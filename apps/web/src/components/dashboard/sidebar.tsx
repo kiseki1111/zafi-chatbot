@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Building2, LogOut, ChevronLeft } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { useAppStore } from "@/lib/app-store";
@@ -16,12 +16,31 @@ import {
 
 export function Sidebar() {
   const { user, logout } = useAuthStore();
-  const { view, setView, setSidebarOpen } = useAppStore();
+  const { view, setView, setSidebarOpen, enabledMenus, setEnabledMenus } = useAppStore();
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
 
   if (!user) return null;
   const safeRole = (user.role || "operator").toLowerCase() as any;
-  const items = menuForRole(safeRole) || [];
+
+  useEffect(() => {
+    if (user.role === "superadmin") {
+      setEnabledMenus(undefined); // Superadmin selalu melihat semua menu miliknya
+      return;
+    }
+
+    const fetchId = user.tenantId || (user.id.startsWith("u-") ? "demo" : user.id);
+    fetch(`/api/v1/tenant/${fetchId}/dashboard`)
+      .then((r) => r.json())
+      .then((data) => {
+        const menus = data?.tenant?.metadata?.enabledMenus;
+        if (Array.isArray(menus)) {
+          setEnabledMenus(menus);
+        }
+      })
+      .catch(() => {});
+  }, [user.id, user.role, user.tenantId, setEnabledMenus]);
+
+  const items = menuForRole(safeRole, enabledMenus, user) || [];
   const theme = ROLE_THEME[safeRole] || { bg: "bg-muted", color: "text-foreground", ring: "ring-muted" };
 
   const go = (v: ViewKey) => setView(v);

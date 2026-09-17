@@ -10,12 +10,13 @@ export class ImageParser {
   private openai: OpenAI;
 
   constructor(private readonly configService: ConfigService) {
-    const apiKey = this.configService.get<string>('OPENROUTER_API_KEY') 
-                || this.configService.get<string>('OPENAI_API_KEY');
-    const baseURL = this.configService.get<string>('OPENROUTER_API_KEY') 
-                  ? 'https://openrouter.ai/api/v1' 
-                  : undefined;
-    
+    const apiKey =
+      this.configService.get<string>('OPENROUTER_API_KEY') ||
+      this.configService.get<string>('OPENAI_API_KEY');
+    const baseURL = this.configService.get<string>('OPENROUTER_API_KEY')
+      ? 'https://openrouter.ai/api/v1'
+      : undefined;
+
     this.openai = new OpenAI({
       apiKey,
       baseURL,
@@ -25,56 +26,67 @@ export class ImageParser {
   async parseImage(buffer: Buffer): Promise<ExtractedProductDto[]> {
     try {
       const resizedBuffer = await sharp(buffer)
-        .resize({ width: 1024, height: 1024, fit: 'inside', withoutEnlargement: true })
+        .resize({
+          width: 1024,
+          height: 1024,
+          fit: 'inside',
+          withoutEnlargement: true,
+        })
         .jpeg({ quality: 80 })
         .toBuffer();
-      
+
       const base64Image = resizedBuffer.toString('base64');
       const response = await this.openai.chat.completions.create({
-        model: this.configService.get<string>('OPENAI_MODEL') || "deepseek/deepseek-v4-flash-0731",
+        model:
+          this.configService.get<string>('OPENAI_MODEL') ||
+          'deepseek/deepseek-v4-flash-0731',
         messages: [
           {
-            role: "system",
-            content: "Anda adalah asisten data ekstraksi katalog. Ekstrak daftar produk dan harganya dari gambar ini."
+            role: 'system',
+            content:
+              'Anda adalah asisten data ekstraksi katalog. Ekstrak daftar produk dan harganya dari gambar ini.',
           },
           {
-            role: "user",
+            role: 'user',
             content: [
-              { type: "text", text: "Tolong ekstrak daftar produk, harga, dan deskripsi dari gambar brosur/katalog ini." },
               {
-                type: "image_url",
+                type: 'text',
+                text: 'Tolong ekstrak daftar produk, harga, dan deskripsi dari gambar brosur/katalog ini.',
+              },
+              {
+                type: 'image_url',
                 image_url: { url: `data:image/jpeg;base64,${base64Image}` },
               },
             ],
           },
         ],
         response_format: {
-          type: "json_schema",
+          type: 'json_schema',
           json_schema: {
-            name: "extracted_products",
+            name: 'extracted_products',
             schema: {
-              type: "object",
+              type: 'object',
               properties: {
                 products: {
-                  type: "array",
+                  type: 'array',
                   items: {
-                    type: "object",
+                    type: 'object',
                     properties: {
-                      nama: { type: "string" },
-                      harga: { type: "number" },
-                      deskripsi: { type: "string" }
+                      nama: { type: 'string' },
+                      harga: { type: 'number' },
+                      deskripsi: { type: 'string' },
                     },
-                    required: ["nama", "harga", "deskripsi"],
-                    additionalProperties: false
-                  }
-                }
+                    required: ['nama', 'harga', 'deskripsi'],
+                    additionalProperties: false,
+                  },
+                },
               },
-              required: ["products"],
-              additionalProperties: false
+              required: ['products'],
+              additionalProperties: false,
             },
-            strict: true
-          }
-        }
+            strict: true,
+          },
+        },
       });
 
       const jsonStr = response.choices[0].message.content;

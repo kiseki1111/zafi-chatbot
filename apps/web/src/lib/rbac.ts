@@ -2,24 +2,12 @@ import type { Role, ViewKey } from "./types";
 
 export type { Role };
 
-export const ROLES: Role[] = [
-  "owner",
-  "superadmin",
-  "admin",
-  "manager",
-  "operator",
-  "marketing",
-  "keuangan",
-];
+export const ROLES: Role[] = ["superadmin", "manager", "administrator"];
 
 export const ROLE_LABELS: Record<Role, string> = {
-  owner: "Pemilik (Owner)",
-  superadmin: "Super Admin",
-  admin: "Admin",
-  manager: "Manajer",
-  operator: "Operator",
-  marketing: "Marketing",
-  keuangan: "Keuangan",
+  superadmin: "Super Admin (Owner Platform)",
+  manager: "Manajer Perusahaan",
+  administrator: "Administrator / Staf CS",
 };
 
 export interface MenuItem {
@@ -31,33 +19,61 @@ export interface MenuItem {
 }
 
 export const MENU_ITEMS: MenuItem[] = [
-  { key: "overview", label: "Dashboard", icon: "LayoutDashboard", roles: ["owner", "superadmin", "admin", "manager", "operator", "marketing", "keuangan"] },
-  { key: "availability", label: "Plansite", icon: "Grid3X3", roles: ["owner", "superadmin", "admin", "manager", "operator"] },
-  { key: "chatbot", label: "Bot WhatsApp", icon: "MessageCircle", roles: ["owner", "superadmin", "admin", "manager", "operator"] },
-  { key: "knowledge", label: "Knowledge Base", icon: "Book", roles: ["owner", "superadmin", "admin", "manager"] },
-  { key: "followup", label: "Follow-Up", icon: "BellRing", roles: ["owner", "superadmin", "admin", "manager", "operator"] },
-  { key: "settings", label: "Pengaturan", icon: "Settings", roles: ["owner", "superadmin", "admin"] },
+  { key: "clients",       label: "Kelola Klien",     icon: "Building2",       roles: ["superadmin"] },
+  { key: "overview",      label: "Dashboard",        icon: "LayoutDashboard", roles: ["superadmin", "manager", "administrator"] },
+  { key: "chatbot",       label: "Bot WhatsApp",     icon: "MessageCircle",   roles: ["manager", "administrator"] },
+  { key: "crm",           label: "Pelanggan",        icon: "Users",           roles: ["manager", "administrator"] },
+  { key: "bus_layout",    label: "Denah Kursi Bus",  icon: "Bus",             roles: ["manager", "administrator"] },
+  { key: "availability",  label: "Plansite",         icon: "Grid3X3",         roles: ["manager"] },
+  { key: "knowledge",     label: "Knowledge Base",   icon: "Book",            roles: ["manager"] },
+  { key: "followup",      label: "Follow-Up",        icon: "BellRing",        roles: ["manager"] },
+  { key: "settings",      label: "Pengaturan",       icon: "Settings",        roles: ["superadmin", "manager"] },
 ];
 
-export function menuForRole(role: Role): MenuItem[] {
-  return MENU_ITEMS.filter((m) => m.roles.includes(role));
+export function menuForRole(role: Role, enabledMenus?: string[], userContext?: { email?: string; name?: string; tenantId?: string | null }): MenuItem[] {
+  let items = MENU_ITEMS.filter((m) => m.roles.includes(role));
+
+  // Filter eksplisit berdasarkan akun / bisnis:
+  const isBusAccount =
+    userContext?.email?.toLowerCase().includes("bus") ||
+    userContext?.name?.toLowerCase().includes("bus") ||
+    userContext?.tenantId === "5d85136d-d79b-4b63-8a80-013a49a8b1c0";
+
+  const isZafiAccount =
+    userContext?.email?.toLowerCase().includes("zafi") ||
+    userContext?.name?.toLowerCase().includes("zafi") ||
+    userContext?.tenantId === "4a023464-c66a-4edf-8926-9a08a05ea221";
+
+  if (isBusAccount) {
+    // Akun Bus TIDAK BOLEH punya menu Plansite Properti
+    items = items.filter((m) => m.key !== "availability");
+  } else if (isZafiAccount) {
+    // Akun Zafi Properti TIDAK BOLEH punya menu Denah Bus
+    items = items.filter((m) => m.key !== "bus_layout");
+  }
+
+  // Jika bukan superadmin dan tenant memiliki konfigurasi menu khusus di metadata
+  if (role !== "superadmin" && Array.isArray(enabledMenus) && enabledMenus.length > 0) {
+    items = items.filter((m) => {
+      // Menu default selalu ada
+      if (m.key === "overview" || m.key === "settings") return true;
+      return enabledMenus.includes(m.key);
+    });
+  }
+
+  return items;
 }
 
-export function canAccess(role: Role, view: ViewKey): boolean {
-  const menus = menuForRole(role);
-  return menus.some((m) => m.key === view);
+export function canAccess(role: Role, view: ViewKey, enabledMenus?: string[], userContext?: { email?: string; name?: string; tenantId?: string | null }): boolean {
+  return menuForRole(role, enabledMenus, userContext).some((m) => m.key === view);
 }
 
 export function defaultViewForRole(role: Role): ViewKey {
-  return "overview";
+  return role === "superadmin" ? "clients" : "overview";
 }
 
 export const ROLE_THEME: Record<Role, { color: string; bg: string; ring: string }> = {
-  owner: { color: "text-indigo-600", bg: "bg-indigo-50 dark:bg-indigo-950/40", ring: "ring-indigo-200 dark:ring-indigo-900" },
-  superadmin: { color: "text-rose-600", bg: "bg-rose-50 dark:bg-rose-950/40", ring: "ring-rose-200 dark:ring-rose-900" },
-  admin: { color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-950/40", ring: "ring-blue-200 dark:ring-blue-900" },
-  manager: { color: "text-amber-600", bg: "bg-amber-50 dark:bg-amber-950/40", ring: "ring-amber-200 dark:ring-amber-900" },
-  operator: { color: "text-emerald-600", bg: "bg-emerald-50 dark:bg-emerald-950/40", ring: "ring-emerald-200 dark:ring-emerald-900" },
-  marketing: { color: "text-purple-600", bg: "bg-purple-50 dark:bg-purple-950/40", ring: "ring-purple-200 dark:ring-purple-900" },
-  keuangan: { color: "text-teal-600", bg: "bg-teal-50 dark:bg-teal-950/40", ring: "ring-teal-200 dark:ring-teal-900" },
+  superadmin:    { color: "text-rose-600",   bg: "bg-rose-50 dark:bg-rose-950/40",    ring: "ring-rose-200 dark:ring-rose-900" },
+  manager:       { color: "text-amber-600",  bg: "bg-amber-50 dark:bg-amber-950/40",  ring: "ring-amber-200 dark:ring-amber-900" },
+  administrator: { color: "text-blue-600",   bg: "bg-blue-50 dark:bg-blue-950/40",    ring: "ring-blue-200 dark:ring-blue-900" },
 };

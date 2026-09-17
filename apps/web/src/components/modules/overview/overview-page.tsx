@@ -51,7 +51,7 @@ export function OverviewPage() {
     setLoading(true);
     try {
       // 1. Tenant dashboard
-      const dashRes = await fetch(`/api/v1/tenant/${user?.id || "demo"}/dashboard`);
+      const dashRes = await fetch(`/api/v1/tenant/${user?.tenantId || user?.id || "demo"}/dashboard`);
       if (dashRes.ok) {
         const dash = await dashRes.json();
         if (dash?.tenant) setTenant(dash.tenant);
