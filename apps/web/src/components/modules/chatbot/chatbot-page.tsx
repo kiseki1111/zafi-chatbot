@@ -1027,128 +1027,81 @@ export function ChatbotPage() {
 
   return (
     <div className="flex flex-col flex-1 h-full min-h-0 gap-2">
-      {/* Page header — slim, consistent with other pages */}
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-600 via-teal-600 to-green-700 px-5 py-2.5 text-white shadow-md shrink-0">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=%2260%22 height=%2260%22 viewBox=%220 0 60 60%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cg fill=%22none%22 fill-rule=%22evenodd%22%3E%3Cg fill=%22%23ffffff%22 fill-opacity=%220.05%22%3E%3Cpath d=%22M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')]" />
-        <div className="relative flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-white/20 p-2.5 backdrop-blur-sm">
-              <MessageCircle className="h-6 w-6 text-white" />
+      {/* ===== Top Bar Ringkas & Terpadu ===== */}
+      <Card className="px-3 py-2 shrink-0 shadow-xs border-muted/70">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2.5">
+            <div className="h-7 w-7 rounded-lg bg-emerald-600 text-white grid place-items-center shadow-xs">
+              <MessageCircle className="h-4 w-4" />
             </div>
             <div>
-              <h1 className="text-lg font-bold tracking-tight">Bot WhatsApp</h1>
-              <p className="text-xs text-emerald-100">Kelola percakapan &amp; pantau status koneksi agent.</p>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-sm leading-none">Live Chat &amp; WA Bot</span>
+                {isConnected && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded-full">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Online
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-          <div className="hidden sm:flex items-center gap-3 text-xs text-emerald-100">
-            <span className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
-              {contacts.length} kontak
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-white/60" />
-              {messagesToday} pesan
-            </span>
-          </div>
-        </div>
-      </div>
 
-      {/* ===== Top bar ===== */}
-      <Card className="px-3 py-2.5">
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* WA Session selector */}
-          <Select value={sessionId} onValueChange={setSessionId}>
-            <SelectTrigger className="w-[180px] h-8 text-xs bg-muted/50 border-0 gap-2">
-              <SelectValue placeholder="Pilih sesi WAHA" />
-            </SelectTrigger>
-            <SelectContent>
-              {sessions.length === 0 && <SelectItem value="none" disabled>Tidak ada sesi aktif</SelectItem>}
-              {sessions.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={cn(
-                        "h-2 w-2 rounded-full",
-                        s.status === "working"
-                          ? "bg-emerald-500"
-                          : s.status === "starting"
-                            ? "bg-amber-500"
-                            : "bg-rose-500",
-                      )}
-                    />
-                    <span className="flex flex-col items-start">
-                      <span className="text-sm font-medium">{s.name}</span>
-                      {s.status === "connected" && s.battery != null && (
-                        <span className="text-[10px] text-muted-foreground">
-                          Baterai: {s.battery}%
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* WA Session selector */}
+            <Select value={sessionId} onValueChange={setSessionId}>
+              <SelectTrigger className="w-[170px] h-7 text-xs bg-muted/50 border-0 gap-2">
+                <SelectValue placeholder="Pilih sesi WAHA" />
+              </SelectTrigger>
+              <SelectContent>
+                {sessions.length === 0 && <SelectItem value="none" disabled>Tidak ada sesi aktif</SelectItem>}
+                {sessions.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={cn(
+                          "h-2 w-2 rounded-full",
+                          s.status === "working"
+                            ? "bg-emerald-500"
+                            : s.status === "starting"
+                              ? "bg-amber-500"
+                              : "bg-rose-500",
+                        )}
+                      />
+                      <span className="text-xs font-medium">{s.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          {/* Online badge */}
-          {isConnected && (
-            <Badge className="bg-emerald-600 text-white gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
-              Online
-            </Badge>
-          )}
-
-          {/* Battery indicator for connected session */}
-          {isConnected && activeSession?.battery != null && (
-            <span className="hidden sm:inline-flex items-center gap-1 text-xs text-muted-foreground">
-              {activeSession.battery < 20 ? (
-                <BatteryLow className="h-4 w-4 text-rose-500" />
-              ) : (
-                <BatteryMedium className="h-4 w-4 text-emerald-600" />
-              )}
-              {activeSession.battery}%
-            </span>
-          )}
-
-          <div className="ml-auto flex items-center gap-2 flex-wrap">
+            {/* Test Real WAHA Trigger Button */}
             <Button
+              type="button"
               variant="outline"
               size="sm"
               onClick={() => setIsWahaTestModalOpen(true)}
-              className="h-8 text-xs gap-1.5 border-dashed border-emerald-600 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
+              className="h-7 text-xs gap-1 border-dashed text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
             >
               <Zap className="h-3.5 w-3.5 text-emerald-600" />
-              Test Kirim WAHA Real
+              <span className="hidden sm:inline">Test Kirim</span> WAHA
             </Button>
+
+            {/* Mock Simulator Modal Trigger */}
             <Button
+              type="button"
               variant="outline"
               size="sm"
               onClick={() => setIsSimModalOpen(true)}
-              className="h-8 text-xs gap-1.5 border-dashed border-indigo-500 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:text-indigo-300"
+              className="h-7 text-xs gap-1 border-dashed text-indigo-700 hover:text-indigo-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/20"
             >
               <Sparkles className="h-3.5 w-3.5 text-indigo-600" />
-              Simulasi Pesan Customer (Test Foto/Text)
+              Simulasi
             </Button>
 
-            {/* Inline stats */}
-            <div className="hidden md:flex items-center gap-3 text-xs">
-              <span className="inline-flex items-center gap-1 text-muted-foreground">
-                <UserCheck className="h-3.5 w-3.5 text-blue-600" />
-                <span className="font-semibold text-foreground">
-                  {contacts.length}
-                </span>{" "}
-                kontak
-              </span>
-              <span className="inline-flex items-center gap-1 text-muted-foreground">
-                <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
-                <span className="font-semibold text-foreground">
-                  {messagesToday}
-                </span>{" "}
-                pesan hari ini
-              </span>
-            </div>
-
-            {/* AI toggle removed */}
+            <span className="text-[11px] text-muted-foreground hidden lg:inline pl-1 border-l">
+              <strong className="text-foreground">{contacts.length}</strong> kontak · <strong className="text-foreground">{messagesToday}</strong> pesan
+            </span>
           </div>
         </div>
       </Card>
