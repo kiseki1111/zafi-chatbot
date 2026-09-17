@@ -144,6 +144,28 @@ export class WahaController {
     }
   }
 
+  @SkipThrottle()
+  @Get('media/:session/:messageId')
+  async getMedia(
+    @Param('session') session: string,
+    @Param('messageId') messageId: string,
+    @Res() res: any,
+  ) {
+    try {
+      const media = await this.wahaService.getMediaFile(session, messageId);
+      if (!media || !media.data) {
+        return res.status(404).send({ error: 'Media not found' });
+      }
+      res.setHeader('Content-Type', media.mimetype || 'image/jpeg');
+      return res.send(media.data);
+    } catch (error) {
+      this.logger.warn(`Failed to proxy media ${messageId}: ${error.message}`);
+      return res.status(error.response?.status || 500).send({
+        error: error.message,
+      });
+    }
+  }
+
   @Post('instances/:id/send')
   async sendMessage(
     @Param('id') id: string,
@@ -283,6 +305,23 @@ export class WahaController {
           message._data?.notifyName || message.sender?.pushname || null;
         const msgId = message.id?._serialized || message.id || 'unknown';
 
+        const isMediaMsg = Boolean(
+          message.hasMedia ||
+          message.type === 'image' ||
+          message.media?.url ||
+          message.mediaUrl ||
+          (message._data && (message._data.mimetype?.startsWith('image/') || message._data.type === 'image'))
+        );
+
+        let extractedMediaUrl =
+          message.media?.url ||
+          message.mediaUrl ||
+          (message.hasMedia && message.media ? message.media.url : null);
+
+        if (!extractedMediaUrl && isMediaMsg && msgId && msgId !== 'unknown') {
+          extractedMediaUrl = `/api/v1/waha/media/${sessionName}/${encodeURIComponent(msgId)}`;
+        }
+
         try {
           const contact = await this.prisma.contact.findUnique({
             where: { phone: contactNumber },
@@ -327,14 +366,24 @@ export class WahaController {
           });
 
           const isMediaMsg =
-            message.hasMedia ||
-            message.type === 'image' ||
-            !!message.media?.url ||
-            !!message.mediaUrl;
-          const extractedMediaUrl =
+            Boolean(
+              message.hasMedia ||
+              message.type === 'image' ||
+              message.media?.url ||
+              message.mediaUrl ||
+              (message._data && (message._data.mimetype?.startsWith('image/') || message._data.type === 'image'))
+            );
+
+          let extractedMediaUrl =
             message.media?.url ||
             message.mediaUrl ||
             (message.hasMedia && message.media ? message.media.url : null);
+
+          // Jika WAHA menyimpan media secara lokal (WAHA media manager), buat URL proxy / langsung ke WAHA media
+          if (!extractedMediaUrl && isMediaMsg && msgId && msgId !== 'unknown') {
+            extractedMediaUrl = `/api/v1/waha/media/${sessionName}/${encodeURIComponent(msgId)}`;
+          }
+
           const finalMessageType = isMediaMsg
             ? 'image'
             : message.type || 'text';
@@ -393,9 +442,13 @@ export class WahaController {
         }
 
         const sender = message.from;
-        const mediaUrls = message.mediaUrl ? [message.mediaUrl] : [];
+        const mediaUrls = message.media?.url
+          ? [message.media.url]
+          : message.mediaUrl
+          ? [message.mediaUrl]
+          : [];
 
-        if (text || mediaUrls.length > 0) {
+        if (text || mediaUrls.length > 0 || message.hasMedia) {
           const incomingMessage: IncomingMessage = {
             senderId: sender,
             text: text,

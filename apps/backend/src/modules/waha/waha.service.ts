@@ -332,6 +332,38 @@ export class WahaService {
     }
   }
 
+  async getMediaFile(sessionName: string, messageId: string): Promise<{ data: Buffer; mimetype: string } | null> {
+    try {
+      // WAHA provides endpoints to download media by message ID or file path
+      const endpoints = [
+        `${this.baseUrl}/api/${sessionName}/chats/messages/${encodeURIComponent(messageId)}/media`,
+        `${this.baseUrl}/api/files/${encodeURIComponent(messageId)}`,
+        `${this.baseUrl}/api/files/${sessionName}/${encodeURIComponent(messageId)}`,
+      ];
+
+      for (const endpoint of endpoints) {
+        try {
+          const res = await axios.get(endpoint, {
+            headers: this.getHeaders(),
+            responseType: 'arraybuffer',
+          });
+          if (res.status === 200 && res.data) {
+            return {
+              data: Buffer.from(res.data),
+              mimetype: String(res.headers['content-type'] || 'image/jpeg'),
+            };
+          }
+        } catch (e) {
+          // Try next endpoint pattern
+        }
+      }
+      return null;
+    } catch (e) {
+      this.logger.warn(`Could not retrieve media file for ${messageId}: ${e.message}`);
+      return null;
+    }
+  }
+
   async getQrCode(sessionName: string): Promise<any> {
     try {
       const response = await axios.get(
