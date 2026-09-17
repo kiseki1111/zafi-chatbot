@@ -25,6 +25,7 @@ const CrmPage = dynamic(() => import("@/components/modules/crm/crm-page").then(m
 
 import { canAccess, defaultViewForRole } from "@/lib/rbac";
 import type { ViewKey } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 export function DashboardShell() {
   const { user } = useAuthStore();
