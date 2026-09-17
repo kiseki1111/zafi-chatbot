@@ -1182,8 +1182,8 @@ export function ChatbotPage() {
             </div>
           ) : activeContact ? (
             <>
-              {/* Conversation header - Compact */}
-              <div className="flex items-center gap-2.5 px-3 py-1.5 border-b shrink-0 bg-background/95">
+              {/* Conversation header - Compact & Centered */}
+              <div className="flex items-center gap-2.5 px-4 h-12 border-b shrink-0 bg-background/95">
                 <Button
                   variant="ghost"
                   size="icon"
@@ -1294,10 +1294,10 @@ export function ChatbotPage() {
                 </ScrollArea>
               </div>
 
-              {/* Chat Input Area - Compact */}
-              <div className="px-3 py-1.5 border-t bg-background shrink-0 space-y-1">
+              {/* Chat Input Area - Compact & Centered */}
+              <div className="px-4 h-12 border-t bg-background shrink-0 flex items-center">
                 {imagePreview && (
-                  <div className="flex items-center gap-2 p-1.5 rounded-lg bg-muted/60 text-xs">
+                  <div className="absolute bottom-14 left-4 right-4 flex items-center gap-2 p-1.5 rounded-lg bg-background border shadow-md text-xs">
                     <ImageIcon className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
                     <span className="truncate flex-1 font-medium">{imagePreview.name}</span>
                     <Button
@@ -1311,7 +1311,7 @@ export function ChatbotPage() {
                     </Button>
                   </div>
                 )}
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-2 w-full">
                   <input
                     type="file"
                     ref={imageInputRef}
