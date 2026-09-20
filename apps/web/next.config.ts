@@ -12,6 +12,10 @@ const nextConfig: any = {
     const backendUrl = process.env.BACKEND_URL || "http://127.0.0.1:3005";
     return [
       {
+        source: "/uploads/:path*",
+        destination: `${backendUrl}/uploads/:path*`,
+      },
+      {
         source: "/api/v1/auth/:path*",
         destination: `${backendUrl}/api/v1/auth/:path*`,
       },

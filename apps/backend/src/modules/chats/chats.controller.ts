@@ -19,8 +19,16 @@ export class ChatsController {
   constructor(private readonly chatsService: ChatsService) {}
 
   @Get()
-  getConversations(@Query('instanceName') instanceName?: string) {
-    return this.chatsService.getConversations(instanceName);
+  getConversations(
+    @Query('instanceName') instanceName?: string,
+    @Query('tenantId') tenantId?: string,
+    @Req() req?: any,
+  ) {
+    const tId =
+      tenantId && tenantId !== 'undefined' && tenantId !== 'null'
+        ? tenantId
+        : req?.user?.tenantId;
+    return this.chatsService.getConversations(instanceName, tId);
   }
 
   @Get(':id/messages')

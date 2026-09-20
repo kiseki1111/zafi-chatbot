@@ -163,7 +163,7 @@ export class WahaService {
     }
   }
 
-  async getSessions(): Promise<any> {
+  async getSessions(tenantId?: string): Promise<any> {
     try {
       let wahaSessions: any[] = [];
       try {
@@ -176,6 +176,20 @@ export class WahaService {
         this.logger.warn(
           `WAHA API is unreachable: ${httpErr.message}. Falling back to database records.`,
         );
+      }
+
+      // If WAHA API unreachable or returned empty, fallback to database
+      if (wahaSessions.length === 0) {
+        const dbInstances = await this.prisma.whatsappInstance.findMany({
+          where: tenantId ? { tenantId } : {},
+          orderBy: { createdAt: 'desc' },
+        });
+        return dbInstances.map((inst) => ({
+          name: inst.instanceName,
+          status: inst.status,
+          me: { id: inst.phone, pushName: inst.profileName },
+          dbStats: inst,
+        }));
       }
 
       const mergedSessions = await Promise.all(
@@ -198,7 +212,11 @@ export class WahaService {
         }),
       );
 
-      // Returning only active WAHA sessions with their DB stats
+      // Filter by tenantId if provided
+      if (tenantId) {
+        return mergedSessions.filter((s) => s.dbStats?.tenantId === tenantId);
+      }
+
       return mergedSessions;
     } catch (error) {
       this.logger.error(`Failed to get sessions: ${error.message}`);

@@ -21,6 +21,9 @@ services:
     environment:
       - NODE_TLS_REJECT_UNAUTHORIZED=0
 
+    volumes:
+      - ./uploads:/app/uploads
+
     networks:
       - backend
 

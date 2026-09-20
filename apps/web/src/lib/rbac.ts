@@ -24,7 +24,7 @@ export const MENU_ITEMS: MenuItem[] = [
   { key: "chatbot",       label: "Bot WhatsApp",     icon: "MessageCircle",   roles: ["manager", "administrator"] },
   { key: "crm",           label: "Pelanggan",        icon: "Users",           roles: ["manager", "administrator"] },
   { key: "bus_layout",    label: "Denah Kursi Bus",  icon: "Bus",             roles: ["manager", "administrator"] },
-  { key: "availability",  label: "Plansite",         icon: "Grid3X3",         roles: ["manager"] },
+  { key: "availability",  label: "Siteplan",         icon: "Grid3X3",         roles: ["manager"] },
   { key: "knowledge",     label: "Knowledge Base",   icon: "Book",            roles: ["manager"] },
   { key: "followup",      label: "Follow-Up",        icon: "BellRing",        roles: ["manager"] },
   { key: "settings",      label: "Pengaturan",       icon: "Settings",        roles: ["superadmin", "manager"] },

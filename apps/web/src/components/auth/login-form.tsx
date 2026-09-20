@@ -145,7 +145,7 @@ export function LoginForm() {
               className="w-full rounded-lg border p-2 text-center transition-all hover:shadow-sm hover:-translate-y-0.5 disabled:opacity-50 bg-emerald-50 text-emerald-800 ring-emerald-200 ring-1"
             >
               <div className="text-xs font-bold">2. Zafi (Properti)</div>
-              <div className="text-[9px] text-muted-foreground">Plansite Kaveling</div>
+              <div className="text-[9px] text-muted-foreground">Siteplan Kaveling</div>
             </button>
             <button
               type="button"

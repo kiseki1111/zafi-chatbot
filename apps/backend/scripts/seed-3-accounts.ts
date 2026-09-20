@@ -81,6 +81,23 @@ async function main() {
       tenantId: zafiTenant.id,
     },
   });
+  // Pastikan sesi WhatsApp Zafi terhubung ke tenant Zafi
+  await prisma.whatsappInstance.upsert({
+    where: { instanceName: 'zafi' },
+    update: { tenantId: zafiTenant.id },
+    create: { instanceName: 'zafi', tenantId: zafiTenant.id, status: 'STOPPED' },
+  });
+  await prisma.whatsappInstance.upsert({
+    where: { instanceName: 'zafi-cs' },
+    update: { tenantId: zafiTenant.id },
+    create: { instanceName: 'zafi-cs', tenantId: zafiTenant.id, status: 'STOPPED' },
+  });
+  await prisma.whatsappInstance.upsert({
+    where: { instanceName: 'Zafi-CS' },
+    update: { tenantId: zafiTenant.id },
+    create: { instanceName: 'Zafi-CS', tenantId: zafiTenant.id, status: 'STOPPED' },
+  });
+
   console.log('✓ 2. Akun Zafi (Properti & Siteplan) siap:');
   console.log(`     Email: zafi@properti.com | Password: ${defaultPassword} | Role: manager`);
   console.log(`     Tenant: ${zafiTenant.name} (Menus: Plansite, CRM, Bot WA, Knowledge, Settings)\n`);
@@ -136,6 +153,13 @@ async function main() {
       tenantId: busTenant.id,
     },
   });
+  // Pastikan sesi WhatsApp Bus terhubung ke tenant Bus
+  await prisma.whatsappInstance.upsert({
+    where: { instanceName: 'nusantara-bus' },
+    update: { tenantId: busTenant.id },
+    create: { instanceName: 'nusantara-bus', tenantId: busTenant.id, status: 'STOPPED' },
+  });
+
   console.log('✓ 3. Akun Nusantara Bus (Armada & Denah Kursi) siap:');
   console.log(`     Email: manager@nusantarabus.com | Password: ${defaultPassword} | Role: manager`);
   console.log(`     Tenant: ${busTenant.name} (Menus: Denah Kursi Bus, CRM, Bot WA, Settings)\n`);

@@ -272,10 +272,12 @@ function KoneksiWATab() {
   const fetchInstances = async () => {
     setLoading(true);
     try {
-      // Ambil langsung dari database (bukan dari WAHA API yang bisa offline)
-      const res = await fetch('/api/v1/waha/instances/db');
+      // Filter per tenant untuk isolasi sesi antar akun
+      const query = user?.tenantId && user.role !== 'superadmin' ? `?tenantId=${user.tenantId}` : '';
+      const res = await fetch(`/api/v1/waha/instances/db${query}`);
       const data = await res.json();
-      setInstances(Array.isArray(data?.data) ? data.data : []);
+      const list = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+      setInstances(list);
     } catch (e) {
       console.error(e);
       toast.error("Gagal mengambil data chatbot");
@@ -285,7 +287,7 @@ function KoneksiWATab() {
 
   React.useEffect(() => {
     fetchInstances();
-  }, []);
+  }, [user?.tenantId, user?.role]);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -322,7 +324,8 @@ function KoneksiWATab() {
     setIsDeleteLoading(true);
     try {
       await fetch(`/api/v1/waha/instances/${nameToDelete}/logout`, { method: 'POST' }).catch(() => {});
-      await fetch(`/api/v1/waha/instances/${nameToDelete}`, { method: 'DELETE' });
+      const query = user?.tenantId && user.role !== 'superadmin' ? `?tenantId=${user.tenantId}` : '';
+      await fetch(`/api/v1/waha/instances/${nameToDelete}${query}`, { method: 'DELETE' });
       toast.success("Chatbot berhasil dihapus");
       setIsDeleteOpen(false);
       setNameToDelete(null);

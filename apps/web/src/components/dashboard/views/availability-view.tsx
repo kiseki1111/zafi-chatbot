@@ -14,7 +14,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Plus, Search, Edit3, Trash2, CheckCircle2, Clock, XCircle, Wrench, Layers, RefreshCw,
+  Plus, Search, Edit3, Trash2, CheckCircle2, Clock, XCircle, Wrench, Layers, RefreshCw, Upload, Image, FileVideo, ExternalLink,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { useToast } from "@/hooks/use-toast";
@@ -264,6 +264,71 @@ export function AvailabilityView() {
     } finally { setIsSaving(false); }
   };
 
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleUploadMedia = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeGroup) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    setIsUploading(true);
+    try {
+      const res = await fetch("/api/v1/availability/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      const resData = data.data || data;
+
+      if (!res.ok || !resData.url) {
+        throw new Error(resData.message || "Gagal upload media");
+      }
+
+      // Simpan URL media ke siteplanImage di ResourceGroup
+      const updateRes = await fetch(`/api/v1/availability/groups/${activeGroup.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ siteplanImage: resData.url }),
+      });
+
+      if (updateRes.ok) {
+        toast({
+          title: "Media Tersimpan",
+          description: `File berhasil disimpan ke local storage VPS: ${resData.url}`,
+        });
+        fetchGroups();
+      }
+    } catch (err: any) {
+      toast({
+        title: "Gagal Upload",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleRemoveMedia = async () => {
+    if (!activeGroup || !confirm("Hapus foto/video siteplan ini?")) return;
+    try {
+      const res = await fetch(`/api/v1/availability/groups/${activeGroup.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ siteplanImage: "" }),
+      });
+      if (res.ok) {
+        toast({ title: "Media Dihapus", description: "Foto/video denah telah dilepas" });
+        fetchGroups();
+      }
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    }
+  };
+
   const handleDeleteItem = async (itemId: string) => {
     if (!confirm("Hapus unit/slot ini?")) return;
     try {
@@ -312,7 +377,7 @@ export function AvailabilityView() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Plansite</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Siteplan</h2>
           <p className="text-sm text-muted-foreground">
             Kelola denah blok, tipe rumah, dan status ketersediaan unit perumahan.
           </p>
@@ -433,8 +498,116 @@ export function AvailabilityView() {
             <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={openCreateModal}>
               <Plus className="h-4 w-4 mr-1" /> Tambah Unit
             </Button>
+        </div>
+      )}
+
+      {/* Media Siteplan Showcase (Foto / Video) */}
+      {activeGroup && (
+        <Card className="p-4 border-dashed bg-muted/20">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                <Image className="h-4 w-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold">Media Denah Siteplan &amp; Video Showcase</h3>
+                <p className="text-xs text-muted-foreground">
+                  Foto denah atau video cluster perumahan. Tersimpan langsung di storage VPS dan dapat dikirim otomatis oleh bot WAHA.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <label className="cursor-pointer">
+                <input
+                  type="file"
+                  accept="image/*,video/*"
+                  className="hidden"
+                  onChange={handleUploadMedia}
+                  disabled={isUploading}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  asChild
+                  disabled={isUploading}
+                  className="text-xs gap-1.5 cursor-pointer"
+                >
+                  <span>
+                    <Upload className={`h-3.5 w-3.5 ${isUploading ? "animate-bounce" : ""}`} />
+                    {isUploading ? "Mengunggah..." : activeGroup.siteplanImage ? "Ganti Foto/Video" : "Upload Foto / Video"}
+                  </span>
+                </Button>
+              </label>
+
+              {activeGroup.siteplanImage && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRemoveMedia}
+                  className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-1" /> Hapus
+                </Button>
+              )}
+            </div>
           </div>
-        )}
+
+          {activeGroup.siteplanImage ? (
+            <div className="mt-2 rounded-xl overflow-hidden border bg-background/50 flex flex-col items-center justify-center p-2">
+              {/\.(mp4|webm|ogg|mov|mkv)$/i.test(activeGroup.siteplanImage) ? (
+                <div className="w-full max-w-2xl space-y-2">
+                  <video
+                    controls
+                    src={activeGroup.siteplanImage}
+                    className="w-full max-h-80 rounded-lg bg-black"
+                  />
+                  <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
+                    <span className="flex items-center gap-1 font-mono text-[11px] truncate max-w-md">
+                      <FileVideo className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                      {activeGroup.siteplanImage}
+                    </span>
+                    <a
+                      href={activeGroup.siteplanImage}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-emerald-600 hover:underline flex items-center gap-1 shrink-0"
+                    >
+                      Buka URL <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                <div className="w-full max-w-2xl space-y-2">
+                  <img
+                    src={activeGroup.siteplanImage}
+                    alt="Denah Siteplan"
+                    className="w-full max-h-80 object-contain rounded-lg bg-muted/40"
+                  />
+                  <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
+                    <span className="flex items-center gap-1 font-mono text-[11px] truncate max-w-md">
+                      <Image className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                      {activeGroup.siteplanImage}
+                    </span>
+                    <a
+                      href={activeGroup.siteplanImage}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-emerald-600 hover:underline flex items-center gap-1 shrink-0"
+                    >
+                      Buka URL <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed p-6 text-center text-xs text-muted-foreground">
+              Belum ada foto denah siteplan atau video properti untuk cluster ini. Klik tombol di atas untuk mengunggah.
+            </div>
+          )}
+        </Card>
+      )}
       </div>
 
       {/* Grid Matrix View */}
@@ -520,7 +693,7 @@ export function AvailabilityView() {
           <DialogHeader>
             <DialogTitle>Tambah Perumahan Baru</DialogTitle>
             <DialogDescription>
-              Buat nama perumahan atau cluster proyek untuk denah plansite.
+              Buat nama perumahan atau cluster proyek untuk denah siteplan.
             </DialogDescription>
           </DialogHeader>
 
@@ -570,7 +743,7 @@ export function AvailabilityView() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal Tambah / Edit Unit Plansite */}
+      {/* Modal Tambah / Edit Unit Siteplan */}
       <Dialog open={isItemModalOpen} onOpenChange={setIsItemModalOpen}>
         <DialogContent>
           <DialogHeader>
@@ -690,11 +863,11 @@ export function AvailabilityView() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal Batch Generator Plansite */}
+      {/* Modal Batch Generator Siteplan */}
       <Dialog open={isBatchModalOpen} onOpenChange={(open) => { setIsBatchModalOpen(open); if (!open) setBatchError(""); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Generate Batch Unit Plansite</DialogTitle>
+            <DialogTitle>Generate Batch Unit Siteplan</DialogTitle>
             <DialogDescription>
               Buat banyak blok sekaligus dengan urutan nomor otomatis (misal Blok A-01 s/d A-20).
             </DialogDescription>

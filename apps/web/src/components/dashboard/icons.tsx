@@ -23,7 +23,7 @@ export const VIEW_TITLES: Record<ViewKey, { title: string; desc: string }> = {
   clients: { title: "Kelola Klien & Bisnis", desc: "Buat akun perusahaan klien baru dan atur hak menu/fitur yang aktif" },
   overview: { title: "Dashboard", desc: "Ringkasan performa asisten AI Anda" },
   bus_layout: { title: "Visualisasi Kursi Bus (17 Seats)", desc: "Denah ketersediaan kursi & reservasi tiket armada 17 seat" },
-  availability: { title: "Plansite", desc: "Kelola denah blok, tipe rumah, dan status ketersediaan unit perumahan" },
+  availability: { title: "Siteplan", desc: "Kelola denah blok, tipe rumah, dan status ketersediaan unit perumahan" },
   chatbot: { title: "Bot WhatsApp", desc: "Koneksi & sesi WhatsApp" },
   knowledge: { title: "Knowledge Base", desc: "Kelola informasi yang diketahui oleh bot" },
   followup: { title: "Follow-Up", desc: "Monitor & kelola auto follow-up pelanggan yang tidak aktif" },

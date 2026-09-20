@@ -498,7 +498,8 @@ export function ChatbotPage() {
   const setSessionId = setActiveSessionId;
   
   useEffect(() => {
-    fetch('/api/v1/waha/instances')
+    const query = user?.tenantId && user.role !== 'superadmin' ? `?tenantId=${user.tenantId}` : '';
+    fetch(`/api/v1/waha/instances${query}`)
       .then(res => res.json())
       .then(data => {
          let sessionsData = data;
@@ -524,7 +525,7 @@ export function ChatbotPage() {
         setSessions(fallback);
         if (!sessionId) setSessionId("dev-session");
       });
-  }, []);
+  }, [user?.tenantId, user?.role]);
 
   const activeSession = useMemo(
     () => sessions.find((s) => s.id === sessionId) ?? null,
@@ -584,7 +585,8 @@ export function ChatbotPage() {
   const fetchConversations = async () => {
     if (!sessionId) return;
     try {
-      const res = await fetch(`/api/v1/chats?instanceName=${sessionId}`);
+      const tenantQuery = user?.tenantId && user.role !== 'superadmin' ? `&tenantId=${user.tenantId}` : '';
+      const res = await fetch(`/api/v1/chats?instanceName=${sessionId}${tenantQuery}`);
       const data = await res.json();
       let chatsData = data;
       if (data && data.data && Array.isArray(data.data)) {

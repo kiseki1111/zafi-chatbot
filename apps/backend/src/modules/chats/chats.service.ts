@@ -16,9 +16,14 @@ export class ChatsService {
     private readonly wahaService: WahaService,
   ) {}
 
-  async getConversations(instanceName?: string) {
-    const where =
-      instanceName && instanceName !== 'all' ? { instanceName } : {};
+  async getConversations(instanceName?: string, tenantId?: string) {
+    const where: any = {};
+    if (instanceName && instanceName !== 'all') {
+      where.instanceName = instanceName;
+    }
+    if (tenantId) {
+      where.whatsappInstance = { tenantId };
+    }
     const conversations = await this.prisma.conversation.findMany({
       where,
       orderBy: { lastMessageAt: 'desc' },

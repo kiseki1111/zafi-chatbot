@@ -9,6 +9,7 @@ import {
   Res,
   Logger,
   StreamableFile,
+  ForbiddenException,
 } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { WahaService } from './waha.service';
@@ -35,8 +36,13 @@ export class WahaController {
     @Body('webhookUrl') webhookUrl?: string,
     @Body('channelAccountId') channelAccountId?: string,
     @Body('tenantId') tenantId?: string,
+    @Req() req?: any,
   ) {
     try {
+      const effectiveTenantId =
+        tenantId && tenantId !== 'undefined' && tenantId !== 'null'
+          ? tenantId
+          : req?.user?.tenantId;
       const webhooks: string[] = [];
 
       if (process.env.WEBHOOK_URL) {
@@ -64,7 +70,7 @@ export class WahaController {
         name,
         webhooks,
         channelAccountId,
-        tenantId,
+        effectiveTenantId,
       );
     } catch (error) {
       if (error.response?.status === 422) {
@@ -90,7 +96,25 @@ export class WahaController {
   }
 
   @Delete('instances/:id')
-  async deleteInstance(@Param('id') id: string) {
+  async deleteInstance(@Param('id') id: string, @Req() req: any) {
+    const tenantId =
+      req.query?.tenantId &&
+      req.query.tenantId !== 'undefined' &&
+      req.query.tenantId !== 'null'
+        ? req.query.tenantId
+        : req.user?.tenantId;
+
+    if (tenantId && req.user?.role !== 'superadmin') {
+      const instance = await this.prisma.whatsappInstance.findUnique({
+        where: { instanceName: id },
+      });
+      if (instance && instance.tenantId && instance.tenantId !== tenantId) {
+        throw new ForbiddenException(
+          'Akses ditolak: sesi ini milik akun lain',
+        );
+      }
+    }
+
     try {
       await this.wahaService.logoutSession(id);
     } catch (e) {
@@ -106,8 +130,14 @@ export class WahaController {
 
   @SkipThrottle()
   @Get('instances')
-  async getInstances() {
-    return this.wahaService.getSessions();
+  async getInstances(@Req() req: any) {
+    const tenantId =
+      req.query?.tenantId &&
+      req.query.tenantId !== 'undefined' &&
+      req.query.tenantId !== 'null'
+        ? req.query.tenantId
+        : req.user?.tenantId;
+    return this.wahaService.getSessions(tenantId);
   }
 
   // Endpoint baru: ambil langsung dari database (bukan dari WAHA API)
@@ -116,10 +146,15 @@ export class WahaController {
   @Get('instances/db')
   async getInstancesFromDb(@Req() req: any) {
     // Coba ambil tenantId dari query param atau dari user session
-    const tenantId = req.query?.tenantId || req.user?.tenantId;
+    const tenantId =
+      req.query?.tenantId &&
+      req.query.tenantId !== 'undefined' &&
+      req.query.tenantId !== 'null'
+        ? req.query.tenantId
+        : req.user?.tenantId;
 
     // Jika ada tenantId, filter hanya instance untuk tenant tersebut
-    // Jika tidak ada, kembalikan semua instance (untuk backward compatibility)
+    // Jika tidak ada, kembalikan semua instance (untuk backward compatibility / superadmin)
     const where = tenantId ? { tenantId } : {};
 
     return this.prisma.whatsappInstance.findMany({

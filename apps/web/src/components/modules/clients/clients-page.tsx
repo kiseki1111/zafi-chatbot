@@ -51,7 +51,7 @@ const AVAILABLE_MODULES = [
   { key: "chatbot", label: "Bot WhatsApp & Takeover", icon: MessageCircle, desc: "Chatbot AI & live chat takeover" },
   { key: "crm", label: "Data Pelanggan (CRM)", icon: Users, desc: "Manajemen kontak, status prospek, & riwayat" },
   { key: "bus_layout", label: "Denah Kursi Bus (17 Seats / Multi-Armada)", icon: Bus, desc: "Visualisasi reservasi tiket & drag-and-drop kursi" },
-  { key: "availability", label: "Plansite Properti", icon: Grid3X3, desc: "Denah blok unit kaveling/rumah properti" },
+  { key: "availability", label: "Siteplan Properti", icon: Grid3X3, desc: "Denah blok unit kaveling/rumah properti" },
   { key: "knowledge", label: "Knowledge Base AI", icon: Book, desc: "Pelatihan dokumen PDF & teks untuk asisten AI" },
   { key: "followup", label: "Follow-Up Otomatis", icon: BellRing, desc: "Broadcast & pengingat berkala ke WhatsApp pelanggan" },
 ];

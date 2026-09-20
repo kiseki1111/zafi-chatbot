@@ -45,7 +45,7 @@ export function OverviewPage() {
 
   useEffect(() => {
     loadAll();
-  }, [user?.id]);
+  }, [user?.id, user?.tenantId]);
 
   async function loadAll() {
     setLoading(true);
@@ -58,8 +58,9 @@ export function OverviewPage() {
         if (dash?.metrics) setMetrics(dash.metrics);
       }
 
-      // 2. WhatsApp sessions
-      const waRes = await fetch("/api/v1/waha/instances");
+      // 2. WhatsApp sessions (terisolasi per tenant)
+      const waQuery = user?.tenantId && user.role !== 'superadmin' ? `?tenantId=${user.tenantId}` : '';
+      const waRes = await fetch(`/api/v1/waha/instances${waQuery}`);
       if (waRes.ok) {
         const waData = await waRes.json();
         const list = Array.isArray(waData) ? waData : (waData?.data ?? []);

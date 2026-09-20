@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
+import * as fs from 'fs';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -13,6 +14,13 @@ async function bootstrap() {
 
   // Serve static assets from 'public' folder
   app.useStaticAssets(join(__dirname, '..', 'public'));
+
+  // Serve static uploads (tersimpan di VPS disk)
+  const uploadsPath = join(process.cwd(), 'uploads');
+  if (!fs.existsSync(uploadsPath)) {
+    fs.mkdirSync(uploadsPath, { recursive: true });
+  }
+  app.useStaticAssets(uploadsPath, { prefix: '/uploads/' });
   const configService = app.get(ConfigService);
 
   // 1. Mengaktifkan HTTP Security Headers sesuai panduan halaman 38
