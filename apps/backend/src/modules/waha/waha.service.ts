@@ -296,6 +296,64 @@ export class WahaService {
     return url;
   }
 
+  /**
+   * Jika URL mengarah ke /uploads/ (publik), coba baca file langsung dari disk lokal
+   * untuk menghindari loop HTTP ke Cloudflare (ETIMEDOUT). Mengembalikan path file lokal
+   * atau null jika file tidak ditemukan di disk.
+   */
+  private resolveToLocalFile(mediaUrl: string): string | null {
+    if (!mediaUrl) return null;
+    try {
+      const baseUrl = this.getMediaBaseUrl();
+      let pathPart: string | null = null;
+
+      if (mediaUrl.startsWith('/')) {
+        pathPart = mediaUrl;
+      } else if (mediaUrl.startsWith(baseUrl)) {
+        pathPart = mediaUrl.substring(baseUrl.length);
+      }
+
+      if (!pathPart) return null;
+
+      // Hanya tangani file di folder uploads lokal
+      const uploadsIdx = pathPart.indexOf('/uploads/');
+      if (uploadsIdx === -1) return null;
+      const relPath = pathPart.substring(uploadsIdx + '/uploads/'.length);
+
+      const localFile = path.join(
+        process.cwd(),
+        'uploads',
+        decodeURIComponent(relPath),
+      );
+      if (fs.existsSync(localFile)) {
+        return localFile;
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  private readLocalMediaFile(localFile: string, fallbackMime: string): { data: Buffer; mime: string } | null {
+    try {
+      const buffer = fs.readFileSync(localFile);
+      const ext = path.extname(localFile).toLowerCase().replace('.', '');
+      const mimeMap: Record<string, string> = {
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        png: 'image/png',
+        gif: 'image/gif',
+        webp: 'image/webp',
+        mp4: 'video/mp4',
+        mov: 'video/quicktime',
+        webm: 'video/webm',
+      };
+      return { data: buffer, mime: mimeMap[ext] || fallbackMime };
+    } catch (e) {
+      return null;
+    }
+  }
+
   async sendImage(
     sessionName: string,
     chatId: string,
@@ -310,15 +368,36 @@ export class WahaService {
       // Simulate human typing presence
       await this.sendTypingPresence(sessionName, chatId);
 
-      // Download the image first to avoid WAHA redirect/HTML issues
-      const imageResponse = await axios.get(imageUrl, {
-        responseType: 'arraybuffer',
-      });
-
-      const base64Data = Buffer.from(imageResponse.data).toString('base64');
-      const mimeType = String(
-        imageResponse.headers['content-type'] || 'image/jpeg',
-      );
+      // Prioritaskan baca dari disk lokal (hindari loop HTTP ke Cloudflare)
+      let base64Data: string;
+      let mimeType: string;
+      const localFile = this.resolveToLocalFile(imageUrl);
+      if (localFile) {
+        const fileData = this.readLocalMediaFile(localFile, 'image/jpeg');
+        if (fileData) {
+          base64Data = fileData.data.toString('base64');
+          mimeType = fileData.mime;
+          this.logger.log(
+            `[WAHA-SEND-IMAGE] Membaca dari disk lokal: ${localFile}`,
+          );
+        } else {
+          const imageResponse = await axios.get(imageUrl, {
+            responseType: 'arraybuffer',
+          });
+          base64Data = Buffer.from(imageResponse.data).toString('base64');
+          mimeType = String(
+            imageResponse.headers['content-type'] || 'image/jpeg',
+          );
+        }
+      } else {
+        const imageResponse = await axios.get(imageUrl, {
+          responseType: 'arraybuffer',
+        });
+        base64Data = Buffer.from(imageResponse.data).toString('base64');
+        mimeType = String(
+          imageResponse.headers['content-type'] || 'image/jpeg',
+        );
+      }
 
       const payload: any = {
         session: sessionName,
@@ -412,17 +491,32 @@ export class WahaService {
         filename: 'video-properti.mp4',
       };
 
-      try {
-        const downloadRes = await axios.get(videoUrl, {
-          responseType: 'arraybuffer',
-          headers: { 'User-Agent': 'Mozilla/5.0' },
-          timeout: 40000,
-        });
-        const base64Data = Buffer.from(downloadRes.data).toString('base64');
-        filePayload.data = base64Data;
-      } catch (dlErr) {
-        // Fallback: kirim URL langsung jika unduhan lokal gagal
-        filePayload.url = videoUrl;
+      // Prioritaskan baca dari disk lokal (hindari loop HTTP ke Cloudflare)
+      const localFile = this.resolveToLocalFile(videoUrl);
+      if (localFile) {
+        const fileData = this.readLocalMediaFile(localFile, 'video/mp4');
+        if (fileData) {
+          filePayload.data = fileData.data.toString('base64');
+          filePayload.mimetype = fileData.mime;
+          this.logger.log(
+            `[WAHA-SEND-VIDEO] Membaca dari disk lokal: ${localFile}`,
+          );
+        }
+      }
+
+      if (!filePayload.data) {
+        try {
+          const downloadRes = await axios.get(videoUrl, {
+            responseType: 'arraybuffer',
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+            timeout: 40000,
+          });
+          const base64Data = Buffer.from(downloadRes.data).toString('base64');
+          filePayload.data = base64Data;
+        } catch (dlErr) {
+          // Fallback: kirim URL langsung jika unduhan lokal gagal
+          filePayload.url = videoUrl;
+        }
       }
 
       const payload: any = {
