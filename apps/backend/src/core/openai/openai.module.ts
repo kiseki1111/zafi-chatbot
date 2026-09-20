@@ -5,6 +5,7 @@ import { OpenAI } from 'openai';
 export const OPENAI_CLIENT = 'OPENAI_CLIENT';
 export const OPENAI_MODEL = 'OPENAI_MODEL';
 export const EMBEDDING_MODEL = 'EMBEDDING_MODEL';
+export const OPENAI_VISION_MODEL = 'OPENAI_VISION_MODEL';
 
 @Global()
 @Module({
@@ -60,7 +61,23 @@ export const EMBEDDING_MODEL = 'EMBEDDING_MODEL';
         );
       },
     },
+    {
+      // Model khusus untuk analisis gambar (Vision). DeepSeek tidak mendukung image input.
+      provide: OPENAI_VISION_MODEL,
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        return (
+          configService.get<string>('OPENAI_VISION_MODEL') ||
+          'meta-llama/llama-4-scout-17b-16e-instruct'
+        );
+      },
+    },
   ],
-  exports: [OPENAI_CLIENT, OPENAI_MODEL, EMBEDDING_MODEL],
+  exports: [
+    OPENAI_CLIENT,
+    OPENAI_MODEL,
+    EMBEDDING_MODEL,
+    OPENAI_VISION_MODEL,
+  ],
 })
 export class OpenAiModule {}

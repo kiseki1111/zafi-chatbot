@@ -688,9 +688,23 @@ export class WahaService {
 
       // 2. Coba unduh langsung dari URL eksternal (WhatsApp CDN / hosted)
       if (mediaUrl && mediaUrl.startsWith('http')) {
-        const res = await axios.get(mediaUrl, {
+        // Perbaiki URL media dari WAHA yang salah host/port (mis. localhost:3000)
+        // -> arahkan ke baseUrl WAHA yang benar
+        let targetUrl = mediaUrl;
+        if (
+          /localhost|127\.0\.0\.1|\.\.:3000/i.test(mediaUrl) &&
+          mediaUrl.includes('/api/files/')
+        ) {
+          const pathPart = mediaUrl.substring(mediaUrl.indexOf('/api/files/'));
+          targetUrl = `${this.baseUrl}${pathPart}`;
+          this.logger.log(
+            `[MEDIA-DOWNLOAD] Memperbaiki URL WAHA: ${mediaUrl} -> ${targetUrl}`,
+          );
+        }
+
+        const res = await axios.get(targetUrl, {
           responseType: 'arraybuffer',
-          headers: { 'User-Agent': 'Mozilla/5.0' },
+          headers: this.getHeaders(),
           timeout: 30000,
         });
         const mime = String(res.headers['content-type'] || 'image/jpeg');

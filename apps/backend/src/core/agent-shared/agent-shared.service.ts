@@ -5,7 +5,11 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { OPENAI_CLIENT, OPENAI_MODEL } from '../openai/openai.module';
+import {
+  OPENAI_CLIENT,
+  OPENAI_MODEL,
+  OPENAI_VISION_MODEL,
+} from '../openai/openai.module';
 import { OpenAI } from 'openai';
 
 @Injectable()
@@ -13,15 +17,20 @@ export class AgentSharedService {
   private readonly logger = new Logger(AgentSharedService.name);
   private openai: OpenAI | null;
   private model: string;
+  private visionModel: string;
 
   constructor(
     private readonly prisma: PrismaService,
     @Inject(OPENAI_CLIENT) private readonly injectedOpenai: OpenAI | null,
     @Inject(OPENAI_MODEL) private readonly injectedModel: string,
+    @Inject(OPENAI_VISION_MODEL)
+    private readonly injectedVisionModel: string,
   ) {
     this.openai = this.injectedOpenai;
     this.model = this.injectedModel;
+    this.visionModel = this.injectedVisionModel;
     this.logger.log(`[AgentShared] Using model: ${this.model}`);
+    this.logger.log(`[AgentShared] Vision model: ${this.visionModel}`);
   }
 
   /**
@@ -269,7 +278,8 @@ export class AgentSharedService {
     if (!this.openai) return '';
     try {
       const response = await this.openai.chat.completions.create({
-        model: this.model,
+        // Gunakan model Vision (Llama-4-Scout) yang mendukung input gambar
+        model: this.visionModel,
         messages: [
           {
             role: 'user',
@@ -279,11 +289,13 @@ export class AgentSharedService {
             ] as any, // type override for openai array content
           },
         ],
-        max_tokens: 300,
+        max_tokens: 400,
       });
       return response.choices[0].message?.content || '';
     } catch (e) {
-      this.logger.error(`Error analyzing image: ${e}`);
+      this.logger.error(
+        `Error analyzing image (model=${this.visionModel}): ${e}`,
+      );
       return '';
     }
   }
