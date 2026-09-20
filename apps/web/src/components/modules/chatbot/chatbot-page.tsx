@@ -650,7 +650,7 @@ export function ChatbotPage() {
         isAI: m.senderType === 'bot' || m.senderType === 'ai',
         senderName: m.senderType === 'agent' ? (m.sender?.name || 'Admin') : undefined,
         messageType: m.messageType?.toLowerCase(),
-        mediaUrl: (m.metadata as any)?.mediaUrl || (m.metadata as any)?.url,
+        mediaUrl: (m.metadata as any)?.localMediaUrl || (m.metadata as any)?.mediaUrl || (m.metadata as any)?.url,
       }));
       
       if (reset) {
@@ -706,7 +706,7 @@ export function ChatbotPage() {
               isAI: m.senderType === 'bot' || m.senderType === 'ai',
               senderName: m.senderType === 'agent' ? (m.sender?.name || 'Admin') : undefined,
               messageType: m.messageType?.toLowerCase(),
-              mediaUrl: (m.metadata as any)?.mediaUrl || (m.metadata as any)?.url,
+              mediaUrl: (m.metadata as any)?.localMediaUrl || (m.metadata as any)?.mediaUrl || (m.metadata as any)?.url,
             }));
             setMessages(prev => {
                if (skip <= 20) return mappedMsgs;

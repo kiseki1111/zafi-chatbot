@@ -423,6 +423,17 @@ export class WahaController {
             ? 'image'
             : message.type || 'text';
 
+          // Strategi baru: unduh media yang diterima & simpan ke storage lokal
+          // agar bisa langsung ditampilkan di dashboard monitoring.
+          let storedMediaUrl: string | null = null;
+          if (isMediaMsg && extractedMediaUrl) {
+            storedMediaUrl = await this.wahaService.downloadAndStoreMedia(
+              sessionName,
+              msgId,
+              extractedMediaUrl,
+            );
+          }
+
           await this.prisma.message.upsert({
             where: { wahaMessageId: msgId },
             update: {
@@ -437,7 +448,10 @@ export class WahaController {
               status: message.fromMe ? 'SENT' : 'RECEIVED',
               metadata: {
                 ...message,
-                ...(extractedMediaUrl ? { mediaUrl: extractedMediaUrl } : {}),
+                ...(extractedMediaUrl
+                  ? { mediaUrl: storedMediaUrl || extractedMediaUrl }
+                  : {}),
+                ...(storedMediaUrl ? { localMediaUrl: storedMediaUrl } : {}),
               },
             },
           });
@@ -481,6 +495,53 @@ export class WahaController {
           : [];
 
         if (text || mediaUrls.length > 0 || message.hasMedia) {
+          // Helper: simpan pesan balasan bot ke database agar tampil di monitoring
+          const saveBotReply = async (
+            replyText: string,
+            msgType: string,
+            meta?: any,
+          ) => {
+            try {
+              const replyContactNumber = (message.from || '').replace(
+                /@c\.us|@s\.whatsapp\.net/g,
+                '',
+              );
+              const contact = await this.prisma.contact.findFirst({
+                where: {
+                  OR: [
+                    { phone: message.from },
+                    { phone: replyContactNumber },
+                    { phone: { contains: replyContactNumber } },
+                  ],
+                },
+              });
+              if (!contact) return;
+              const conversation = await this.prisma.conversation.findFirst({
+                where: {
+                  instanceName: sessionName,
+                  contactId: contact.id,
+                },
+              });
+              if (!conversation) return;
+              await this.prisma.message.create({
+                data: {
+                  conversationId: conversation.id,
+                  senderType: 'bot',
+                  messageType: msgType,
+                  content: replyText || '',
+                  status: 'SENT',
+                  metadata: meta || {},
+                },
+              });
+              await this.prisma.conversation.update({
+                where: { id: conversation.id },
+                data: { lastMessageAt: new Date() },
+              });
+            } catch (e) {
+              this.logger.warn(`Failed to save bot reply: ${e.message}`);
+            }
+          };
+
           const incomingMessage: IncomingMessage = {
             senderId: sender,
             text: text,
@@ -500,6 +561,7 @@ export class WahaController {
                     sender,
                     reply.text,
                   );
+                  await saveBotReply(reply.text, 'text');
                 }
               }
               if (reply.order) {
@@ -559,6 +621,33 @@ export class WahaController {
                       sender,
                       img.url,
                       img.caption || '',
+                    );
+                    await saveBotReply(
+                      img.caption || 'Mengirim gambar',
+                      'image',
+                      { mediaUrl: img.url },
+                    );
+                  }
+                }
+              }
+              if (reply.videos && reply.videos.length > 0) {
+                for (const vid of reply.videos) {
+                  if (sessionName === 'CLI_TEST_SESSION') {
+                    this.cliOutputQueue.push({
+                      type: 'video',
+                      text: `[Waha Bot video] URL: ${vid.url}, Caption: ${vid.caption}`,
+                    });
+                  } else {
+                    await this.wahaService.sendVideoFile(
+                      sessionName,
+                      sender,
+                      vid.url,
+                      vid.caption || '',
+                    );
+                    await saveBotReply(
+                      vid.caption || 'Mengirim video',
+                      'video',
+                      { mediaUrl: vid.url },
                     );
                   }
                 }

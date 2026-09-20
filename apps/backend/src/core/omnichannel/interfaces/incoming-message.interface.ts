@@ -1,6 +1,7 @@
 export interface AgentResponse {
   text: string;
   images: { url: string; caption: string }[];
+  videos?: { url: string; caption: string }[];
   order?: any;
 }
 

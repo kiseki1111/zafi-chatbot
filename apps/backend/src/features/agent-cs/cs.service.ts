@@ -35,9 +35,9 @@ ATURAN MENJAWAB KETERSEDIAAN UNIT / PLANSITE:
 3. JIKA PELANGGAN INGIN SURVEY LOKASI, BOOKING, ATAU KONSULTASI LEBIH LANJUT:
    Anda WAJIB mengarahkan mereka untuk langsung menghubungi tim Sales / Marketing resmi kami {fallbackContact} agar jadwal survey atau pemesanan unit dapat segera diproses.
 
-ATURAN PENGIRIMAN GAMBAR:
-Jika di dalam database terdapat link gambar untuk produk tersebut, JANGAN memasukannya ke dalam text balasan.
-PISAHKAN link URL gambar tersebut ke dalam array "images" pada format JSON. Jangan pernah gunakan example.com.
+ATURAN PENGIRIMAN GAMBAR & VIDEO:
+Jika di dalam database terdapat link gambar atau video untuk produk/perumahan tersebut, JANGAN memasukannya ke dalam text balasan.
+PISAHKAN link URL gambar ke dalam array "images" dan link URL video ke dalam array "videos" pada format JSON. Jangan pernah gunakan example.com.
 
 ATURAN FALLBACK (PERTANYAAN DI LUAR DATABASE):
 JANGAN NGARANG. Jika informasi yang ditanyakan TIDAK ADA di DATABASE TOKO, balas dengan menolak secara halus menggunakan kalimat ini:
@@ -48,6 +48,9 @@ WAJIB MERESPON DALAM FORMAT JSON BERIKUT:
   "text": "Balasan teks untuk pelanggan",
   "images": [
     { "url": "https://url-gambar...", "caption": "Nama Produk" }
+  ],
+  "videos": [
+    { "url": "https://url-video...", "caption": "Video Produk" }
   ],
   "order": {
     "customerName": "Nama Pelanggan",
@@ -130,6 +133,7 @@ WAJIB MERESPON DALAM FORMAT JSON BERIKUT:
       return {
         text: 'Maaf, nomor bot ini belum terhubung dengan toko manapun.',
         images: [],
+        videos: [],
       };
     }
 
@@ -238,10 +242,16 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
             (img: any) => img && img.url && !img.url.includes('example.com'),
           )
         : [];
+      const aiVideos = Array.isArray(parsed.videos)
+        ? parsed.videos.filter(
+            (vid: any) => vid && vid.url && !vid.url.includes('example.com'),
+          )
+        : [];
       const order = parsed.order || null;
       return {
         text: aiText,
         images: aiImages,
+        videos: aiVideos,
         order: order,
       };
     } catch (e) {
@@ -249,6 +259,7 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
       return {
         text: 'Maaf, sistem sedang sibuk. Silakan coba lagi nanti.',
         images: [],
+        videos: [],
       };
     }
   }

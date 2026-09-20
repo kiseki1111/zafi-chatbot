@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../core/prisma/prisma.service';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class WahaService {
@@ -350,6 +352,144 @@ export class WahaService {
     }
   }
 
+  async sendMedia(
+    sessionName: string,
+    chatId: string,
+    mediaUrl: string,
+    caption?: string,
+  ): Promise<any> {
+    const isVideo = /\.(mp4|mov|webm|mkv|ogg)($|\?)/i.test(mediaUrl);
+    if (isVideo) {
+      return this.sendVideoFile(sessionName, chatId, mediaUrl, caption);
+    }
+    return this.sendImage(sessionName, chatId, mediaUrl, caption);
+  }
+
+  // Kirim video sebagai file/dokumen MP4 (kompatibel penuh dengan semua perangkat
+  // tanpa memerlukan FFmpeg di WAHA tier free untuk metadata durasi native)
+  async sendVideoFile(
+    sessionName: string,
+    chatId: string,
+    videoUrl: string,
+    caption?: string,
+  ): Promise<any> {
+    try {
+      await this.sendTypingPresence(sessionName, chatId);
+
+      let filePayload: any = {
+        mimetype: 'video/mp4',
+        filename: 'video-properti.mp4',
+      };
+
+      try {
+        const downloadRes = await axios.get(videoUrl, {
+          responseType: 'arraybuffer',
+          headers: { 'User-Agent': 'Mozilla/5.0' },
+          timeout: 40000,
+        });
+        const base64Data = Buffer.from(downloadRes.data).toString('base64');
+        filePayload.data = base64Data;
+      } catch (dlErr) {
+        // Fallback: kirim URL langsung jika unduhan lokal gagal
+        filePayload.url = videoUrl;
+      }
+
+      const payload: any = {
+        session: sessionName,
+        chatId: chatId,
+        file: filePayload,
+      };
+      if (caption) payload.caption = caption;
+
+      // /api/sendFile menghasilkan documentMessage MP4 yang bisa dibuka & diputar
+      // di semua perangkat (iPhone & Android) tanpa bergantung FFmpeg di WAHA
+      const response = await axios.post(
+        `${this.baseUrl}/api/sendFile`,
+        payload,
+        {
+          headers: this.getHeaders(),
+          timeout: 50000,
+        },
+      );
+
+      await this.prisma.whatsappInstance
+        .update({
+          where: { instanceName: sessionName },
+          data: { messagesSent: { increment: 1 } },
+        })
+        .catch(() => null);
+
+      return response.data;
+    } catch (error: any) {
+      const errorDetail = error.response?.data
+        ? JSON.stringify(error.response.data)
+        : error.message;
+      this.logger.error(`Failed to send video file: ${errorDetail}`);
+      throw error;
+    }
+  }
+
+  async sendVideo(
+    sessionName: string,
+    chatId: string,
+    videoUrl: string,
+    caption?: string,
+  ): Promise<any> {
+    try {
+      await this.sendTypingPresence(sessionName, chatId);
+
+      // Download buffer terlebih dahulu agar terbebas dari issue 403 Forbidden atau CDN block pada WAHA
+      let filePayload: any = {
+        mimetype: 'video/mp4',
+      };
+
+      try {
+        const downloadRes = await axios.get(videoUrl, {
+          responseType: 'arraybuffer',
+          headers: { 'User-Agent': 'Mozilla/5.0' },
+          timeout: 35000,
+        });
+        const base64Data = Buffer.from(downloadRes.data).toString('base64');
+        filePayload.data = `data:video/mp4;base64,${base64Data}`;
+      } catch (dlErr) {
+        // Fallback gunakan URL langsung jika unduh lokal gagal
+        filePayload.url = videoUrl;
+      }
+
+      const payload: any = {
+        session: sessionName,
+        chatId: chatId,
+        file: filePayload,
+      };
+      if (caption) payload.caption = caption;
+
+      // Gunakan /api/sendVideo untuk menghasilkan native playable videoMessage di WhatsApp
+      const response = await axios.post(
+        `${this.baseUrl}/api/sendVideo`,
+        payload,
+        {
+          headers: this.getHeaders(),
+          timeout: 45000,
+        },
+      );
+
+      await this.prisma.whatsappInstance
+        .update({
+          where: { instanceName: sessionName },
+          data: { messagesSent: { increment: 1 } },
+        })
+        .catch(() => null);
+
+      return response.data;
+    } catch (error: any) {
+      const errorDetail = error.response?.data
+        ? JSON.stringify(error.response.data)
+        : error.message;
+      this.logger.error(`Failed to send video: ${errorDetail}`);
+      throw error;
+    }
+  }
+
   async getMediaFile(sessionName: string, messageId: string): Promise<{ data: Buffer; mimetype: string } | null> {
     try {
       // WAHA provides endpoints to download media by message ID or file path
@@ -378,6 +518,81 @@ export class WahaService {
       return null;
     } catch (e) {
       this.logger.warn(`Could not retrieve media file for ${messageId}: ${e.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Unduh media yang diterima dan simpan ke folder uploads lokal (VPS disk),
+   * agar gambar/video dapat langsung ditampilkan di dashboard monitoring.
+   * Mengembalikan URL lokal (/uploads/...) atau null jika gagal.
+   */
+  async downloadAndStoreMedia(
+    sessionName: string,
+    messageId: string,
+    mediaUrl?: string | null,
+  ): Promise<string | null> {
+    try {
+      // Jika sudah URL lokal, tidak perlu diunduh lagi
+      if (mediaUrl && mediaUrl.startsWith('/uploads/')) {
+        return mediaUrl;
+      }
+      // Data URI (base64) — langsung simpan
+      if (mediaUrl && mediaUrl.startsWith('data:')) {
+        const match = mediaUrl.match(/^data:([^;]+);base64,(.*)$/);
+        if (match) {
+          const ext = (match[1].split('/')[1] || 'png').replace('jpeg', 'jpg');
+          const buffer = Buffer.from(match[2], 'base64');
+          return this.writeMediaBuffer(buffer, match[1], ext);
+        }
+      }
+
+      // 1. Coba unduh via WAHA media endpoint (untuk URL proxy /api/v1/waha/media/...)
+      if (mediaUrl && mediaUrl.includes('/api/v1/waha/media/')) {
+        const file = await this.getMediaFile(sessionName, messageId);
+        if (file && file.data.length > 0) {
+          const ext = (file.mimetype.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+          return this.writeMediaBuffer(file.data, file.mimetype, ext);
+        }
+      }
+
+      // 2. Coba unduh langsung dari URL eksternal (WhatsApp CDN / hosted)
+      if (mediaUrl && mediaUrl.startsWith('http')) {
+        const res = await axios.get(mediaUrl, {
+          responseType: 'arraybuffer',
+          headers: { 'User-Agent': 'Mozilla/5.0' },
+          timeout: 30000,
+        });
+        const mime = String(res.headers['content-type'] || 'image/jpeg');
+        const ext = (mime.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+        return this.writeMediaBuffer(Buffer.from(res.data), mime, ext);
+      }
+
+      return null;
+    } catch (e) {
+      this.logger.warn(
+        `Could not download & store media ${messageId}: ${e.message}`,
+      );
+      return null;
+    }
+  }
+
+  private writeMediaBuffer(
+    buffer: Buffer,
+    mimetype: string,
+    ext: string,
+  ): string | null {
+    try {
+      const uploadsPath = path.join(process.cwd(), 'uploads', 'incoming');
+      if (!fs.existsSync(uploadsPath)) {
+        fs.mkdirSync(uploadsPath, { recursive: true });
+      }
+      const filename = `${Date.now()}-${Math.round(Math.random() * 1e6)}.${ext}`;
+      const filePath = path.join(uploadsPath, filename);
+      fs.writeFileSync(filePath, buffer);
+      return `/uploads/incoming/${filename}`;
+    } catch (e) {
+      this.logger.warn(`Could not write media to disk: ${e.message}`);
       return null;
     }
   }

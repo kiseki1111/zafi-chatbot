@@ -97,14 +97,14 @@ export const useAuthStore = create<AuthState>()(
           };
         } else if (preset === "zafi") {
           user = {
-            id: "54bcc682-7ae9-497f-97da-3e41ba1b2ee5", // Real ID in DB
-            name: "Zafi Property Manager",
-            email: "zafi@properti.com",
+            id: "11111111-1111-1111-1111-111111111111",
+            name: "Zafi Property",
+            email: "zafi@gmail.com",
             role: "manager",
             status: "active",
             createdAt: "2024-01-01",
             lastLogin: new Date().toISOString().slice(0, 16).replace("T", " "),
-            tenantId: "4a023464-c66a-4edf-8926-9a08a05ea221",
+            tenantId: "11111111-1111-1111-1111-111111111111",
           };
         } else {
           user = {

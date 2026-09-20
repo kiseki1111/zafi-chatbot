@@ -39,8 +39,9 @@ export function LoginForm() {
       targetEmail = "superadmin@propertiku.id";
       targetPassword = "SuperAdmin@123";
     } else if (preset === "zafi") {
-      targetEmail = "zafi@properti.com";
-      targetPassword = "Manager@123";
+      // Login dengan akun asli zafi@gmail.com (yang punya menu siteplan)
+      targetEmail = "zafi@gmail.com";
+      targetPassword = "zafi123";
     } else {
       targetEmail = "manager@nusantarabus.com";
       targetPassword = "Manager@123";
