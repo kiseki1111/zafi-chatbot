@@ -279,6 +279,23 @@ export class WahaService {
     }
   }
 
+  private getMediaBaseUrl(): string {
+    return (
+      this.configService.get<string>('PUBLIC_URL') ||
+      this.configService.get<string>('BACKEND_PUBLIC_URL') ||
+      'https://nexara.zafitech.my.id'
+    ).replace(/\/+$/, '');
+  }
+
+  private resolveMediaUrl(url: string): string {
+    if (!url) return url;
+    // Path relatif /uploads/... atau /api/... -> ubah ke URL absolut
+    if (url.startsWith('/')) {
+      return `${this.getMediaBaseUrl()}${url}`;
+    }
+    return url;
+  }
+
   async sendImage(
     sessionName: string,
     chatId: string,
@@ -286,6 +303,10 @@ export class WahaService {
     caption?: string,
   ): Promise<any> {
     try {
+      imageUrl = this.resolveMediaUrl(imageUrl);
+      this.logger.log(
+        `[WAHA-SEND-IMAGE] Sesi=${sessionName} | Chat=${chatId} | URL yang diakses: ${imageUrl}`,
+      );
       // Simulate human typing presence
       await this.sendTypingPresence(sessionName, chatId);
 
@@ -335,7 +356,9 @@ export class WahaService {
       const errorDetail = error.response?.data
         ? JSON.stringify(error.response.data)
         : error.message;
-      this.logger.error(`Failed to send image: ${errorDetail}`);
+      this.logger.error(
+        `Failed to send image. URL=${imageUrl} | Error: ${errorDetail}`,
+      );
 
       await this.prisma.whatsappInstance
         .update({
@@ -358,6 +381,10 @@ export class WahaService {
     mediaUrl: string,
     caption?: string,
   ): Promise<any> {
+    mediaUrl = this.resolveMediaUrl(mediaUrl);
+    this.logger.log(
+      `[WAHA-SEND-MEDIA] Sesi=${sessionName} | Chat=${chatId} | URL yang diakses: ${mediaUrl}`,
+    );
     const isVideo = /\.(mp4|mov|webm|mkv|ogg)($|\?)/i.test(mediaUrl);
     if (isVideo) {
       return this.sendVideoFile(sessionName, chatId, mediaUrl, caption);
@@ -374,6 +401,10 @@ export class WahaService {
     caption?: string,
   ): Promise<any> {
     try {
+      videoUrl = this.resolveMediaUrl(videoUrl);
+      this.logger.log(
+        `[WAHA-SEND-VIDEO] Sesi=${sessionName} | Chat=${chatId} | URL yang diakses: ${videoUrl}`,
+      );
       await this.sendTypingPresence(sessionName, chatId);
 
       let filePayload: any = {
@@ -424,7 +455,9 @@ export class WahaService {
       const errorDetail = error.response?.data
         ? JSON.stringify(error.response.data)
         : error.message;
-      this.logger.error(`Failed to send video file: ${errorDetail}`);
+      this.logger.error(
+        `Failed to send video file. URL=${videoUrl} | Error: ${errorDetail}`,
+      );
       throw error;
     }
   }
@@ -533,6 +566,9 @@ export class WahaService {
     mediaUrl?: string | null,
   ): Promise<string | null> {
     try {
+      this.logger.log(
+        `[MEDIA-DOWNLOAD] Sesi=${sessionName} | MsgId=${messageId} | URL sumber: ${mediaUrl || '(tidak ada)'}`,
+      );
       // Jika sudah URL lokal, tidak perlu diunduh lagi
       if (mediaUrl && mediaUrl.startsWith('/uploads/')) {
         return mediaUrl;
