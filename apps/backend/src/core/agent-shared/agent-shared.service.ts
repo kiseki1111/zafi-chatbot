@@ -5,6 +5,7 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import axios from 'axios';
 import {
   OPENAI_CLIENT,
   OPENAI_MODEL,
@@ -277,6 +278,21 @@ export class AgentSharedService {
   ): Promise<string> {
     if (!this.openai) return '';
     try {
+      // Convert media ke base64 data URI agar OpenRouter/Llama dapat baca gambar
+      // tanpa bergantung URL publik (localhost/private gagal).
+      let imageContent: any = { type: 'image_url', image_url: { url: mediaUrl } };
+      try {
+        const dataUri = await this.fetchImageAsDataUri(mediaUrl);
+        if (dataUri) {
+          imageContent = {
+            type: 'image_url',
+            image_url: { url: dataUri },
+          };
+        }
+      } catch (e) {
+        this.logger.warn(`Could not pre-fetch image, fallback URL: ${e.message}`);
+      }
+
       const response = await this.openai.chat.completions.create({
         // Gunakan model Vision (Llama-4-Scout) yang mendukung input gambar
         model: this.visionModel,
@@ -285,7 +301,7 @@ export class AgentSharedService {
             role: 'user',
             content: [
               { type: 'text', text: prompt },
-              { type: 'image_url', image_url: { url: mediaUrl } },
+              imageContent,
             ] as any, // type override for openai array content
           },
         ],
@@ -297,6 +313,42 @@ export class AgentSharedService {
         `Error analyzing image (model=${this.visionModel}): ${e}`,
       );
       return '';
+    }
+  }
+
+  /**
+   * Unduh gambar & mengkonversi ke base64 data URI, agar vision model tidak
+   * depend pada URL publik. Untuk URL WAHA internal (localhost:3000) -> arahkan
+   * ke baseUrl WAHA yang benar sebelum unduh.
+   */
+  private async fetchImageAsDataUri(mediaUrl: string): Promise<string | null> {
+    try {
+      let targetUrl = mediaUrl;
+      // Perbaiki URL WAHA internal (localhost:3000/api/files/...) -> baseUrl WAHA
+      if (
+        mediaUrl &&
+        /localhost|127\.0\.0\.1/i.test(mediaUrl) &&
+        mediaUrl.includes('/api/files/')
+      ) {
+        const baseUrl =
+          process.env.WAHA_API_URL || 'http://103.30.195.145:3060';
+        const pathPart = mediaUrl.substring(mediaUrl.indexOf('/api/files/'));
+        targetUrl = `${baseUrl.replace(/\/+$/, '')}${pathPart}`;
+      }
+
+      const res = await axios.get(targetUrl, {
+        responseType: 'arraybuffer',
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+        timeout: 30000,
+      });
+      const mime = String(res.headers['content-type'] || 'image/jpeg');
+      const base64 = Buffer.from(res.data).toString('base64');
+      return `data:${mime};base64,${base64}`;
+    } catch (e) {
+      this.logger.warn(
+        `fetchImageAsDataUri failed for ${mediaUrl}: ${e.message}`,
+      );
+      return null;
     }
   }
 }
