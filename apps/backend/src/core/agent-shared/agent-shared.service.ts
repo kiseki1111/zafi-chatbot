@@ -324,21 +324,28 @@ export class AgentSharedService {
   private async fetchImageAsDataUri(mediaUrl: string): Promise<string | null> {
     try {
       let targetUrl = mediaUrl;
-      // Perbaiki URL WAHA internal (localhost:3000/api/files/...) -> baseUrl WAHA
-      if (
+      const isWahaInternal =
         mediaUrl &&
         /localhost|127\.0\.0\.1/i.test(mediaUrl) &&
-        mediaUrl.includes('/api/files/')
-      ) {
+        mediaUrl.includes('/api/files/');
+
+      // Perbaiki URL WAHA internal (localhost:3000/api/files/...) -> baseUrl WAHA
+      // sekaligus tambahkan header X-Api-Key (WAHA minta autentikasi)
+      if (isWahaInternal) {
         const baseUrl =
           process.env.WAHA_API_URL || 'http://103.30.195.145:3060';
         const pathPart = mediaUrl.substring(mediaUrl.indexOf('/api/files/'));
         targetUrl = `${baseUrl.replace(/\/+$/, '')}${pathPart}`;
       }
 
+      const apiKey =
+        process.env.WAHA_API_KEY || 'ZafitechDunia12345#';
       const res = await axios.get(targetUrl, {
         responseType: 'arraybuffer',
-        headers: { 'User-Agent': 'Mozilla/5.0' },
+        headers: {
+          'User-Agent': 'Mozilla/5.0',
+          ...(isWahaInternal ? { 'X-Api-Key': apiKey } : {}),
+        },
         timeout: 30000,
       });
       const mime = String(res.headers['content-type'] || 'image/jpeg');

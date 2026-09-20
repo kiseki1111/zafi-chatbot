@@ -229,7 +229,12 @@ function MessageBubble({
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
           />
         ) : null}
-        {msg.text && <p className="whitespace-pre-wrap break-words">{msg.text}</p>}
+        {/* Untuk pesan image: tampilkan hanya gambar (tanpa placeholder "Mengirim foto").
+            Teks hanya tampil jika ada caption/isi teks asli. */}
+        {msg.text &&
+          !(msg.messageType === "image" && (msg.text === "Mengirim foto" || msg.text?.startsWith("Mengirim "))) && (
+          <p className="whitespace-pre-wrap break-words">{msg.text}</p>
+        )}
         <div
           className={cn(
             "mt-1 flex items-center gap-1 justify-end text-[10px]",
