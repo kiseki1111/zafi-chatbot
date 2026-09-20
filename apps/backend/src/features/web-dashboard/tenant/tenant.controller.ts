@@ -191,8 +191,53 @@ export class TenantController {
   async createTenantStaff(
     @Param('tenantId') tenantId: string,
     @Body()
-    body: { name: string; email: string; password?: string; role?: string },
+    body: {
+      name: string;
+      email: string;
+      password?: string;
+      role?: string;
+      allowedMenus?: string[];
+    },
   ) {
     return this.tenantService.createTenantStaff(tenantId, body);
+  }
+
+  // Superadmin: Detail klien lengkap beserta daftar user & statistik
+  @Get('clients/:tenantId')
+  async getClientDetail(@Param('tenantId') tenantId: string) {
+    return this.tenantService.getClientDetail(tenantId);
+  }
+
+  // Superadmin: Hapus perusahaan klien
+  @Delete('clients/:tenantId')
+  async deleteClient(@Param('tenantId') tenantId: string) {
+    return this.tenantService.deleteClient(tenantId);
+  }
+
+  // Superadmin / Manager: Update data akun pengguna/staf klien
+  @Patch('clients/:tenantId/users/:userId')
+  async updateTenantStaff(
+    @Param('tenantId') tenantId: string,
+    @Param('userId') userId: string,
+    @Body()
+    body: {
+      name?: string;
+      email?: string;
+      password?: string;
+      role?: string;
+      isActive?: boolean;
+      allowedMenus?: string[];
+    },
+  ) {
+    return this.tenantService.updateTenantStaff(tenantId, userId, body);
+  }
+
+  // Superadmin / Manager: Hapus akun pengguna/staf klien
+  @Delete('clients/:tenantId/users/:userId')
+  async deleteTenantStaff(
+    @Param('tenantId') tenantId: string,
+    @Param('userId') userId: string,
+  ) {
+    return this.tenantService.deleteTenantStaff(tenantId, userId);
   }
 }

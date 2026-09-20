@@ -43,6 +43,20 @@ export interface DragSeat {
   passengerPhone?: string;
 }
 
+export function parseIdrPrice(value: string | number | undefined | null): number {
+  if (value === undefined || value === null || value === "") return 0;
+  if (typeof value === "number") return isNaN(value) ? 0 : value;
+  const cleaned = value.toString().replace(/[^0-9]/g, "");
+  if (!cleaned) return 0;
+  const parsed = parseInt(cleaned, 10);
+  return isNaN(parsed) ? 0 : parsed;
+}
+
+export function formatIdr(value: number | string | undefined | null): string {
+  const num = typeof value === "number" ? value : parseIdrPrice(value);
+  return (num || 0).toLocaleString("id-ID");
+}
+
 export interface BusFleet {
   id: string;
   name: string;
@@ -657,12 +671,16 @@ export function BusLayoutView() {
             </div>
             <div>
               <Label className="font-medium">Harga Tiket Default (Rp)</Label>
-              <Input
-                type="number"
-                value={newBusForm.price}
-                onChange={(e) => setNewBusForm({ ...newBusForm, price: Number(e.target.value) })}
-                className="h-8 mt-1 text-xs"
-              />
+              <div className="relative mt-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">Rp</span>
+                <Input
+                  type="text"
+                  value={formatIdr(newBusForm.price)}
+                  onChange={(e) => setNewBusForm({ ...newBusForm, price: parseIdrPrice(e.target.value) })}
+                  className="h-8 pl-9 text-xs font-mono"
+                  placeholder="250.000"
+                />
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -724,12 +742,16 @@ export function BusLayoutView() {
 
             <div>
               <Label className="font-medium">Harga Tiket (Rp)</Label>
-              <Input
-                type="number"
-                value={seatForm.price}
-                onChange={(e) => setSeatForm({ ...seatForm, price: Number(e.target.value) })}
-                className="h-8 mt-1 text-xs"
-              />
+              <div className="relative mt-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">Rp</span>
+                <Input
+                  type="text"
+                  value={formatIdr(seatForm.price)}
+                  onChange={(e) => setSeatForm({ ...seatForm, price: parseIdrPrice(e.target.value) })}
+                  className="h-8 pl-9 text-xs font-mono"
+                  placeholder="250.000"
+                />
+              </div>
             </div>
           </div>
           <DialogFooter>

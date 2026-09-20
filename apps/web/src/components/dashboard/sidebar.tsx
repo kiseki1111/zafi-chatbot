@@ -32,9 +32,15 @@ export function Sidebar() {
     fetch(`/api/v1/tenant/${fetchId}/dashboard`)
       .then((r) => r.json())
       .then((data) => {
-        const menus = data?.tenant?.metadata?.enabledMenus;
-        if (Array.isArray(menus)) {
-          setEnabledMenus(menus);
+        // Cek apakah ada menu spesifik untuk akun staf ini
+        const userMenus = data?.tenant?.metadata?.userMenus?.[user.id];
+        if (Array.isArray(userMenus) && userMenus.length > 0) {
+          setEnabledMenus(userMenus);
+        } else {
+          const menus = data?.tenant?.metadata?.enabledMenus;
+          if (Array.isArray(menus)) {
+            setEnabledMenus(menus);
+          }
         }
       })
       .catch(() => {});

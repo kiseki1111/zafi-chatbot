@@ -14,11 +14,90 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Plus, Search, Edit3, Trash2, CheckCircle2, Clock, XCircle, Wrench, Layers, RefreshCw, Upload, Image, FileVideo, ExternalLink,
+  Plus, Search, Edit3, Trash2, CheckCircle2, Clock, XCircle, Wrench, Layers, RefreshCw, Upload, Image, FileVideo, ExternalLink, Play, Copy, Check, Film, BookOpen, Sparkles, FileText,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { useToast } from "@/hooks/use-toast";
 import type { ResourceGroup, ResourceItem, ResourceStatus } from "@/lib/types";
+
+/**
+ * Membersihkan format harga (menerima "3500000", "3.500.000", maupun "Rp 3.500.000") menjadi angka murni
+ */
+export function parseIdrPrice(value: string | number | undefined | null): number | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value === "number") return isNaN(value) ? undefined : value;
+  const cleaned = value.toString().replace(/[^0-9]/g, "");
+  if (!cleaned) return undefined;
+  const parsed = parseInt(cleaned, 10);
+  return isNaN(parsed) ? undefined : parsed;
+}
+
+/**
+ * Memformat angka ke pemisah ribuan standar Indonesia (contoh: 3500000 -> "3.500.000")
+ */
+export function formatIdr(value: number | string | undefined | null): string {
+  const num = typeof value === "number" ? value : parseIdrPrice(value);
+  if (num === undefined) return "0";
+  return num.toLocaleString("id-ID");
+}
+
+export interface SiteplanMedia {
+  id: string;
+  name: string;
+  url: string;
+  type: "image" | "video";
+  description?: string;
+  createdAt?: string;
+}
+
+export interface ClusterKnowledgeItem {
+  id: string;
+  title: string;
+  category: string;
+  content: string;
+  updatedAt?: string;
+}
+
+function parseClusterKnowledge(raw?: string | null): ClusterKnowledgeItem[] {
+  if (!raw || !raw.trim()) return [];
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {}
+  }
+  return [
+    {
+      id: "k-legacy",
+      title: "Informasi & Ketentuan Cluster",
+      category: "Umum",
+      content: trimmed,
+      updatedAt: new Date().toISOString().slice(0, 10),
+    },
+  ];
+}
+
+function parseGroupMedia(raw?: string | null): SiteplanMedia[] {
+  if (!raw || !raw.trim()) return [];
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {}
+  }
+  return [
+    {
+      id: "legacy-1",
+      name: "Denah Siteplan Utama",
+      url: trimmed,
+      type: /\.(mp4|webm|ogg|mov|mkv)$/i.test(trimmed) ? "video" : "image",
+      description: "Denah perumahan / cluster",
+      createdAt: new Date().toISOString().slice(0, 10),
+    },
+  ];
+}
 
 const STATUS_CONFIG: Record<ResourceStatus, { label: string; bg: string; border: string; text: string; icon: any }> = {
   AVAILABLE: {
@@ -177,8 +256,9 @@ export function AvailabilityView() {
   const handleSaveItem = async () => {
     const code = itemForm.code.trim();
     if (!activeGroup || !code) { setItemError("Nama blok / kode wajib diisi"); return; }
-    if (itemForm.price && isNaN(parseFloat(itemForm.price))) { setItemError("Harga harus angka valid"); return; }
-    if (itemForm.price && parseFloat(itemForm.price) < 0) { setItemError("Harga tidak boleh negatif"); return; }
+    const parsedPrice = parseIdrPrice(itemForm.price);
+    if (itemForm.price && parsedPrice === undefined) { setItemError("Harga harus angka valid"); return; }
+    if (parsedPrice !== undefined && parsedPrice < 0) { setItemError("Harga tidak boleh negatif"); return; }
     setItemError("");
     if (isSaving) return;
     setIsSaving(true);
@@ -188,7 +268,7 @@ export function AvailabilityView() {
         name: itemForm.name.trim() || undefined,
         houseType: itemForm.houseType.trim() || undefined,
         status: itemForm.status,
-        price: itemForm.price ? parseFloat(itemForm.price) : undefined,
+        price: parsedPrice,
         customerName: itemForm.customerName.trim() || undefined,
         customerPhone: itemForm.customerPhone.trim() || undefined,
         notes: itemForm.notes.trim() || undefined,
@@ -238,6 +318,7 @@ export function AvailabilityView() {
     if (isNaN(endNum) || endNum < 1) { setBatchError("Nomor akhir harus berupa angka minimal 1"); return; }
     if (endNum < startNum) { setBatchError("Nomor akhir harus ≥ nomor awal"); return; }
     if (endNum - startNum > 200) { setBatchError("Maksimal 200 unit per batch"); return; }
+    const parsedBatchPrice = parseIdrPrice(batchForm.price);
     setBatchError("");
     if (isSaving) return;
     setIsSaving(true);
@@ -250,7 +331,7 @@ export function AvailabilityView() {
           startNumber: startNum,
           endNumber: endNum,
           houseType: batchForm.houseType.trim() || undefined,
-          price: batchForm.price ? parseFloat(batchForm.price) : undefined,
+          price: parsedBatchPrice,
         }),
       });
       if (res.ok) {
@@ -264,14 +345,172 @@ export function AvailabilityView() {
     } finally { setIsSaving(false); }
   };
 
+  const handleItemPriceChange = (val: string) => {
+    const raw = val.replace(/[^0-9]/g, "");
+    if (!raw) {
+      setItemForm({ ...itemForm, price: "" });
+      return;
+    }
+    const formatted = parseInt(raw, 10).toLocaleString("id-ID");
+    setItemForm({ ...itemForm, price: formatted });
+  };
+
+  const handleBatchPriceChange = (val: string) => {
+    const raw = val.replace(/[^0-9]/g, "");
+    if (!raw) {
+      setBatchForm({ ...batchForm, price: "" });
+      return;
+    }
+    const formatted = parseInt(raw, 10).toLocaleString("id-ID");
+    setBatchForm({ ...batchForm, price: formatted });
+  };
+
+  // Knowledge Modular Khusus Cluster
+  const clusterKnowledgeList = useMemo(() => {
+    return parseClusterKnowledge(activeGroup?.description);
+  }, [activeGroup?.description]);
+
+  const [isKnowledgeModalOpen, setIsKnowledgeModalOpen] = useState(false);
+  const [editingKnowledgeId, setEditingKnowledgeId] = useState<string | null>(null);
+  const [knowledgeForm, setKnowledgeForm] = useState({
+    title: "",
+    category: "Spesifikasi Bangunan",
+    content: "",
+  });
+  const [isSavingKnowledge, setIsSavingKnowledge] = useState(false);
+
+  const openCreateKnowledgeModal = (defaultCat?: string) => {
+    setEditingKnowledgeId(null);
+    setKnowledgeForm({
+      title: "",
+      category: defaultCat || "Spesifikasi Bangunan",
+      content: "",
+    });
+    setIsKnowledgeModalOpen(true);
+  };
+
+  const openEditKnowledgeModal = (item: ClusterKnowledgeItem) => {
+    setEditingKnowledgeId(item.id);
+    setKnowledgeForm({
+      title: item.title,
+      category: item.category || "Umum",
+      content: item.content,
+    });
+    setIsKnowledgeModalOpen(true);
+  };
+
+  const handleSaveKnowledgeItem = async () => {
+    if (!activeGroup) return;
+    if (!knowledgeForm.title.trim() || !knowledgeForm.content.trim()) {
+      toast({ title: "Lengkapi data", description: "Judul dan isi knowledge wajib diisi", variant: "destructive" });
+      return;
+    }
+
+    setIsSavingKnowledge(true);
+    try {
+      let updated: ClusterKnowledgeItem[];
+      if (editingKnowledgeId) {
+        updated = clusterKnowledgeList.map((k) =>
+          k.id === editingKnowledgeId
+            ? {
+                ...k,
+                title: knowledgeForm.title.trim(),
+                category: knowledgeForm.category,
+                content: knowledgeForm.content.trim(),
+                updatedAt: new Date().toISOString().slice(0, 10),
+              }
+            : k
+        );
+      } else {
+        const newItem: ClusterKnowledgeItem = {
+          id: "k-" + Date.now(),
+          title: knowledgeForm.title.trim(),
+          category: knowledgeForm.category,
+          content: knowledgeForm.content.trim(),
+          updatedAt: new Date().toISOString().slice(0, 10),
+        };
+        updated = [...clusterKnowledgeList, newItem];
+      }
+
+      await saveClusterKnowledgeList(updated);
+      setIsKnowledgeModalOpen(false);
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setIsSavingKnowledge(false);
+    }
+  };
+
+  const handleDeleteKnowledgeItem = async (id: string, title: string) => {
+    if (!activeGroup) return;
+    if (!confirm(`Hapus knowledge "${title}"?`)) return;
+
+    try {
+      const updated = clusterKnowledgeList.filter((k) => k.id !== id);
+      await saveClusterKnowledgeList(updated);
+      toast({ title: "Dihapus", description: "Knowledge cluster berhasil dihapus" });
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const saveClusterKnowledgeList = async (list: ClusterKnowledgeItem[]) => {
+    if (!activeGroup) return;
+    const payload = JSON.stringify(list);
+    const res = await fetch(`/api/v1/availability/groups/${activeGroup.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ description: payload }),
+    });
+    if (res.ok) {
+      toast({ title: "Berhasil", description: "Knowledge cluster berhasil disimpan untuk bot AI" });
+      fetchGroups();
+    } else {
+      throw new Error("Gagal menyimpan ke server");
+    }
+  };
+
+  // Galeri Foto & Video Properti
+  const mediaList = useMemo(() => {
+    return parseGroupMedia(activeGroup?.siteplanImage);
+  }, [activeGroup?.siteplanImage]);
+
+  // Upload Modal State
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadName, setUploadName] = useState("");
+  const [uploadDesc, setUploadDesc] = useState("");
   const [isUploading, setIsUploading] = useState(false);
 
-  const handleUploadMedia = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Detail & Edit Media Modal State
+  const [selectedMedia, setSelectedMedia] = useState<SiteplanMedia | null>(null);
+  const [editMediaName, setEditMediaName] = useState("");
+  const [editMediaDesc, setEditMediaDesc] = useState("");
+  const [isSavingMedia, setIsSavingMedia] = useState(false);
+
+  const handleSelectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !activeGroup) return;
+    if (file) {
+      setUploadFile(file);
+      if (!uploadName.trim()) {
+        const clean = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
+        setUploadName(clean);
+      }
+    }
+  };
+
+  const handleUploadNewMedia = async () => {
+    if (!uploadFile || !activeGroup) {
+      toast({ title: "Pilih file", description: "Silakan pilih file gambar atau video terlebih dahulu", variant: "destructive" });
+      return;
+    }
+    if (!uploadName.trim()) {
+      toast({ title: "Nama file wajib", description: "Beri nama file agar dikenali oleh bot AI", variant: "destructive" });
+      return;
+    }
 
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("file", uploadFile);
 
     setIsUploading(true);
     try {
@@ -286,46 +525,87 @@ export function AvailabilityView() {
         throw new Error(resData.message || "Gagal upload media");
       }
 
-      // Simpan URL media ke siteplanImage di ResourceGroup
-      const updateRes = await fetch(`/api/v1/availability/groups/${activeGroup.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ siteplanImage: resData.url }),
-      });
+      const newMedia: SiteplanMedia = {
+        id: "m-" + Date.now(),
+        name: uploadName.trim(),
+        url: resData.url,
+        type: resData.mediaType || (uploadFile.type.startsWith("video/") ? "video" : "image"),
+        description: uploadDesc.trim() || undefined,
+        createdAt: new Date().toISOString().slice(0, 10),
+      };
 
-      if (updateRes.ok) {
-        toast({
-          title: "Media Tersimpan",
-          description: `File berhasil disimpan ke local storage VPS: ${resData.url}`,
-        });
-        fetchGroups();
-      }
+      const updated = [...mediaList, newMedia];
+      await saveMediaList(updated);
+
+      setIsUploadModalOpen(false);
+      setUploadFile(null);
+      setUploadName("");
+      setUploadDesc("");
     } catch (err: any) {
-      toast({
-        title: "Gagal Upload",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast({ title: "Gagal Upload", description: err.message, variant: "destructive" });
     } finally {
       setIsUploading(false);
-      e.target.value = "";
     }
   };
 
-  const handleRemoveMedia = async () => {
-    if (!activeGroup || !confirm("Hapus foto/video siteplan ini?")) return;
+  const openMediaDetail = (m: SiteplanMedia) => {
+    setSelectedMedia(m);
+    setEditMediaName(m.name);
+    setEditMediaDesc(m.description || "");
+  };
+
+  const handleUpdateMedia = async () => {
+    if (!selectedMedia || !activeGroup) return;
+    if (!editMediaName.trim()) {
+      toast({ title: "Nama wajib", description: "Nama file tidak boleh kosong", variant: "destructive" });
+      return;
+    }
+
+    setIsSavingMedia(true);
     try {
-      const res = await fetch(`/api/v1/availability/groups/${activeGroup.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ siteplanImage: "" }),
-      });
-      if (res.ok) {
-        toast({ title: "Media Dihapus", description: "Foto/video denah telah dilepas" });
-        fetchGroups();
-      }
-    } catch (e: any) {
-      toast({ title: "Error", description: e.message, variant: "destructive" });
+      const updated = mediaList.map((m) =>
+        m.id === selectedMedia.id
+          ? { ...m, name: editMediaName.trim(), description: editMediaDesc.trim() || undefined }
+          : m
+      );
+      await saveMediaList(updated);
+      setSelectedMedia(null);
+    } catch (err: any) {
+      toast({ title: "Gagal Menyimpan", description: err.message, variant: "destructive" });
+    } finally {
+      setIsSavingMedia(false);
+    }
+  };
+
+  const handleDeleteMedia = async () => {
+    if (!selectedMedia || !activeGroup) return;
+    if (!confirm(`Hapus media "${selectedMedia.name}" dari cluster ini?`)) return;
+
+    setIsSavingMedia(true);
+    try {
+      const updated = mediaList.filter((m) => m.id !== selectedMedia.id);
+      await saveMediaList(updated);
+      setSelectedMedia(null);
+    } catch (err: any) {
+      toast({ title: "Gagal Menghapus", description: err.message, variant: "destructive" });
+    } finally {
+      setIsSavingMedia(false);
+    }
+  };
+
+  const saveMediaList = async (list: SiteplanMedia[]) => {
+    if (!activeGroup) return;
+    const payload = JSON.stringify(list);
+    const res = await fetch(`/api/v1/availability/groups/${activeGroup.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ siteplanImage: payload }),
+    });
+    if (res.ok) {
+      toast({ title: "Tersimpan", description: "Galeri media berhasil diperbarui" });
+      fetchGroups();
+    } else {
+      throw new Error("Gagal menyimpan ke server");
     }
   };
 
@@ -349,7 +629,7 @@ export function AvailabilityView() {
       name: item.name || "",
       houseType: item.houseType || "",
       status: item.status,
-      price: item.price ? String(item.price) : "",
+      price: item.price ? formatIdr(item.price) : "",
       customerName: item.customerName || "",
       customerPhone: item.customerPhone || "",
       notes: item.notes || "",
@@ -444,6 +724,140 @@ export function AvailabilityView() {
         </div>
       )}
 
+      {/* Modular Knowledge Khusus Cluster */}
+      {activeGroup && (
+        <Card className="p-4 border bg-gradient-to-br from-background via-muted/10 to-background shadow-2xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2.5 border-b">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 shrink-0">
+                <BookOpen className="h-4 w-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="font-bold text-sm text-foreground">
+                    Knowledge Khusus Cluster: {activeGroup.name}
+                  </h4>
+                  <Badge variant="secondary" className="text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                    {clusterKnowledgeList.length} Topik Tersimpan
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Informasi mendalam spesifikasi rumah, fasilitas lingkungan, dan promo cluster. Digunakan otomatis oleh bot AI WhatsApp saat menjawab pembeli.
+                </p>
+              </div>
+            </div>
+
+            <Button
+              size="sm"
+              onClick={() => openCreateKnowledgeModal()}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-8 px-3.5 gap-1.5 font-semibold shrink-0 shadow-2xs"
+            >
+              <Plus className="h-3.5 w-3.5" /> Tambah Topik Knowledge
+            </Button>
+          </div>
+
+          {clusterKnowledgeList.length === 0 ? (
+            <div className="py-6 px-4 border border-dashed rounded-xl bg-muted/20 text-center space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Belum ada topik knowledge khusus untuk cluster <strong>{activeGroup.name}</strong>. Pilih topik awal untuk ditambahkan:
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-xs h-7 gap-1 border-blue-200 text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+                  onClick={() => openCreateKnowledgeModal("Spesifikasi Bangunan")}
+                >
+                  + Spesifikasi Bangunan
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-xs h-7 gap-1 border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                  onClick={() => openCreateKnowledgeModal("Fasilitas & Lingkungan")}
+                >
+                  + Fasilitas &amp; Lingkungan
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-xs h-7 gap-1 border-purple-200 text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/40"
+                  onClick={() => openCreateKnowledgeModal("Promo & Ketentuan KPR")}
+                >
+                  + Promo &amp; KPR
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+              {clusterKnowledgeList.map((item) => {
+                const categoryColor =
+                  item.category?.toLowerCase().includes("spesifikasi")
+                    ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800"
+                    : item.category?.toLowerCase().includes("fasilitas") || item.category?.toLowerCase().includes("lingkungan")
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                    : item.category?.toLowerCase().includes("promo") || item.category?.toLowerCase().includes("kpr")
+                    ? "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800"
+                    : "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/40 dark:text-slate-300 dark:border-slate-800";
+
+                return (
+                  <div
+                    key={item.id}
+                    className="p-3.5 rounded-xl border bg-card hover:border-emerald-500/60 hover:shadow-2xs transition-all flex flex-col justify-between gap-2.5"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <Badge variant="outline" className={`text-[10px] font-semibold py-0 px-2 border ${categoryColor}`}>
+                          {item.category || "Umum"}
+                        </Badge>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                            onClick={() => openEditKnowledgeModal(item)}
+                            title="Edit Topik"
+                          >
+                            <Edit3 className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                            onClick={() => handleDeleteKnowledgeItem(item.id, item.title)}
+                            title="Hapus Topik"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <h5 className="font-bold text-xs text-foreground line-clamp-1">{item.title}</h5>
+                      <p className="text-[11px] text-muted-foreground line-clamp-3 mt-1 font-sans leading-relaxed whitespace-pre-wrap">
+                        {item.content}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[10px] text-muted-foreground/80 pt-1.5 border-t">
+                      <span className="flex items-center gap-1">
+                        <Sparkles className="h-3 w-3 text-emerald-600" /> Aktif di AI Bot
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => openEditKnowledgeModal(item)}
+                        className="text-emerald-600 hover:underline font-medium"
+                      >
+                        Buka / Edit
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+      )}
+
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="p-4 flex flex-col justify-between">
@@ -498,116 +912,8 @@ export function AvailabilityView() {
             <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={openCreateModal}>
               <Plus className="h-4 w-4 mr-1" /> Tambah Unit
             </Button>
-        </div>
-      )}
-
-      {/* Media Siteplan Showcase (Foto / Video) */}
-      {activeGroup && (
-        <Card className="p-4 border-dashed bg-muted/20">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
-                <Image className="h-4 w-4" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold">Media Denah Siteplan &amp; Video Showcase</h3>
-                <p className="text-xs text-muted-foreground">
-                  Foto denah atau video cluster perumahan. Tersimpan langsung di storage VPS dan dapat dikirim otomatis oleh bot WAHA.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <label className="cursor-pointer">
-                <input
-                  type="file"
-                  accept="image/*,video/*"
-                  className="hidden"
-                  onChange={handleUploadMedia}
-                  disabled={isUploading}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  asChild
-                  disabled={isUploading}
-                  className="text-xs gap-1.5 cursor-pointer"
-                >
-                  <span>
-                    <Upload className={`h-3.5 w-3.5 ${isUploading ? "animate-bounce" : ""}`} />
-                    {isUploading ? "Mengunggah..." : activeGroup.siteplanImage ? "Ganti Foto/Video" : "Upload Foto / Video"}
-                  </span>
-                </Button>
-              </label>
-
-              {activeGroup.siteplanImage && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleRemoveMedia}
-                  className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40"
-                >
-                  <Trash2 className="h-3.5 w-3.5 mr-1" /> Hapus
-                </Button>
-              )}
-            </div>
           </div>
-
-          {activeGroup.siteplanImage ? (
-            <div className="mt-2 rounded-xl overflow-hidden border bg-background/50 flex flex-col items-center justify-center p-2">
-              {/\.(mp4|webm|ogg|mov|mkv)$/i.test(activeGroup.siteplanImage) ? (
-                <div className="w-full max-w-2xl space-y-2">
-                  <video
-                    controls
-                    src={activeGroup.siteplanImage}
-                    className="w-full max-h-80 rounded-lg bg-black"
-                  />
-                  <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
-                    <span className="flex items-center gap-1 font-mono text-[11px] truncate max-w-md">
-                      <FileVideo className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                      {activeGroup.siteplanImage}
-                    </span>
-                    <a
-                      href={activeGroup.siteplanImage}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-emerald-600 hover:underline flex items-center gap-1 shrink-0"
-                    >
-                      Buka URL <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </div>
-                </div>
-              ) : (
-                <div className="w-full max-w-2xl space-y-2">
-                  <img
-                    src={activeGroup.siteplanImage}
-                    alt="Denah Siteplan"
-                    className="w-full max-h-80 object-contain rounded-lg bg-muted/40"
-                  />
-                  <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
-                    <span className="flex items-center gap-1 font-mono text-[11px] truncate max-w-md">
-                      <Image className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                      {activeGroup.siteplanImage}
-                    </span>
-                    <a
-                      href={activeGroup.siteplanImage}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-emerald-600 hover:underline flex items-center gap-1 shrink-0"
-                    >
-                      Buka URL <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="rounded-xl border border-dashed p-6 text-center text-xs text-muted-foreground">
-              Belum ada foto denah siteplan atau video properti untuk cluster ini. Klik tombol di atas untuk mengunggah.
-            </div>
-          )}
-        </Card>
-      )}
+        )}
       </div>
 
       {/* Grid Matrix View */}
@@ -686,6 +992,285 @@ export function AvailabilityView() {
           })}
         </div>
       )}
+
+      {/* Galeri Foto & Video Properti (Di Bawah List Siteplan) */}
+      {activeGroup && (
+        <Card className="p-5 border shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b">
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                  <Image className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-foreground">
+                    Galeri Foto &amp; Video Properti ({mediaList.length})
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Koleksi media siteplan, foto rumah, dan video virtual tour. Beri nama pada tiap file agar bot AI WhatsApp dapat mengirimkan foto/video yang tepat saat diminta oleh calon pembeli.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <Button
+              size="sm"
+              onClick={() => {
+                setUploadFile(null);
+                setUploadName("");
+                setUploadDesc("");
+                setIsUploadModalOpen(true);
+              }}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5 font-semibold h-9 px-4 shrink-0 shadow-2xs"
+            >
+              <Upload className="h-4 w-4" /> Upload Foto / Video
+            </Button>
+          </div>
+
+          {mediaList.length === 0 ? (
+            <div className="py-14 border border-dashed rounded-2xl text-center text-xs text-muted-foreground bg-muted/20">
+              Belum ada foto atau video properti untuk cluster ini. Klik tombol di atas untuk mengunggah media baru.
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              {mediaList.map((m) => (
+                <div
+                  key={m.id}
+                  onClick={() => openMediaDetail(m)}
+                  className="group rounded-2xl border bg-card overflow-hidden cursor-pointer hover:border-emerald-500 hover:shadow-xs transition-all flex flex-col"
+                >
+                  {/* Thumbnail */}
+                  <div className="h-28 w-full bg-muted relative overflow-hidden flex items-center justify-center">
+                    {m.type === "video" ? (
+                      <>
+                        <video src={m.url} className="w-full h-full object-cover" preload="metadata" />
+                        <div className="absolute inset-0 bg-black/30 flex items-center justify-center group-hover:bg-black/40 transition-colors">
+                          <div className="h-8 w-8 rounded-full bg-white/95 text-blue-600 flex items-center justify-center shadow-xs">
+                            <Play className="h-3.5 w-3.5 fill-current ml-0.5" />
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <img
+                        src={m.url}
+                        alt={m.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                      />
+                    )}
+
+                    {/* Badge Tipe */}
+                    <div className="absolute top-1.5 right-1.5">
+                      <Badge
+                        variant="secondary"
+                        className={`text-[9px] font-bold px-1.5 py-0 shadow-2xs backdrop-blur-sm ${
+                          m.type === "video"
+                            ? "bg-blue-600/90 text-white"
+                            : "bg-emerald-600/90 text-white"
+                        }`}
+                      >
+                        {m.type === "video" ? "VIDEO" : "FOTO"}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {/* Keterangan Singkat */}
+                  <div className="p-2.5 flex-1 flex flex-col justify-between">
+                    <p className="font-semibold text-xs text-foreground truncate group-hover:text-emerald-600 transition-colors" title={m.name}>
+                      {m.name}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground truncate mt-0.5">
+                      {m.description || "Klik untuk detail & kelola"}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* DIALOG: UPLOAD MEDIA BARU */}
+      <Dialog open={isUploadModalOpen} onOpenChange={setIsUploadModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5 text-emerald-600" />
+              Upload Foto / Video Properti
+            </DialogTitle>
+            <DialogDescription>
+              File akan disimpan ke storage VPS dan dapat diakses oleh bot AI WhatsApp.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 text-xs py-1">
+            <div>
+              <Label>Pilih File Foto atau Video (Wajib)</Label>
+              <Input
+                type="file"
+                accept="image/*,video/*"
+                onChange={handleSelectFile}
+                className="mt-1 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 file:border-0 file:rounded-md file:mr-2"
+              />
+              {uploadFile && (
+                <p className="text-[11px] text-emerald-600 font-medium mt-1">
+                  ✓ File terpilih: {uploadFile.name} ({(uploadFile.size / 1024 / 1024).toFixed(2)} MB)
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label>Nama File / Judul Media (Wajib)</Label>
+              <Input
+                value={uploadName}
+                onChange={(e) => setUploadName(e.target.value)}
+                placeholder="Contoh: Foto Fasad Tipe 36, Denah Siteplan Blok A, Video Virtual Tour"
+                className="h-8 mt-1"
+              />
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                Beri nama yang jelas karena bot AI akan mencocokkan nama ini dengan permintaan pelanggan di WhatsApp.
+              </p>
+            </div>
+
+            <div>
+              <Label>Deskripsi / Keterangan untuk Bot AI (Opsional)</Label>
+              <Textarea
+                value={uploadDesc}
+                onChange={(e) => setUploadDesc(e.target.value)}
+                placeholder="Contoh: Tampilan tampak depan rumah minimalis 2 kamar tidur dengan carport luas."
+                rows={3}
+                className="mt-1 text-xs"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setIsUploadModalOpen(false)}>
+              Batal
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleUploadNewMedia}
+              disabled={isUploading}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+            >
+              {isUploading ? "Mengunggah..." : "Unggah & Simpan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIALOG: DETAIL & EDIT MEDIA (CRUD) */}
+      <Dialog open={!!selectedMedia} onOpenChange={(open) => { if (!open) setSelectedMedia(null); }}>
+        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {selectedMedia?.type === "video" ? <FileVideo className="h-5 w-5 text-blue-600" /> : <Image className="h-5 w-5 text-emerald-600" />}
+              Detail &amp; Pengaturan Media
+            </DialogTitle>
+            <DialogDescription>
+              Lihat pratinjau media, edit nama file untuk bot AI, atau hapus media ini.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedMedia && (
+            <div className="space-y-4 text-xs">
+              {/* Preview Media */}
+              <div className="rounded-2xl border bg-black/5 dark:bg-black/30 overflow-hidden flex items-center justify-center p-2">
+                {selectedMedia.type === "video" ? (
+                  <video controls src={selectedMedia.url} className="w-full max-h-72 rounded-xl bg-black" />
+                ) : (
+                  <img src={selectedMedia.url} alt={selectedMedia.name} className="w-full max-h-72 object-contain rounded-xl" />
+                )}
+              </div>
+
+              {/* Form Edit */}
+              <div className="space-y-3">
+                <div>
+                  <Label>Nama File / Judul Media</Label>
+                  <Input
+                    value={editMediaName}
+                    onChange={(e) => setEditMediaName(e.target.value)}
+                    className="h-8 mt-1"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    Nama yang digunakan oleh bot AI untuk mencocokkan pertanyaan customer di WhatsApp.
+                  </p>
+                </div>
+
+                <div>
+                  <Label>Deskripsi / Kata Kunci untuk Bot AI</Label>
+                  <Textarea
+                    value={editMediaDesc}
+                    onChange={(e) => setEditMediaDesc(e.target.value)}
+                    rows={2}
+                    className="mt-1 text-xs"
+                    placeholder="Keterangan gambar atau spesifikasi unit terkait..."
+                  />
+                </div>
+
+                <div>
+                  <Label>URL File di VPS Storage</Label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Input
+                      readOnly
+                      value={selectedMedia.url}
+                      className="h-8 font-mono text-[11px] bg-muted/40"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs shrink-0 gap-1"
+                      onClick={() => {
+                        navigator.clipboard.writeText(window.location.origin + selectedMedia.url);
+                        toast({ title: "Disalin!", description: "Link URL media disalin ke clipboard" });
+                      }}
+                    >
+                      <Copy className="h-3.5 w-3.5" /> Salin URL
+                    </Button>
+                    <a
+                      href={selectedMedia.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center justify-center h-8 px-2.5 rounded-md border text-xs text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 shrink-0 gap-1"
+                    >
+                      Buka <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="flex items-center justify-between sm:justify-between w-full pt-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={isSavingMedia}
+              onClick={handleDeleteMedia}
+              className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1" /> Hapus Media
+            </Button>
+
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setSelectedMedia(null)}>
+                Tutup
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={isSavingMedia}
+                onClick={handleUpdateMedia}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+              >
+                {isSavingMedia ? "Menyimpan..." : "Simpan Perubahan"}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal Tambah Perumahan */}
       <Dialog open={isGroupModalOpen} onOpenChange={setIsGroupModalOpen}>
@@ -797,13 +1382,17 @@ export function AvailabilityView() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="unitPrice">Harga (Opsional)</Label>
-                <Input
-                  id="unitPrice"
-                  type="number"
-                  placeholder="misal: 350000000"
-                  value={itemForm.price}
-                  onChange={(e) => setItemForm({ ...itemForm, price: e.target.value })}
-                />
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">Rp</span>
+                  <Input
+                    id="unitPrice"
+                    type="text"
+                    placeholder="misal: 350.000.000"
+                    value={itemForm.price}
+                    onChange={(e) => handleItemPriceChange(e.target.value)}
+                    className="pl-9 font-mono"
+                  />
+                </div>
               </div>
             </div>
 
@@ -931,13 +1520,17 @@ export function AvailabilityView() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="batchPrice">Harga Default (Opsional)</Label>
-                <Input
-                  id="batchPrice"
-                  type="number"
-                  placeholder="350000000"
-                  value={batchForm.price}
-                  onChange={(e) => setBatchForm({ ...batchForm, price: e.target.value })}
-                />
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">Rp</span>
+                  <Input
+                    id="batchPrice"
+                    type="text"
+                    placeholder="misal: 350.000.000"
+                    value={batchForm.price}
+                    onChange={(e) => handleBatchPriceChange(e.target.value)}
+                    className="pl-9 font-mono"
+                  />
+                </div>
               </div>
             </div>
             {batchError && <p role="alert" className="text-xs text-destructive font-medium">{batchError}</p>}
@@ -949,6 +1542,80 @@ export function AvailabilityView() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIALOG: TAMBAH / EDIT KNOWLEDGE KHUSUS CLUSTER */}
+      <Dialog open={isKnowledgeModalOpen} onOpenChange={setIsKnowledgeModalOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5 text-emerald-600" />
+              {editingKnowledgeId ? "Edit Topik Knowledge Cluster" : "Tambah Topik Knowledge Cluster"}
+            </DialogTitle>
+            <DialogDescription>
+              Tuliskan informasi spesifik cluster <strong>{activeGroup?.name}</strong>. Bot AI WhatsApp otomatis memprioritaskan informasi ini saat calon pembeli bertanya.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3.5 text-xs py-1">
+            <div className="space-y-1">
+              <Label>Judul Topik (Wajib)</Label>
+              <Input
+                value={knowledgeForm.title}
+                onChange={(e) => setKnowledgeForm({ ...knowledgeForm, title: e.target.value })}
+                placeholder="Contoh: Detail Spesifikasi Rumah Tipe 36, Fasilitas & Lingkungan Cluster"
+                className="h-8 mt-1"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label>Kategori Topik</Label>
+              <select
+                value={knowledgeForm.category}
+                onChange={(e) => setKnowledgeForm({ ...knowledgeForm, category: e.target.value })}
+                className="w-full h-8 mt-1 rounded-md border bg-background px-2 text-xs"
+              >
+                <option value="Spesifikasi Bangunan">Spesifikasi Bangunan (Material, Pondasi, Listrik, Air)</option>
+                <option value="Fasilitas & Lingkungan">Fasilitas &amp; Lingkungan (Keamanan, Taman, One Gate)</option>
+                <option value="Akses & Lokasi">Akses &amp; Lokasi (Dekat Tol, Stasiun, Sekolah)</option>
+                <option value="Promo & Ketentuan KPR">Promo &amp; Ketentuan KPR (DP 0%, Subsidi, Akad)</option>
+                <option value="Umum / Lainnya">Umum / Lainnya</option>
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <Label>Isi Penjelasan Knowledge (Wajib)</Label>
+              <Textarea
+                rows={7}
+                value={knowledgeForm.content}
+                onChange={(e) => setKnowledgeForm({ ...knowledgeForm, content: e.target.value })}
+                placeholder="Tuliskan poin-poin informasi lengkap yang perlu diketahui calon pembeli..."
+                className="font-sans leading-relaxed text-xs"
+              />
+            </div>
+
+            <div className="p-3 bg-muted/40 rounded-xl border space-y-1 text-[11px] text-muted-foreground">
+              <span className="font-semibold text-foreground flex items-center gap-1">
+                <Sparkles className="h-3.5 w-3.5 text-emerald-600" /> Tips untuk AI yang Akurat:
+              </span>
+              <p>Tuliskan sedetail mungkin merek atau ukuran (misal: "Lantai granit 60x60, listrik 1300 Watt, air sumur bor jetpump dengan toren 500L").</p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setIsKnowledgeModalOpen(false)}>
+              Batal
+            </Button>
+            <Button
+              size="sm"
+              disabled={isSavingKnowledge}
+              onClick={handleSaveKnowledgeItem}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+            >
+              {isSavingKnowledge ? "Menyimpan..." : "Simpan Topik Knowledge"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

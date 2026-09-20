@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Menu, Bell, Sun, Moon, LogOut, User as UserIcon,
-  Settings as SettingsIcon, ChevronDown, AlertTriangle, QrCode,
+  Settings as SettingsIcon, ChevronDown, AlertTriangle, QrCode, X,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { useAppStore } from "@/lib/app-store";
@@ -25,6 +25,7 @@ export function Topbar() {
   const { user, logout } = useAuthStore();
   const { view, setView, sidebarOpen, setSidebarOpen, theme, toggleTheme } = useAppStore();
   const [offlineInstances, setOfflineInstances] = useState<{ instanceName: string; status: string }[]>([]);
+  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
     if (!user?.tenantId) return;
@@ -52,7 +53,7 @@ export function Topbar() {
 
   return (
     <>
-      {offlineInstances.length > 0 && (
+      {offlineInstances.length > 0 && !dismissed && (
         <div className="bg-amber-500 text-amber-950 px-4 py-2 text-xs font-medium flex items-center justify-between border-b border-amber-600/20 shadow-sm transition-all animate-in fade-in">
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 shrink-0 text-amber-950 animate-pulse" />
@@ -60,17 +61,28 @@ export function Topbar() {
               Perhatian: Ada <strong>{offlineInstances.length} nomor WhatsApp</strong> (<em>{offlineInstances.map(i => i.instanceName).join(', ')}</em>) yang terputus atau perlu login / scan QR ulang agar fitur bot & follow-up berjalan normal.
             </span>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 text-[11px] bg-white hover:bg-amber-50 border-amber-600/30 text-amber-950 font-semibold shrink-0 ml-4 gap-1.5 shadow-none"
-            onClick={() => {
-              window.history.pushState({}, '', '?view=settings&tab=koneksi');
-              setView("settings");
-            }}
-          >
-            <QrCode className="h-3 w-3" /> Hubungkan Sekarang
-          </Button>
+          <div className="flex items-center gap-2 shrink-0 ml-4">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-[11px] bg-white hover:bg-amber-50 border-amber-600/30 text-amber-950 font-semibold gap-1.5 shadow-none"
+              onClick={() => {
+                window.history.pushState({}, '', '?view=settings&tab=koneksi');
+                setView("settings");
+              }}
+            >
+              <QrCode className="h-3 w-3" /> Hubungkan Sekarang
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7 text-amber-950 hover:bg-amber-600/30 hover:text-amber-950 rounded-full"
+              onClick={() => setDismissed(true)}
+              title="Tutup notifikasi"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       )}
       <header className="sticky top-0 z-30 h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">

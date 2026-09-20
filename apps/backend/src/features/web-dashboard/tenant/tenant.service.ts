@@ -743,7 +743,13 @@ export class TenantService {
   // Superadmin / Manager: Buat akun staf/admin tambahan untuk tenant tertentu
   async createTenantStaff(
     tenantId: string,
-    data: { name: string; email: string; password?: string; role?: string },
+    data: {
+      name: string;
+      email: string;
+      password?: string;
+      role?: string;
+      allowedMenus?: string[];
+    },
   ) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
@@ -754,7 +760,7 @@ export class TenantService {
     const defaultPassword = data.password || 'Staff@123';
     const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 
-    return this.prisma.user.create({
+    const newUser = await this.prisma.user.create({
       data: {
         name: data.name,
         email: data.email,
@@ -770,6 +776,173 @@ export class TenantService {
         tenantId: true,
         createdAt: true,
       },
+    });
+
+    // Simpan menu spesifik untuk user ini di metadata tenant jika diberikan
+    if (Array.isArray(data.allowedMenus)) {
+      const existingMeta = (tenant.metadata as any) || {};
+      const userMenus = existingMeta.userMenus || {};
+      userMenus[newUser.id] = data.allowedMenus;
+
+      await this.prisma.tenant.update({
+        where: { id: tenantId },
+        data: {
+          metadata: {
+            ...existingMeta,
+            userMenus,
+          },
+        },
+      });
+    }
+
+    return newUser;
+  }
+
+  // Superadmin: Detail klien lengkap beserta daftar user & statistik
+  async getClientDetail(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      include: {
+        users: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            isActive: true,
+            lastLogin: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: 'asc' },
+        },
+        whatsappInstances: true,
+        _count: {
+          select: {
+            products: true,
+            knowledgeBases: true,
+            resourceGroups: true,
+          },
+        },
+      },
+    });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+
+    const meta = (tenant.metadata as any) || {};
+    const userMenus = meta.userMenus || {};
+
+    const usersWithMenus = tenant.users.map((u) => ({
+      ...u,
+      allowedMenus: userMenus[u.id] || meta.enabledMenus || [],
+    }));
+
+    return {
+      ...tenant,
+      users: usersWithMenus,
+    };
+  }
+
+  // Superadmin: Hapus perusahaan klien beserta relasinya
+  async deleteClient(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+
+    return this.prisma.tenant.delete({
+      where: { id: tenantId },
+    });
+  }
+
+  // Superadmin / Manager: Update data akun pengguna/staf klien
+  async updateTenantStaff(
+    tenantId: string,
+    userId: string,
+    data: {
+      name?: string;
+      email?: string;
+      password?: string;
+      role?: string;
+      isActive?: boolean;
+      allowedMenus?: string[];
+    },
+  ) {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, tenantId },
+    });
+    if (!user)
+      throw new NotFoundException('User tidak ditemukan pada tenant ini');
+
+    const updateData: any = {};
+    if (data.name) updateData.name = data.name;
+    if (data.email) updateData.email = data.email;
+    if (data.role) updateData.role = data.role;
+    if (typeof data.isActive === 'boolean') updateData.isActive = data.isActive;
+    if (data.password && data.password.trim()) {
+      const bcrypt = await import('bcrypt');
+      updateData.password = await bcrypt.hash(data.password.trim(), 10);
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isActive: true,
+        tenantId: true,
+        updatedAt: true,
+      },
+    });
+
+    if (Array.isArray(data.allowedMenus)) {
+      const tenant = await this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+      });
+      if (tenant) {
+        const existingMeta = (tenant.metadata as any) || {};
+        const userMenus = existingMeta.userMenus || {};
+        userMenus[userId] = data.allowedMenus;
+        await this.prisma.tenant.update({
+          where: { id: tenantId },
+          data: {
+            metadata: {
+              ...existingMeta,
+              userMenus,
+            },
+          },
+        });
+      }
+    }
+
+    return updatedUser;
+  }
+
+  // Superadmin / Manager: Hapus akun pengguna/staf klien
+  async deleteTenantStaff(tenantId: string, userId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, tenantId },
+    });
+    if (!user)
+      throw new NotFoundException('User tidak ditemukan pada tenant ini');
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+    if (tenant) {
+      const existingMeta = (tenant.metadata as any) || {};
+      if (existingMeta.userMenus && existingMeta.userMenus[userId]) {
+        delete existingMeta.userMenus[userId];
+        await this.prisma.tenant.update({
+          where: { id: tenantId },
+          data: { metadata: existingMeta },
+        });
+      }
+    }
+
+    return this.prisma.user.delete({
+      where: { id: userId },
     });
   }
 }

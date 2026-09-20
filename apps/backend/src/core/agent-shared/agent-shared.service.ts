@@ -123,7 +123,54 @@ export class AgentSharedService {
           })
           .join('\n');
 
-        return `Perumahan: "${g.name}" (Total ${total} Unit | Unit Ready: ${available} | Proses Bank: ${booked} | Sudah Terjual: ${occupied})\nDaftar Unit/Blok:\n${itemList}`;
+        let mediaStr = '';
+        if (g.siteplanImage) {
+          try {
+            const raw = g.siteplanImage.trim();
+            if (raw.startsWith('[')) {
+              const medias = JSON.parse(raw);
+              if (Array.isArray(medias) && medias.length > 0) {
+                mediaStr =
+                  '\nDaftar Foto & Video yang tersedia untuk dikirimkan ke pelanggan:\n' +
+                  medias
+                    .map(
+                      (m: any) =>
+                        `  - [${m.type === 'video' ? 'VIDEO' : 'FOTO'}] "${m.name}": ${m.url}${m.description ? ` (${m.description})` : ''}`,
+                    )
+                    .join('\n');
+              }
+            } else {
+              mediaStr = `\nFoto/Video Siteplan: ${raw}`;
+            }
+          } catch (e) {}
+        }
+
+        let descStr = '';
+        if (g.description) {
+          try {
+            const rawDesc = g.description.trim();
+            if (rawDesc.startsWith('[')) {
+              const knowledges = JSON.parse(rawDesc);
+              if (Array.isArray(knowledges) && knowledges.length > 0) {
+                descStr =
+                  '\nKnowledge & Informasi Khusus Cluster:\n' +
+                  knowledges
+                    .map(
+                      (k: any) =>
+                        `  * [${k.category || 'Info'}] ${k.title}:\n    ${k.content.replace(/\n/g, '\n    ')}`,
+                    )
+                    .join('\n\n') +
+                  '\n';
+              }
+            } else {
+              descStr = `\nInformasi & Knowledge Khusus Cluster:\n${rawDesc}\n`;
+            }
+          } catch (e) {
+            descStr = `\nInformasi Khusus Cluster:\n${g.description}\n`;
+          }
+        }
+
+        return `Perumahan: "${g.name}" (Total ${total} Unit | Unit Ready: ${available} | Proses Bank: ${booked} | Sudah Terjual: ${occupied})${descStr}\nDaftar Unit/Blok:\n${itemList}${mediaStr}`;
       });
 
       return summaries.join('\n\n');
