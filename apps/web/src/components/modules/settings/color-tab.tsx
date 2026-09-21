@@ -52,13 +52,14 @@ export function WarnaWebsiteTab() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await fetch(`/api/v1/tenant/${user?.id || 'demo'}/settings`, {
+      const targetId = user?.tenantId || (user?.id?.startsWith('u-') ? 'demo' : user?.id) || 'demo';
+      await fetch(`/api/v1/tenant/${targetId}/settings`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ colorPalette: colors }),
       });
       applyColorsLocally(colors);
-      toast.success("Palet warna website berhasil disimpan!");
+      toast.success("Warna tema akun ini berhasil disimpan!");
     } catch (e) {
       toast.error("Gagal menyimpan palet warna");
     }

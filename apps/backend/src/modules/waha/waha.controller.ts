@@ -638,7 +638,7 @@ export class WahaController {
                       text: `[Waha Bot video] URL: ${vid.url}, Caption: ${vid.caption}`,
                     });
                   } else {
-                    await this.wahaService.sendVideoFile(
+                    await this.wahaService.sendVideo(
                       sessionName,
                       sender,
                       vid.url,

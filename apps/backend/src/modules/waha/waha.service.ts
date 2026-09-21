@@ -466,7 +466,9 @@ export class WahaService {
     );
     const isVideo = /\.(mp4|mov|webm|mkv|ogg)($|\?)/i.test(mediaUrl);
     if (isVideo) {
-      return this.sendVideoFile(sessionName, chatId, mediaUrl, caption);
+      // Sekarang video sudah dioptimasi ffmpeg (H.264 + faststart + AAC),
+      // sehingga aman dan wajib dikirim sebagai video native player!
+      return this.sendVideo(sessionName, chatId, mediaUrl, caption);
     }
     return this.sendImage(sessionName, chatId, mediaUrl, caption);
   }
@@ -563,24 +565,38 @@ export class WahaService {
     caption?: string,
   ): Promise<any> {
     try {
+      videoUrl = this.resolveMediaUrl(videoUrl);
       await this.sendTypingPresence(sessionName, chatId);
 
-      // Download buffer terlebih dahulu agar terbebas dari issue 403 Forbidden atau CDN block pada WAHA
       let filePayload: any = {
         mimetype: 'video/mp4',
       };
 
-      try {
-        const downloadRes = await axios.get(videoUrl, {
-          responseType: 'arraybuffer',
-          headers: { 'User-Agent': 'Mozilla/5.0' },
-          timeout: 35000,
-        });
-        const base64Data = Buffer.from(downloadRes.data).toString('base64');
-        filePayload.data = `data:video/mp4;base64,${base64Data}`;
-      } catch (dlErr) {
-        // Fallback gunakan URL langsung jika unduh lokal gagal
-        filePayload.url = videoUrl;
+      // 1. Prioritaskan baca langsung dari disk lokal jika file ada di uploads
+      const localFile = this.resolveToLocalFile(videoUrl);
+      if (localFile) {
+        const fileData = this.readLocalMediaFile(localFile, 'video/mp4');
+        if (fileData) {
+          filePayload.data = `data:video/mp4;base64,${fileData.data.toString('base64')}`;
+          this.logger.log(
+            `[WAHA-SEND-VIDEO-NATIVE] Membaca video langsung dari disk lokal: ${localFile}`,
+          );
+        }
+      }
+
+      // 2. Jika bukan file lokal, download via HTTP
+      if (!filePayload.data) {
+        try {
+          const downloadRes = await axios.get(videoUrl, {
+            responseType: 'arraybuffer',
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+            timeout: 35000,
+          });
+          const base64Data = Buffer.from(downloadRes.data).toString('base64');
+          filePayload.data = `data:video/mp4;base64,${base64Data}`;
+        } catch (dlErr) {
+          filePayload.url = videoUrl;
+        }
       }
 
       const payload: any = {
@@ -612,7 +628,7 @@ export class WahaService {
       const errorDetail = error.response?.data
         ? JSON.stringify(error.response.data)
         : error.message;
-      this.logger.error(`Failed to send video: ${errorDetail}`);
+      this.logger.error(`Failed to send native video: ${errorDetail}`);
       throw error;
     }
   }

@@ -116,7 +116,8 @@ function BotSettingsTab() {
   async function handleSave() {
     setSaving(true);
     try {
-      await fetch(`/api/v1/tenant/${user?.id || 'demo'}/settings`, {
+      const targetId = user?.tenantId || user?.id || 'demo';
+      await fetch(`/api/v1/tenant/${targetId}/settings`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(settings)

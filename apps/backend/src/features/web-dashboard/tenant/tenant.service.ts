@@ -182,30 +182,48 @@ export class TenantService {
       colorPalette?: { primary?: string; secondary?: string; accent?: string };
     },
   ) {
-    if (userId.includes('@')) {
-      const owner = await this.prisma.user.findUnique({
-        where: { email: userId },
+    let resolvedTenantId: string | null = null;
+
+    // 1. Cek apakah userId langsung merupakan UUID Tenant
+    const directTenant = await this.prisma.tenant.findUnique({
+      where: { id: userId },
+    });
+    if (directTenant) {
+      resolvedTenantId = directTenant.id;
+    } else {
+      if (userId.includes('@')) {
+        const owner = await this.prisma.user.findUnique({
+          where: { email: userId },
+        });
+        if (owner) userId = owner.id;
+      } else if (userId === 'demo' || userId.startsWith('u-')) {
+        const firstOwner = await this.prisma.user.findFirst({
+          where: { role: { in: ['manager', 'owner', 'ADMIN'] } },
+        });
+        if (firstOwner) userId = firstOwner.id;
+      }
+
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        include: { tenant: true },
       });
-      if (owner) userId = owner.id;
-    } else if (userId === 'demo' || userId.startsWith('u-')) {
-      const firstOwner = await this.prisma.user.findFirst({
-        where: { role: { in: ['manager', 'owner', 'ADMIN'] } },
-      });
-      if (firstOwner) userId = firstOwner.id;
+      if (user && user.tenantId) {
+        resolvedTenantId = user.tenantId;
+      }
     }
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: { tenant: true },
-    });
-    if (!user || !user.tenantId)
+    if (!resolvedTenantId) {
       throw new NotFoundException('Tenant not found');
+    }
 
     const { colorPalette, ...otherData } = data;
     const updatePayload: any = { ...otherData };
 
     if (colorPalette) {
-      const existingMetadata = (user.tenant?.metadata as any) || {};
+      const currentTenant = await this.prisma.tenant.findUnique({
+        where: { id: resolvedTenantId },
+      });
+      const existingMetadata = (currentTenant?.metadata as any) || {};
       updatePayload.metadata = {
         ...existingMetadata,
         colorPalette,
@@ -213,7 +231,7 @@ export class TenantService {
     }
 
     return this.prisma.tenant.update({
-      where: { id: user.tenantId },
+      where: { id: resolvedTenantId },
       data: updatePayload,
     });
   }

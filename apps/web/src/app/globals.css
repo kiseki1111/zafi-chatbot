@@ -141,13 +141,15 @@
 .border-emerald-600 {
   border-color: var(--brand-primary) !important;
 }
-.from-emerald-600 {
-  --tw-gradient-from: var(--brand-primary) !important;
-  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+.from-emerald-600, .from-emerald-700, .from-indigo-700 {
+  background-image: none !important;
+  background-color: var(--brand-primary) !important;
 }
-.via-teal-600 {
-  --tw-gradient-stops: var(--tw-gradient-from), var(--brand-secondary), var(--tw-gradient-to) !important;
+.via-teal-600, .via-teal-700, .via-blue-700 {
+  background-image: none !important;
+  background-color: var(--brand-primary) !important;
 }
-.to-green-700 {
-  --tw-gradient-to: var(--brand-secondary) !important;
+.to-green-700, .to-slate-900, .to-emerald-900 {
+  background-image: none !important;
+  background-color: var(--brand-primary) !important;
 }

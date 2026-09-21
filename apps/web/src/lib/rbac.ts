@@ -21,13 +21,13 @@ export interface MenuItem {
 export const MENU_ITEMS: MenuItem[] = [
   { key: "clients",       label: "Kelola Klien",     icon: "Building2",       roles: ["superadmin"] },
   { key: "overview",      label: "Dashboard",        icon: "LayoutDashboard", roles: ["superadmin", "manager", "administrator"] },
-  { key: "chatbot",       label: "Bot WhatsApp",     icon: "MessageCircle",   roles: ["manager", "administrator"] },
-  { key: "crm",           label: "Pelanggan",        icon: "Users",           roles: ["manager", "administrator"] },
-  { key: "bus_layout",    label: "Denah Kursi Bus",  icon: "Bus",             roles: ["manager", "administrator"] },
-  { key: "availability",  label: "Siteplan",         icon: "Grid3X3",         roles: ["manager"] },
-  { key: "knowledge",     label: "Knowledge Base",   icon: "Book",            roles: ["manager"] },
-  { key: "followup",      label: "Follow-Up",        icon: "BellRing",        roles: ["manager"] },
-  { key: "settings",      label: "Pengaturan",       icon: "Settings",        roles: ["superadmin", "manager"] },
+  { key: "chatbot",       label: "Bot WhatsApp",     icon: "MessageCircle",   roles: ["superadmin", "manager", "administrator"] },
+  { key: "crm",           label: "Pelanggan",        icon: "Users",           roles: ["superadmin", "manager", "administrator"] },
+  { key: "bus_layout",    label: "Denah Kursi Bus",  icon: "Bus",             roles: ["superadmin", "manager", "administrator"] },
+  { key: "availability",  label: "Siteplan",         icon: "Grid3X3",         roles: ["superadmin", "manager", "administrator"] },
+  { key: "knowledge",     label: "Knowledge Base",   icon: "Book",            roles: ["superadmin", "manager", "administrator"] },
+  { key: "followup",      label: "Follow-Up",        icon: "BellRing",        roles: ["superadmin", "manager", "administrator"] },
+  { key: "settings",      label: "Pengaturan",       icon: "Settings",        roles: ["superadmin", "manager", "administrator"] },
 ];
 
 export function menuForRole(

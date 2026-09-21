@@ -37,18 +37,24 @@ export function DashboardShell() {
   useEffect(() => {
     if (!user) return;
 
-    // Load custom color palette if available
-    fetch(`/api/v1/tenant/${user.tenantId || user.id || 'demo'}/dashboard`)
+    // Load custom color palette if available (reset ke default dulu jika tidak ada palette per-akun)
+    const targetTenantId = user.tenantId || (user.id.startsWith('u-') ? 'demo' : user.id);
+    fetch(`/api/v1/tenant/${targetTenantId}/dashboard`)
       .then(r => r.json())
       .then(data => {
         const palette = data?.tenant?.metadata?.colorPalette;
-        if (palette) {
-          if (palette.primary) document.documentElement.style.setProperty("--brand-primary", palette.primary);
-          if (palette.secondary) document.documentElement.style.setProperty("--brand-secondary", palette.secondary);
-          if (palette.accent) document.documentElement.style.setProperty("--brand-accent", palette.accent);
-        }
+        const primary = palette?.primary || "#059669";
+        const secondary = palette?.secondary || "#0d9488";
+        const accent = palette?.accent || "#3b82f6";
+        document.documentElement.style.setProperty("--brand-primary", primary);
+        document.documentElement.style.setProperty("--brand-secondary", secondary);
+        document.documentElement.style.setProperty("--brand-accent", accent);
       })
-      .catch(() => {});
+      .catch(() => {
+        document.documentElement.style.setProperty("--brand-primary", "#059669");
+        document.documentElement.style.setProperty("--brand-secondary", "#0d9488");
+        document.documentElement.style.setProperty("--brand-accent", "#3b82f6");
+      });
 
     if (viewParam) {
       if (!canAccess(user.role, viewParam as ViewKey, enabledMenus, user)) {
