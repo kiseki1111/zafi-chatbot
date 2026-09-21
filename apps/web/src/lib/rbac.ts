@@ -35,30 +35,28 @@ export function menuForRole(
   enabledMenus?: string[],
   userContext?: { email?: string; name?: string; tenantId?: string | null },
 ): MenuItem[] {
-  // ============================================================
-  // SINGLE SOURCE OF TRUTH:
-  // Menu yang tampil berasal HANYA dari `enabledMenus` (yang sudah
-  // di-set dari tenant.metadata.userMenus[userId] ATAU enabledMenus tenant).
-  // Tidak ada penambahan menu dari hardcode role di sini.
-  // ============================================================
+  // Superadmin melihat menu kelola klien, dashboard, pengaturan
   if (role === "superadmin") {
-    // Superadmin melihat semua menu yang memang untuk superadmin
     return MENU_ITEMS.filter((m) => m.roles.includes("superadmin"));
   }
 
-  // Non-superadmin: hanya tampilkan menu yang ADA di enabledMenus
-  // (sumber tunggal dari database via sidebar), dipersempit ke menu yang
-  // memang tersedia untuk role-nya sebagai keamanan lapis kedua.
   const roleAllowed = MENU_ITEMS.filter((m) => m.roles.includes(role));
 
-  if (!Array.isArray(enabledMenus) || enabledMenus.length === 0) {
-    // Tidak ada konfigurasi menu -> hanya menu wajib (Dashboard & Pengaturan)
+  // Jika enabledMenus belum di-load (undefined), tampilkan menu bawaan role
+  // agar tidak kosong / freeze saat awal halaman dibuka
+  if (enabledMenus === undefined) {
+    return roleAllowed;
+  }
+
+  // Jika sudah di-load dari server (array terisi): filter ketat sesuai database
+  if (Array.isArray(enabledMenus) && enabledMenus.length > 0) {
     return roleAllowed.filter(
-      (m) => m.key === "overview" || m.key === "settings",
+      (m) => m.key === "overview" || m.key === "settings" || enabledMenus.includes(m.key),
     );
   }
 
-  return roleAllowed.filter((m) => enabledMenus.includes(m.key));
+  // Jika eksplisit array kosong []: hanya menu wajib
+  return roleAllowed.filter((m) => m.key === "overview" || m.key === "settings");
 }
 
 export function canAccess(role: Role, view: ViewKey, enabledMenus?: string[], userContext?: { email?: string; name?: string; tenantId?: string | null }): boolean {
