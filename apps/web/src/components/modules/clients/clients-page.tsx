@@ -522,7 +522,7 @@ export function ClientsPage() {
               </div>
               <div className="px-5 py-2.5 rounded-2xl bg-background border shadow-2xs text-center">
                 <span className="text-muted-foreground block text-[11px] font-medium">Modul Aktif Klien</span>
-                <strong className="text-lg font-bold text-emerald-600">{enabledList.length} Modul</strong>
+                <strong className="text-lg font-bold text-emerald-600">{tenantActiveModules.length} Modul</strong>
               </div>
             </div>
           </div>
@@ -558,7 +558,7 @@ export function ClientsPage() {
                 <Shield className="h-4 w-4" />
                 <span>Hak Akses Fitur Klien</span>
                 <span className="ml-1 px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
-                  {enabledList.length}
+                  {tenantActiveModules.length}
                 </span>
               </TabsTrigger>
             </TabsList>

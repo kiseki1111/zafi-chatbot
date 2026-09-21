@@ -142,12 +142,12 @@ export class WahaService {
         },
       };
 
-      // Explicitly disable ignores so that messages are not dropped
+      // Ignore status, groups, channels, and broadcast so WAHA only emits direct messages
       payload.config.ignore = {
-        status: false,
-        groups: false,
-        channels: false,
-        broadcast: false,
+        status: true,
+        groups: true,
+        channels: true,
+        broadcast: true,
       };
 
       const response = await axios.post(
@@ -466,9 +466,7 @@ export class WahaService {
     );
     const isVideo = /\.(mp4|mov|webm|mkv|ogg)($|\?)/i.test(mediaUrl);
     if (isVideo) {
-      // Sekarang video sudah dioptimasi ffmpeg (H.264 + faststart + AAC),
-      // sehingga aman dan wajib dikirim sebagai video native player!
-      return this.sendVideo(sessionName, chatId, mediaUrl, caption);
+      return this.sendVideoFile(sessionName, chatId, mediaUrl, caption);
     }
     return this.sendImage(sessionName, chatId, mediaUrl, caption);
   }

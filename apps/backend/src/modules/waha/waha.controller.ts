@@ -331,11 +331,14 @@ export class WahaController {
     if (payload?.event === 'message') {
       const message = payload.payload;
       const sessionName = payload.session;
+      const isDirectPhone = (jid?: string): boolean =>
+        Boolean(jid && /^\+?\d+(@(c\.us|s\.whatsapp\.net|lid))?$/.test(jid));
 
-      if (sessionName && message.from && !message.from.includes('@g.us')) {
-        const contactNumber = message.fromMe
-          ? message.to || message._data?.key?.remoteJid || message.from
-          : message.from;
+      const contactNumber = message?.fromMe
+        ? message.to || message._data?.key?.remoteJid || message.from
+        : message?.from;
+
+      if (sessionName && isDirectPhone(contactNumber)) {
         const contactName =
           message._data?.notifyName || message.sender?.pushname || null;
         const msgId = message.id?._serialized || message.id || 'unknown';
@@ -466,8 +469,12 @@ export class WahaController {
         }
       }
 
-      // Send to Omnichannel Queue (Hanya event 'message' agar AI tidak membalas 2x)
-      if (payload.event === 'message' && !message.fromMe) {
+      // Send to Omnichannel Queue (Hanya event 'message' dari nomor pribadi agar AI tidak membalas grup/status)
+      if (
+        payload.event === 'message' &&
+        !message.fromMe &&
+        isDirectPhone(message.from)
+      ) {
         let text = message.body?.trim() || '';
 
         let quotedText = '';
@@ -638,7 +645,7 @@ export class WahaController {
                       text: `[Waha Bot video] URL: ${vid.url}, Caption: ${vid.caption}`,
                     });
                   } else {
-                    await this.wahaService.sendVideo(
+                    await this.wahaService.sendVideoFile(
                       sessionName,
                       sender,
                       vid.url,

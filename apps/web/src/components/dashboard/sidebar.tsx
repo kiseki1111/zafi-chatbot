@@ -32,15 +32,18 @@ export function Sidebar() {
     fetch(`/api/v1/tenant/${fetchId}/dashboard`)
       .then((r) => r.json())
       .then((data) => {
+        const tenant = data?.data?.tenant || data?.tenant;
+        const tenantMenus = tenant?.metadata?.enabledMenus;
         // Cek apakah ada menu spesifik untuk akun staf ini
-        const userMenus = data?.tenant?.metadata?.userMenus?.[user.id];
+        const userMenus = tenant?.metadata?.userMenus?.[user.id];
         if (Array.isArray(userMenus) && userMenus.length > 0) {
-          setEnabledMenus(userMenus);
-        } else {
-          const menus = data?.tenant?.metadata?.enabledMenus;
-          if (Array.isArray(menus)) {
-            setEnabledMenus(menus);
-          }
+          // Hak akses user tidak boleh melebihi menu yang diizinkan untuk perusahaannya
+          const effective = Array.isArray(tenantMenus)
+            ? userMenus.filter((m: string) => tenantMenus.includes(m))
+            : userMenus;
+          setEnabledMenus(effective);
+        } else if (Array.isArray(tenantMenus)) {
+          setEnabledMenus(tenantMenus);
         }
       })
       .catch(() => {});

@@ -42,7 +42,8 @@ export function DashboardShell() {
     fetch(`/api/v1/tenant/${targetTenantId}/dashboard`)
       .then(r => r.json())
       .then(data => {
-        const palette = data?.tenant?.metadata?.colorPalette;
+        const tenant = data?.data?.tenant || data?.tenant;
+        const palette = tenant?.metadata?.colorPalette;
         const primary = palette?.primary || "#059669";
         const secondary = palette?.secondary || "#0d9488";
         const accent = palette?.accent || "#3b82f6";
