@@ -30,8 +30,9 @@ export function Sidebar() {
 
     const fetchId = user.tenantId || (user.id.startsWith("u-") ? "demo" : user.id);
     fetch(`/api/v1/tenant/${fetchId}/dashboard`)
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
+        if (!data) return;
         const tenant = data?.data?.tenant || data?.tenant;
         const tenantMenus = tenant?.metadata?.enabledMenus;
         // Cek apakah ada menu spesifik untuk akun staf ini

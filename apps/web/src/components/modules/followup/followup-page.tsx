@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { cn } from "@/lib/utils";
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from "@/components/ui/card";
@@ -15,7 +16,7 @@ import {
 } from "@/components/ui/table";
 import {
   BellRing, Clock, Users, Send, Loader2, RefreshCw, History,
-  Settings, Zap, User, Sun, Sunset, Sunrise, Moon,
+  Settings, Zap, User, Sun, Sunset, Sunrise, Moon, Sparkles, Check, Trash2, Plus,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -73,6 +74,91 @@ export function FollowupPage() {
   const [saving, setSaving] = useState(false);
   const [triggering, setTriggering] = useState(false);
   const [isConfirmTriggerOpen, setIsConfirmTriggerOpen] = useState(false);
+
+  // Modal Tambah Antrean Follow-Up (CRUD)
+  const [isAddQueueOpen, setIsAddQueueOpen] = useState(false);
+  const [addingQueue, setAddingQueue] = useState(false);
+  const [instances, setInstances] = useState<string[]>([]);
+  const [queueForm, setQueueForm] = useState({
+    phone: "",
+    name: "",
+    instanceName: "",
+  });
+
+  useEffect(() => {
+    fetch("/api/v1/waha/instances/db")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        const list = Array.isArray(data) ? data : data?.data || [];
+        const names = list.map((i: any) => i.instanceName).filter(Boolean);
+        if (names.length > 0) {
+          setInstances(names);
+          setQueueForm((prev) => ({ ...prev, instanceName: names[0] }));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleClearPending = async () => {
+    try {
+      const res = await fetch("/api/v1/followup/clear-pending", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (res.ok) {
+        toast.success("Semua antrean lama berhasil dibatalkan (abort)!");
+        loadAll();
+      }
+    } catch {
+      toast.error("Gagal membersihkan antrean");
+    }
+  };
+
+  const handleAddToQueue = async () => {
+    if (!queueForm.phone.trim()) {
+      toast.error("Nomor WhatsApp wajib diisi");
+      return;
+    }
+    setAddingQueue(true);
+    try {
+      const res = await fetch("/api/v1/followup/queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: queueForm.phone,
+          name: queueForm.name,
+          instanceName: queueForm.instanceName || instances[0] || "default",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Gagal menambahkan ke antrean");
+      toast.success(data.message || "Kontak berhasil ditambahkan ke antrean follow-up!");
+      setIsAddQueueOpen(false);
+      setQueueForm({ phone: "", name: "", instanceName: instances[0] || "" });
+      await loadAll();
+    } catch (e: any) {
+      toast.error(e.message || "Gagal menambahkan ke antrean");
+    } finally {
+      setAddingQueue(false);
+    }
+  };
+
+  const handleRemoveFromQueue = async (contactId: string, instanceName: string, name?: string) => {
+    try {
+      const res = await fetch(`/api/v1/followup/queue/${contactId}/${instanceName}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        toast.success(`Kontak ${name || ""} berhasil dihapus dari antrean!`);
+        await loadAll();
+      } else {
+        toast.error("Gagal menghapus kontak dari antrean");
+      }
+    } catch {
+      toast.error("Gagal menghapus kontak dari antrean");
+    }
+  };
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -416,11 +502,45 @@ export function FollowupPage() {
         {/* Pending Contacts */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Users className="h-4 w-4" />
-              Menunggu Follow-Up
-            </CardTitle>
-            <CardDescription>Pelanggan yang belum di-follow-up</CardDescription>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Users className="h-4 w-4" />
+                  Menunggu Follow-Up
+                  {inactiveContacts.length > 0 && (
+                    <Badge variant="secondary" className="font-mono text-xs ml-1.5">
+                      {inactiveContacts.length}
+                    </Badge>
+                  )}
+                </CardTitle>
+                <CardDescription>Daftar pelanggan yang siap menerima follow-up AI</CardDescription>
+              </div>
+              <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                <Button
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-7 gap-1 font-semibold"
+                  onClick={() => {
+                    setQueueForm({ phone: "", name: "", instanceName: instances[0] || "" });
+                    setIsAddQueueOpen(true);
+                  }}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Tambah Antrean
+                </Button>
+                {inactiveContacts.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 border-rose-200 dark:border-rose-900 font-medium"
+                    onClick={handleClearPending}
+                    title="Kosongkan semua kontak yang sedang menunggu follow-up"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-1" />
+                    Abort Semua
+                  </Button>
+                )}
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             {!config.isEnabled ? (
@@ -442,17 +562,17 @@ export function FollowupPage() {
                 {inactiveContacts.map((c) => (
                   <div
                     key={`${c.contactId}-${c.instanceName}`}
-                    className="flex items-center gap-3 rounded-lg border p-3"
+                    className="flex items-center gap-3 rounded-lg border p-3 hover:bg-muted/30 transition-colors"
                   >
-                    <div className="grid place-items-center h-8 w-8 rounded-full bg-muted text-xs font-bold">
+                    <div className="grid place-items-center h-8 w-8 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-xs font-bold shrink-0">
                       {(c.contactName ?? c.contactPhone ?? "?").charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">
+                      <p className="text-sm font-semibold truncate">
                         {c.contactName || "Tanpa Nama"}
                       </p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {c.contactPhone} · {c.instanceName}
+                      <p className="text-xs text-muted-foreground truncate font-mono">
+                        +{c.contactPhone} · <span className="font-sans font-medium text-foreground">{c.instanceName}</span>
                       </p>
                     </div>
                     <Badge variant="outline" className="shrink-0 text-[10px]">
@@ -460,6 +580,15 @@ export function FollowupPage() {
                         ? formatRelativeTime(new Date(c.lastMessageAt))
                         : "-"}
                     </Badge>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 shrink-0"
+                      onClick={() => handleRemoveFromQueue(c.contactId, c.instanceName, c.contactName || c.contactPhone)}
+                      title="Hapus kontak ini dari antrean follow-up"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -556,6 +685,83 @@ export function FollowupPage() {
             >
               {triggering ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Send className="h-4 w-4 mr-1.5" />}
               Ya, Kirim Sekarang
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Modal Tambah Antrean Follow-Up (CRUD) */}
+      <Dialog open={isAddQueueOpen} onOpenChange={setIsAddQueueOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5 text-emerald-600" /> Tambah Antrean Follow-Up
+            </DialogTitle>
+            <DialogDescription className="pt-1 text-xs text-foreground/80">
+              Tambahkan kontak WhatsApp secara manual ke daftar <strong>Menunggu Follow-Up</strong>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3.5 text-xs py-2">
+            <div>
+              <Label className="font-semibold">Nomor WhatsApp Tujuan (Wajib)</Label>
+              <Input
+                value={queueForm.phone}
+                onChange={(e) => setQueueForm({ ...queueForm, phone: e.target.value })}
+                placeholder="6281234567890"
+                className="h-8 mt-1 font-mono"
+              />
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                Nomor pelanggan yang akan menerima pesan follow-up otomatis.
+              </p>
+            </div>
+
+            <div>
+              <Label className="font-semibold">Nama Pelanggan (Opsional)</Label>
+              <Input
+                value={queueForm.name}
+                onChange={(e) => setQueueForm({ ...queueForm, name: e.target.value })}
+                placeholder="Contoh: Budi Santoso"
+                className="h-8 mt-1"
+              />
+            </div>
+
+            <div>
+              <Label className="font-semibold">Sesi WhatsApp Bot Pengirim</Label>
+              {instances.length > 0 ? (
+                <Select
+                  value={queueForm.instanceName}
+                  onValueChange={(v) => setQueueForm({ ...queueForm, instanceName: v })}
+                >
+                  <SelectTrigger className="h-8 mt-1 text-xs">
+                    <SelectValue placeholder="Pilih sesi bot" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {instances.map((name) => (
+                      <SelectItem key={name} value={name}>{name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  value={queueForm.instanceName}
+                  onChange={(e) => setQueueForm({ ...queueForm, instanceName: e.target.value })}
+                  placeholder="Zafi-CS"
+                  className="h-8 mt-1 font-mono"
+                />
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" size="sm" onClick={() => setIsAddQueueOpen(false)}>Batal</Button>
+            <Button
+              size="sm"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+              onClick={handleAddToQueue}
+              disabled={addingQueue}
+            >
+              {addingQueue ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Plus className="h-4 w-4 mr-1.5" />}
+              Tambahkan ke Antrean
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -26,6 +26,8 @@ import {
   Trash2,
   Edit2,
   FileText,
+  Calendar,
+  Clock,
 } from "lucide-react";
 import { useAppStore } from "@/lib/app-store";
 import { useAuthStore } from "@/lib/auth-store";
@@ -96,6 +98,7 @@ export function CrmPage() {
       if (search) params.set("search", search);
       if (statusFilter !== "ALL") params.set("status", statusFilter);
       const res = await fetch(`/api/v1/contacts?${params.toString()}`);
+      if (!res.ok) return;
       const data = await res.json();
       const list = Array.isArray(data) ? data : data.data || [];
       setContacts(list);
@@ -257,10 +260,10 @@ export function CrmPage() {
                 <thead className="sticky top-0 bg-muted/50 border-b text-muted-foreground">
                   <tr>
                     <th className="p-3">Nama Pelanggan</th>
-                    <th className="p-3">Perusahaan / Instansi</th>
-                    <th className="p-3">Kontak WhatsApp</th>
+                    <th className="p-3">Nomor WhatsApp</th>
+                    <th className="p-3">Pertama Kali Chat</th>
+                    <th className="p-3">Terakhir Kali Chat</th>
                     <th className="p-3">Status</th>
-                    <th className="p-3">Update</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -270,6 +273,12 @@ export function CrmPage() {
                       badge: "bg-muted text-foreground",
                     };
                     const isSelected = selectedContact?.id === c.id;
+                    const cleanPhone = (c.phone || "")
+                      .replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, "")
+                      .replace(/^\+/, "");
+                    const firstChat = (c as any).firstChatAt || c.createdAt;
+                    const lastChat = (c as any).lastChatAt || c.conversations?.[0]?.lastMessageAt || c.updatedAt;
+
                     return (
                       <tr
                         key={c.id}
@@ -279,28 +288,34 @@ export function CrmPage() {
                         }`}
                       >
                         <td className="p-3">
-                          <p className="font-semibold text-foreground">{c.name}</p>
-                          <p className="text-[11px] text-muted-foreground">{c.email || c.address || "Belum ada info tambahan"}</p>
+                          <p className="font-semibold text-foreground">{c.name || `+${cleanPhone}`}</p>
+                          <p className="text-[11px] text-muted-foreground">{c.email || c.notes || "Pelanggan WhatsApp"}</p>
                         </td>
                         <td className="p-3">
-                          <div className="flex items-center gap-1.5 font-medium text-foreground">
-                            <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                            <span>{c.company || "-"}</span>
-                          </div>
+                          <p className="font-mono text-muted-foreground font-medium">+{cleanPhone}</p>
                         </td>
-                        <td className="p-3">
-                          <p className="font-mono text-muted-foreground">+{c.phone}</p>
+                        <td className="p-3 text-muted-foreground">
+                          {firstChat ? new Date(firstChat).toLocaleString("id-ID", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          }) : "-"}
+                        </td>
+                        <td className="p-3 text-muted-foreground">
+                          {lastChat ? new Date(lastChat).toLocaleString("id-ID", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          }) : "-"}
                         </td>
                         <td className="p-3">
                           <Badge variant="secondary" className={`text-[10px] ${statusMeta.badge}`}>
                             {statusMeta.label}
                           </Badge>
-                        </td>
-                        <td className="p-3 text-muted-foreground">
-                          {new Date(c.updatedAt).toLocaleDateString("id-ID", {
-                            day: "numeric",
-                            month: "short",
-                          })}
                         </td>
                       </tr>
                     );
@@ -339,18 +354,46 @@ export function CrmPage() {
             {/* Info Pelanggan */}
             <div className="space-y-2.5 text-xs border rounded-lg p-3 bg-muted/20">
               <div className="space-y-1">
-                <span className="text-[10px] font-semibold text-muted-foreground uppercase">Perusahaan / Instansi</span>
-                <div className="flex items-center gap-1.5 font-medium text-foreground">
-                  <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <span>{selectedContact.company || "Tidak ada"}</span>
+                <span className="text-[10px] font-semibold text-muted-foreground uppercase">Kontak WhatsApp</span>
+                <div className="flex items-center gap-1.5 font-mono text-foreground font-medium">
+                  <Phone className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                  <span>+{(selectedContact.phone || "").replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, "").replace(/^\+/, "")}</span>
                 </div>
               </div>
 
               <div className="space-y-1 pt-1 border-t">
-                <span className="text-[10px] font-semibold text-muted-foreground uppercase">Kontak WhatsApp</span>
-                <div className="flex items-center gap-1.5 font-mono text-foreground">
-                  <Phone className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                  <span>+{selectedContact.phone}</span>
+                <span className="text-[10px] font-semibold text-muted-foreground uppercase">Pertama Kali Chat</span>
+                <div className="flex items-center gap-1.5 text-foreground">
+                  <Calendar className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+                  <span>
+                    {((selectedContact as any).firstChatAt || selectedContact.createdAt)
+                      ? new Date((selectedContact as any).firstChatAt || selectedContact.createdAt).toLocaleString("id-ID", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : "-"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-1 pt-1 border-t">
+                <span className="text-[10px] font-semibold text-muted-foreground uppercase">Terakhir Kali Chat</span>
+                <div className="flex items-center gap-1.5 text-foreground">
+                  <Clock className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                  <span>
+                    {((selectedContact as any).lastChatAt || selectedContact.conversations?.[0]?.lastMessageAt || selectedContact.updatedAt)
+                      ? new Date((selectedContact as any).lastChatAt || selectedContact.conversations?.[0]?.lastMessageAt || selectedContact.updatedAt).toLocaleString("id-ID", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : "-"}
+                  </span>
                 </div>
               </div>
 
@@ -364,13 +407,15 @@ export function CrmPage() {
                 </div>
               )}
 
-              <div className="space-y-1 pt-1 border-t">
-                <span className="text-[10px] font-semibold text-muted-foreground uppercase">Alamat / Lokasi</span>
-                <div className="flex items-center gap-1.5 text-foreground">
-                  <MapPin className="h-3.5 w-3.5 text-rose-600 shrink-0" />
-                  <span>{selectedContact.address || "Belum dicatat"}</span>
+              {selectedContact.address && (
+                <div className="space-y-1 pt-1 border-t">
+                  <span className="text-[10px] font-semibold text-muted-foreground uppercase">Alamat / Lokasi</span>
+                  <div className="flex items-center gap-1.5 text-foreground">
+                    <MapPin className="h-3.5 w-3.5 text-rose-600 shrink-0" />
+                    <span>{selectedContact.address}</span>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Quick Actions */}
@@ -425,15 +470,6 @@ export function CrmPage() {
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 placeholder="6281234567890"
                 className="h-8 mt-1 font-mono"
-              />
-            </div>
-            <div>
-              <label className="font-medium">Perusahaan / Instansi / Kategori</label>
-              <Input
-                value={form.company}
-                onChange={(e) => setForm({ ...form, company: e.target.value })}
-                placeholder="Contoh: PT Harapan Jaya / Pembeli Kaveling"
-                className="h-8 mt-1"
               />
             </div>
             <div>
@@ -510,14 +546,6 @@ export function CrmPage() {
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 className="h-8 mt-1 font-mono"
-              />
-            </div>
-            <div>
-              <label className="font-medium">Perusahaan / Instansi / Kategori</label>
-              <Input
-                value={form.company}
-                onChange={(e) => setForm({ ...form, company: e.target.value })}
-                className="h-8 mt-1"
               />
             </div>
             <div>

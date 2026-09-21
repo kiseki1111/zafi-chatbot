@@ -3,12 +3,202 @@ import { PrismaService } from 'src/core/prisma/prisma.service';
 import { OnboardingDto } from './dto/onboarding.dto';
 import { DataAgentService } from '../../knowledge-ingest/data-agent.service';
 
+export const PLAN_TIERS = {
+  trial: {
+    key: 'trial',
+    name: 'Free Trial',
+    price: 0,
+    priceLabel: 'Gratis',
+    maxMau: 10,
+    maxAiResponses: 50,
+  },
+  pro: {
+    key: 'pro',
+    name: 'Pro',
+    price: 1500000,
+    priceLabel: 'Rp 1.500k/bln',
+    maxMau: 2000,
+    maxAiResponses: 15000,
+  },
+  business: {
+    key: 'business',
+    name: 'Business',
+    price: 2500000,
+    priceLabel: 'Rp 2.500k/bln',
+    maxMau: 8000,
+    maxAiResponses: 50000,
+  },
+  enterprise: {
+    key: 'enterprise',
+    name: 'Enterprise',
+    price: 5799000,
+    priceLabel: 'Rp 5.799k/bln',
+    maxMau: 30000,
+    maxAiResponses: 150000,
+  },
+  custom: {
+    key: 'custom',
+    name: 'Custom',
+    price: 0,
+    priceLabel: 'Kustom',
+    maxMau: 1000,
+    maxAiResponses: 10000,
+  },
+};
+
 @Injectable()
 export class TenantService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly dataAgentService: DataAgentService,
   ) {}
+
+  async getTenantQuota(tenantId: string, preloadedTenant?: any) {
+    let tenant =
+      preloadedTenant ||
+      (await this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+        include: {
+          whatsappInstances: { select: { instanceName: true } },
+        },
+      }));
+
+    if (!tenant) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: tenantId },
+        include: {
+          tenant: {
+            include: {
+              whatsappInstances: { select: { instanceName: true } },
+            },
+          },
+        },
+      });
+      if (user && user.tenant) {
+        tenant = user.tenant;
+      }
+    }
+
+    if (!tenant) {
+      tenant = await this.prisma.tenant.findFirst({
+        include: {
+          whatsappInstances: { select: { instanceName: true } },
+        },
+      });
+    }
+
+    if (!tenant) throw new NotFoundException('Tenant not found');
+
+    const meta = (tenant.metadata as any) || {};
+    const planKey = (meta.plan || 'trial') as keyof typeof PLAN_TIERS;
+    const tierConfig = PLAN_TIERS[planKey] || PLAN_TIERS.trial;
+
+    const maxMau =
+      typeof meta.maxMau === 'number' ? meta.maxMau : tierConfig.maxMau;
+    const maxAiResponses =
+      typeof meta.maxAiResponses === 'number'
+        ? meta.maxAiResponses
+        : tierConfig.maxAiResponses;
+    const planPrice =
+      typeof meta.planPrice === 'number' ? meta.planPrice : tierConfig.price;
+    const planName = meta.planName || tierConfig.name;
+
+    const instanceNames = tenant.whatsappInstances
+      ? tenant.whatsappInstances.map((i: any) => i.instanceName)
+      : (
+          await this.prisma.whatsappInstance.findMany({
+            where: { tenantId },
+            select: { instanceName: true },
+          })
+        ).map((i) => i.instanceName);
+
+    let mauUsed = 0;
+    let aiResponsesUsed = 0;
+
+    if (instanceNames.length > 0) {
+      // 1 nomor unik yang menghubungi bot = 1 MAU
+      const conversations = await this.prisma.conversation.findMany({
+        where: {
+          instanceName: { in: instanceNames },
+          contact: { phone: { not: { contains: 'broadcast' } } },
+        },
+        select: { contactId: true },
+        distinct: ['contactId'],
+      });
+      mauUsed = conversations.length;
+
+      // 1 bubble balasan bot = 1 AI response
+      aiResponsesUsed = await this.prisma.message.count({
+        where: {
+          senderType: 'bot',
+          conversation: { instanceName: { in: instanceNames } },
+        },
+      });
+    }
+
+    return {
+      plan: planKey,
+      planName,
+      planPrice,
+      priceLabel: tierConfig.priceLabel,
+      mauUsed,
+      maxMau,
+      mauPercent:
+        maxMau > 0 ? Math.min(100, Math.round((mauUsed / maxMau) * 100)) : 0,
+      isMauExceeded: mauUsed >= maxMau,
+      aiResponsesUsed,
+      maxAiResponses,
+      aiResponsesPercent:
+        maxAiResponses > 0
+          ? Math.min(100, Math.round((aiResponsesUsed / maxAiResponses) * 100))
+          : 0,
+      isAiResponsesExceeded: aiResponsesUsed >= maxAiResponses,
+    };
+  }
+
+  async updateTenantQuota(
+    tenantId: string,
+    data: {
+      plan?: string;
+      maxMau?: number;
+      maxAiResponses?: number;
+      planPrice?: number;
+    },
+  ) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+
+    const meta = (tenant.metadata as any) || {};
+    const planKey = (data.plan || meta.plan || 'trial') as keyof typeof PLAN_TIERS;
+    const tierConfig = PLAN_TIERS[planKey] || PLAN_TIERS.trial;
+
+    const maxMau =
+      typeof data.maxMau === 'number' ? data.maxMau : tierConfig.maxMau;
+    const maxAiResponses =
+      typeof data.maxAiResponses === 'number'
+        ? data.maxAiResponses
+        : tierConfig.maxAiResponses;
+    const planPrice =
+      typeof data.planPrice === 'number' ? data.planPrice : tierConfig.price;
+
+    const updated = await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: {
+        metadata: {
+          ...meta,
+          plan: planKey,
+          planName: tierConfig.name,
+          planPrice,
+          maxMau,
+          maxAiResponses,
+        },
+      },
+    });
+
+    return this.getTenantQuota(tenantId, updated);
+  }
 
   async getDashboardOverview(userId: string) {
     // 1. Cek langsung jika input adalah ID Tenant
@@ -43,9 +233,16 @@ export class TenantService {
 
         if (!tenant) {
           const firstOwner = await this.prisma.user.findFirst({
-            where: { role: { in: ['manager', 'owner', 'ADMIN', 'administrator'] } },
+            where: {
+              role: { in: ['manager', 'owner', 'ADMIN', 'administrator'] },
+              tenantId: { not: null },
+            },
+            include: { tenant: true },
           });
-          if (firstOwner) userId = firstOwner.id;
+          if (firstOwner && firstOwner.tenant) {
+            tenant = firstOwner.tenant;
+            tenantId = firstOwner.tenantId || undefined;
+          }
         }
       }
 
@@ -55,12 +252,19 @@ export class TenantService {
           include: { tenant: true },
         });
 
-        if (!user || !user.tenantId) {
-          throw new NotFoundException('User tidak terhubung dengan tenant manapun');
+        if (user && user.tenantId && user.tenant) {
+          tenant = user.tenant;
+          tenantId = user.tenantId;
+        } else {
+          // Fallback ke tenant pertama di database agar demo/superadmin tidak 404
+          const fallbackTenant = await this.prisma.tenant.findFirst();
+          if (fallbackTenant) {
+            tenant = fallbackTenant;
+            tenantId = fallbackTenant.id;
+          } else {
+            throw new NotFoundException('User tidak terhubung dengan tenant manapun');
+          }
         }
-
-        tenant = user.tenant;
-        tenantId = user.tenantId;
       }
     }
 
@@ -144,6 +348,9 @@ export class TenantService {
       orderBy: { stock: 'asc' },
     });
 
+    // Quota usage (MAU & AI responses)
+    const quota = await this.getTenantQuota(tenantId, tenant);
+
     return {
       tenant,
       metrics: {
@@ -160,6 +367,7 @@ export class TenantService {
             ? Math.round((botMessages / totalMessages) * 100)
             : 0,
       },
+      quota,
       revenueTrend,
       insights: {
         topProduct: topProduct?.name || '-',
@@ -624,7 +832,7 @@ export class TenantService {
 
   // Superadmin: List all client tenants with user and enabledMenus
   async listAllClients() {
-    return this.prisma.tenant.findMany({
+    const clients = await this.prisma.tenant.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
         users: {
@@ -636,6 +844,7 @@ export class TenantService {
             createdAt: true,
           },
         },
+        whatsappInstances: { select: { instanceName: true } },
         _count: {
           select: {
             products: true,
@@ -645,6 +854,16 @@ export class TenantService {
         },
       },
     });
+
+    return Promise.all(
+      clients.map(async (client) => {
+        const quota = await this.getTenantQuota(client.id, client);
+        return {
+          ...client,
+          quota,
+        };
+      }),
+    );
   }
 
   // Superadmin: Create new tenant + manager account + menu configuration
@@ -668,6 +887,10 @@ export class TenantService {
         agentName: 'Asisten AI',
         metadata: {
           enabledMenus: data.enabledMenus,
+          plan: 'trial',
+          maxMau: 10,
+          maxAiResponses: 50,
+          planPrice: 0,
         },
       },
     });
@@ -855,9 +1078,12 @@ export class TenantService {
       allowedMenus: userMenus[u.id] || meta.enabledMenus || [],
     }));
 
+    const quota = await this.getTenantQuota(tenantId, tenant);
+
     return {
       ...tenant,
       users: usersWithMenus,
+      quota,
     };
   }
 

@@ -334,11 +334,24 @@ export class WahaController {
       const isDirectPhone = (jid?: string): boolean =>
         Boolean(jid && /^\+?\d+(@(c\.us|s\.whatsapp\.net|lid))?$/.test(jid));
 
-      const contactNumber = message?.fromMe
-        ? message.to || message._data?.key?.remoteJid || message.from
-        : message?.from;
+      const rawAlt =
+        message?._data?.key?.remoteJidAlt ||
+        message?._data?.remoteJidAlt ||
+        message?._data?.senderAlt ||
+        message?._data?.key?.participant;
+      const realPhoneJid = rawAlt && !rawAlt.includes('@lid') ? rawAlt : null;
 
-      if (sessionName && isDirectPhone(contactNumber)) {
+      const rawNumber = message?.fromMe
+        ? message.to || message._data?.key?.remoteJid || message.from
+        : realPhoneJid || message?.from;
+
+      const cleanNumber = (rawNumber || '')
+        .replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, '')
+        .replace(/^\+/, '');
+
+      const contactNumber = cleanNumber || rawNumber;
+
+      if (sessionName && isDirectPhone(rawNumber)) {
         const contactName =
           message._data?.notifyName || message.sender?.pushname || null;
         const msgId = message.id?._serialized || message.id || 'unknown';
@@ -361,15 +374,26 @@ export class WahaController {
         }
 
         try {
-          const contact = await this.prisma.contact.findUnique({
-            where: { phone: contactNumber },
+          const contact = await this.prisma.contact.findFirst({
+            where: {
+              OR: [
+                { phone: contactNumber },
+                { phone: rawNumber },
+                ...(message?.from ? [{ phone: message.from }] : []),
+              ],
+            },
           });
           let contactId;
           if (contact) {
             await this.prisma.contact.update({
               where: { id: contact.id },
               data: {
-                name: contactName || undefined,
+                phone: contactNumber,
+                name:
+                  contactName ||
+                  (contact.name && !contact.name.includes('@') && contact.name !== contact.phone
+                    ? contact.name
+                    : `+${contactNumber}`),
               },
             });
             contactId = contact.id;
@@ -377,7 +401,7 @@ export class WahaController {
             const newContact = await this.prisma.contact.create({
               data: {
                 phone: contactNumber,
-                name: contactName || contactNumber,
+                name: contactName || `+${contactNumber}`,
               },
             });
             contactId = newContact.id;

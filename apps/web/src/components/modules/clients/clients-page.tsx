@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,6 +55,54 @@ const AVAILABLE_MODULES = [
   { key: "availability", label: "Siteplan Properti", icon: Grid3X3, desc: "Denah blok unit kaveling/rumah" },
   { key: "knowledge", label: "Knowledge Base AI", icon: Book, desc: "Pelatihan dokumen untuk asisten AI" },
   { key: "followup", label: "Follow-Up Otomatis", icon: BellRing, desc: "Pengingat otomatis via WhatsApp" },
+];
+
+export const PLAN_TIERS = [
+  {
+    key: "trial",
+    name: "Free Trial",
+    price: 0,
+    priceLabel: "Gratis",
+    maxMau: 10,
+    maxAiResponses: 50,
+    desc: "10 MAU · 50 Respons AI (Gratis)",
+  },
+  {
+    key: "pro",
+    name: "Pro",
+    price: 1500000,
+    priceLabel: "Rp 1.500k/bln",
+    maxMau: 2000,
+    maxAiResponses: 15000,
+    desc: "2.000 MAU · 15.000 Respons AI",
+  },
+  {
+    key: "business",
+    name: "Business",
+    price: 2500000,
+    priceLabel: "Rp 2.500k/bln",
+    maxMau: 8000,
+    maxAiResponses: 50000,
+    desc: "8.000 MAU · 50.000 Respons AI",
+  },
+  {
+    key: "enterprise",
+    name: "Enterprise",
+    price: 5799000,
+    priceLabel: "Rp 5.799k/bln",
+    maxMau: 30000,
+    maxAiResponses: 150000,
+    desc: "30.000 MAU · 150.000 Respons AI",
+  },
+  {
+    key: "custom",
+    name: "Kustom",
+    price: 0,
+    priceLabel: "Kustom",
+    maxMau: 1000,
+    maxAiResponses: 10000,
+    desc: "Batas & kuota disesuaikan bebas",
+  },
 ];
 
 export function ClientsPage() {
@@ -118,6 +167,49 @@ export function ClientsPage() {
     isActive: true,
     allowedMenus: [] as string[],
   });
+
+  // Dialog Edit Paket & Kuota Klien (MAU & AI Response)
+  const [isEditQuotaOpen, setIsEditQuotaOpen] = useState(false);
+  const [quotaForm, setQuotaForm] = useState({
+    plan: "trial",
+    maxMau: 10,
+    maxAiResponses: 50,
+    planPrice: 0,
+  });
+
+  const openEditQuotaModal = (client: any) => {
+    const q = client.quota || {};
+    const currentPlan = q.plan || "trial";
+    const tier = PLAN_TIERS.find((p) => p.key === currentPlan) || PLAN_TIERS[0];
+    setQuotaForm({
+      plan: currentPlan,
+      maxMau: typeof q.maxMau === "number" ? q.maxMau : tier.maxMau,
+      maxAiResponses: typeof q.maxAiResponses === "number" ? q.maxAiResponses : tier.maxAiResponses,
+      planPrice: typeof q.planPrice === "number" ? q.planPrice : tier.price,
+    });
+    setIsEditQuotaOpen(true);
+  };
+
+  const handleSaveQuota = async () => {
+    if (!selectedClient) return;
+    try {
+      const res = await fetch(`/api/v1/tenant/clients/${selectedClient.id}/quota`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(quotaForm),
+      });
+      if (res.ok) {
+        toast.success("Paket dan kuota klien berhasil diperbarui!");
+        setIsEditQuotaOpen(false);
+        fetchClientDetail(selectedClient.id);
+        fetchClients();
+      } else {
+        toast.error("Gagal memperbarui kuota klien");
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Gagal memperbarui kuota klien");
+    }
+  };
 
   const fetchClients = async () => {
     setLoading(true);
@@ -516,14 +608,41 @@ export function ClientsPage() {
             </div>
 
             <div className="flex items-center gap-4 text-xs">
-              <div className="px-5 py-2.5 rounded-2xl bg-background border shadow-2xs text-center">
-                <span className="text-muted-foreground block text-[11px] font-medium">Total Akun Staf</span>
-                <strong className="text-lg font-bold text-foreground">{usersList.length} Akun</strong>
+            <div className="flex flex-wrap items-center gap-2.5 text-xs">
+              <div className="px-3.5 py-2 rounded-2xl bg-background border shadow-2xs text-center">
+                <span className="text-muted-foreground block text-[10px] font-medium">Total Akun</span>
+                <strong className="text-base font-bold text-foreground">{usersList.length} Staf</strong>
               </div>
-              <div className="px-5 py-2.5 rounded-2xl bg-background border shadow-2xs text-center">
-                <span className="text-muted-foreground block text-[11px] font-medium">Modul Aktif Klien</span>
-                <strong className="text-lg font-bold text-emerald-600">{tenantActiveModules.length} Modul</strong>
+              <div className="px-3.5 py-2 rounded-2xl bg-background border shadow-2xs text-center">
+                <span className="text-muted-foreground block text-[10px] font-medium">Modul Aktif</span>
+                <strong className="text-base font-bold text-emerald-600">{tenantActiveModules.length} Modul</strong>
               </div>
+              <div className="px-3.5 py-2 rounded-2xl bg-background border shadow-2xs text-center">
+                <span className="text-muted-foreground block text-[10px] font-medium">Paket</span>
+                <strong className="text-base font-bold text-blue-600">{selectedClient.quota?.planName || "Free Trial"}</strong>
+              </div>
+              <div className="px-3.5 py-2 rounded-2xl bg-background border shadow-2xs text-center">
+                <span className="text-muted-foreground block text-[10px] font-medium">Nomor (MAU)</span>
+                <strong className="text-base font-mono font-bold text-foreground">
+                  {(selectedClient.quota?.mauUsed || 0).toLocaleString()} / {(selectedClient.quota?.maxMau || 10).toLocaleString()}
+                </strong>
+              </div>
+              <div className="px-3.5 py-2 rounded-2xl bg-background border shadow-2xs text-center">
+                <span className="text-muted-foreground block text-[10px] font-medium">Respons AI</span>
+                <strong className="text-base font-mono font-bold text-foreground">
+                  {(selectedClient.quota?.aiResponsesUsed || 0).toLocaleString()} / {(selectedClient.quota?.maxAiResponses || 50).toLocaleString()}
+                </strong>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-10 px-3 text-xs gap-1.5 border-emerald-600/40 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 font-medium"
+                onClick={() => openEditQuotaModal(selectedClient)}
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5 text-emerald-600" />
+                Atur Kuota
+              </Button>
+            </div>
             </div>
           </div>
         </Card>
@@ -560,6 +679,14 @@ export function ClientsPage() {
                 <span className="ml-1 px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
                   {tenantActiveModules.length}
                 </span>
+              </TabsTrigger>
+
+              <TabsTrigger
+                value="quota"
+                className="h-9 px-5 rounded-xl text-sm font-semibold transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs flex items-center gap-2.5 text-muted-foreground hover:text-foreground"
+              >
+                <Sparkles className="h-4 w-4 text-emerald-600" />
+                <span>Paket &amp; Kuota (MAU/AI)</span>
               </TabsTrigger>
             </TabsList>
           </div>
@@ -797,7 +924,245 @@ export function ClientsPage() {
               </div>
             </Card>
           </TabsContent>
+
+          {/* TAB 4: PAKET & KUOTA CHATBOT (MAU & AI RESPONSE) */}
+          <TabsContent value="quota" className="space-y-4">
+            <Card className="p-5 border shadow-xs space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-bold text-base">Status Paket &amp; Penggunaan Kuota</h4>
+                    <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300">
+                      {selectedClient.quota?.planName || "Free Trial"}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Skema kuota dihitung dari jumlah kontak unik (1 nomor = 1 MAU) dan bubble chat balasan otomatis bot AI.
+                  </p>
+                </div>
+                <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5 font-semibold" onClick={() => openEditQuotaModal(selectedClient)}>
+                  <SlidersHorizontal className="h-3.5 w-3.5" /> Ubah Paket / Kuota
+                </Button>
+              </div>
+
+              {/* Progress Meters */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 rounded-xl border bg-muted/20 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold flex items-center gap-1.5">
+                      <Users className="h-4 w-4 text-blue-600" /> Kontak Unik (MAU)
+                    </span>
+                    <span className="font-mono font-bold text-sm">
+                      {(selectedClient.quota?.mauUsed || 0).toLocaleString()} / {(selectedClient.quota?.maxMau || 10).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="h-3 w-full bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-full rounded-full transition-all duration-500",
+                        selectedClient.quota?.isMauExceeded
+                          ? "bg-rose-600"
+                          : (selectedClient.quota?.mauPercent || 0) >= 80
+                            ? "bg-amber-500"
+                            : "bg-blue-600"
+                      )}
+                      style={{ width: `${selectedClient.quota?.mauPercent || 0}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1">
+                    <span>1 nomor WhatsApp yang chat = 1 MAU</span>
+                    <span className="font-bold">{selectedClient.quota?.mauPercent || 0}% terpakai</span>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl border bg-muted/20 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold flex items-center gap-1.5">
+                      <Bot className="h-4 w-4 text-emerald-600" /> Respons AI (Bubble Chat)
+                    </span>
+                    <span className="font-mono font-bold text-sm">
+                      {(selectedClient.quota?.aiResponsesUsed || 0).toLocaleString()} / {(selectedClient.quota?.maxAiResponses || 50).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="h-3 w-full bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-full rounded-full transition-all duration-500",
+                        selectedClient.quota?.isAiResponsesExceeded
+                          ? "bg-rose-600"
+                          : (selectedClient.quota?.aiResponsesPercent || 0) >= 80
+                            ? "bg-amber-500"
+                            : "bg-emerald-600"
+                      )}
+                      style={{ width: `${selectedClient.quota?.aiResponsesPercent || 0}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1">
+                    <span>1 bubble balasan bot = 1 AI response</span>
+                    <span className="font-bold">{selectedClient.quota?.aiResponsesPercent || 0}% terpakai</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tier Cards Comparison */}
+              <div>
+                <h5 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">
+                  Pilihan Paket Standar Platform
+                </h5>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {PLAN_TIERS.filter(p => p.key !== "custom").map((p) => {
+                    const isCurrent = (selectedClient.quota?.plan || "trial") === p.key;
+                    return (
+                      <div
+                        key={p.key}
+                        className={cn(
+                          "p-4 rounded-xl border flex flex-col justify-between transition-all",
+                          isCurrent
+                            ? "border-emerald-600 bg-emerald-50/40 dark:bg-emerald-950/20 ring-2 ring-emerald-500/20"
+                            : "bg-background hover:bg-muted/30"
+                        )}
+                      >
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <h6 className="font-bold text-sm">{p.name}</h6>
+                            {isCurrent && (
+                              <Badge className="bg-emerald-600 text-white text-[9px] h-4">Aktif</Badge>
+                            )}
+                          </div>
+                          <p className="font-bold text-base text-emerald-700 dark:text-emerald-300 mt-1">{p.priceLabel}</p>
+                          <div className="text-xs text-muted-foreground space-y-1 mt-3">
+                            <p className="flex items-center gap-1.5 font-medium text-foreground">
+                              <Users className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+                              {p.maxMau.toLocaleString()} MAU
+                            </p>
+                            <p className="flex items-center gap-1.5 font-medium text-foreground">
+                              <Bot className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                              {p.maxAiResponses.toLocaleString()} Respons AI
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant={isCurrent ? "outline" : "default"}
+                          className={cn("w-full mt-4 text-xs h-8 font-semibold", isCurrent ? "border-emerald-600 text-emerald-700" : "bg-emerald-600 hover:bg-emerald-700 text-white")}
+                          onClick={() => {
+                            setQuotaForm({
+                              plan: p.key,
+                              maxMau: p.maxMau,
+                              maxAiResponses: p.maxAiResponses,
+                              planPrice: p.price,
+                            });
+                            setIsEditQuotaOpen(true);
+                          }}
+                        >
+                          {isCurrent ? "Edit Kuota" : "Pilih Paket Ini"}
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </Card>
+          </TabsContent>
         </Tabs>
+
+        {/* DIALOG: EDIT PAKET & KUOTA KLIEN (MAU & AI RESPONSE) */}
+        <Dialog open={isEditQuotaOpen} onOpenChange={setIsEditQuotaOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-emerald-600" />
+                Atur Paket &amp; Kuota Klien
+              </DialogTitle>
+              <DialogDescription>
+                Atur paket langganan dan batasan kuota MAU serta bubble respons AI untuk <strong>{selectedClient.name}</strong>.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2 text-xs">
+              <div className="space-y-1.5">
+                <Label className="font-semibold">Pilih Skema Paket</Label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {PLAN_TIERS.map((tier) => {
+                    const isSelected = quotaForm.plan === tier.key;
+                    return (
+                      <button
+                        key={tier.key}
+                        type="button"
+                        onClick={() => {
+                          setQuotaForm({
+                            plan: tier.key,
+                            maxMau: tier.maxMau,
+                            maxAiResponses: tier.maxAiResponses,
+                            planPrice: tier.price,
+                          });
+                        }}
+                        className={cn(
+                          "p-2.5 rounded-xl border text-left transition-all",
+                          isSelected
+                            ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 ring-1 ring-emerald-600"
+                            : "hover:bg-muted/50 border-border"
+                        )}
+                      >
+                        <p className="font-bold text-xs">{tier.name}</p>
+                        <p className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold">{tier.priceLabel}</p>
+                        <p className="text-[9px] text-muted-foreground mt-0.5">{tier.maxMau.toLocaleString()} MAU</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-2 border-t">
+                <div className="space-y-1">
+                  <Label className="font-semibold flex items-center gap-1">
+                    <Users className="h-3.5 w-3.5 text-blue-600" /> Batas MAU (Nomor)
+                  </Label>
+                  <Input
+                    type="number"
+                    value={quotaForm.maxMau}
+                    onChange={(e) => setQuotaForm({ ...quotaForm, maxMau: Number(e.target.value) || 0 })}
+                    className="h-8 font-mono"
+                  />
+                  <p className="text-[10px] text-muted-foreground">1 nomor unik = 1 MAU</p>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="font-semibold flex items-center gap-1">
+                    <Bot className="h-3.5 w-3.5 text-emerald-600" /> Batas Respons AI
+                  </Label>
+                  <Input
+                    type="number"
+                    value={quotaForm.maxAiResponses}
+                    onChange={(e) => setQuotaForm({ ...quotaForm, maxAiResponses: Number(e.target.value) || 0 })}
+                    className="h-8 font-mono"
+                  />
+                  <p className="text-[10px] text-muted-foreground">1 bubble bot = 1 respons</p>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="font-semibold">Harga Langganan (Rp / bulan)</Label>
+                <Input
+                  type="number"
+                  value={quotaForm.planPrice}
+                  onChange={(e) => setQuotaForm({ ...quotaForm, planPrice: Number(e.target.value) || 0 })}
+                  className="h-8 font-mono"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" size="sm" onClick={() => setIsEditQuotaOpen(false)}>
+                Batal
+              </Button>
+              <Button size="sm" onClick={handleSaveQuota} className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">
+                Simpan Paket &amp; Kuota
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* DIALOG: BUAT AKUN STAF BARU DENGAN HAK AKSES MENU PER AKUN */}
         <Dialog open={isAddStaffOpen} onOpenChange={setIsAddStaffOpen}>
@@ -1299,7 +1664,17 @@ export function ClientsPage() {
                         </span>
                         <span>•</span>
                         <span className="font-semibold text-foreground">
-                          {staffCount} Akun Pengguna
+                          {staffCount} Akun
+                        </span>
+                        <span>•</span>
+                        <Badge variant="outline" className="text-[10px] font-bold bg-muted/40 text-blue-700 dark:text-blue-300">
+                          {client.quota?.planName || "Free Trial"}
+                        </Badge>
+                        <span className="font-mono text-[11px] text-muted-foreground">
+                          MAU: {(client.quota?.mauUsed || 0).toLocaleString()}/{(client.quota?.maxMau || 10).toLocaleString()}
+                        </span>
+                        <span className="font-mono text-[11px] text-muted-foreground">
+                          AI: {(client.quota?.aiResponsesUsed || 0).toLocaleString()}/{(client.quota?.maxAiResponses || 50).toLocaleString()}
                         </span>
                       </div>
                     </div>

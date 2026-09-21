@@ -164,6 +164,27 @@ export class TenantController {
     return this.tenantService.createClient(body);
   }
 
+  // Superadmin / Client: Ambil kuota MAU & AI response
+  @Get('clients/:tenantId/quota')
+  async getTenantQuota(@Param('tenantId') tenantId: string) {
+    return this.tenantService.getTenantQuota(tenantId);
+  }
+
+  // Superadmin: Update kuota paket (MAU & AI responses)
+  @Patch('clients/:tenantId/quota')
+  async updateTenantQuota(
+    @Param('tenantId') tenantId: string,
+    @Body()
+    body: {
+      plan?: string;
+      maxMau?: number;
+      maxAiResponses?: number;
+      planPrice?: number;
+    },
+  ) {
+    return this.tenantService.updateTenantQuota(tenantId, body);
+  }
+
   // Superadmin: Update hak akses menu untuk klien tertentu
   @Patch('clients/:tenantId/menus')
   async updateClientMenus(

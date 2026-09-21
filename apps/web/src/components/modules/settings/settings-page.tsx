@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Bot, Save, Smartphone, ShieldCheck, Loader2, Plus, Trash2, QrCode, Palette } from "lucide-react";
+import { Bot, Save, Smartphone, ShieldCheck, Loader2, Plus, Trash2, QrCode, Palette, Wrench } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { WarnaWebsiteTab } from "./color-tab";
 
@@ -214,7 +214,8 @@ function BotSettingsTab() {
               className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium hover:bg-muted/50 transition-colors"
             >
               <span className="flex items-center gap-2">
-                <span className="text-lg">🛠</span> System Prompt Asisten
+                <Wrench className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                <span>System Prompt Asisten</span>
               </span>
               <span className="text-xs text-muted-foreground">{showPrompt ? "Sembunyikan" : "Klik untuk edit"}</span>
             </button>

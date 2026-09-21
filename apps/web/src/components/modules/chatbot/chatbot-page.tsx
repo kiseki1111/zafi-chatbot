@@ -61,6 +61,7 @@ import {
   Sparkles,
   UserCog,
   Image as ImageIcon,
+  Users,
 } from "lucide-react";
 import type {
   Contact,
@@ -586,6 +587,55 @@ export function ChatbotPage() {
     imageUrl: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&auto=format&fit=crop",
   });
 
+  // Quota & Billing state (MAU & AI Response)
+  const [quota, setQuota] = useState<{
+    plan: string;
+    planName: string;
+    planPrice: number;
+    priceLabel: string;
+    mauUsed: number;
+    maxMau: number;
+    mauPercent: number;
+    aiResponsesUsed: number;
+    maxAiResponses: number;
+    aiResponsesPercent: number;
+    isMauExceeded: boolean;
+    isAiResponsesExceeded: boolean;
+  }>({
+    plan: "trial",
+    planName: "Free Trial",
+    planPrice: 0,
+    priceLabel: "Gratis",
+    mauUsed: 0,
+    maxMau: 10,
+    mauPercent: 0,
+    aiResponsesUsed: 0,
+    maxAiResponses: 50,
+    aiResponsesPercent: 0,
+    isMauExceeded: false,
+    isAiResponsesExceeded: false,
+  });
+
+  const fetchQuota = () => {
+    const fetchId =
+      user?.tenantId ||
+      (user?.id && !user.id.startsWith("u-") && user.role !== "superadmin"
+        ? user.id
+        : "demo");
+    if (!fetchId) return;
+    fetch(`/api/v1/tenant/clients/${fetchId}/quota`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        const data = res?.data || res;
+        if (data && data.plan) setQuota(data);
+      })
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    fetchQuota();
+  }, [user?.tenantId, user?.id, user?.role]);
+
   // Fetch Conversations
   const fetchConversations = async () => {
     if (!sessionId) return;
@@ -602,9 +652,18 @@ export function ChatbotPage() {
         return;
       }
       const mappedContacts: Contact[] = chatsData.map((c: any) => {
-        const rawName = c.contactName || c.contactNumber || "";
-        const cleanName = rawName.split('@')[0];
-        const cleanPhone = (c.contactNumber || "").split('@')[0];
+        const cleanPhone = (c.contactNumber || "")
+          .replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, "")
+          .replace(/^\+/, "");
+        let cleanName = c.contactName || "";
+        if (
+          !cleanName ||
+          cleanName.includes('@') ||
+          cleanName === c.contactNumber ||
+          cleanName === cleanPhone
+        ) {
+          cleanName = cleanPhone ? `+${cleanPhone}` : "Pelanggan";
+        }
         return {
           id: c.id,
           name: cleanName,
@@ -692,6 +751,7 @@ export function ChatbotPage() {
   useEffect(() => {
     const fetchLatest = () => {
       fetchConversations();
+      fetchQuota();
       if (activeId) {
          fetch(`/api/v1/chats/${activeId}/messages?skip=0&take=20`)
           .then(r => r.json())
@@ -1078,30 +1138,6 @@ export function ChatbotPage() {
               </SelectContent>
             </Select>
 
-            {/* Test Real WAHA Trigger Button */}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setIsWahaTestModalOpen(true)}
-              className="h-7 text-xs gap-1 border-dashed text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
-            >
-              <Zap className="h-3.5 w-3.5 text-emerald-600" />
-              <span className="hidden sm:inline">Test Kirim</span> WAHA
-            </Button>
-
-            {/* Mock Simulator Modal Trigger */}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setIsSimModalOpen(true)}
-              className="h-7 text-xs gap-1 border-dashed text-indigo-700 hover:text-indigo-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/20"
-            >
-              <Sparkles className="h-3.5 w-3.5 text-indigo-600" />
-              Simulasi
-            </Button>
-
             <span className="text-[11px] text-muted-foreground hidden lg:inline pl-1 border-l">
               <strong className="text-foreground">{contacts.length}</strong> kontak · <strong className="text-foreground">{messagesToday}</strong> pesan
             </span>
@@ -1385,6 +1421,83 @@ export function ChatbotPage() {
         </Card>
 
       </div>
+
+      {/* ===== Quota Usage Info Bar (MAU & AI Response) ===== */}
+      {quota && (
+        <Card className="p-3 bg-muted/20 border shadow-2xs shrink-0">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2.5 shrink-0">
+              <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                <Sparkles className="h-4 w-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-semibold text-foreground">Paket Chatbot:</span>
+                  <Badge variant="outline" className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300">
+                    {quota.planName}
+                  </Badge>
+                  <span className="text-muted-foreground text-[11px]">({quota.priceLabel})</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground">Kuota nomor aktif (MAU) dan bubble respons AI WhatsApp</p>
+              </div>
+            </div>
+
+            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4 w-full md:w-auto">
+              {/* Kontak Unik MAU */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="font-medium text-muted-foreground flex items-center gap-1">
+                    <Users className="h-3 w-3 text-blue-600" />
+                    Kontak Unik (MAU)
+                  </span>
+                  <span className="font-semibold font-mono text-foreground">
+                    {quota.mauUsed.toLocaleString()} / {quota.maxMau.toLocaleString()} ({quota.mauPercent}%)
+                  </span>
+                </div>
+                <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={cn(
+                      "h-full transition-all duration-500 rounded-full",
+                      quota.isMauExceeded
+                        ? "bg-rose-600"
+                        : quota.mauPercent >= 80
+                          ? "bg-amber-500"
+                          : "bg-blue-600"
+                    )}
+                    style={{ width: `${quota.mauPercent}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Respons AI */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="font-medium text-muted-foreground flex items-center gap-1">
+                    <Bot className="h-3 w-3 text-emerald-600" />
+                    Respons AI (Bubble Chat)
+                  </span>
+                  <span className="font-semibold font-mono text-foreground">
+                    {quota.aiResponsesUsed.toLocaleString()} / {quota.maxAiResponses.toLocaleString()} ({quota.aiResponsesPercent}%)
+                  </span>
+                </div>
+                <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={cn(
+                      "h-full transition-all duration-500 rounded-full",
+                      quota.isAiResponsesExceeded
+                        ? "bg-rose-600"
+                        : quota.aiResponsesPercent >= 80
+                          ? "bg-amber-500"
+                          : "bg-emerald-600"
+                    )}
+                    style={{ width: `${quota.aiResponsesPercent}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* ----- Mobile info sheet ----- */}
       <Sheet open={infoOpenMobile} onOpenChange={setInfoOpenMobile}>

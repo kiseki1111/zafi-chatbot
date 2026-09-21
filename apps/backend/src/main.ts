@@ -67,6 +67,6 @@ async function bootstrap() {
   if (!port) {
     throw new Error('PORT environment variable is not set!');
   }
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
 }
 bootstrap();

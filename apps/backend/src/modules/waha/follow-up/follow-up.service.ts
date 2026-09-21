@@ -54,7 +54,9 @@ export class FollowUpService {
       return [];
     }
 
-    const inactivityMs = config.inactivityHours * 60 * 60 * 1000;
+    // Jika inactivityHours === 0, ambang batas inaktivitas adalah 1 menit (mode testing cepat)
+    const minutes = config.inactivityHours === 0 ? 1 : config.inactivityHours * 60;
+    const inactivityMs = minutes * 60 * 1000;
     const cutoffTime = new Date(Date.now() - inactivityMs);
 
     const conversations = await this.prisma.conversation.findMany({
@@ -265,5 +267,243 @@ Bahasa: Indonesia. Maksimal 2 emoji. Tanpa markdown.`;
   async manualTrigger(instanceName?: string) {
     this.logger.log('Manual follow-up triggered');
     return this.processFollowUps(instanceName);
+  }
+
+  // Tambah kontak baru ke antrean follow-up
+  async addToQueue(data: { phone: string; name?: string; instanceName?: string }) {
+    const cleanPhone = (data.phone || '').replace(/[^0-9]/g, '');
+    if (!cleanPhone) {
+      throw new Error('Nomor WhatsApp wajib diisi');
+    }
+    const name = data.name || `Pelanggan (+${cleanPhone})`;
+
+    let instanceName = data.instanceName;
+    if (!instanceName) {
+      const firstInst = await this.prisma.whatsappInstance.findFirst();
+      instanceName = firstInst?.instanceName || 'default';
+    }
+
+    await this.prisma.whatsappInstance.upsert({
+      where: { instanceName },
+      update: {},
+      create: { instanceName, status: 'WORKING' },
+    });
+
+    const contact = await this.prisma.contact.upsert({
+      where: { phone: cleanPhone },
+      update: { name },
+      create: { phone: cleanPhone, name },
+    });
+
+    // Set lastMessageAt ke waktu lampau agar langsung masuk daftar inaktif
+    const config = await this.getConfig();
+    const minutes = config.inactivityHours === 0 ? 1 : config.inactivityHours * 60;
+    const pastTime = new Date(Date.now() - (minutes + 1) * 60 * 1000);
+
+    const conversation = await this.prisma.conversation.upsert({
+      where: {
+        instanceName_contactId: {
+          instanceName,
+          contactId: contact.id,
+        },
+      },
+      update: {
+        lastMessageAt: pastTime,
+        status: 'OPEN',
+      },
+      create: {
+        instanceName,
+        contactId: contact.id,
+        lastMessageAt: pastTime,
+        status: 'OPEN',
+      },
+    });
+
+    // Buat pesan dummy agar AI punya konteks obrolan
+    await this.prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        senderType: 'customer',
+        content: 'Halo kak, saya tertarik dengan informasinya...',
+        status: 'RECEIVED',
+        createdAt: pastTime,
+      },
+    });
+
+    // Hapus dari riwayat FollowUp jika ada agar statusnya pending
+    await this.prisma.followUp.deleteMany({
+      where: {
+        contactId: contact.id,
+        instanceName,
+      },
+    });
+
+    return {
+      success: true,
+      message: `Kontak +${cleanPhone} berhasil ditambahkan ke antrean follow-up!`,
+      contactId: contact.id,
+      instanceName,
+    };
+  }
+
+  // Hapus satu kontak dari antrean follow-up
+  async removeFromQueue(contactId: string, instanceName: string) {
+    await this.prisma.followUp.upsert({
+      where: {
+        contactId_instanceName: {
+          contactId,
+          instanceName,
+        },
+      },
+      update: {},
+      create: {
+        contactId,
+        instanceName,
+      },
+    });
+    return { success: true, message: 'Kontak berhasil dihapus dari antrean follow-up' };
+  }
+
+  // Bersihkan antrean follow-up (abort nomor lain agar tersisa hanya nomor yang ditest)
+  async clearPendingFollowUps(exceptPhone?: string) {
+    const cleanExcept = exceptPhone ? exceptPhone.replace(/[^0-9]/g, '') : null;
+    const inactive = await this.getInactiveContacts();
+    for (const item of inactive) {
+      if (cleanExcept && item.contactPhone?.replace(/[^0-9]/g, '') === cleanExcept) {
+        continue;
+      }
+      await this.prisma.followUp.upsert({
+        where: {
+          contactId_instanceName: {
+            contactId: item.contactId,
+            instanceName: item.instanceName,
+          },
+        },
+        update: {},
+        create: {
+          contactId: item.contactId,
+          instanceName: item.instanceName,
+        },
+      });
+    }
+    return { success: true, message: 'Antrean lain berhasil dibersihkan' };
+  }
+
+  // Uji Coba & Testing Simulator: Menjadikan nomor tertentu siap difollow-up
+  async simulateFollowUpContact(data: {
+    phone: string;
+    name?: string;
+    instanceName?: string;
+    inactivityMinutes?: number;
+    inactivityHours?: number;
+    clearOthers?: boolean;
+    autoTriggerInSeconds?: number;
+    activateFollowUp?: boolean;
+  }) {
+    const cleanPhone = (data.phone || '').replace(/[^0-9]/g, '');
+    if (!cleanPhone) {
+      throw new Error('Nomor telepon wajib diisi');
+    }
+    const name = data.name || `Pelanggan Test (+${cleanPhone})`;
+    
+    // Hitung delay menit: default 1 menit jika diminta
+    const delayMinutes =
+      data.inactivityMinutes !== undefined
+        ? data.inactivityMinutes
+        : data.inactivityHours !== undefined
+          ? data.inactivityHours * 60
+          : 1;
+
+    // 1. Dapatkan instanceName (ambil dari param, atau instance pertama yang ada)
+    let instanceName = data.instanceName;
+    if (!instanceName) {
+      const firstInst = await this.prisma.whatsappInstance.findFirst();
+      instanceName = firstInst?.instanceName || 'default';
+    }
+
+    // 2. Pastikan instance tercatat di DB
+    await this.prisma.whatsappInstance.upsert({
+      where: { instanceName },
+      update: {},
+      create: { instanceName, status: 'WORKING' },
+    });
+
+    // 3. Pastikan contact ada
+    const contact = await this.prisma.contact.upsert({
+      where: { phone: cleanPhone },
+      update: { name },
+      create: { phone: cleanPhone, name },
+    });
+
+    // 4. Hitung waktu mundur: disetel lebih lama dari delayMinutes agar terdeteksi inaktif
+    const pastTime = new Date(Date.now() - (delayMinutes + 1) * 60 * 1000);
+
+    // 5. Buat / update conversation dengan lastMessageAt di masa lalu
+    const conversation = await this.prisma.conversation.upsert({
+      where: {
+        instanceName_contactId: {
+          instanceName,
+          contactId: contact.id,
+        },
+      },
+      update: {
+        lastMessageAt: pastTime,
+        status: 'OPEN',
+      },
+      create: {
+        instanceName,
+        contactId: contact.id,
+        lastMessageAt: pastTime,
+        status: 'OPEN',
+      },
+    });
+
+    // Buat 1 pesan dummy terakhir dari customer di conversation tersebut agar AI punya konteks riwayat
+    await this.prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        senderType: 'customer',
+        content: 'Halo kak, saya mau tanya info lebih lanjut dong...',
+        status: 'RECEIVED',
+        createdAt: pastTime,
+      },
+    });
+
+    // 6. Hapus dari riwayat followUp jika nomor ini sudah pernah difollow-up, agar masuk antrean lagi
+    await this.prisma.followUp.deleteMany({
+      where: {
+        contactId: contact.id,
+        instanceName,
+      },
+    });
+
+    // 7. Bersihkan antrean nomor lain jika clearOthers: true (agar HANYA 1 nomor ini di list)
+    if (data.clearOthers) {
+      await this.clearPendingFollowUps(cleanPhone);
+    }
+
+    // 8. Jika diminta aktifkan follow-up, aktifkan config (jika delay 1 menit, set inactivityHours = 0)
+    if (data.activateFollowUp !== false) {
+      await this.updateConfig({
+        isEnabled: true,
+        inactivityHours: delayMinutes <= 5 ? 0 : Math.floor(delayMinutes / 60),
+      });
+    }
+
+    // 9. Jika autoTriggerInSeconds disetel, jalankan timeout
+    if (data.autoTriggerInSeconds && data.autoTriggerInSeconds > 0) {
+      setTimeout(() => {
+        this.logger.log(`[AUTO-TRIGGER] Menjalankan follow-up otomatis untuk ${cleanPhone} setelah ${data.autoTriggerInSeconds} detik`);
+        this.processFollowUps(instanceName);
+      }, data.autoTriggerInSeconds * 1000);
+    }
+
+    return {
+      success: true,
+      message: `Nomor +${cleanPhone} berhasil diset sebagai satu-satunya antrean follow-up (delay ${delayMinutes} menit)!`,
+      contactId: contact.id,
+      instanceName,
+      lastMessageAt: pastTime,
+    };
   }
 }

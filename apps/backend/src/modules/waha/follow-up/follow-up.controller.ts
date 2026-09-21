@@ -3,6 +3,8 @@ import {
   Get,
   Post,
   Put,
+  Delete,
+  Param,
   Query,
   Body,
   Logger,
@@ -38,6 +40,26 @@ export class FollowUpController {
     return this.followUpService.getInactiveContacts(instanceName);
   }
 
+  @Post('queue')
+  async addToQueue(
+    @Body()
+    body: {
+      phone: string;
+      name?: string;
+      instanceName?: string;
+    },
+  ) {
+    return this.followUpService.addToQueue(body);
+  }
+
+  @Delete('queue/:contactId/:instanceName')
+  async removeFromQueue(
+    @Param('contactId') contactId: string,
+    @Param('instanceName') instanceName: string,
+  ) {
+    return this.followUpService.removeFromQueue(contactId, instanceName);
+  }
+
   @Get('stats')
   async getStats() {
     return this.followUpService.getStats();
@@ -54,5 +76,10 @@ export class FollowUpController {
   @Post('trigger')
   async manualTrigger(@Body('instanceName') instanceName?: string) {
     return this.followUpService.manualTrigger(instanceName);
+  }
+
+  @Post('clear-pending')
+  async clearPendingFollowUps(@Body('exceptPhone') exceptPhone?: string) {
+    return this.followUpService.clearPendingFollowUps(exceptPhone);
   }
 }

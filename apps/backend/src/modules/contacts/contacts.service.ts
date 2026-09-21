@@ -11,7 +11,9 @@ export class ContactsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async listContacts(search?: string, status?: string) {
-    const where: any = {};
+    const where: any = {
+      phone: { not: { contains: 'broadcast' } },
+    };
     if (status && status !== 'ALL') {
       where.status = status;
     }
@@ -24,7 +26,7 @@ export class ContactsService {
       ];
     }
 
-    return this.prisma.contact.findMany({
+    const contacts = await this.prisma.contact.findMany({
       where,
       orderBy: { updatedAt: 'desc' },
       include: {
@@ -34,10 +36,59 @@ export class ContactsService {
           orderBy: { lastMessageAt: 'desc' },
           include: {
             assignedTo: { select: { id: true, name: true } },
-            messages: { take: 1, orderBy: { createdAt: 'desc' } },
+            messages: { take: 5, orderBy: { createdAt: 'desc' } },
           },
         },
       },
+    });
+
+    return contacts.map((c) => {
+      let realPhone = c.phone;
+      const msgs = c.conversations?.[0]?.messages || [];
+      for (const msg of msgs) {
+        const meta = msg.metadata as any;
+        const alt =
+          meta?._data?.key?.remoteJidAlt ||
+          meta?._data?.remoteJidAlt ||
+          meta?._data?.senderAlt ||
+          meta?._data?.key?.participant;
+        if (alt && !alt.includes('@lid')) {
+          realPhone = alt;
+          break;
+        }
+      }
+
+      const cleanPhone = (realPhone || '')
+        .replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, '')
+        .replace(/^\+/, '');
+
+      let displayName = c.name;
+      if (
+        !displayName ||
+        displayName.includes('@') ||
+        displayName === c.phone ||
+        displayName === cleanPhone
+      ) {
+        for (const msg of msgs) {
+          const meta = msg.metadata as any;
+          const notify = meta?._data?.notifyName || meta?.sender?.pushname;
+          if (notify && typeof notify === 'string') {
+            displayName = notify;
+            break;
+          }
+        }
+        if (!displayName || displayName === c.phone) {
+          displayName = cleanPhone ? `+${cleanPhone}` : c.name;
+        }
+      }
+
+      return {
+        ...c,
+        name: displayName,
+        phone: cleanPhone,
+        firstChatAt: c.createdAt,
+        lastChatAt: c.conversations?.[0]?.lastMessageAt || c.updatedAt,
+      };
     });
   }
 

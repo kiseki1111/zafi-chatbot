@@ -25,7 +25,12 @@ export class ChatsService {
       where.whatsappInstance = { tenantId };
     }
     const conversations = await this.prisma.conversation.findMany({
-      where,
+      where: {
+        ...where,
+        contact: {
+          phone: { not: { contains: 'broadcast' } },
+        },
+      },
       orderBy: { lastMessageAt: 'desc' },
       include: {
         assignedTo: {
@@ -34,29 +39,54 @@ export class ChatsService {
         contact: true,
         messages: {
           orderBy: { createdAt: 'desc' },
-          take: 1,
+          take: 10,
         },
       },
     });
 
     return conversations.map((c) => {
-      let realPhone = c.contact?.phone;
-      if (
-        realPhone &&
-        realPhone.endsWith('@lid') &&
-        c.messages &&
-        c.messages.length > 0
-      ) {
-        const msg = c.messages[0];
+      let realPhone = c.contact?.phone || '';
+      for (const msg of c.messages || []) {
         const meta = msg.metadata as any;
-        if (meta?._data?.key?.remoteJidAlt) {
-          realPhone = meta._data.key.remoteJidAlt;
+        const alt =
+          meta?._data?.key?.remoteJidAlt ||
+          meta?._data?.remoteJidAlt ||
+          meta?._data?.senderAlt ||
+          meta?._data?.key?.participant;
+        if (alt && !alt.includes('@lid')) {
+          realPhone = alt;
+          break;
         }
       }
+
+      const cleanPhone = (realPhone || '')
+        .replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, '')
+        .replace(/^\+/, '');
+
+      let displayName = c.contact?.name || '';
+      if (
+        !displayName ||
+        displayName.includes('@') ||
+        displayName === c.contact?.phone ||
+        displayName === cleanPhone
+      ) {
+        for (const msg of c.messages || []) {
+          const meta = msg.metadata as any;
+          const notify = meta?._data?.notifyName || meta?.sender?.pushname;
+          if (notify && typeof notify === 'string') {
+            displayName = notify;
+            break;
+          }
+        }
+        if (!displayName || displayName === c.contact?.phone) {
+          displayName = cleanPhone ? `+${cleanPhone}` : c.contact?.name || 'Pelanggan';
+        }
+      }
+
       return {
         ...c,
-        contactName: c.contact?.name,
-        contactNumber: realPhone,
+        contactName: displayName,
+        contactNumber: cleanPhone,
       };
     });
   }
