@@ -30,38 +30,35 @@ export const MENU_ITEMS: MenuItem[] = [
   { key: "settings",      label: "Pengaturan",       icon: "Settings",        roles: ["superadmin", "manager"] },
 ];
 
-export function menuForRole(role: Role, enabledMenus?: string[], userContext?: { email?: string; name?: string; tenantId?: string | null }): MenuItem[] {
-  let items = MENU_ITEMS.filter((m) => m.roles.includes(role));
-
-  // Filter eksplisit berdasarkan akun / bisnis:
-  const isBusAccount =
-    userContext?.email?.toLowerCase().includes("bus") ||
-    userContext?.name?.toLowerCase().includes("bus") ||
-    userContext?.tenantId === "5d85136d-d79b-4b63-8a80-013a49a8b1c0";
-
-  const isZafiAccount =
-    userContext?.email?.toLowerCase().includes("zafi") ||
-    userContext?.name?.toLowerCase().includes("zafi") ||
-    userContext?.tenantId === "4a023464-c66a-4edf-8926-9a08a05ea221";
-
-  if (isBusAccount) {
-    // Akun Bus TIDAK BOLEH punya menu Plansite Properti
-    items = items.filter((m) => m.key !== "availability");
-  } else if (isZafiAccount) {
-    // Akun Zafi Properti TIDAK BOLEH punya menu Denah Bus
-    items = items.filter((m) => m.key !== "bus_layout");
+export function menuForRole(
+  role: Role,
+  enabledMenus?: string[],
+  userContext?: { email?: string; name?: string; tenantId?: string | null },
+): MenuItem[] {
+  // ============================================================
+  // SINGLE SOURCE OF TRUTH:
+  // Menu yang tampil berasal HANYA dari `enabledMenus` (yang sudah
+  // di-set dari tenant.metadata.userMenus[userId] ATAU enabledMenus tenant).
+  // Tidak ada penambahan menu dari hardcode role di sini.
+  // ============================================================
+  if (role === "superadmin") {
+    // Superadmin melihat semua menu yang memang untuk superadmin
+    return MENU_ITEMS.filter((m) => m.roles.includes("superadmin"));
   }
 
-  // Jika bukan superadmin dan tenant memiliki konfigurasi menu khusus di metadata
-  if (role !== "superadmin" && Array.isArray(enabledMenus) && enabledMenus.length > 0) {
-    items = items.filter((m) => {
-      // Menu default selalu ada
-      if (m.key === "overview" || m.key === "settings") return true;
-      return enabledMenus.includes(m.key);
-    });
+  // Non-superadmin: hanya tampilkan menu yang ADA di enabledMenus
+  // (sumber tunggal dari database via sidebar), dipersempit ke menu yang
+  // memang tersedia untuk role-nya sebagai keamanan lapis kedua.
+  const roleAllowed = MENU_ITEMS.filter((m) => m.roles.includes(role));
+
+  if (!Array.isArray(enabledMenus) || enabledMenus.length === 0) {
+    // Tidak ada konfigurasi menu -> hanya menu wajib (Dashboard & Pengaturan)
+    return roleAllowed.filter(
+      (m) => m.key === "overview" || m.key === "settings",
+    );
   }
 
-  return items;
+  return roleAllowed.filter((m) => enabledMenus.includes(m.key));
 }
 
 export function canAccess(role: Role, view: ViewKey, enabledMenus?: string[], userContext?: { email?: string; name?: string; tenantId?: string | null }): boolean {

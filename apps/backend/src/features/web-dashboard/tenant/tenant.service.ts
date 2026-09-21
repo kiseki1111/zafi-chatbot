@@ -778,22 +778,24 @@ export class TenantService {
       },
     });
 
-    // Simpan menu spesifik untuk user ini di metadata tenant jika diberikan
-    if (Array.isArray(data.allowedMenus)) {
-      const existingMeta = (tenant.metadata as any) || {};
-      const userMenus = existingMeta.userMenus || {};
-      userMenus[newUser.id] = data.allowedMenus;
+    // Simpan menu spesifik untuk user ini di metadata tenant.
+    // JADIKAN SINGLE SOURCE OF TRUTH: selalu tulis userMenus[userId],
+    // gunakan allowedMenus jika diberikan, jika tidak fallback ke enabledMenus tenant.
+    const existingMeta = (tenant.metadata as any) || {};
+    const userMenus = existingMeta.userMenus || {};
+    userMenus[newUser.id] = Array.isArray(data.allowedMenus)
+      ? data.allowedMenus
+      : existingMeta.enabledMenus || [];
 
-      await this.prisma.tenant.update({
-        where: { id: tenantId },
-        data: {
-          metadata: {
-            ...existingMeta,
-            userMenus,
-          },
+    await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: {
+        metadata: {
+          ...existingMeta,
+          userMenus,
         },
-      });
-    }
+      },
+    });
 
     return newUser;
   }
