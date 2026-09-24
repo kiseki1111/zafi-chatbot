@@ -16,6 +16,9 @@ services:
     restart: unless-stopped
     environment:
       WHATSAPP_HOOK_URL: http://backend:3030/api/waha/webhook
+      WHATSAPP_API_KEY: ZafitechDunia12345#
+      WHATSAPP_SWAGGER_USERNAME: admin
+      WHATSAPP_SWAGGER_PASSWORD: adminpassword123
     volumes:
       - waha_sessions:/.waha/sessions
 
@@ -32,6 +35,9 @@ services:
       DATABASE_URL: postgresql://${DATABASE_USER:-postgres}:${DATABASE_PASSWORD:-secret_password}@postgres:5432/${DATABASE_NAME:-rbac_api_db}?schema=public
       PORT: 3030
       NODE_TLS_REJECT_UNAUTHORIZED: 0
+      WAHA_API_URL: http://waha:3000
+      WAHA_API_KEY: ZafitechDunia12345#
+      WHATSAPP_API_KEY: ZafitechDunia12345#
     volumes:
       - ./uploads:/app/uploads
     ports:
