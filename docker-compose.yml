@@ -1,49 +1,55 @@
 services:
-  backend:
-    image: ghcr.io/sisfoku/iqbal-backend:${IMAGE_TAG:-latest}
-    container_name: iqbal-backend
-    env_file:
-      - .env
+  postgres:
+    image: pgvector/pgvector:pg15
+    container_name: rbac-postgres
     restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DATABASE_USER:-postgres}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-secret_password}
+      POSTGRES_DB: ${DATABASE_NAME:-rbac_api_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
+  waha:
+    image: devlikeapro/waha:latest
+    container_name: waha-core
+    restart: unless-stopped
+    environment:
+      WHATSAPP_HOOK_URL: http://backend:3030/api/waha/webhook
+    volumes:
+      - waha_sessions:/.waha/sessions
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: iqbal-backend
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - waha
+    environment:
+      DATABASE_URL: postgresql://${DATABASE_USER:-postgres}:${DATABASE_PASSWORD:-secret_password}@postgres:5432/${DATABASE_NAME:-rbac_api_db}?schema=public
+      PORT: 3030
+      NODE_TLS_REJECT_UNAUTHORIZED: 0
+    volumes:
+      - ./uploads:/app/uploads
     ports:
       - "3030:3030"
 
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
-
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-      - "openrouter.ai:104.18.2.115"
-      - "api.openai.com:162.159.140.245"
-
-    environment:
-      - NODE_TLS_REJECT_UNAUTHORIZED=0
-
-    volumes:
-      - ./uploads:/app/uploads
-
-    networks:
-      - backend
-
   web:
-    image: ghcr.io/sisfoku/iqbal-web:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile.web
     container_name: iqbal-web
     restart: unless-stopped
-
     depends_on:
       - backend
-
     environment:
       BACKEND_URL: http://backend:3030
-
     ports:
       - "3001:3001"
 
-    networks:
-      - backend
-
-networks:
-  backend:
-    external: true
+volumes:
+  postgres_data:
+  waha_sessions:
