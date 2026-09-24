@@ -23,10 +23,10 @@ jobs:
         include:
           - name: backend
             dockerfile: Dockerfile.backend
-            image: ghcr.io/sisfoku/iqbal-backend
+            image: ghcr.io/kiseki1111/zafi-backend
           - name: web
             dockerfile: Dockerfile.web
-            image: ghcr.io/sisfoku/iqbal-web
+            image: ghcr.io/kiseki1111/zafi-web
   
     steps:
       - uses: actions/checkout@v4
