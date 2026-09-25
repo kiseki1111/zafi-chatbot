@@ -53,6 +53,7 @@ services:
       - backend
     environment:
       PORT: 3001
+      HOSTNAME: "0.0.0.0"
       BACKEND_URL: http://backend:3030
     ports:
       - "3001:3001"
