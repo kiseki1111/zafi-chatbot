@@ -18,7 +18,7 @@ export class ImageParser {
       : undefined;
 
     this.openai = new OpenAI({
-      apiKey,
+      apiKey: apiKey || 'dummy-key-placeholder',
       baseURL,
     });
   }
