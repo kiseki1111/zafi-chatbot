@@ -4,15 +4,12 @@ import * as bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('=== SEEDING 3 AKUN UTAMA SISTEM ===\n');
+  console.log('=== SEEDING SEMUA AKUN UTAMA SISTEM ===\n');
 
-  // Password default untuk testing
   const defaultPassword = 'Password@123';
   const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 
-  // -------------------------------------------------------------
-  // 1. Akun Superadmin (Master Platform - Kelola Klien & Fitur Khusus)
-  // -------------------------------------------------------------
+  // 1. Akun Superadmin
   const superadmin = await prisma.user.upsert({
     where: { email: 'superadmin@propertiku.id' },
     update: {
@@ -27,12 +24,10 @@ async function main() {
       role: 'superadmin',
     },
   });
-  console.log('✓ 1. Akun Superadmin siap:');
+  console.log('✓ 1. Akun Superadmin:');
   console.log(`     Email: superadmin@propertiku.id | Password: ${defaultPassword} | Role: superadmin\n`);
 
-  // -------------------------------------------------------------
-  // 2. Akun Zafi (Developer Properti / Siteplan Plansite)
-  // -------------------------------------------------------------
+  // 2. Akun Zafi Property
   let zafiTenant = await prisma.tenant.findFirst({
     where: { name: 'Zafi Properti Land' },
   });
@@ -47,19 +42,7 @@ async function main() {
         metadata: {
           enabledMenus: ['overview', 'chatbot', 'crm', 'availability', 'knowledge', 'followup', 'settings'],
           businessType: 'properti',
-          featuresNote: 'Menggunakan visualisasi siteplan kaveling unit rumah',
-        },
-      },
-    });
-  } else {
-    await prisma.tenant.update({
-      where: { id: zafiTenant.id },
-      data: {
-        category: 'properti',
-        metadata: {
-          enabledMenus: ['overview', 'chatbot', 'crm', 'availability', 'knowledge', 'followup', 'settings'],
-          businessType: 'properti',
-          featuresNote: 'Menggunakan visualisasi siteplan kaveling unit rumah',
+          featuresNote: 'Visualisasi siteplan kaveling unit rumah',
         },
       },
     });
@@ -81,30 +64,17 @@ async function main() {
       tenantId: zafiTenant.id,
     },
   });
-  // Pastikan sesi WhatsApp Zafi terhubung ke tenant Zafi
-  await prisma.whatsappInstance.upsert({
-    where: { instanceName: 'zafi' },
-    update: { tenantId: zafiTenant.id },
-    create: { instanceName: 'zafi', tenantId: zafiTenant.id, status: 'STOPPED' },
-  });
+
   await prisma.whatsappInstance.upsert({
     where: { instanceName: 'zafi-cs' },
     update: { tenantId: zafiTenant.id },
     create: { instanceName: 'zafi-cs', tenantId: zafiTenant.id, status: 'STOPPED' },
   });
-  await prisma.whatsappInstance.upsert({
-    where: { instanceName: 'Zafi-CS' },
-    update: { tenantId: zafiTenant.id },
-    create: { instanceName: 'Zafi-CS', tenantId: zafiTenant.id, status: 'STOPPED' },
-  });
 
-  console.log('✓ 2. Akun Zafi (Properti & Siteplan) siap:');
-  console.log(`     Email: zafi@properti.com | Password: ${defaultPassword} | Role: manager`);
-  console.log(`     Tenant: ${zafiTenant.name} (Menus: Plansite, CRM, Bot WA, Knowledge, Settings)\n`);
+  console.log('✓ 2. Akun Zafi Property:');
+  console.log(`     Email: zafi@properti.com | Password: ${defaultPassword} | Tenant ID: ${zafiTenant.id}\n`);
 
-  // -------------------------------------------------------------
-  // 3. Akun Nusantara Bus (PO Bus & Reservasi Denah 17 Seat)
-  // -------------------------------------------------------------
+  // 3. Akun Nusantara Bus
   let busTenant = await prisma.tenant.findFirst({
     where: { name: 'PO Nusantara Bus Transport' },
   });
@@ -116,18 +86,6 @@ async function main() {
         phone: '6281234567890',
         address: 'Terminal Bus Terpadu Jakarta Timur',
         agentName: 'Nusantara Bus CS',
-        metadata: {
-          enabledMenus: ['overview', 'chatbot', 'crm', 'bus_layout', 'settings'],
-          businessType: 'transport',
-          featuresNote: 'Denah kursi 17 seats microbus eksekutif & reservasi tiket',
-        },
-      },
-    });
-  } else {
-    await prisma.tenant.update({
-      where: { id: busTenant.id },
-      data: {
-        category: 'transport',
         metadata: {
           enabledMenus: ['overview', 'chatbot', 'crm', 'bus_layout', 'settings'],
           businessType: 'transport',
@@ -153,16 +111,62 @@ async function main() {
       tenantId: busTenant.id,
     },
   });
-  // Pastikan sesi WhatsApp Bus terhubung ke tenant Bus
+
   await prisma.whatsappInstance.upsert({
     where: { instanceName: 'nusantara-bus' },
     update: { tenantId: busTenant.id },
     create: { instanceName: 'nusantara-bus', tenantId: busTenant.id, status: 'STOPPED' },
   });
 
-  console.log('✓ 3. Akun Nusantara Bus (Armada & Denah Kursi) siap:');
-  console.log(`     Email: manager@nusantarabus.com | Password: ${defaultPassword} | Role: manager`);
-  console.log(`     Tenant: ${busTenant.name} (Menus: Denah Kursi Bus, CRM, Bot WA, Settings)\n`);
+  console.log('✓ 3. Akun Nusantara Bus:');
+  console.log(`     Email: manager@nusantarabus.com | Password: ${defaultPassword} | Tenant ID: ${busTenant.id}\n`);
+
+  // 4. Akun Rindang Property
+  let rindangTenant = await prisma.tenant.findFirst({
+    where: { name: 'Rindang Property' },
+  });
+  if (!rindangTenant) {
+    rindangTenant = await prisma.tenant.create({
+      data: {
+        name: 'Rindang Property',
+        category: 'properti',
+        phone: '6289876543210',
+        address: 'Jl. Rindang Asri No. 12, Jawa Barat',
+        agentName: 'Rindang AI Properti',
+        metadata: {
+          enabledMenus: ['overview', 'chatbot', 'crm', 'availability', 'knowledge', 'followup', 'settings'],
+          businessType: 'properti',
+          featuresNote: 'Visualisasi siteplan perumahan Rindang',
+        },
+      },
+    });
+  }
+
+  const rindangUser = await prisma.user.upsert({
+    where: { email: 'rindang@gmail.com' },
+    update: {
+      name: 'Rindang Property Manager',
+      role: 'manager',
+      password: hashedPassword,
+      tenantId: rindangTenant.id,
+    },
+    create: {
+      name: 'Rindang Property Manager',
+      email: 'rindang@gmail.com',
+      password: hashedPassword,
+      role: 'manager',
+      tenantId: rindangTenant.id,
+    },
+  });
+
+  await prisma.whatsappInstance.upsert({
+    where: { instanceName: 'rindang-cs' },
+    update: { tenantId: rindangTenant.id },
+    create: { instanceName: 'rindang-cs', tenantId: rindangTenant.id, status: 'STOPPED' },
+  });
+
+  console.log('✓ 4. Akun Rindang Property:');
+  console.log(`     Email: rindang@gmail.com | Password: ${defaultPassword} | Tenant ID: ${rindangTenant.id}\n`);
 
   console.log('==================================================');
   console.log('SEEDING SELESAI!');
