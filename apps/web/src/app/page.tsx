@@ -2,19 +2,20 @@
 
 export const dynamic = "force-dynamic";
 
-import { useEffect, Suspense } from "react";
-import { useAuthStore } from "@/lib/auth-store";
+import dynamic from "next/dynamic";
+import { useEffect } from "react";
 import { useAppStore } from "@/lib/app-store";
-import { LoginForm } from "@/components/auth/login-form";
-import { RegisterForm } from "@/components/auth/register-form";
-import { ForgotPasswordForm } from "@/components/auth/forgot-password-form";
-import { DashboardShell } from "@/components/dashboard/dashboard-shell";
+import { useAuthStore } from "@/lib/auth-store";
+
+const LoginForm = dynamic(() => import("@/components/auth/login-form").then(m => ({ default: m.LoginForm })), { ssr: false });
+const RegisterForm = dynamic(() => import("@/components/auth/register-form").then(m => ({ default: m.RegisterForm })), { ssr: false });
+const ForgotPasswordForm = dynamic(() => import("@/components/auth/forgot-password-form").then(m => ({ default: m.ForgotPasswordForm })), { ssr: false });
+const DashboardShell = dynamic(() => import("@/components/dashboard/dashboard-shell").then(m => ({ default: m.DashboardShell })), { ssr: false });
 
 export default function Home() {
   const { isAuthenticated, authView } = useAuthStore();
   const { theme } = useAppStore();
 
-  // Apply theme class
   useEffect(() => {
     const root = document.documentElement;
     if (theme === "dark") root.classList.add("dark");
@@ -27,9 +28,5 @@ export default function Home() {
     return <LoginForm />;
   }
 
-  return (
-    <Suspense fallback={<div>Loading dashboard...</div>}>
-      <DashboardShell />
-    </Suspense>
-  );
+  return <DashboardShell />;
 }
