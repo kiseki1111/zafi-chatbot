@@ -5,7 +5,10 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-
+  experimental: {
+    // ponytail: disables static prerender globally, fixes useContext SSR crash
+    missingSuspenseWithCSRBailout: false,
+  },
   reactStrictMode: false,
   async rewrites() {
     const backendUrl = process.env.BACKEND_URL || "http://127.0.0.1:3005";
