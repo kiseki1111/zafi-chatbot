@@ -19,6 +19,8 @@ services:
       WHATSAPP_API_KEY: ZafitechDunia12345#
       WHATSAPP_SWAGGER_USERNAME: admin
       WHATSAPP_SWAGGER_PASSWORD: adminpassword123
+    ports:
+      - "3000:3000"
     volumes:
       - waha_sessions:/.waha/sessions
 
