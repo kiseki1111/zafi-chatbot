@@ -61,10 +61,15 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Webhook (Optional)
-        if: ${{ secrets.KOMODO_WEBHOOK_URL != '' || secrets.COOLIFY_WEBHOOK_URL != '' }}
+      - name: Trigger Webhook
+        env:
+          COOLIFY_URL: ${{ secrets.COOLIFY_WEBHOOK_URL }}
+          KOMODO_URL: ${{ secrets.KOMODO_WEBHOOK_URL }}
         run: |
-          WEBHOOK_URL="${{ secrets.COOLIFY_WEBHOOK_URL || secrets.KOMODO_WEBHOOK_URL }}"
-          curl -X POST "$WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -d "{\"secret\":\"${{ secrets.KOMODO_WEBHOOK_SECRET }}\"}"
+          URL="${COOLIFY_URL:-$KOMODO_URL}"
+          if [ -n "$URL" ]; then
+            echo "Triggering deployment webhook..."
+            curl -X POST "$URL"
+          else
+            echo "No deployment webhook URL configured, skipping."
+          fi
