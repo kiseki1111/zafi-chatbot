@@ -24,6 +24,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV BACKEND_URL=http://backend:3030
 ENV NEXT_PRIVATE_STANDALONE=1
 
+ARG CACHEBUST=1
 COPY . .
 
 RUN npm run build -w nextjs_tailwind_shadcn_ts
