@@ -25,9 +25,7 @@ services:
       - waha_sessions:/.waha/sessions
 
   backend:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
+    image: ghcr.io/kiseki1111/zafi-backend:latest
     container_name: iqbal-backend
     restart: unless-stopped
     depends_on:
@@ -46,9 +44,7 @@ services:
       - "3030:3030"
 
   web:
-    build:
-      context: .
-      dockerfile: Dockerfile.web
+    image: ghcr.io/kiseki1111/zafi-web:latest
     container_name: iqbal-web
     restart: unless-stopped
     depends_on:
