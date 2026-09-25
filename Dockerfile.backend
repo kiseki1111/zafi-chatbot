@@ -4,19 +4,23 @@ FROM node:22-alpine AS deps
 
 WORKDIR /workspace
 
+ENV NODE_ENV=development
+
 COPY package*.json ./
 COPY apps/backend/package.json apps/backend/package.json
 COPY apps/web/package.json apps/web/package.json
 
 # Workaround for npm optional dependency bug in monorepo
 RUN --mount=type=cache,target=/root/.npm \
-    rm -f package-lock.json && npm install --legacy-peer-deps
+    rm -f package-lock.json && npm install --include=dev --legacy-peer-deps
 
 #########################################################
 
 FROM deps AS builder
 
 WORKDIR /workspace
+
+ENV NODE_ENV=development
 
 COPY . .
 
