@@ -57,20 +57,3 @@ jobs:
           no-cache: ${{ matrix.name == 'web' }}
           cache-from: ${{ matrix.name == 'web' && '' || 'type=gha' }}
           cache-to: ${{ matrix.name == 'web' && '' || 'type=gha,mode=max' }}
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Trigger Webhook
-        env:
-          COOLIFY_URL: ${{ secrets.COOLIFY_WEBHOOK_URL || 'https://coolify.zafii.tech/api/v1/deploy?uuid=hqcqrwm4b5gxzbvrwrw3g73m&force=false' }}
-          KOMODO_URL: ${{ secrets.KOMODO_WEBHOOK_URL }}
-        run: |
-          URL="${COOLIFY_URL:-$KOMODO_URL}"
-          if [ -n "$URL" ]; then
-            echo "Triggering deployment webhook..."
-            curl -f -sSL "$URL"
-          else
-            echo "No deployment webhook URL configured, skipping."
-          fi
