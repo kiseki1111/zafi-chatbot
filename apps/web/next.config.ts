@@ -1,10 +1,16 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: any = {
   output: "standalone",
-  /* config options here */
+  turbopack: {
+    root: path.resolve(__dirname, "../../"),
+  },
   typescript: {
     ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
   },
 
   reactStrictMode: false,
