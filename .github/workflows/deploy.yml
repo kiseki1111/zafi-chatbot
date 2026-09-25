@@ -64,13 +64,13 @@ jobs:
     steps:
       - name: Trigger Webhook
         env:
-          COOLIFY_URL: ${{ secrets.COOLIFY_WEBHOOK_URL }}
+          COOLIFY_URL: ${{ secrets.COOLIFY_WEBHOOK_URL || 'https://coolify.zafii.tech/api/v1/deploy?uuid=hqcqrwm4b5gxzbvrwrw3g73m&force=false' }}
           KOMODO_URL: ${{ secrets.KOMODO_WEBHOOK_URL }}
         run: |
           URL="${COOLIFY_URL:-$KOMODO_URL}"
           if [ -n "$URL" ]; then
             echo "Triggering deployment webhook..."
-            curl -X POST "$URL"
+            curl -f -sSL "$URL"
           else
             echo "No deployment webhook URL configured, skipping."
           fi
