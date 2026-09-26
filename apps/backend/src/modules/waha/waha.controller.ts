@@ -327,6 +327,81 @@ export class WahaController {
         );
     }
 
+    // Handle call.received: Tolak otomatis dan catat pesan notifikasi
+    if (payload?.event === 'call.received' || payload?.event === 'call') {
+      const callData = payload.payload;
+      const caller = callData?.from || callData?.caller || callData?.participant;
+      const callId = callData?.id;
+      const sessionName = payload.session;
+
+      this.logger.log(`[PANGGILAN MASUK] Dari: ${caller} | Call ID: ${callId}`);
+
+      if (sessionName && callId) {
+        this.wahaService.rejectCall(sessionName, callId).catch(() => null);
+      }
+
+      if (caller && sessionName) {
+        const cleanCaller = caller.replace(/@(c\.us|s\.whatsapp\.net)$/i, '').replace(/^\+/, '');
+        try {
+          let contact = await this.prisma.contact.findFirst({
+            where: {
+              OR: [
+                { phone: cleanCaller },
+                { phone: `+${cleanCaller}` },
+                { phone: caller },
+              ],
+            },
+          });
+          if (!contact) {
+            contact = await this.prisma.contact.create({
+              data: {
+                phone: cleanCaller,
+                name: `+${cleanCaller}`,
+              },
+            });
+          }
+
+          const conversation = await this.prisma.conversation.upsert({
+            where: {
+              instanceName_contactId: {
+                instanceName: sessionName,
+                contactId: contact.id,
+              },
+            },
+            update: {
+              lastMessageAt: new Date(),
+              unreadCount: { increment: 1 },
+            },
+            create: {
+              instanceName: sessionName,
+              contactId: contact.id,
+              unreadCount: 1,
+            },
+          });
+
+          await this.prisma.message.create({
+            data: {
+              conversationId: conversation.id,
+              senderType: 'system',
+              messageType: 'CALL',
+              content: '📞 Panggilan WhatsApp masuk (Otomatis ditolak)',
+              status: 'RECEIVED',
+              metadata: { callData },
+            },
+          });
+
+          // Kirim balasan otomatis ke penelpon
+          await this.wahaService.sendMessage(
+            sessionName,
+            caller,
+            'Halo, mohon maaf nomor ini beroperasi secara otomatis dan tidak dapat menerima panggilan suara/video. Silakan tinggalkan pesan melalui chat teks, kami akan segera merespons. Terima kasih! 🙏',
+          ).catch(() => null);
+        } catch (e) {
+          this.logger.warn(`Failed to process call.received: ${e.message}`);
+        }
+      }
+    }
+
     // Process message events: Gunakan HANYA event 'message' agar tidak dobel dengan 'message.any'
     if (payload?.event === 'message') {
       const message = payload.payload;
@@ -519,6 +594,7 @@ export class WahaController {
         }
 
         const sender = message.from;
+        const msgId = message.id?._serialized || message.id || 'unknown';
         const mediaUrls = message.media?.url
           ? [message.media.url]
           : message.mediaUrl
@@ -526,6 +602,12 @@ export class WahaController {
           : [];
 
         if (text || mediaUrls.length > 0 || message.hasMedia) {
+          // Tandai pesan sudah dibaca (Blue Ticks) & munculkan status mengetik di WhatsApp
+          if (sessionName && sender) {
+            this.wahaService.sendSeen(sessionName, sender, msgId).catch(() => null);
+            this.wahaService.sendTypingPresence(sessionName, sender).catch(() => null);
+          }
+
           // Helper: simpan pesan balasan bot ke database agar tampil di monitoring
           const saveBotReply = async (
             replyText: string,

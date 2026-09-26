@@ -59,15 +59,99 @@ export class WahaService {
   // Sends the 'typing...' status to WA
   async sendTypingPresence(sessionName: string, chatId: string): Promise<void> {
     try {
+      const targetChat = chatId.includes('@') ? chatId : `${chatId}@c.us`;
       await axios.post(
         `${this.baseUrl}/api/startTyping`,
-        { session: sessionName, chatId: chatId },
-        { headers: this.getHeaders() },
+        { session: sessionName, chatId: targetChat },
+        { headers: this.getHeaders(), timeout: 5000 },
       );
     } catch (error) {
       this.logger.debug(
         `Could not send typing presence for ${sessionName}. Error: ${error.message}`,
       );
+    }
+  }
+
+  // Stops typing presence
+  async stopTypingPresence(sessionName: string, chatId: string): Promise<void> {
+    try {
+      const targetChat = chatId.includes('@') ? chatId : `${chatId}@c.us`;
+      await axios.post(
+        `${this.baseUrl}/api/stopTyping`,
+        { session: sessionName, chatId: targetChat },
+        { headers: this.getHeaders(), timeout: 5000 },
+      );
+    } catch (error) {
+      this.logger.debug(
+        `Could not stop typing presence for ${sessionName}. Error: ${error.message}`,
+      );
+    }
+  }
+
+  // Sends blue ticks / read receipt (sendSeen)
+  async sendSeen(sessionName: string, chatId: string, messageId?: string): Promise<void> {
+    try {
+      const targetChat = chatId.includes('@') ? chatId : `${chatId}@c.us`;
+      const payload: any = { session: sessionName, chatId: targetChat };
+      if (messageId) payload.messageId = messageId;
+      await axios.post(
+        `${this.baseUrl}/api/sendSeen`,
+        payload,
+        { headers: this.getHeaders(), timeout: 5000 },
+      );
+    } catch (error) {
+      this.logger.debug(
+        `Could not send seen receipt for ${sessionName}. Error: ${error.message}`,
+      );
+    }
+  }
+
+  // Mengambil foto profil kontak dari WAHA
+  async getContactProfilePicture(sessionName: string, contactPhone: string): Promise<string | null> {
+    try {
+      const cleanPhone = contactPhone.replace(/@(c\.us|s\.whatsapp\.net)$/i, '').replace(/^\+/, '');
+      const contactId = `${cleanPhone}@c.us`;
+      const response = await axios.get(`${this.baseUrl}/api/contacts/profile-picture`, {
+        params: { session: sessionName, contactId },
+        headers: this.getHeaders(),
+        timeout: 8000,
+      });
+      return response.data?.url || response.data?.profilePicture || null;
+    } catch (error) {
+      this.logger.debug(`Could not get profile picture for ${contactPhone}: ${error.message}`);
+      return null;
+    }
+  }
+
+  // Mengambil status bio / about kontak dari WAHA
+  async getContactAbout(sessionName: string, contactPhone: string): Promise<string | null> {
+    try {
+      const cleanPhone = contactPhone.replace(/@(c\.us|s\.whatsapp\.net)$/i, '').replace(/^\+/, '');
+      const contactId = `${cleanPhone}@c.us`;
+      const response = await axios.get(`${this.baseUrl}/api/contacts/about`, {
+        params: { session: sessionName, contactId },
+        headers: this.getHeaders(),
+        timeout: 8000,
+      });
+      return response.data?.about || response.data?.status || null;
+    } catch (error) {
+      this.logger.debug(`Could not get about for ${contactPhone}: ${error.message}`);
+      return null;
+    }
+  }
+
+  // Menolak panggilan masuk secara otomatis
+  async rejectCall(sessionName: string, callId: string): Promise<any> {
+    try {
+      const response = await axios.post(
+        `${this.baseUrl}/api/${sessionName}/calls/reject`,
+        { callId },
+        { headers: this.getHeaders(), timeout: 5000 },
+      );
+      return response.data;
+    } catch (error) {
+      this.logger.debug(`Could not reject call ${callId}: ${error.message}`);
+      return null;
     }
   }
 
@@ -122,7 +206,7 @@ export class WahaService {
         payload.config = {
           webhooks: formattedUrls.map((url) => ({
             url: url,
-            events: ['message', 'message.any', 'session.status'],
+            events: ['message', 'message.any', 'session.status', 'call.received', 'presence.update'],
             retries: {
               delaySeconds: 10,
               attempts: 15,

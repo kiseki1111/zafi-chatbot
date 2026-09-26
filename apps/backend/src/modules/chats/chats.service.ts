@@ -116,6 +116,36 @@ export class ChatsService {
     return messages.reverse(); // Return oldest first for chat UI
   }
 
+  async getContactProfile(conversationId: string) {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: { contact: true },
+    });
+    if (!conversation) throw new NotFoundException('Conversation not found');
+
+    const phone = conversation.contact?.phone || '';
+    const instanceName = conversation.instanceName;
+
+    let pfpUrl: string | null = null;
+    let bio: string | null = null;
+
+    if (instanceName && phone) {
+      [pfpUrl, bio] = await Promise.all([
+        this.wahaService.getContactProfilePicture(instanceName, phone).catch(() => null),
+        this.wahaService.getContactAbout(instanceName, phone).catch(() => null),
+      ]);
+    }
+
+    return {
+      contactId: conversation.contact?.id,
+      name: conversation.contact?.name,
+      phone: phone,
+      profilePicture: pfpUrl,
+      about: bio,
+      instanceName,
+    };
+  }
+
   // Admin takeover: set mode=human, assign agent
   async takeoverConversation(conversationId: string, agentId?: string) {
     const conversation = await this.prisma.conversation.findUnique({

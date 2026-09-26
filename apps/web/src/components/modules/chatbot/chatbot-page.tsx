@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -182,7 +182,20 @@ function MessageBubble({
   contactName: string;
 }) {
   const isOut = msg.direction === "out";
+  const isCall = msg.messageType === "call";
   const isImage = msg.messageType === "image" && msg.mediaUrl;
+
+  if (isCall) {
+    return (
+      <div className="flex w-full justify-center my-2">
+        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-[11px] font-medium shadow-xs">
+          <Phone className="h-3 w-3 text-amber-600" />
+          <span>{msg.text || "Panggilan WhatsApp masuk (Otomatis ditolak)"}</span>
+          <span className="text-[9px] opacity-70 ml-1">{msg.timestamp}</span>
+        </div>
+      </div>
+    );
+  }
   return (
     <div
       className={cn(
@@ -280,6 +293,9 @@ function ContactListItem({
     >
       <div className="relative shrink-0">
         <Avatar className="h-10 w-10">
+          {contact.avatar && (
+            <AvatarImage src={contact.avatar} alt={contact.name} className="object-cover" />
+          )}
           <AvatarFallback className="text-xs bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300">
             {initials(contact.name)}
           </AvatarFallback>
@@ -587,6 +603,10 @@ export function ChatbotPage() {
     imageUrl: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&auto=format&fit=crop",
   });
 
+  // Contact detail modal state
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+
   // Quota & Billing state (MAU & AI Response)
   const [quota, setQuota] = useState<{
     plan: string;
@@ -678,7 +698,17 @@ export function ChatbotPage() {
           lastMessageAt: new Date(c.lastMessageAt).toLocaleTimeString(),
         };
       });
-      setContacts(mappedContacts);
+      setContacts((prev) => {
+        const prevMap = new Map(prev.map((item) => [item.id, item]));
+        return mappedContacts.map((mc) => {
+          const existing = prevMap.get(mc.id);
+          return {
+            ...mc,
+            avatar: existing?.avatar || mc.avatar,
+            about: existing?.about || mc.about,
+          };
+        });
+      });
       if (!activeId && mappedContacts.length > 0) {
          setActiveId(mappedContacts.find((c) => c.unread > 0)?.id ?? mappedContacts[0].id);
       }
@@ -743,8 +773,34 @@ export function ChatbotPage() {
     fetchConversations();
   }, [sessionId]);
 
+  // Fetch active contact profile picture & bio
+  const fetchActiveProfile = async (convId: string) => {
+    if (!convId) return;
+    setLoadingProfile(true);
+    try {
+      const res = await fetch(`/api/v1/chats/${convId}/profile`);
+      if (res.ok) {
+        const profile = await res.json();
+        const pfp = profile?.profilePicture || null;
+        const about = profile?.about || null;
+        setContacts((prev) =>
+          prev.map((c) =>
+            c.id === convId ? { ...c, avatar: pfp || c.avatar, about: about || c.about } : c
+          )
+        );
+      }
+    } catch (e) {
+      console.debug("Could not fetch contact profile:", e);
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
+
   useEffect(() => {
-    if (activeId) fetchMessages(true);
+    if (activeId) {
+      fetchMessages(true);
+      fetchActiveProfile(activeId);
+    }
   }, [activeId]);
 
   // Polling for real-time updates (every 5 seconds)
@@ -1232,34 +1288,49 @@ export function ChatbotPage() {
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <Avatar className="h-7 w-7 shrink-0">
-                  <AvatarFallback className="text-[11px] bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300">
-                    {initials(activeContact.name)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <p className="font-semibold text-xs truncate leading-tight">
-                      {activeContact.name}
-                    </p>
-                    <Badge
-                      variant="secondary"
-                      className={cn(
-                        "text-[9px] px-1 py-0 h-4",
-                        STAGE_META[activeContact.stage].badge,
-                      )}
-                    >
-                      {STAGE_META[activeContact.stage].label}
-                    </Badge>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground leading-tight">
-                    +{activeContact.phone}
-                    {activeContact.tags.length > 0 && (
-                      <span className="ml-1">
-                        · {activeContact.tags.join(", ")}
-                      </span>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setProfileModalOpen(true)}
+                  className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer hover:opacity-85 transition-opacity"
+                  title="Klik untuk melihat detail profil WhatsApp"
+                >
+                  <Avatar className="h-7 w-7 shrink-0 ring-1 ring-border">
+                    {activeContact.avatar && (
+                      <AvatarImage src={activeContact.avatar} alt={activeContact.name} className="object-cover" />
                     )}
-                  </p>
+                    <AvatarFallback className="text-[11px] bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300">
+                      {initials(activeContact.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="font-semibold text-xs truncate leading-tight">
+                        {activeContact.name}
+                      </p>
+                      <Badge
+                        variant="secondary"
+                        className={cn(
+                          "text-[9px] px-1 py-0 h-4",
+                          STAGE_META[activeContact.stage].badge,
+                        )}
+                      >
+                        {STAGE_META[activeContact.stage].label}
+                      </Badge>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground leading-tight truncate">
+                      +{activeContact.phone}
+                      {activeContact.about ? (
+                        <span className="ml-1 text-emerald-600 dark:text-emerald-400 font-normal">
+                          · &ldquo;{activeContact.about}&rdquo;
+                        </span>
+                      ) : activeContact.tags.length > 0 ? (
+                        <span className="ml-1">
+                          · {activeContact.tags.join(", ")}
+                        </span>
+                      ) : null}
+                    </p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <Button
@@ -1657,6 +1728,102 @@ export function ChatbotPage() {
               {wahaTestLoading ? "Mengirim..." : "Tembak WAHA API"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ----- Contact Profile & Bio Modal ----- */}
+      <Dialog open={profileModalOpen} onOpenChange={setProfileModalOpen}>
+        <DialogContent className="max-w-sm sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center font-bold text-base">
+              Detail Profil WhatsApp
+            </DialogTitle>
+          </DialogHeader>
+
+          {activeContact && (
+            <div className="flex flex-col items-center text-center space-y-4 py-2">
+              <div className="relative">
+                <Avatar className="h-24 w-24 border-2 border-emerald-500 shadow-md">
+                  {activeContact.avatar && (
+                    <AvatarImage
+                      src={activeContact.avatar}
+                      alt={activeContact.name}
+                      className="object-cover"
+                    />
+                  )}
+                  <AvatarFallback className="text-2xl font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
+                    {initials(activeContact.name)}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
+
+              <div className="space-y-1 w-full">
+                <h3 className="font-semibold text-base text-foreground">
+                  {activeContact.name}
+                </h3>
+                <p className="text-xs text-muted-foreground font-mono">
+                  +{activeContact.phone}
+                </p>
+                <div className="flex justify-center gap-1.5 pt-1">
+                  <Badge
+                    variant="secondary"
+                    className={cn("text-[10px]", STAGE_META[activeContact.stage].badge)}
+                  >
+                    {STAGE_META[activeContact.stage].label}
+                  </Badge>
+                  {activeContact.mode === "human" ? (
+                    <Badge variant="outline" className="text-[10px] text-blue-600 border-blue-300">
+                      Ditangani Admin
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-300">
+                      Bot Aktif
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
+              {/* Bio / About Box */}
+              <div className="w-full bg-muted/40 rounded-xl p-3 border text-left space-y-1">
+                <Label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  Info / Bio WhatsApp
+                </Label>
+                {loadingProfile ? (
+                  <p className="text-xs text-muted-foreground italic">Mengambil info dari WhatsApp...</p>
+                ) : activeContact.about ? (
+                  <p className="text-xs text-foreground font-medium whitespace-pre-wrap">
+                    &ldquo;{activeContact.about}&rdquo;
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic">
+                    (Tidak ada status bio / disembunyikan privasi kontak)
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-2 w-full pt-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 text-xs"
+                  onClick={() => {
+                    navigator.clipboard.writeText(`+${activeContact.phone}`);
+                  }}
+                >
+                  Salin Nomor
+                </Button>
+                <Button
+                  size="sm"
+                  className="flex-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                  onClick={() => {
+                    window.open(`https://wa.me/${activeContact.phone}`, "_blank");
+                  }}
+                >
+                  Buka di WhatsApp
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

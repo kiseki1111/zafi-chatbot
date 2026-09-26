@@ -40,6 +40,12 @@ export class ChatsController {
     return this.chatsService.getMessages(id, skip, take);
   }
 
+  // Get Contact Profile (Avatar, About/Bio) from WAHA
+  @Get(':id/profile')
+  getContactProfile(@Param('id') id: string) {
+    return this.chatsService.getContactProfile(id);
+  }
+
   // Admin takeover conversation
   @Post(':id/takeover')
   @UseGuards(JwtAuthGuard)

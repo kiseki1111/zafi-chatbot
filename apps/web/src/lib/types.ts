@@ -80,6 +80,7 @@ export interface Contact {
   name: string;
   phone: string;
   avatar?: string;
+  about?: string;
   tags: string[];
   lastMessage?: string;
   lastMessageAt?: string;
