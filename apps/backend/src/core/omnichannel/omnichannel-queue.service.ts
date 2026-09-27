@@ -7,7 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 export class OmnichannelQueueService {
   private readonly logger = new Logger(OmnichannelQueueService.name);
 
-  // Buffer debounce per nomor (10 detik untuk menghindari deteksi bot WA)
+  // Buffer debounce per nomor pelanggan per chatbot (10 detik untuk menggabungkan chat beruntun & hindari deteksi bot)
   private messageBuffer = new Map<
     string,
     {
@@ -17,9 +17,11 @@ export class OmnichannelQueueService {
     }
   >();
 
-  // Antrean FIFO terisolasi per nomor telepon (nomor berbeda diproses paralel tanpa saling tunggu)
-  private userQueues = new Map<string, IncomingMessage[]>();
-  private activeProcessingUsers = new Set<string>();
+  // Antrean FIFO per chatbot instance:
+  // 1 chatbot membalas chat pelanggan 1 per 1 (serial/FIFO).
+  // Chatbot yang berbeda berjalan paralel tanpa saling memblokir.
+  private botQueues = new Map<string, IncomingMessage[]>();
+  private activeProcessingBots = new Set<string>();
 
   constructor(
     private readonly csService: CsService,
@@ -27,52 +29,53 @@ export class OmnichannelQueueService {
   ) {}
 
   enqueue(message: IncomingMessage) {
-    const { senderId, text, provider } = message;
-    const bufferKey = `${provider}_${senderId}`;
+    const { senderId, text, sessionName, provider } = message;
+    const botKey = sessionName || provider || 'default_bot';
+    const customerKey = `${botKey}_${senderId}`;
 
-    const existing = this.messageBuffer.get(bufferKey);
+    const existing = this.messageBuffer.get(customerKey);
     if (existing) {
       clearTimeout(existing.timer);
       existing.texts.push(text);
-      existing.message.text = existing.texts.join('\n'); // Gabungkan pesan beruntun
+      existing.message.text = existing.texts.join('\n'); // Gabungkan chat beruntun
 
       existing.timer = setTimeout(() => {
-        this.flushBuffer(bufferKey);
-      }, 10000); // 10 detik debounce anti-bot detection
+        this.flushCustomerBuffer(customerKey, botKey);
+      }, 10000); // 10 detik debounce
     } else {
-      this.messageBuffer.set(bufferKey, {
+      this.messageBuffer.set(customerKey, {
         texts: [text],
         message: { ...message },
         timer: setTimeout(() => {
-          this.flushBuffer(bufferKey);
+          this.flushCustomerBuffer(customerKey, botKey);
         }, 10000),
       });
     }
   }
 
-  private flushBuffer(bufferKey: string) {
-    const buffered = this.messageBuffer.get(bufferKey);
+  private flushCustomerBuffer(customerKey: string, botKey: string) {
+    const buffered = this.messageBuffer.get(customerKey);
     if (!buffered) return;
 
-    this.messageBuffer.delete(bufferKey);
+    this.messageBuffer.delete(customerKey);
 
-    // Masukkan ke antrean khusus nomor ini
-    if (!this.userQueues.has(bufferKey)) {
-      this.userQueues.set(bufferKey, []);
+    // Masukkan ke antrean FIFO milik chatbot ini
+    if (!this.botQueues.has(botKey)) {
+      this.botQueues.set(botKey, []);
     }
-    this.userQueues.get(bufferKey)!.push(buffered.message);
+    this.botQueues.get(botKey)!.push(buffered.message);
 
-    // Jalankan pemrosesan untuk nomor ini secara independen
-    this.processUserQueue(bufferKey);
+    // Jalankan pemrosesan untuk chatbot ini
+    this.processBotQueue(botKey);
   }
 
-  private async processUserQueue(bufferKey: string) {
-    // Jika nomor ini sedang dalam proses inferensi AI, biarkan loop yang berjalan menyelesaikannya secara FIFO
-    if (this.activeProcessingUsers.has(bufferKey)) return;
-    this.activeProcessingUsers.add(bufferKey);
+  private async processBotQueue(botKey: string) {
+    // Jika chatbot ini sedang sibuk membalas pesan, pesan berikutnya menunggu giliran secara FIFO
+    if (this.activeProcessingBots.has(botKey)) return;
+    this.activeProcessingBots.add(botKey);
 
     try {
-      const queue = this.userQueues.get(bufferKey);
+      const queue = this.botQueues.get(botKey);
 
       while (queue && queue.length > 0) {
         const task = queue.shift();
@@ -80,10 +83,10 @@ export class OmnichannelQueueService {
 
         try {
           this.logger.log(
-            `[Omnichannel] Memproses pesan dari ${task.senderId} via ${task.provider} (Queue independen per nomor)`,
+            `[Omnichannel] Chatbot "${botKey}" memproses pesan dari ${task.senderId} (Sisa antrean bot ini: ${queue.length})`,
           );
 
-          // Cek apakah conversation sedang dalam mode human (admin takeover)
+          // Cek apakah percakapan sedang dalam mode human (admin takeover)
           const cleanSenderPhone = task.senderId.replace(
             /@c\.us|@s\.whatsapp\.net/g,
             '',
@@ -104,16 +107,16 @@ export class OmnichannelQueueService {
 
           if (conversation?.mode === 'human') {
             this.logger.log(
-              `[Omnichannel] Conversation ${task.senderId} (ID: ${conversation.id}) dalam mode human, AI 100% BYPASS/SKIP.`,
+              `[Omnichannel] Chat ${task.senderId} (ID: ${conversation.id}) dalam mode human, AI 100% BYPASS/SKIP.`,
             );
-            continue; // Pesan sudah tersimpan di webhook, skip reply AI
+            continue; // Skip reply AI
           }
 
           const response = await this.csService.handleMessage(task);
           await task.replyCallback(response);
         } catch (error) {
           this.logger.error(
-            `[Omnichannel] Error memproses pesan dari ${task.senderId}: ${error.message}`,
+            `[Omnichannel] Error memproses chat ${task.senderId} pada bot ${botKey}: ${error.message}`,
           );
           try {
             await task.replyCallback({
@@ -124,8 +127,10 @@ export class OmnichannelQueueService {
         }
       }
     } finally {
-      this.userQueues.delete(bufferKey);
-      this.activeProcessingUsers.delete(bufferKey);
+      this.activeProcessingBots.delete(botKey);
+      if (this.botQueues.get(botKey)?.length === 0) {
+        this.botQueues.delete(botKey);
+      }
     }
   }
 }

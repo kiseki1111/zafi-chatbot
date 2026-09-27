@@ -315,8 +315,8 @@ export function CrmPage() {
                       <tr
                         key={c.id}
                         onClick={() => setSelectedContact(c)}
-                        className={`cursor-pointer transition-colors ${
-                          isSelected ? "bg-emerald-50 dark:bg-emerald-950/30" : "hover:bg-muted/40"
+                        className={`cursor-pointer transition-all duration-150 ease-out select-none ${
+                          isSelected ? "bg-emerald-50 dark:bg-emerald-950/30" : "hover:bg-muted/60"
                         }`}
                       >
                         <td className="p-3">

@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Menu, Bell, Sun, Moon, LogOut, User as UserIcon,
-  Settings as SettingsIcon, ChevronDown, AlertTriangle, QrCode, X,
+  Settings as SettingsIcon, ChevronDown, AlertTriangle, QrCode, X, Download,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { useAppStore } from "@/lib/app-store";
@@ -26,6 +26,25 @@ export function Topbar() {
   const { view, setView, sidebarOpen, setSidebarOpen, theme, toggleTheme } = useAppStore();
   const [offlineInstances, setOfflineInstances] = useState<{ instanceName: string; status: string }[]>([]);
   const [dismissed, setDismissed] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === "accepted") {
+      setInstallPrompt(null);
+    }
+  };
 
   useEffect(() => {
     if (!user?.tenantId) return;
@@ -101,6 +120,20 @@ export function Topbar() {
         </Sheet>
 
         {/* Title removed per user request */}
+
+        {/* PWA Install Button when available */}
+        {installPrompt && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleInstallClick}
+            className="h-8 text-xs gap-1.5 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 shrink-0 shadow-xs"
+          >
+            <Download className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Install Aplikasi</span>
+            <span className="sm:hidden">Install</span>
+          </Button>
+        )}
 
         {/* Theme toggle */}
         <Button variant="ghost" size="icon" className="h-9 w-9 ml-auto md:ml-0" onClick={toggleTheme} title="Ganti tema">

@@ -132,12 +132,14 @@ export function DashboardShell() {
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {user.tenantId && <Topbar />}
+        <Topbar />
         <main className={cn(
           "flex-1 overflow-x-hidden",
           view === "chatbot" ? "p-1 lg:p-1.5 overflow-hidden flex flex-col" : "p-4 lg:p-6 overflow-y-auto"
         )}>
-          {render()}
+          <div key={view} className={cn("animate-in fade-in-50 slide-in-from-bottom-2 duration-200 ease-out", view === "chatbot" && "flex-1 flex flex-col min-h-0")}>
+            {render()}
+          </div>
         </main>
       </div>
     </div>

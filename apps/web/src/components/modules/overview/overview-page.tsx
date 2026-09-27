@@ -223,11 +223,11 @@ export function OverviewPage() {
 
       {/* KPI Cards */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="group hover:-translate-y-1 hover:shadow-md hover:border-emerald-500/40 transition-all duration-200 ease-out cursor-default">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardDescription className="text-xs">Sesi WhatsApp Aktif</CardDescription>
-              <div className="h-8 w-8 rounded-lg grid place-items-center bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600">
+              <div className="h-8 w-8 rounded-lg grid place-items-center bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 group-hover:scale-110 transition-transform duration-200 ease-out">
                 <Phone className="h-4 w-4" />
               </div>
             </div>
@@ -247,11 +247,11 @@ export function OverviewPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="group hover:-translate-y-1 hover:shadow-md hover:border-teal-500/40 transition-all duration-200 ease-out cursor-default">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardDescription className="text-xs">Knowledge Base</CardDescription>
-              <div className="h-8 w-8 rounded-lg grid place-items-center bg-teal-100 dark:bg-teal-950/40 text-teal-600">
+              <div className="h-8 w-8 rounded-lg grid place-items-center bg-teal-100 dark:bg-teal-950/40 text-teal-600 group-hover:scale-110 transition-transform duration-200 ease-out">
                 <Brain className="h-4 w-4" />
               </div>
             </div>
@@ -262,11 +262,11 @@ export function OverviewPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="group hover:-translate-y-1 hover:shadow-md hover:border-amber-500/40 transition-all duration-200 ease-out cursor-default">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardDescription className="text-xs">Total Pesan</CardDescription>
-              <div className="h-8 w-8 rounded-lg grid place-items-center bg-amber-100 dark:bg-amber-950/40 text-amber-600">
+              <div className="h-8 w-8 rounded-lg grid place-items-center bg-amber-100 dark:bg-amber-950/40 text-amber-600 group-hover:scale-110 transition-transform duration-200 ease-out">
                 <MessageCircle className="h-4 w-4" />
               </div>
             </div>
@@ -279,11 +279,11 @@ export function OverviewPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="group hover:-translate-y-1 hover:shadow-md hover:border-violet-500/40 transition-all duration-200 ease-out cursor-default">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardDescription className="text-xs">AI Success Rate</CardDescription>
-              <div className="h-8 w-8 rounded-lg grid place-items-center bg-violet-100 dark:bg-violet-950/40 text-violet-600">
+              <div className="h-8 w-8 rounded-lg grid place-items-center bg-violet-100 dark:bg-violet-950/40 text-violet-600 group-hover:scale-110 transition-transform duration-200 ease-out">
                 <Zap className="h-4 w-4" />
               </div>
             </div>

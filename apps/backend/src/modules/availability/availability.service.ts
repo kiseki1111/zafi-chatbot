@@ -76,7 +76,14 @@ export class AvailabilityService {
       description?: string;
       siteplanImage?: string;
     },
+    tenantId?: string,
   ) {
+    if (tenantId) {
+      const group = await this.prisma.resourceGroup.findFirst({
+        where: { id, tenantId },
+      });
+      if (!group) throw new NotFoundException('Group not found or access denied');
+    }
     return this.prisma.resourceGroup.update({
       where: { id },
       data,
@@ -84,7 +91,13 @@ export class AvailabilityService {
     });
   }
 
-  async deleteGroup(id: string) {
+  async deleteGroup(id: string, tenantId?: string) {
+    if (tenantId) {
+      const group = await this.prisma.resourceGroup.findFirst({
+        where: { id, tenantId },
+      });
+      if (!group) throw new NotFoundException('Group not found or access denied');
+    }
     return this.prisma.resourceGroup.delete({
       where: { id },
     });
@@ -103,7 +116,14 @@ export class AvailabilityService {
       customerName?: string;
       customerPhone?: string;
     },
+    tenantId?: string,
   ) {
+    if (tenantId) {
+      const group = await this.prisma.resourceGroup.findFirst({
+        where: { id: groupId, tenantId },
+      });
+      if (!group) throw new NotFoundException('Group not found or access denied');
+    }
     return this.prisma.resourceItem.create({
       data: {
         groupId,
@@ -127,7 +147,14 @@ export class AvailabilityService {
     endNumber: number,
     houseType?: string,
     price?: number,
+    tenantId?: string,
   ) {
+    if (tenantId) {
+      const group = await this.prisma.resourceGroup.findFirst({
+        where: { id: groupId, tenantId },
+      });
+      if (!group) throw new NotFoundException('Group not found or access denied');
+    }
     const itemsData: any[] = [];
     for (let i = startNumber; i <= endNumber; i++) {
       const code = `${prefix}${i < 10 ? '0' + i : i}`;
@@ -160,14 +187,27 @@ export class AvailabilityService {
       customerName?: string;
       customerPhone?: string;
     },
+    tenantId?: string,
   ) {
+    if (tenantId) {
+      const item = await this.prisma.resourceItem.findFirst({
+        where: { id, group: { tenantId } },
+      });
+      if (!item) throw new NotFoundException('Item not found or access denied');
+    }
     return this.prisma.resourceItem.update({
       where: { id },
       data,
     });
   }
 
-  async deleteItem(id: string) {
+  async deleteItem(id: string, tenantId?: string) {
+    if (tenantId) {
+      const item = await this.prisma.resourceItem.findFirst({
+        where: { id, group: { tenantId } },
+      });
+      if (!item) throw new NotFoundException('Item not found or access denied');
+    }
     return this.prisma.resourceItem.delete({
       where: { id },
     });

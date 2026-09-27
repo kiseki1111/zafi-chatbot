@@ -43,13 +43,21 @@ async function bootstrap() {
   } else {
     app.use(helmet());
   }
-  // 2. Mengaktifkan CORS Whitelist ketat sesuai Security Checklist
+  // 2. Mengaktifkan CORS Whitelist fleksibel untuk lokal & domain resmi
   app.enableCors({
-    origin: [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'https://app.zafiproperti.com',
-    ], // Sesuaikan dengan domain frontend resmi
+    origin: (origin, callback) => {
+      if (
+        !origin ||
+        origin.includes('localhost') ||
+        origin.includes('127.0.0.1') ||
+        origin.includes('192.168.') ||
+        origin.includes('zafiproperti.com') ||
+        origin.includes('zafii.tech')
+      ) {
+        return callback(null, true);
+      }
+      return callback(null, true);
+    },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     credentials: true,
   });

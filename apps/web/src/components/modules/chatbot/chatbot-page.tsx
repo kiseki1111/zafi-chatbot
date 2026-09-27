@@ -285,10 +285,10 @@ function ContactListItem({
         }
       }}
       className={cn(
-        "w-full grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-lg p-2.5 text-left transition-colors cursor-pointer select-none outline-none focus-visible:ring-2 focus-visible:ring-emerald-500",
+        "w-full grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-lg p-2.5 text-left transition-all duration-150 ease-out cursor-pointer select-none outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 active:scale-[0.98]",
         active
-          ? "bg-emerald-50 dark:bg-emerald-950/30 ring-1 ring-emerald-200 dark:ring-emerald-800"
-          : "hover:bg-muted/60",
+          ? "bg-emerald-50 dark:bg-emerald-950/30 ring-1 ring-emerald-200 dark:ring-emerald-800 shadow-xs"
+          : "hover:bg-muted/60 hover:translate-x-0.5",
       )}
     >
       <div className="relative shrink-0">

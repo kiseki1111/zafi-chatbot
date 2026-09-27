@@ -33,13 +33,15 @@ services:
     depends_on:
       - postgres
       - waha
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgresql://${DATABASE_USER:-postgres}:${DATABASE_PASSWORD:-secret_password}@postgres:5432/${DATABASE_NAME:-rbac_api_db}?schema=public
       PORT: 3030
       NODE_TLS_REJECT_UNAUTHORIZED: 0
       WAHA_API_URL: http://waha:3000
-      WAHA_API_KEY: ZafitechDunia12345#
-      WHATSAPP_API_KEY: ZafitechDunia12345#
+      WAHA_API_KEY: ${WAHA_API_KEY:-ZafitechDunia12345#}
+      WHATSAPP_API_KEY: ${WHATSAPP_API_KEY:-ZafitechDunia12345#}
     volumes:
       - ./uploads:/app/uploads
     ports:
@@ -51,6 +53,8 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
+    env_file:
+      - .env
     environment:
       PORT: 3001
       HOSTNAME: "0.0.0.0"

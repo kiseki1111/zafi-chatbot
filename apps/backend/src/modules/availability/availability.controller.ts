@@ -27,13 +27,19 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 const execAsync = promisify(exec);
 
+@UseGuards(JwtAuthGuard)
 @Controller('api/v1/availability')
 export class AvailabilityController {
   private readonly logger = new Logger(AvailabilityController.name);
 
   constructor(private readonly availabilityService: AvailabilityService) {}
 
-  @Public()
+  private resolveTenantId(req: any): string | undefined {
+    const isSuper = req?.user?.roles?.includes('superadmin');
+    if (isSuper) return undefined;
+    return req?.user?.tenantId;
+  }
+
   @Post('upload')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -170,6 +176,7 @@ export class AvailabilityController {
   @Put('groups/:id')
   async updateGroup(
     @Param('id') id: string,
+    @Req() req: any,
     @Body()
     body: {
       name?: string;
@@ -178,17 +185,20 @@ export class AvailabilityController {
       siteplanImage?: string;
     },
   ) {
-    return this.availabilityService.updateGroup(id, body);
+    const tenantId = this.resolveTenantId(req);
+    return this.availabilityService.updateGroup(id, body, tenantId);
   }
 
   @Delete('groups/:id')
-  async deleteGroup(@Param('id') id: string) {
-    return this.availabilityService.deleteGroup(id);
+  async deleteGroup(@Param('id') id: string, @Req() req: any) {
+    const tenantId = this.resolveTenantId(req);
+    return this.availabilityService.deleteGroup(id, tenantId);
   }
 
   @Post('groups/:groupId/items')
   async addItem(
     @Param('groupId') groupId: string,
+    @Req() req: any,
     @Body()
     body: {
       code: string;
@@ -202,12 +212,14 @@ export class AvailabilityController {
       customerPhone?: string;
     },
   ) {
-    return this.availabilityService.addItem(groupId, body);
+    const tenantId = this.resolveTenantId(req);
+    return this.availabilityService.addItem(groupId, body, tenantId);
   }
 
   @Post('groups/:groupId/batch-items')
   async addBatchItems(
     @Param('groupId') groupId: string,
+    @Req() req: any,
     @Body()
     body: {
       prefix: string;
@@ -217,6 +229,7 @@ export class AvailabilityController {
       price?: number;
     },
   ) {
+    const tenantId = this.resolveTenantId(req);
     return this.availabilityService.addBatchItems(
       groupId,
       body.prefix,
@@ -224,12 +237,14 @@ export class AvailabilityController {
       body.endNumber,
       body.houseType,
       body.price,
+      tenantId,
     );
   }
 
   @Put('items/:id')
   async updateItem(
     @Param('id') id: string,
+    @Req() req: any,
     @Body()
     body: {
       code?: string;
@@ -243,11 +258,13 @@ export class AvailabilityController {
       customerPhone?: string;
     },
   ) {
-    return this.availabilityService.updateItem(id, body);
+    const tenantId = this.resolveTenantId(req);
+    return this.availabilityService.updateItem(id, body, tenantId);
   }
 
   @Delete('items/:id')
-  async deleteItem(@Param('id') id: string) {
-    return this.availabilityService.deleteItem(id);
+  async deleteItem(@Param('id') id: string, @Req() req: any) {
+    const tenantId = this.resolveTenantId(req);
+    return this.availabilityService.deleteItem(id, tenantId);
   }
 }
