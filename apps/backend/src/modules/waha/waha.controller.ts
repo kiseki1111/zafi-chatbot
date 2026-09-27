@@ -12,6 +12,8 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
+import * as fs from 'fs';
+import * as path from 'path';
 import { WahaService } from './waha.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { OmnichannelQueueService } from '../../core/omnichannel/omnichannel-queue.service';
@@ -85,6 +87,11 @@ export class WahaController {
     }
   }
 
+  @Post('instances/:id/restart')
+  async restartInstance(@Param('id') id: string) {
+    return this.wahaService.restartSession(id);
+  }
+
   @Post('instances/:id/stop')
   async stopInstance(@Param('id') id: string) {
     return this.wahaService.stopSession(id);
@@ -155,12 +162,23 @@ export class WahaController {
 
     // Jika ada tenantId, filter hanya instance untuk tenant tersebut
     // Jika tidak ada, kembalikan semua instance (untuk backward compatibility / superadmin)
-    const where = tenantId ? { tenantId } : {};
+    // Kecualikan sesi uji coba native video agar tidak mencemari daftar chatbot operasional
+    const where: any = tenantId ? { tenantId } : {};
+    where.NOT = [
+      { instanceName: { startsWith: 'test-video' } },
+      { instanceName: { startsWith: 'silent' } },
+    ];
 
     return this.prisma.whatsappInstance.findMany({
       where,
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  @SkipThrottle()
+  @Get('instances/:id/status')
+  async getInstanceStatus(@Param('id') id: string) {
+    return this.wahaService.getSession(id);
   }
 
   @SkipThrottle()
@@ -172,9 +190,9 @@ export class WahaController {
       res.setHeader('Content-Disposition', `inline; filename="qr-${id}.png"`);
       return res.send(Buffer.from(qrBuffer));
     } catch (error) {
-      this.logger.error(`Failed to get QR code for ${id}: ${error.message}`);
-      return res.status(error.response?.status || 500).send({
-        error: error.message,
+      this.logger.warn(`QR code for ${id} not available: ${error.message}`);
+      return res.status(error.response?.status || 404).send({
+        error: error.message || 'QR Code belum tersedia atau server WAHA offline.',
       });
     }
   }
@@ -201,11 +219,66 @@ export class WahaController {
     }
   }
 
+  @Post('instances/:id/send-test-video')
+  async sendTestVideo(
+    @Param('id') id: string,
+    @Body() body: { targetPhone?: string; videoUrl?: string; caption?: string },
+  ) {
+    const targetPhone = body.targetPhone || '6281257456315';
+    const cleanPhone = targetPhone.replace(/@(c\.us|s\.whatsapp\.net)$/i, '').replace(/^\+/, '').replace(/\D/g, '');
+    const chatId = `${cleanPhone}@c.us`;
+
+    // Ambil video dari uploads disk lokal jika ada, atau gunakan URL video publik mp4 yang valid
+    let videoUrl = body.videoUrl;
+    if (!videoUrl) {
+      const uploadsDir = path.join(process.cwd(), 'uploads');
+      let foundLocalFile: string | null = null;
+      if (fs.existsSync(uploadsDir)) {
+        const files = fs.readdirSync(uploadsDir);
+        const vidFile = files.find(f => /\.(mp4|mov|webm)$/i.test(f));
+        if (vidFile) {
+          foundLocalFile = `/uploads/${vidFile}`;
+        }
+      }
+      // Jika di disk lokal VPS/local ada video, pakai file lokal tersebut. Jika tidak, pakai sample video H.264 MP4 yang ringan
+      videoUrl = foundLocalFile || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
+    }
+
+    const caption = body.caption || '🎬 Uji Coba Pengiriman Video Native Player WAHA (No-Bot Response Test)';
+
+    this.logger.log(`[TEST-NATIVE-VIDEO] Mengirim video native ke ${chatId} via sesi ${id}. URL=${videoUrl}`);
+
+    try {
+      const result = await this.wahaService.sendVideo(id, chatId, videoUrl, caption);
+      return {
+        success: true,
+        message: `Video native berhasil dikirim ke +${cleanPhone}`,
+        target: chatId,
+        videoUrl,
+        result,
+      };
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || error.response?.data?.error || error.message;
+      this.logger.error(`[TEST-NATIVE-VIDEO] Gagal: ${errorMsg}`);
+      return {
+        success: false,
+        message: `Gagal mengirim video native: ${errorMsg}`,
+        error: error.response?.data || error.message,
+      };
+    }
+  }
+
   @Post('instances/:id/send')
   async sendMessage(
     @Param('id') id: string,
     @Body() body: { chatId: string; text: string },
   ) {
+    if (id.toLowerCase().includes('test-video') || id.toLowerCase().includes('silent')) {
+      throw new ForbiddenException(
+        'Sesi pengujian video native dikonfigurasi silent dan hanya diizinkan untuk uji coba video native.',
+      );
+    }
+
     const contact = await this.prisma.contact.upsert({
       where: { phone: body.chatId },
       update: {},
@@ -281,6 +354,32 @@ export class WahaController {
     if (!payload) return { status: 'ignored' };
 
     const sessionName = payload.session || 'unknown';
+
+    // Perlindungan Sesi Pengujian Pribadi (Silent/No-Bot/Test-Video):
+    // Jangan tanggapi pesan apa pun, jangan simpan kontak/chat pribadi, jangan tolak panggilan pribadi.
+    // Hanya perbarui status koneksi jika ada perubahan status sesi.
+    const isTestSession =
+      sessionName.toLowerCase().includes('test-video') ||
+      sessionName.toLowerCase().includes('silent') ||
+      sessionName.toLowerCase().includes('manual-only');
+
+    if (isTestSession) {
+      if (payload?.event === 'session.status') {
+        const status = payload.payload?.status;
+        if (sessionName && status) {
+          const updateData: any = { status };
+          if (status === 'WORKING') updateData.lastConnectedAt = new Date();
+          await this.prisma.whatsappInstance
+            .upsert({
+              where: { instanceName: sessionName },
+              update: updateData,
+              create: { instanceName: sessionName, status },
+            })
+            .catch(() => null);
+        }
+      }
+      return { status: 'ignored_test_session' };
+    }
 
     // Defensively create WhatsappInstance if it doesn't exist to prevent foreign key errors
     if (sessionName !== 'unknown') {
@@ -569,7 +668,14 @@ export class WahaController {
       }
 
       // Send to Omnichannel Queue (Hanya event 'message' dari nomor pribadi agar AI tidak membalas grup/status)
+      // Abaikan jika sesi adalah sesi pengujian khusus (misal: test-video / silent / no-bot)
+      const isTestSession =
+        sessionName.toLowerCase().includes('test-video') ||
+        sessionName.toLowerCase().includes('silent') ||
+        sessionName.toLowerCase().includes('manual-only');
+
       if (
+        !isTestSession &&
         payload.event === 'message' &&
         !message.fromMe &&
         isDirectPhone(message.from)

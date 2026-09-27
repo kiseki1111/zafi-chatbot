@@ -72,8 +72,10 @@ zafi-project-*.json
 # Database Backups
 database-backup.json
 database-backup.sql
-# Secrets and Backups
-*.json
+# Secrets and Backups (exclude node_modules so library json files are preserved)
+/*.json
+/apps/backend/*.json
+/apps/web/*.json
 *.sql
 !package.json
 !package-lock.json

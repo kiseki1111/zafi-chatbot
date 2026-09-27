@@ -15,14 +15,25 @@ export class WahaService {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
   ) {
-    this.baseUrl = this.configService.get<string>(
-      'WAHA_API_URL',
-      'http://103.30.195.145:3060',
-    );
-    this.apiKey = this.configService.get<string>(
-      'WAHA_API_KEY',
-      'ZafitechDunia12345#',
-    );
+    let url =
+      this.configService.get<string>('WAHA_API_URL') ||
+      process.env.WAHA_API_URL ||
+      'https://waha.zafii.tech';
+    if (url.includes('waha:3000') && process.platform === 'win32') {
+      url = url.replace('waha:3000', '127.0.0.1:3000');
+    }
+    this.baseUrl = url.replace(/\/$/, '');
+    let key =
+      this.configService.get<string>('WAHA_API_KEY') ||
+      this.configService.get<string>('WHATSAPP_API_KEY') ||
+      process.env.WAHA_API_KEY ||
+      process.env.WHATSAPP_API_KEY ||
+      'ZafitechDunia12345#';
+    if (key === 'ZafitechDunia12345') {
+      key = 'ZafitechDunia12345#';
+    }
+    this.apiKey = key;
+    this.logger.log(`[WAHA SERVICE] Initialized with baseUrl: ${this.baseUrl} and apiKey: ${this.apiKey}`);
   }
 
   private getHeaders() {
@@ -307,6 +318,31 @@ export class WahaService {
     } catch (error) {
       this.logger.error(`Failed to get sessions: ${error.message}`);
       throw error;
+    }
+  }
+
+  async getSession(sessionName: string): Promise<any> {
+    try {
+      const response = await axios.get(
+        `${this.baseUrl}/api/sessions/${sessionName}`,
+        { headers: this.getHeaders(), timeout: 2000 },
+      );
+      return response.data;
+    } catch {
+      try {
+        const db = await this.prisma.whatsappInstance.findUnique({
+          where: { instanceName: sessionName },
+        });
+        return db
+          ? {
+              name: db.instanceName,
+              status: db.status,
+              me: { id: db.phone, pushName: db.profileName },
+            }
+          : { name: sessionName, status: 'STOPPED' };
+      } catch {
+        return { name: sessionName, status: 'STOPPED' };
+      }
     }
   }
 
@@ -840,9 +876,11 @@ export class WahaService {
   }
 
   async getQrCode(sessionName: string): Promise<any> {
+    const url = `${this.baseUrl}/api/${sessionName}/auth/qr`;
+    this.logger.log(`[WAHA QR] Fetching QR: ${url} with apiKey: ${this.apiKey}`);
     try {
       const response = await axios.get(
-        `${this.baseUrl}/api/${sessionName}/auth/qr`,
+        url,
         {
           headers: { ...this.getHeaders(), Accept: 'image/png' },
           responseType: 'arraybuffer',
@@ -850,9 +888,12 @@ export class WahaService {
       );
       return response.data;
     } catch (error) {
+      this.logger.error(`[WAHA QR] First attempt failed: ${error.message} (status: ${error.response?.status})`);
       try {
+        const fallbackUrl = `${this.baseUrl}/api/sessions/${sessionName}/auth/qr`;
+        this.logger.log(`[WAHA QR] Trying fallback: ${fallbackUrl}`);
         const fallbackResponse = await axios.get(
-          `${this.baseUrl}/api/sessions/${sessionName}/auth/qr`,
+          fallbackUrl,
           {
             headers: { ...this.getHeaders(), Accept: 'image/png' },
             responseType: 'arraybuffer',
@@ -861,11 +902,24 @@ export class WahaService {
         return fallbackResponse.data;
       } catch (innerError) {
         this.logger.error(
-          `Failed to get QR code for session ${sessionName}`,
-          innerError.message,
+          `Failed to get QR code for session ${sessionName}: ${innerError.message} (status: ${innerError.response?.status})`,
         );
         throw innerError;
       }
+    }
+  }
+
+  async restartSession(sessionName: string): Promise<any> {
+    try {
+      const response = await axios.post(
+        `${this.baseUrl}/api/sessions/${sessionName}/restart`,
+        {},
+        { headers: this.getHeaders() },
+      );
+      return response.data;
+    } catch {
+      await this.stopSession(sessionName).catch(() => null);
+      return this.startSession(sessionName);
     }
   }
 

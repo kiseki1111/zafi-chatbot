@@ -11,7 +11,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   waha:
-    image: devlikeapro/waha:latest
+    image: devlikeapro/waha:chrome
     container_name: waha-core
     restart: unless-stopped
     environment:

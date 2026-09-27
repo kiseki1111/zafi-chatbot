@@ -594,15 +594,6 @@ export function ChatbotPage() {
     imageUrl: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&auto=format&fit=crop",
   });
 
-  // Mock incoming simulator modal state
-  const [isSimModalOpen, setIsSimModalOpen] = useState(false);
-  const [simForm, setSimForm] = useState({
-    phone: "628987654321",
-    name: "Calon Pembeli Properti",
-    text: "Halo admin, apakah unit ini masih tersedia?",
-    imageUrl: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&auto=format&fit=crop",
-  });
-
   // Contact detail modal state
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(false);
@@ -1050,28 +1041,6 @@ export function ChatbotPage() {
     }
   }
 
-  // Trigger Mock Customer Incoming Message (for offline/testing)
-  async function triggerSimCustomer() {
-    try {
-      await fetch('/api/v1/chats/mock-customer-incoming', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: simForm.phone,
-          name: simForm.name,
-          text: simForm.text,
-          imageUrl: simForm.imageUrl || undefined,
-          instanceName: sessionId || 'dev-session',
-        }),
-      });
-      setIsSimModalOpen(false);
-      await fetchConversations();
-      if (activeId) fetchMessages(true);
-    } catch (e) {
-      console.error("Gagal kirim simulasi pelanggan", e);
-    }
-  }
-
   // Trigger Real WAHA Send Test
   async function triggerRealWahaTest() {
     setWahaTestLoading(true);
@@ -1238,8 +1207,16 @@ export function ChatbotPage() {
           <ScrollArea className="flex-1 min-h-0">
             <div className="px-2 py-1 space-y-0.5">
               {filteredContacts.length === 0 ? (
-                <div className="text-center text-xs text-muted-foreground py-10">
-                  Tidak ada kontak cocok.
+                <div className="flex flex-col items-center justify-center text-center p-6 space-y-2.5">
+                  <div className="h-10 w-10 rounded-xl bg-muted/80 grid place-items-center text-muted-foreground">
+                    <MessageCircle className="h-5 w-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-foreground">Belum Ada Kontak</p>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed max-w-[190px]">
+                      Pesan masuk dari WhatsApp akan muncul otomatis di sini.
+                    </p>
+                  </div>
                 </div>
               ) : (
                 filteredContacts.map((c) => (
@@ -1579,64 +1556,6 @@ export function ChatbotPage() {
           {activeContact && infoPanel}
         </SheetContent>
       </Sheet>
-
-      {/* ----- Simulator Modal ----- */}
-      <Dialog open={isSimModalOpen} onOpenChange={setIsSimModalOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-indigo-600" />
-              Simulasi Pesan Customer (Testing)
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 text-xs">
-            <div>
-              <Label className="font-medium">Nomor WhatsApp Pengirim</Label>
-              <Input
-                value={simForm.phone}
-                onChange={(e) => setSimForm({ ...simForm, phone: e.target.value })}
-                className="h-8 mt-1 font-mono"
-              />
-            </div>
-            <div>
-              <Label className="font-medium">Nama Pengirim</Label>
-              <Input
-                value={simForm.name}
-                onChange={(e) => setSimForm({ ...simForm, name: e.target.value })}
-                className="h-8 mt-1"
-              />
-            </div>
-            <div>
-              <Label className="font-medium">Teks Pesan</Label>
-              <Input
-                value={simForm.text}
-                onChange={(e) => setSimForm({ ...simForm, text: e.target.value })}
-                className="h-8 mt-1"
-              />
-            </div>
-            <div>
-              <Label className="font-medium">URL Foto / Gambar (Opsional)</Label>
-              <Input
-                value={simForm.imageUrl}
-                onChange={(e) => setSimForm({ ...simForm, imageUrl: e.target.value })}
-                placeholder="https://..."
-                className="h-8 mt-1"
-              />
-              <p className="text-[10px] text-muted-foreground mt-1">
-                Kirim foto untuk mengetes fitur terima gambar dari customer di chat bubble.
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" size="sm" onClick={() => setIsSimModalOpen(false)}>
-              Batal
-            </Button>
-            <Button size="sm" onClick={triggerSimCustomer} className="bg-indigo-600 hover:bg-indigo-700 text-white">
-              Kirim Sebagai Pelanggan
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* ----- Real WAHA Tester Modal ----- */}
       <Dialog open={isWahaTestModalOpen} onOpenChange={setIsWahaTestModalOpen}>

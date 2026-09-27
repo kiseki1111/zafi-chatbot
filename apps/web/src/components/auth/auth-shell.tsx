@@ -45,7 +45,7 @@ export function AuthShell({
         </div>
 
         <p className="relative z-10 text-xs text-emerald-100/70">
-          © 2025 Chatbot Manager. Ditenagai oleh Waha WhatsApp API.
+          © {new Date().getFullYear()} Chatbot Manager. Ditenagai oleh Waha WhatsApp API.
         </p>
       </div>
 

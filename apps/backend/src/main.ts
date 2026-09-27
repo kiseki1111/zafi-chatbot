@@ -10,6 +10,10 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import helmet from 'helmet';
 
 async function bootstrap() {
+  if (!process.env.DATABASE_URL) {
+    process.env.DATABASE_URL =
+      'postgresql://postgres:secret_password@127.0.0.1:5432/rbac_api_db?schema=public';
+  }
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // Serve static assets from 'public' folder
@@ -63,10 +67,7 @@ async function bootstrap() {
   app.useGlobalInterceptors(new TransformInterceptor());
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  const port = process.env.PORT;
-  if (!port) {
-    throw new Error('PORT environment variable is not set!');
-  }
+  const port = process.env.PORT || 3030;
   await app.listen(port, '0.0.0.0');
 }
 bootstrap();

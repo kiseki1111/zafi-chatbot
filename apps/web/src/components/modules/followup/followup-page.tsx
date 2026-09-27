@@ -339,13 +339,27 @@ export function FollowupPage() {
             <CardDescription>Atur jadwal dan perilaku auto follow-up</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="enabled">Aktifkan Follow-Up</Label>
-              <Switch
-                id="enabled"
-                checked={config.isEnabled}
-                onCheckedChange={(v) => setConfig({ ...config, isEnabled: v })}
-              />
+            <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/20">
+              <div className="space-y-0.5">
+                <Label htmlFor="enabled" className="text-sm font-semibold">Aktifkan Follow-Up Otomatis</Label>
+                <p className="text-xs text-muted-foreground">Bot akan otomatis mengirim pesan follow-up sesuai jadwal.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant={config.isEnabled ? "default" : "secondary"}
+                  className={cn(
+                    "text-[10px] uppercase font-bold tracking-wider",
+                    config.isEnabled ? "bg-emerald-600 text-white" : "text-muted-foreground"
+                  )}
+                >
+                  {config.isEnabled ? "Aktif" : "Nonaktif"}
+                </Badge>
+                <Switch
+                  id="enabled"
+                  checked={config.isEnabled}
+                  onCheckedChange={(v) => setConfig({ ...config, isEnabled: v })}
+                />
+              </div>
             </div>
             <div className="space-y-4 pt-1">
               {/* Jadwal Waktu Eksekusi */}

@@ -614,13 +614,25 @@ export function BusLayoutView() {
                 )}
               </div>
             ) : (
-              <div className="h-full grid place-items-center text-center py-12 text-muted-foreground text-xs">
-                <div>
-                  <Armchair className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                  {isEditMode
-                    ? "Tarik kursi ke posisi presisi yang diinginkan."
-                    : "Klik salah satu kursi di denah untuk melihat atau mengubah status reservasi."}
+              <div className="h-full flex flex-col items-center justify-center text-center py-12 px-4 space-y-3">
+                <div className="h-14 w-14 rounded-2xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 border border-blue-200 dark:border-blue-800 grid place-items-center shadow-xs">
+                  <Armchair className="h-7 w-7" />
                 </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-bold text-foreground">
+                    {isEditMode ? "Mode Edit Denah Aktif" : "Pilih Nomor Kursi"}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed max-w-[220px]">
+                    {isEditMode
+                      ? "Geser atau tarik (drag & drop) kursi ke posisi kabin yang diinginkan."
+                      : "Klik salah satu kursi di denah sebelah kiri untuk melihat rincian tiket, nama penumpang, atau mengubah status pemesanan."}
+                  </p>
+                </div>
+                {!isEditMode && (
+                  <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">
+                    💡 Tips: Klik kursi hijau untuk booking
+                  </span>
+                )}
               </div>
             )}
           </CardContent>

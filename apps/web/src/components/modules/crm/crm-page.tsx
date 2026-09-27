@@ -254,7 +254,22 @@ export function CrmPage() {
             {loading ? (
               <div className="text-center text-xs text-muted-foreground py-12">Memuat data pelanggan...</div>
             ) : contacts.length === 0 ? (
-              <div className="text-center text-xs text-muted-foreground py-12">Belum ada data pelanggan yang tersimpan.</div>
+              <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+                <div className="h-16 w-16 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 grid place-items-center mb-4 text-emerald-600 shadow-sm">
+                  <Users className="h-8 w-8" />
+                </div>
+                <h4 className="text-sm font-semibold text-foreground">Belum Ada Data Pelanggan</h4>
+                <p className="text-xs text-muted-foreground max-w-sm mt-1 mb-5 leading-relaxed">
+                  Semua nomor WhatsApp yang menghubungi asisten bot Anda akan dicatat otomatis di sini. Anda juga dapat menambahkan kontak pelanggan baru secara manual.
+                </p>
+                <Button
+                  size="sm"
+                  onClick={() => setIsAddOpen(true)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5 shadow-sm"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Tambah Pelanggan Pertama
+                </Button>
+              </div>
             ) : (
               <table className="w-full text-left text-xs border-collapse">
                 <thead className="sticky top-0 bg-muted/50 border-b text-muted-foreground">

@@ -25,6 +25,7 @@ import { ContactsModule } from './modules/contacts/contacts.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: ['.env', 'apps/backend/.env'],
       load: [jwtConfig],
     }),
     ThrottlerModule.forRoot([

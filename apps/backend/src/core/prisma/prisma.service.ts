@@ -9,8 +9,16 @@ export class PrismaService
   implements OnModuleInit, OnModuleDestroy
 {
   constructor() {
+    let dbUrl =
+      process.env.DATABASE_URL ||
+      'postgresql://postgres:secret_password@127.0.0.1:5432/rbac_api_db?schema=public';
+    if (dbUrl.includes('@postgres:5432') && process.platform === 'win32') {
+      dbUrl = dbUrl.replace('@postgres:5432', '@127.0.0.1:5432');
+    }
+    process.env.DATABASE_URL = dbUrl;
+
     // Membangun kolam koneksi native ke PostgreSQL menggunakan Driver Adapter untuk Prisma 7.8
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    const pool = new Pool({ connectionString: dbUrl });
     const adapter = new PrismaPg(pool);
 
     // Menyuntikkan adapter ke dalam konfigurasi dasar PrismaClient

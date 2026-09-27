@@ -11,8 +11,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Bot, Save, Smartphone, ShieldCheck, Loader2, Plus, Trash2, QrCode, Palette, Wrench } from "lucide-react";
+import { Bot, Save, Smartphone, ShieldCheck, Loader2, Plus, Trash2, QrCode, Palette, Wrench, CheckCircle2, RefreshCw, LogOut, Lock } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
+import { cn } from "@/lib/utils";
 import { WarnaWebsiteTab } from "./color-tab";
 
 export function SettingsPage({ defaultTab = "bot" }: { defaultTab?: string }) {
@@ -183,10 +184,35 @@ function BotSettingsTab() {
             </div>
             <div className="space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="agentTone">Gaya Bahasa / Karakter Asisten</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="agentTone">Gaya Bahasa / Karakter Asisten</Label>
+                  <span className="text-[10px] text-muted-foreground">Pilih cepat:</span>
+                </div>
+                {/* Preset Chips Gaya Bahasa untuk Admin Awam */}
+                <div className="flex flex-wrap gap-1.5 pb-1">
+                  {[
+                    { label: "Sopan & Ramah", tone: "Sopan, ramah, hangat, menggunakan emotikon senyum dan bahasa Indonesia yang santun." },
+                    { label: "Kasual & Santai", tone: "Kasual, santai, asik diajak ngobrol, seperti teman akrab tapi tetap menghargai pembeli." },
+                    { label: "Formal Profesional", tone: "Formal, lugas, profesional, presisi, minim emotikon, cocok untuk institusi/korporat." },
+                  ].map((preset) => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => setSettings({ ...settings, agentTone: preset.tone })}
+                      className={cn(
+                        "text-[10px] px-2 py-0.5 rounded-full border transition-all",
+                        settings.agentTone === preset.tone
+                          ? "bg-emerald-50 border-emerald-500 text-emerald-700 font-medium dark:bg-emerald-950/40 dark:text-emerald-300"
+                          : "bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      + {preset.label}
+                    </button>
+                  ))}
+                </div>
                 <Textarea 
                   id="agentTone"
-                  className="min-h-[100px] text-sm" 
+                  className="min-h-[90px] text-sm" 
                   value={settings.agentTone} 
                   onChange={e => setSettings({...settings, agentTone: e.target.value})}
                 />
@@ -270,6 +296,164 @@ function KoneksiWATab() {
   const [isDeleteOpen, setIsDeleteOpen] = React.useState(false);
   const [nameToDelete, setNameToDelete] = React.useState<string | null>(null);
   const [isDeleteLoading, setIsDeleteLoading] = React.useState(false);
+
+  // Dedicated personal test session state
+  const TEST_SESSION_NAME = "test-video-native";
+  const [testSessionStatus, setTestSessionStatus] = React.useState<string>("STOPPED");
+  const [testSessionQr, setTestSessionQr] = React.useState<string | null>(null);
+  const [isTestSessionLoading, setIsTestSessionLoading] = React.useState(false);
+  const [isRefreshingQr, setIsRefreshingQr] = React.useState(false);
+  const [isPollingStatus, setIsPollingStatus] = React.useState(false);
+
+  // Test video dialog
+  const [isVideoModalOpen, setIsVideoModalOpen] = React.useState(false);
+  const [videoUrlInput, setVideoUrlInput] = React.useState("");
+  const [videoLoading, setVideoLoading] = React.useState(false);
+  const [videoResult, setVideoResult] = React.useState<any>(null);
+
+  const checkTestSessionStatus = React.useCallback(async () => {
+    try {
+      const res = await fetch(`/api/v1/waha/instances/${TEST_SESSION_NAME}/status`);
+      if (res.ok) {
+        const json = await res.json();
+        const data = json?.data || json;
+        const status = data?.status || "STOPPED";
+        setTestSessionStatus(status);
+        if (status === "WORKING") {
+          setTestSessionQr(null);
+        }
+        return status;
+      }
+    } catch {
+      // ignore
+    }
+    return "STOPPED";
+  }, []);
+
+  const fetchTestQr = async () => {
+    try {
+      const res = await fetch(`/api/v1/waha/instances/${TEST_SESSION_NAME}/qr?t=${Date.now()}`);
+      if (res.ok) {
+        const blob = await res.blob();
+        setTestSessionQr(URL.createObjectURL(blob));
+        return true;
+      }
+    } catch {
+      // ignore
+    }
+    return false;
+  };
+
+  const handleRefreshQr = async () => {
+    setIsRefreshingQr(true);
+    try {
+      toast.info("Membuat QR Code baru di WAHA...");
+      await fetch(`/api/v1/waha/instances/${TEST_SESSION_NAME}/restart`, { method: "POST" });
+      setTimeout(async () => {
+        const ok = await fetchTestQr();
+        if (ok) {
+          toast.success("QR Code baru berhasil dibuat!");
+        } else {
+          toast.info("Sedang menyiapkan QR, silakan klik refresh sekali lagi.");
+        }
+        setIsRefreshingQr(false);
+      }, 2500);
+    } catch (e: any) {
+      toast.error("Gagal refresh QR: " + e.message);
+      setIsRefreshingQr(false);
+    }
+  };
+
+  const handleStartPersonalWa = async () => {
+    setIsTestSessionLoading(true);
+    try {
+      await fetch('/api/v1/waha/instances', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: TEST_SESSION_NAME })
+      });
+      toast.info("Menyiapkan sesi login WhatsApp pribadi...");
+      setTimeout(async () => {
+        await fetchTestQr();
+        setIsTestSessionLoading(false);
+        setIsPollingStatus(true);
+      }, 1500);
+    } catch (e: any) {
+      toast.error("Gagal memulai sesi pengujian: " + e.message);
+      setIsTestSessionLoading(false);
+    }
+  };
+
+  const handleLogoutPersonalWa = async () => {
+    setIsTestSessionLoading(true);
+    try {
+      await fetch(`/api/v1/waha/instances/${TEST_SESSION_NAME}/logout`, { method: 'POST' });
+      setTestSessionStatus("STOPPED");
+      setTestSessionQr(null);
+      setIsPollingStatus(false);
+      toast.success("WhatsApp Pribadi berhasil diputuskan");
+    } catch (e: any) {
+      toast.error("Gagal memutuskan sesi: " + e.message);
+    } finally {
+      setIsTestSessionLoading(false);
+    }
+  };
+
+  // Check status when modal is opened, and only poll when user is waiting for QR/connecting
+  React.useEffect(() => {
+    if (!isVideoModalOpen) {
+      setIsPollingStatus(false);
+      return;
+    }
+
+    checkTestSessionStatus();
+
+    if (!isPollingStatus) return;
+
+    const timer = setInterval(async () => {
+      const st = await checkTestSessionStatus();
+      if (st === "WORKING") {
+        setIsPollingStatus(false);
+        toast.success("WhatsApp Pribadi Terhubung!");
+      } else if (st === "SCAN_QR_CODE" && !testSessionQr) {
+        fetchTestQr();
+      }
+    }, 3000);
+
+    return () => {
+      clearInterval(timer);
+    };
+  }, [isVideoModalOpen, isPollingStatus, checkTestSessionStatus, testSessionQr]);
+
+  const handleSendTestVideo = async () => {
+    if (testSessionStatus !== "WORKING") {
+      toast.error("Hubungkan akun WhatsApp pribadi Anda terlebih dahulu (Scan QR)");
+      return;
+    }
+    setVideoLoading(true);
+    setVideoResult(null);
+    try {
+      const res = await fetch(`/api/v1/waha/instances/${TEST_SESSION_NAME}/send-test-video`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetPhone: "6281257456315",
+          videoUrl: videoUrlInput.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      setVideoResult(data);
+      if (data.success) {
+        toast.success("Video native berhasil dikirim ke +62 812-5745-6315");
+      } else {
+        toast.error("Gagal mengirim video: " + (data.message || "Unknown error"));
+      }
+    } catch (e: any) {
+      toast.error("Kesalahan jaringan: " + e.message);
+    } finally {
+      setVideoLoading(false);
+    }
+  };
 
   const fetchInstances = async () => {
     setLoading(true);
@@ -366,9 +550,19 @@ function KoneksiWATab() {
             <CardTitle className="text-base">Chatbot WhatsApp</CardTitle>
             <CardDescription className="text-xs">Kelola nomor WhatsApp yang terhubung ke asisten Anda</CardDescription>
           </div>
-          <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setIsAddOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" /> Tambah Chatbot Baru
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs gap-1.5 border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+              onClick={() => setIsVideoModalOpen(true)}
+            >
+              🎬 Uji Kirim Video Native
+            </Button>
+            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setIsAddOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" /> Tambah Chatbot Baru
+            </Button>
+          </div>
         </CardHeader>
 
         <CardContent className="space-y-3">
@@ -512,6 +706,182 @@ function KoneksiWATab() {
           <DialogFooter>
             <Button onClick={() => setQrCodeData(null)} className="w-full bg-slate-800 text-white">
               Selesai
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Uji Coba Kirim Video Native (Akun Pribadi & No-Bot Response) */}
+      <Dialog open={isVideoModalOpen} onOpenChange={setIsVideoModalOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <span>🎬 Uji Kirim Video Native WAHA</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Sesi terisolasi khusus akun WhatsApp pribadi Anda. <strong>100% Silent (tanpa bot AI, tanpa balas chat, tanpa simpan pesan)</strong>. Hanya dapat mengirim video ke nomor uji coba.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2 text-xs">
+            {/* 1. Status Login WA Pribadi */}
+            <div className="rounded-lg border p-3 bg-slate-50 dark:bg-slate-900/50 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-xs text-slate-700 dark:text-slate-200">
+                  Akun WhatsApp Penguji
+                </span>
+                {testSessionStatus === "WORKING" ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                    <CheckCircle2 className="h-3 w-3" /> Terhubung
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
+                    Belum Terhubung
+                  </span>
+                )}
+              </div>
+
+              {testSessionStatus === "WORKING" ? (
+                <div className="flex items-center justify-between pt-1">
+                  <div className="text-[11px] text-muted-foreground space-y-0.5">
+                    <p className="text-emerald-600 dark:text-emerald-400 font-medium">
+                      ✓ Siap mengirim video native
+                    </p>
+                    <p className="text-[10px]">Sesi: <code>{TEST_SESSION_NAME}</code> (Protected & Silent)</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleLogoutPersonalWa}
+                    disabled={isTestSessionLoading}
+                    className="h-7 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200 gap-1"
+                  >
+                    <LogOut className="h-3 w-3" /> Putuskan
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3 pt-1">
+                  {testSessionQr ? (
+                    <div className="flex flex-col items-center justify-center p-3 bg-white dark:bg-slate-950 rounded-md border space-y-2">
+                      <img
+                        src={testSessionQr}
+                        alt="Scan QR WhatsApp Pribadi"
+                        className="w-40 h-40 border-2 border-emerald-500 rounded-lg shadow-sm"
+                      />
+                      <div className="text-center space-y-1">
+                        <p className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                          Buka WhatsApp &gt; Perangkat Tertaut, lalu scan QR ini
+                        </p>
+                        <p className="text-[10px] text-muted-foreground flex items-center justify-center gap-1">
+                          <Loader2 className="h-3 w-3 animate-spin text-emerald-600" />
+                          Menunggu Anda melakukan scan...
+                        </p>
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleRefreshQr}
+                          disabled={isRefreshingQr}
+                          className="h-7 text-[11px] gap-1"
+                        >
+                          <RefreshCw className={cn("h-3 w-3", isRefreshingQr && "animate-spin")} />
+                          {isRefreshingQr ? "Memperbarui QR..." : "Refresh QR"}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
+                      <p className="text-[11px] text-muted-foreground">
+                        Login akun pribadi Anda untuk menguji coba native player video tanpa mengganggu chatbot operasional.
+                      </p>
+                      <Button
+                        size="sm"
+                        onClick={handleStartPersonalWa}
+                        disabled={isTestSessionLoading}
+                        className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 text-xs gap-1.5"
+                      >
+                        {isTestSessionLoading ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <QrCode className="h-3.5 w-3.5" />
+                        )}
+                        {isTestSessionLoading ? "Menyiapkan..." : "Scan QR WhatsApp"}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* 2. Nomor WhatsApp Tujuan (Locked) */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <Label className="font-semibold text-xs">Nomor WhatsApp Tujuan</Label>
+                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                  <Lock className="h-2.5 w-2.5" /> Terkunci (+62 812-5745-6315)
+                </span>
+              </div>
+              <Input
+                value="+62 812-5745-6315"
+                disabled
+                className="h-8 text-xs font-mono bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 cursor-not-allowed font-semibold"
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Satu-satunya tindakan yang diizinkan pada sesi ini adalah mengirim uji video ke nomor Anda.
+              </p>
+            </div>
+
+            {/* 3. URL Video Opsional */}
+            <div className="space-y-1">
+              <Label className="font-semibold text-xs">URL Video / File MP4 (Opsional)</Label>
+              <Input
+                value={videoUrlInput}
+                onChange={(e) => setVideoUrlInput(e.target.value)}
+                placeholder="Kosongkan untuk memakai video lokal VPS atau sample mp4"
+                className="h-8 text-xs"
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Default: otomatis mencari file MP4 di folder <code>uploads/</code> atau sample video H.264 Google Cloud.
+              </p>
+            </div>
+
+            {/* 4. Hasil Pengiriman */}
+            {videoResult && (
+              <div className={cn(
+                "p-3 rounded-lg border text-[11px] font-mono space-y-1",
+                videoResult.success
+                  ? "bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-200"
+                  : "bg-rose-50 border-rose-200 text-rose-900 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-200"
+              )}>
+                <p className="font-bold">
+                  {videoResult.success ? "✓ Video Berhasil Dikirim!" : "✗ Pengiriman Gagal"}
+                </p>
+                <p className="font-sans">{videoResult.message}</p>
+                {videoResult.videoUrl && (
+                  <p className="opacity-80 truncate">Source: {videoResult.videoUrl}</p>
+                )}
+                {videoResult.error && (
+                  <p className="text-rose-600 dark:text-rose-400 font-sans">
+                    Detail: {typeof videoResult.error === 'object' ? JSON.stringify(videoResult.error) : videoResult.error}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" size="sm" onClick={() => setIsVideoModalOpen(false)}>
+              Tutup
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSendTestVideo}
+              disabled={videoLoading || testSessionStatus !== "WORKING"}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
+            >
+              {videoLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              {videoLoading ? "Mengirim Video..." : "Kirim Video Native Sekarang"}
             </Button>
           </DialogFooter>
         </DialogContent>

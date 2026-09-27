@@ -104,7 +104,7 @@ export function LoginForm() {
           </div>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10 pointer-events-none" />
-            <PasswordInput id="password" value={password} onChange={setPassword} placeholder="••••••••" autoComplete="current-password" className="pl-9" />
+            <PasswordInput id="password" value={password} onChange={setPassword} placeholder="Masukkan kata sandi..." autoComplete="current-password" className="pl-9" />
           </div>
         </div>
 

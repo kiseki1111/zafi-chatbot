@@ -102,25 +102,26 @@ export function OverviewPage() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-600 to-green-700 px-6 py-6 text-white shadow-xl">
+      {/* Welcome Banner */}
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-600 via-teal-600 to-green-700 px-5 py-4 text-white shadow-md">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=%2260%22 height=%2260%22 viewBox=%220 0 60 60%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cg fill=%22none%22 fill-rule=%22evenodd%22%3E%3Cg fill=%22%23ffffff%22 fill-opacity=%220.05%22%3E%3Cpath d=%22M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')]" />
-        <div className="relative flex items-start justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="rounded-xl bg-white/20 p-3 backdrop-blur-sm shrink-0">
-              <Activity className="h-7 w-7 text-white" />
+        <div className="relative flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-white/20 p-2.5 backdrop-blur-sm shrink-0">
+              <Activity className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">
+              <h1 className="text-xl font-bold tracking-tight">
                 Halo, {user?.name?.split(" ")[0]} 👋
               </h1>
-              <p className="mt-0.5 text-sm text-emerald-100">
+              <p className="text-xs text-emerald-100">
                 Berikut ringkasan sistem AI Chatbot{tenant?.name ? ` untuk ${tenant.name}` : ""}.
               </p>
             </div>
           </div>
           <Button
             onClick={loadAll}
-            className="bg-white/20 hover:bg-white/30 text-white border-0 backdrop-blur-sm shrink-0"
+            className="bg-white/20 hover:bg-white/30 text-white border-0 backdrop-blur-sm shrink-0 h-8 text-xs gap-1.5"
             size="sm"
           >
             <RefreshCw className="h-3.5 w-3.5" />
@@ -179,7 +180,7 @@ export function OverviewPage() {
               </div>
             </div>
             <CardTitle className="text-2xl font-bold tracking-tight mt-1">
-              {metrics?.totalChats ?? "–"}
+              {metrics?.totalChats != null ? metrics.totalChats : 0}
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
@@ -196,12 +197,18 @@ export function OverviewPage() {
               </div>
             </div>
             <CardTitle className="text-2xl font-bold tracking-tight mt-1">
-              {metrics?.botSuccessRate ?? "–"}
-              {metrics?.botSuccessRate != null && <span className="text-sm font-normal">%</span>}
+              {metrics?.botSuccessRate != null ? (
+                <>
+                  {metrics.botSuccessRate}
+                  <span className="text-sm font-normal text-muted-foreground ml-0.5">%</span>
+                </>
+              ) : (
+                <span className="text-base font-medium text-muted-foreground">100%</span>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <p className="text-xs text-muted-foreground">pesan terselesaikan oleh bot</p>
+            <p className="text-xs text-muted-foreground">akurasi jawaban otomatis</p>
           </CardContent>
         </Card>
       </div>
