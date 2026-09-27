@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../../core/prisma/prisma.service';
 import { WahaService } from '../waha.service';
@@ -14,8 +14,16 @@ export class FollowUpService {
     private readonly agentSharedService: AgentSharedService,
   ) {}
 
-  async getConfig() {
-    const config = await this.prisma.followUpConfig.findFirst();
+  async getConfig(tenantId?: string) {
+    let config: any = null;
+    if (tenantId) {
+      config = await this.prisma.followUpConfig.findUnique({
+        where: { tenantId },
+      });
+    }
+    if (!config) {
+      config = await this.prisma.followUpConfig.findFirst();
+    }
     if (!config) {
       return {
         isEnabled: false,
@@ -34,22 +42,31 @@ export class FollowUpService {
       inactivityHours: number;
       followUpPrompt: string;
     }>,
+    tenantId?: string,
   ) {
-    const existing = await this.prisma.followUpConfig.findFirst();
-    if (existing) {
-      return this.prisma.followUpConfig.update({
-        where: { id: existing.id },
-        data,
-      });
+    const targetTenantId =
+      tenantId || (await this.prisma.tenant.findFirst())?.id;
+    if (!targetTenantId) {
+      throw new BadRequestException('Tenant not found');
     }
-    const firstTenant = await this.prisma.tenant.findFirst();
-    return this.prisma.followUpConfig.create({
-      data: { ...data, tenantId: firstTenant?.id || '' },
+
+    return this.prisma.followUpConfig.upsert({
+      where: { tenantId: targetTenantId },
+      update: data,
+      create: {
+        ...data,
+        tenantId: targetTenantId,
+      },
     });
   }
 
-  async getInactiveContacts(instanceName?: string) {
-    const config = await this.getConfig();
+  private sleep(ms: number) {
+    if (process.env.NODE_ENV === 'test') return Promise.resolve();
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async getInactiveContacts(instanceName?: string, tenantId?: string) {
+    const config = await this.getConfig(tenantId);
     if (!config.isEnabled) {
       return [];
     }
@@ -59,12 +76,18 @@ export class FollowUpService {
     const inactivityMs = minutes * 60 * 1000;
     const cutoffTime = new Date(Date.now() - inactivityMs);
 
+    const where: any = {
+      ...(instanceName ? { instanceName } : {}),
+      lastMessageAt: { lt: cutoffTime },
+      status: { not: 'CLOSED' },
+    };
+
+    if (tenantId) {
+      where.whatsappInstance = { tenantId };
+    }
+
     const conversations = await this.prisma.conversation.findMany({
-      where: {
-        ...(instanceName ? { instanceName } : {}),
-        lastMessageAt: { lt: cutoffTime },
-        status: { not: 'CLOSED' },
-      },
+      where,
       include: {
         contact: true,
         messages: {
@@ -170,14 +193,17 @@ Bahasa: Indonesia. Maksimal 2 emoji. Tanpa markdown.`;
     }
   }
 
-  async processFollowUps(instanceName?: string) {
-    const config = await this.getConfig();
+  async processFollowUps(instanceName?: string, tenantId?: string) {
+    const config = await this.getConfig(tenantId);
     if (!config.isEnabled) {
       this.logger.log('Follow-up is disabled, skipping');
       return { processed: 0, sent: 0, errors: 0 };
     }
 
-    const inactiveContacts = await this.getInactiveContacts(instanceName);
+    const inactiveContacts = await this.getInactiveContacts(
+      instanceName,
+      tenantId,
+    );
     this.logger.log(
       `Found ${inactiveContacts.length} inactive contacts for follow-up`,
     );
@@ -188,7 +214,8 @@ Bahasa: Indonesia. Maksimal 2 emoji. Tanpa markdown.`;
     let sent = 0;
     let errors = 0;
 
-    for (const contact of inactiveContacts) {
+    for (let i = 0; i < inactiveContacts.length; i++) {
+      const contact = inactiveContacts[i];
       this.logger.log(
         `Processing follow-up for ${contact.contactPhone} on ${contact.instanceName}`,
       );
@@ -215,6 +242,14 @@ Bahasa: Indonesia. Maksimal 2 emoji. Tanpa markdown.`;
         this.logger.warn(`No message generated for ${contact.contactPhone}`);
         errors++;
       }
+
+      // Jeda 1 menit antar nomor untuk keamanan anti-spam WhatsApp (kecuali kontak terakhir)
+      if (i < inactiveContacts.length - 1) {
+        this.logger.log(
+          `[Follow-Up Anti-Spam] Menunggu jeda 1 menit sebelum berpindah ke nomor berikutnya...`,
+        );
+        await this.sleep(60000);
+      }
     }
 
     return { processed: inactiveContacts.length, sent, errors };
@@ -223,25 +258,50 @@ Bahasa: Indonesia. Maksimal 2 emoji. Tanpa markdown.`;
   @Cron('0 9 * * *')
   async scheduledFollowUp() {
     this.logger.log('Starting scheduled follow-up at 9 AM');
-    const result = await this.processFollowUps();
-    this.logger.log(
-      `Scheduled follow-up completed: ${result.sent} sent, ${result.errors} errors`,
-    );
+    const activeConfigs = await this.prisma.followUpConfig.findMany({
+      where: { isEnabled: true },
+    });
+
+    for (const config of activeConfigs) {
+      this.logger.log(
+        `[Scheduled Follow-Up] Menjalankan untuk tenant: ${config.tenantId}`,
+      );
+      await this.processFollowUps(undefined, config.tenantId);
+    }
   }
 
-  async getStats() {
-    const totalFollowUps = await this.prisma.followUp.count();
-    const inactiveContacts = await this.getInactiveContacts();
+  async getStats(tenantId?: string) {
+    const where: any = {};
+    if (tenantId) {
+      const instances = await this.prisma.whatsappInstance.findMany({
+        where: { tenantId },
+        select: { instanceName: true },
+      });
+      where.instanceName = { in: instances.map((i) => i.instanceName) };
+    }
+
+    const totalFollowUps = await this.prisma.followUp.count({ where });
+    const inactiveContacts = await this.getInactiveContacts(undefined, tenantId);
     return {
       totalFollowedUp: totalFollowUps,
       pendingCount: inactiveContacts.length,
-      isEnabled: (await this.getConfig()).isEnabled,
+      isEnabled: (await this.getConfig(tenantId)).isEnabled,
     };
   }
 
-  async getHistory(skip = 0, take = 50) {
+  async getHistory(skip = 0, take = 50, tenantId?: string) {
+    const where: any = {};
+    if (tenantId) {
+      const instances = await this.prisma.whatsappInstance.findMany({
+        where: { tenantId },
+        select: { instanceName: true },
+      });
+      where.instanceName = { in: instances.map((i) => i.instanceName) };
+    }
+
     const [followUps, total] = await Promise.all([
       this.prisma.followUp.findMany({
+        where,
         skip,
         take,
         orderBy: { followedUpAt: 'desc' },
@@ -249,7 +309,7 @@ Bahasa: Indonesia. Maksimal 2 emoji. Tanpa markdown.`;
           contact: { select: { phone: true, name: true } },
         },
       }),
-      this.prisma.followUp.count(),
+      this.prisma.followUp.count({ where }),
     ]);
 
     return {
@@ -264,9 +324,9 @@ Bahasa: Indonesia. Maksimal 2 emoji. Tanpa markdown.`;
     };
   }
 
-  async manualTrigger(instanceName?: string) {
+  async manualTrigger(instanceName?: string, tenantId?: string) {
     this.logger.log('Manual follow-up triggered');
-    return this.processFollowUps(instanceName);
+    return this.processFollowUps(instanceName, tenantId);
   }
 
   // Tambah kontak baru ke antrean follow-up

@@ -747,11 +747,7 @@ export function ClientsPage() {
                             <td className="p-3.5">
                               <Badge
                                 variant="outline"
-                                className={
-                                  u.role === "manager"
-                                    ? "border-purple-300 bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 font-bold uppercase text-[10px]"
-                                    : "border-blue-300 bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 uppercase text-[10px]"
-                                }
+                                className="border-slate-300 bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-300 uppercase text-[10px]"
                               >
                                 {u.role}
                               </Badge>
@@ -1210,17 +1206,16 @@ export function ClientsPage() {
               </div>
 
               <div className="space-y-1">
-                <Label>Peran / Role Utama</Label>
-                <select
+                <Label>Tag / Label Jabatan</Label>
+                <Input
                   value={staffForm.role}
                   onChange={(e) => setStaffForm({ ...staffForm, role: e.target.value })}
-                  className="w-full h-8 mt-1 rounded-md border bg-background px-2 text-xs"
-                >
-                  <option value="administrator">Administrator (Kelola data &amp; bot)</option>
-                  <option value="operator">Operator / CS (Chat &amp; takeover pelanggan)</option>
-                  <option value="marketing">Marketing (Broadcast &amp; kampanye)</option>
-                  <option value="manager">Manager (Akses manajerial)</option>
-                </select>
+                  placeholder="contoh: Marketing, Direktur, dll."
+                  className="h-8 mt-1"
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Ketik bebas sebagai tag penanda posisi. Akses menu sepenuhnya diatur melalui checklist di bawah.
+                </p>
               </div>
 
               {/* Checklist Hak Akses Menu Khusus Akun Ini */}
@@ -1336,17 +1331,13 @@ export function ClientsPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label>Peran / Role</Label>
-                  <select
+                  <Label>Tag / Label Jabatan</Label>
+                  <Input
                     value={editStaffForm.role}
                     onChange={(e) => setEditStaffForm({ ...editStaffForm, role: e.target.value })}
-                    className="w-full h-8 mt-1 rounded-md border bg-background px-2 text-xs"
-                  >
-                    <option value="administrator">Administrator</option>
-                    <option value="operator">Operator</option>
-                    <option value="marketing">Marketing</option>
-                    <option value="manager">Manager</option>
-                  </select>
+                    placeholder="contoh: Marketing, Direktur, dll."
+                    className="h-8 mt-1"
+                  />
                 </div>
                 <div className="space-y-1">
                   <Label>Status Akun</Label>

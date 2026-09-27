@@ -11,6 +11,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { DataAgentService } from '../../features/knowledge-ingest/data-agent.service';
 const pdfParse = require('pdf-parse');
 import * as mammoth from 'mammoth';
+import * as xlsx from 'xlsx';
 
 @Injectable()
 export class KnowledgeService {
@@ -96,11 +97,23 @@ export class KnowledgeService {
     } else if (ext === 'doc' || ext === 'docx') {
       const result = await mammoth.extractRawText({ buffer: file.buffer });
       content = result.value;
+    } else if (ext === 'csv' || ext === 'xls' || ext === 'xlsx') {
+      const workbook = xlsx.read(file.buffer, { type: 'buffer' });
+      const sheetTexts: string[] = [];
+      for (const sheetName of workbook.SheetNames) {
+        const worksheet = workbook.Sheets[sheetName];
+        // Format sebagai CSV baris teks terstruktur yang mudah dipahami LLM
+        const csvText = xlsx.utils.sheet_to_csv(worksheet);
+        if (csvText && csvText.trim()) {
+          sheetTexts.push(`[Sheet: ${sheetName}]\n${csvText.trim()}`);
+        }
+      }
+      content = sheetTexts.join('\n\n');
     } else if (ext === 'txt') {
       content = file.buffer.toString('utf8');
     } else {
       throw new BadRequestException(
-        'Unsupported file format. Use PDF, DOCX, or TXT.',
+        'Unsupported file format. Use PDF, DOCX, CSV, XLS, XLSX, or TXT.',
       );
     }
 

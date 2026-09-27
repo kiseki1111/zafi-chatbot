@@ -112,5 +112,14 @@ describe('WahaController - Unit Tests (Feature 6 Call Reject & Webhooks)', () =>
         expect.stringContaining('tidak dapat menerima panggilan'),
       );
     });
+
+    it('harus menolak request dengan ForbiddenException jika webhook secret salah', async () => {
+      const payload = { session: 'zafi-cs', event: 'message' };
+      const req = { ip: '192.168.1.100', query: {} };
+
+      await expect(
+        controller.handleWebhook(payload, 'wrong-secret', req),
+      ).rejects.toThrow('Invalid or missing webhook secret');
+    });
   });
 });

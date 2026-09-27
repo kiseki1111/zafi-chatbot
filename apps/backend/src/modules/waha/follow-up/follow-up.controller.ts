@@ -7,19 +7,32 @@ import {
   Param,
   Query,
   Body,
+  UseGuards,
+  Req,
   Logger,
 } from '@nestjs/common';
 import { FollowUpService } from './follow-up.service';
+import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 
+@UseGuards(JwtAuthGuard)
 @Controller('api/v1/followup')
 export class FollowUpController {
   private readonly logger = new Logger(FollowUpController.name);
 
   constructor(private readonly followUpService: FollowUpService) {}
 
+  private resolveTenantId(req: any): string | undefined {
+    const isSuper = req?.user?.roles?.includes('superadmin');
+    if (isSuper) {
+      return req?.query?.tenantId;
+    }
+    return req?.user?.tenantId;
+  }
+
   @Get('config')
-  async getConfig() {
-    return this.followUpService.getConfig();
+  async getConfig(@Req() req: any) {
+    const tenantId = this.resolveTenantId(req);
+    return this.followUpService.getConfig(tenantId);
   }
 
   @Put('config')
@@ -31,13 +44,19 @@ export class FollowUpController {
       inactivityHours?: number;
       followUpPrompt?: string;
     },
+    @Req() req: any,
   ) {
-    return this.followUpService.updateConfig(data);
+    const tenantId = this.resolveTenantId(req);
+    return this.followUpService.updateConfig(data, tenantId);
   }
 
   @Get('list')
-  async getInactiveContacts(@Query('instanceName') instanceName?: string) {
-    return this.followUpService.getInactiveContacts(instanceName);
+  async getInactiveContacts(
+    @Query('instanceName') instanceName?: string,
+    @Req() req?: any,
+  ) {
+    const tenantId = this.resolveTenantId(req);
+    return this.followUpService.getInactiveContacts(instanceName, tenantId);
   }
 
   @Post('queue')
@@ -61,21 +80,32 @@ export class FollowUpController {
   }
 
   @Get('stats')
-  async getStats() {
-    return this.followUpService.getStats();
+  async getStats(@Req() req?: any) {
+    const tenantId = this.resolveTenantId(req);
+    return this.followUpService.getStats(tenantId);
   }
 
   @Get('history')
-  async getHistory(@Query('skip') skip?: number, @Query('take') take?: number) {
+  async getHistory(
+    @Query('skip') skip?: number,
+    @Query('take') take?: number,
+    @Req() req?: any,
+  ) {
+    const tenantId = this.resolveTenantId(req);
     return this.followUpService.getHistory(
       parseInt(String(skip || 0)),
       parseInt(String(take || 50)),
+      tenantId,
     );
   }
 
   @Post('trigger')
-  async manualTrigger(@Body('instanceName') instanceName?: string) {
-    return this.followUpService.manualTrigger(instanceName);
+  async manualTrigger(
+    @Body('instanceName') instanceName?: string,
+    @Req() req?: any,
+  ) {
+    const tenantId = this.resolveTenantId(req);
+    return this.followUpService.manualTrigger(instanceName, tenantId);
   }
 
   @Post('clear-pending')

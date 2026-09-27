@@ -125,44 +125,11 @@ export const useAuthStore = create<AuthState>()(
         set({ user: tenantUser, isAuthenticated: true, authView: "login" });
       },
 
-      register: async (data) => {
-        if (!data.email.includes("@")) return { ok: false, message: "Email tidak valid." };
-        if (data.password.length < 6) return { ok: false, message: "Password minimal 6 karakter." };
-        
-        try {
-          const response = await fetch('/api/v1/auth/register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name: data.name,
-              email: data.email,
-              phone: data.phone,
-              passwordPlain: data.password,
-            }),
-          });
-          const result = await response.json();
-          
-          if (!response.ok) {
-            return { ok: false, message: result.message || "Pendaftaran gagal." };
-          }
-          
-          const responseData = result.data || result;
-          const user: User = {
-            id: responseData.user.id,
-            name: responseData.user.name,
-            email: responseData.user.email,
-            phone: data.phone,
-            role: responseData.user.roles?.[0] || "manager",
-            status: "active",
-            createdAt: new Date().toISOString().slice(0, 10),
-            lastLogin: new Date().toISOString().slice(0, 16).replace("T", " "),
-            tenantId: responseData.user.tenantId || null,
-          };
-          set({ user, isAuthenticated: true });
-          return { ok: true };
-        } catch (error) {
-          return { ok: false, message: "Terjadi kesalahan jaringan." };
-        }
+      register: async () => {
+        return {
+          ok: false,
+          message: "Pendaftaran mandiri dinonaktifkan. Hubungi Superadmin untuk pembuatan akun.",
+        };
       },
       updateUser: (data) => {
         const currentUser = get().user;
@@ -170,7 +137,10 @@ export const useAuthStore = create<AuthState>()(
           set({ user: { ...currentUser, ...data } });
         }
       },
-      logout: () => set({ user: null, isAuthenticated: false, authView: "login" }),
+      logout: () => {
+        fetch('/api/v1/auth/logout', { method: 'POST' }).catch(() => {});
+        set({ user: null, isAuthenticated: false, authView: "login" });
+      },
     }),
     { name: "umkm-auth" },
   ),

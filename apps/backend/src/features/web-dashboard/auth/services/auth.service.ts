@@ -61,6 +61,7 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       roles: userRolesArray,
+      tenantId: user.tenantId,
     };
 
     //Penerbitan pasangan token

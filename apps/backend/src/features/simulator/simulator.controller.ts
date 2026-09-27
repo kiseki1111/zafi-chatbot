@@ -3,15 +3,20 @@ import {
   Post,
   Body,
   Res,
+  Req,
   Logger,
   Get,
   Param,
+  UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { AgentAssistantService } from '../agent-assistant/agent-assistant.service';
 import { CsService } from '../agent-cs/cs.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
+@UseGuards(JwtAuthGuard)
 @Controller('api/v1/agent/simulator')
 export class SimulatorController {
   private readonly logger = new Logger(SimulatorController.name);
@@ -118,9 +123,12 @@ export class SimulatorController {
       tenantId: string;
       chatId: string;
     },
+    @Req() req: any,
     @Res() res: Response,
   ) {
     const { message, simulateAs, tenantId, chatId } = body;
+    const isSuper = req?.user?.roles?.includes('superadmin');
+    const effectiveTenantId = isSuper ? tenantId : (req?.user?.tenantId || tenantId);
 
     try {
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
@@ -136,8 +144,8 @@ export class SimulatorController {
         'customer',
       );
 
-      let realTenantId = tenantId;
-      if (tenantId === 'demo' || tenantId.startsWith('t-')) {
+      let realTenantId = effectiveTenantId;
+      if (realTenantId === 'demo' || realTenantId?.startsWith('t-')) {
         const firstOwner = await this.prisma.user.findFirst({
           where: { role: 'owner' },
         });

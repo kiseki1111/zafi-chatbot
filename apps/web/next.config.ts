@@ -26,6 +26,10 @@ const nextConfig: NextConfig = {
         destination: `${backendUrl}/api/v1/waha/:path*`,
       },
       {
+        source: "/api/v1/platform/:path*",
+        destination: `${backendUrl}/api/v1/platform/:path*`,
+      },
+      {
         source: "/api/v1/channel-accounts",
         destination: `${backendUrl}/api/v1/channel-accounts`,
       },

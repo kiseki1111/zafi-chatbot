@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ChatsController } from './chats.controller';
 import { ChatsService } from './chats.service';
+import { ChatStreamService } from './chat-stream.service';
 
 describe('ChatsController - Unit Tests (Feature 1 Profile & Bio)', () => {
   let controller: ChatsController;
@@ -14,12 +15,20 @@ describe('ChatsController - Unit Tests (Feature 1 Profile & Bio)', () => {
     releaseConversation: jest.fn(),
   };
 
+  const mockChatStreamService = {
+    emit: jest.fn(),
+    subscribe: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ChatsController],
-      providers: [{ provide: ChatsService, useValue: mockChatsService }],
+      providers: [
+        { provide: ChatsService, useValue: mockChatsService },
+        { provide: ChatStreamService, useValue: mockChatStreamService },
+      ],
     }).compile();
 
     controller = module.get<ChatsController>(ChatsController);

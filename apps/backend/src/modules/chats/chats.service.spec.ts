@@ -28,12 +28,18 @@ describe('ChatsService', () => {
     getSessionStatus: jest.fn(),
   };
 
+  const mockChatStreamService = {
+    emit: jest.fn(),
+    subscribe: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ChatsService,
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: WahaService, useValue: mockWahaService },
+        { provide: require('./chat-stream.service').ChatStreamService, useValue: mockChatStreamService },
       ],
     }).compile();
 

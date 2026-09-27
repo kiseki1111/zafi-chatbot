@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthStore } from "@/lib/auth-store";
 import { useAppStore } from "@/lib/app-store";
 import { cn } from "@/lib/utils";
@@ -92,9 +93,74 @@ export function OverviewPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-32 gap-3">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
-        <p className="text-sm text-muted-foreground">Memuat dashboard...</p>
+      <div className="space-y-5">
+        {/* Banner Skeleton */}
+        <div className="rounded-xl border p-5 bg-card flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-10 w-10 rounded-lg" />
+            <div className="space-y-2">
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-3.5 w-64" />
+            </div>
+          </div>
+          <Skeleton className="h-8 w-20 rounded-md" />
+        </div>
+
+        {/* 4 KPI Cards Skeleton */}
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i} className="p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-8 w-8 rounded-lg" />
+              </div>
+              <Skeleton className="h-7 w-16" />
+              <Skeleton className="h-3 w-28" />
+            </Card>
+          ))}
+        </div>
+
+        {/* Main Content Skeleton */}
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card className="lg:col-span-2 p-5 space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="space-y-1.5">
+                <Skeleton className="h-4 w-36" />
+                <Skeleton className="h-3 w-48" />
+              </div>
+              <Skeleton className="h-8 w-24" />
+            </div>
+            <div className="space-y-3 pt-2">
+              {[1, 2].map((i) => (
+                <div key={i} className="p-4 rounded-xl border flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="h-10 w-10 rounded-xl" />
+                    <div className="space-y-1.5">
+                      <Skeleton className="h-4 w-28" />
+                      <Skeleton className="h-3 w-20" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-8 w-24 rounded-md" />
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card className="p-5 space-y-4">
+            <div className="space-y-1.5 border-b pb-3">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-3 w-40" />
+            </div>
+            <div className="space-y-3 pt-2">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="p-3 rounded-lg border space-y-2">
+                  <Skeleton className="h-3.5 w-32" />
+                  <Skeleton className="h-3 w-full" />
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -129,6 +195,31 @@ export function OverviewPage() {
           </Button>
         </div>
       </div>
+
+      {/* Empty State Banner jika belum ada bot WA */}
+      {totalSessions === 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/90 dark:border-amber-900/50 dark:bg-amber-950/20 p-4 text-amber-900 dark:text-amber-200 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="rounded-lg bg-amber-100 dark:bg-amber-900/50 p-2 shrink-0 text-amber-700 dark:text-amber-300">
+              <Smartphone className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="font-semibold text-sm">Nomor WhatsApp Belum Terhubung</p>
+              <p className="text-xs text-amber-700/80 dark:text-amber-300/80 mt-0.5">
+                Hubungkan nomor WhatsApp toko Anda agar AI dapat mulai melayani pesan pelanggan otomatis 24/7.
+              </p>
+            </div>
+          </div>
+          <Button
+            onClick={() => setView("settings")}
+            className="bg-amber-600 hover:bg-amber-700 text-white shrink-0 h-8 text-xs gap-1.5"
+            size="sm"
+          >
+            Hubungkan WhatsApp Sekarang
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">

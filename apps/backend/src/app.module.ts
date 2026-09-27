@@ -20,6 +20,7 @@ import { SimulatorModule } from './features/simulator/simulator.module';
 import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 import { AvailabilityModule } from './modules/availability/availability.module';
 import { ContactsModule } from './modules/contacts/contacts.module';
+import { PlatformModule } from './modules/platform/platform.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { ContactsModule } from './modules/contacts/contacts.module';
     WahaModule,
     ChatsModule,
     ContactsModule,
+    PlatformModule,
     FollowUpModule,
     KnowledgeIngestModule,
     OpenAiModule,

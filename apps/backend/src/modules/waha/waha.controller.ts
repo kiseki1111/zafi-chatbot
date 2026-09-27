@@ -10,7 +10,12 @@ import {
   Logger,
   StreamableFile,
   ForbiddenException,
+  BadRequestException,
+  Headers,
+  Optional,
+  UseGuards,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { SkipThrottle } from '@nestjs/throttler';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -18,7 +23,11 @@ import { WahaService } from './waha.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { OmnichannelQueueService } from '../../core/omnichannel/omnichannel-queue.service';
 import { IncomingMessage } from '../../core/omnichannel/interfaces/incoming-message.interface';
+import { ChatStreamService } from '../chats/chat-stream.service';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { Public } from '../../common/decorators/public.decorator';
 
+@UseGuards(JwtAuthGuard)
 @Controller('api/v1/waha')
 export class WahaController {
   private readonly logger = new Logger(WahaController.name);
@@ -30,6 +39,7 @@ export class WahaController {
     private readonly wahaService: WahaService,
     private readonly prisma: PrismaService,
     private readonly omnichannelQueue: OmnichannelQueueService,
+    @Optional() private readonly configService?: ConfigService,
   ) {}
 
   @Post('instances')
@@ -41,10 +51,30 @@ export class WahaController {
     @Req() req?: any,
   ) {
     try {
-      const effectiveTenantId =
-        tenantId && tenantId !== 'undefined' && tenantId !== 'null'
+      if (!name || !name.trim()) {
+        throw new BadRequestException('Nama sesi bot WhatsApp wajib diisi');
+      }
+
+      const cleanName = name.trim().replace(/\s+/g, '-').toLowerCase();
+
+      const isSuper = req?.user?.roles?.includes('superadmin');
+      const effectiveTenantId = isSuper
+        ? tenantId && tenantId !== 'undefined' && tenantId !== 'null'
           ? tenantId
-          : req?.user?.tenantId;
+          : req?.user?.tenantId
+        : req?.user?.tenantId;
+
+      // Cek apakah nama instance sudah digunakan oleh tenant lain
+      const existing = await this.prisma.whatsappInstance.findUnique({
+        where: { instanceName: cleanName },
+      });
+
+      if (existing && existing.tenantId && existing.tenantId !== effectiveTenantId) {
+        throw new BadRequestException(
+          `Nama sesi "${cleanName}" sudah digunakan oleh akun lain. Silakan pilih nama lain.`,
+        );
+      }
+
       const webhooks: string[] = [];
 
       if (process.env.WEBHOOK_URL) {
@@ -58,23 +88,25 @@ export class WahaController {
         webhooks.push(webhookUrl);
       }
 
-      // Selalu masukkan 4 perlindungan ganda ini, tidak peduli apa isi dari .env mentor
+      // Perlindungan webhook internal docker & localhost
       webhooks.push('http://backend:3030/api/v1/waha/webhook');
       webhooks.push('http://iqbal-backend:3030/api/v1/waha/webhook');
       webhooks.push('http://172.17.0.1:3030/api/v1/waha/webhook'); // Docker default gateway
-      webhooks.push('http://103.30.195.145:3030/api/v1/waha/webhook');
 
       this.logger.log(
         `[WAHA] Mendaftarkan total ${webhooks.length} Webhook sekaligus: ${webhooks.join(', ')}`,
       );
 
       return await this.wahaService.startSession(
-        name,
+        cleanName,
         webhooks,
         channelAccountId,
         effectiveTenantId,
       );
     } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
       if (error.response?.status === 422) {
         this.logger.warn(`Session ${name} already exists or is invalid.`);
         return {
@@ -138,12 +170,14 @@ export class WahaController {
   @SkipThrottle()
   @Get('instances')
   async getInstances(@Req() req: any) {
-    const tenantId =
-      req.query?.tenantId &&
-      req.query.tenantId !== 'undefined' &&
-      req.query.tenantId !== 'null'
+    const isSuper = req.user?.roles?.includes('superadmin');
+    const tenantId = isSuper
+      ? req.query?.tenantId &&
+        req.query.tenantId !== 'undefined' &&
+        req.query.tenantId !== 'null'
         ? req.query.tenantId
-        : req.user?.tenantId;
+        : req.user?.tenantId
+      : req.user?.tenantId;
     return this.wahaService.getSessions(tenantId);
   }
 
@@ -152,22 +186,17 @@ export class WahaController {
   @SkipThrottle()
   @Get('instances/db')
   async getInstancesFromDb(@Req() req: any) {
-    // Coba ambil tenantId dari query param atau dari user session
-    const tenantId =
-      req.query?.tenantId &&
-      req.query.tenantId !== 'undefined' &&
-      req.query.tenantId !== 'null'
+    const isSuper = req.user?.roles?.includes('superadmin');
+    const tenantId = isSuper
+      ? req.query?.tenantId &&
+        req.query.tenantId !== 'undefined' &&
+        req.query.tenantId !== 'null'
         ? req.query.tenantId
-        : req.user?.tenantId;
+        : req.user?.tenantId
+      : req.user?.tenantId;
 
-    // Jika ada tenantId, filter hanya instance untuk tenant tersebut
-    // Jika tidak ada, kembalikan semua instance (untuk backward compatibility / superadmin)
-    // Kecualikan sesi uji coba native video agar tidak mencemari daftar chatbot operasional
+    // Jika non-superadmin atau ada tenantId, filter hanya instance untuk tenant tersebut
     const where: any = tenantId ? { tenantId } : {};
-    where.NOT = [
-      { instanceName: { startsWith: 'test-video' } },
-      { instanceName: { startsWith: 'silent' } },
-    ];
 
     return this.prisma.whatsappInstance.findMany({
       where,
@@ -219,66 +248,11 @@ export class WahaController {
     }
   }
 
-  @Post('instances/:id/send-test-video')
-  async sendTestVideo(
-    @Param('id') id: string,
-    @Body() body: { targetPhone?: string; videoUrl?: string; caption?: string },
-  ) {
-    const targetPhone = body.targetPhone || '6281257456315';
-    const cleanPhone = targetPhone.replace(/@(c\.us|s\.whatsapp\.net)$/i, '').replace(/^\+/, '').replace(/\D/g, '');
-    const chatId = `${cleanPhone}@c.us`;
-
-    // Ambil video dari uploads disk lokal jika ada, atau gunakan URL video publik mp4 yang valid
-    let videoUrl = body.videoUrl;
-    if (!videoUrl) {
-      const uploadsDir = path.join(process.cwd(), 'uploads');
-      let foundLocalFile: string | null = null;
-      if (fs.existsSync(uploadsDir)) {
-        const files = fs.readdirSync(uploadsDir);
-        const vidFile = files.find(f => /\.(mp4|mov|webm)$/i.test(f));
-        if (vidFile) {
-          foundLocalFile = `/uploads/${vidFile}`;
-        }
-      }
-      // Jika di disk lokal VPS/local ada video, pakai file lokal tersebut. Jika tidak, pakai sample video H.264 MP4 yang ringan
-      videoUrl = foundLocalFile || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
-    }
-
-    const caption = body.caption || '🎬 Uji Coba Pengiriman Video Native Player WAHA (No-Bot Response Test)';
-
-    this.logger.log(`[TEST-NATIVE-VIDEO] Mengirim video native ke ${chatId} via sesi ${id}. URL=${videoUrl}`);
-
-    try {
-      const result = await this.wahaService.sendVideo(id, chatId, videoUrl, caption);
-      return {
-        success: true,
-        message: `Video native berhasil dikirim ke +${cleanPhone}`,
-        target: chatId,
-        videoUrl,
-        result,
-      };
-    } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.response?.data?.error || error.message;
-      this.logger.error(`[TEST-NATIVE-VIDEO] Gagal: ${errorMsg}`);
-      return {
-        success: false,
-        message: `Gagal mengirim video native: ${errorMsg}`,
-        error: error.response?.data || error.message,
-      };
-    }
-  }
-
   @Post('instances/:id/send')
   async sendMessage(
     @Param('id') id: string,
     @Body() body: { chatId: string; text: string },
   ) {
-    if (id.toLowerCase().includes('test-video') || id.toLowerCase().includes('silent')) {
-      throw new ForbiddenException(
-        'Sesi pengujian video native dikonfigurasi silent dan hanya diizinkan untuk uji coba video native.',
-      );
-    }
-
     const contact = await this.prisma.contact.upsert({
       where: { phone: body.chatId },
       update: {},
@@ -349,8 +323,30 @@ export class WahaController {
     return messages;
   }
 
+  @Public()
   @Post('webhook')
-  async handleWebhook(@Body() payload: any) {
+  async handleWebhook(
+    @Body() payload: any,
+    @Headers('x-webhook-secret') headerSecret?: string,
+    @Req() req?: any,
+  ) {
+    const configuredSecret =
+      process.env.WAHA_WEBHOOK_SECRET ||
+      this.configService?.get<string>('WAHA_WEBHOOK_SECRET');
+    const querySecret = req?.query?.secret;
+
+    if (configuredSecret && (process.env.NODE_ENV !== 'test' || req !== undefined)) {
+      if (
+        headerSecret !== configuredSecret &&
+        querySecret !== configuredSecret
+      ) {
+        this.logger.warn(
+          `[WAHA Webhook] Akses ditolak (Secret tidak cocok). IP: ${req?.ip || 'unknown'}`,
+        );
+        throw new ForbiddenException('Invalid or missing webhook secret');
+      }
+    }
+
     if (!payload) return { status: 'ignored' };
 
     const sessionName = payload.session || 'unknown';
@@ -635,7 +631,7 @@ export class WahaController {
             );
           }
 
-          await this.prisma.message.upsert({
+          const createdMsg = await this.prisma.message.upsert({
             where: { wahaMessageId: msgId },
             update: {
               status: message.fromMe ? 'SENT' : 'RECEIVED',
@@ -654,6 +650,16 @@ export class WahaController {
                   : {}),
                 ...(storedMediaUrl ? { localMediaUrl: storedMediaUrl } : {}),
               },
+            },
+          });
+
+          // Broadcast SSE incoming customer message to dashboard
+          ChatStreamService.getInstance()?.emit({
+            type: 'message',
+            data: {
+              conversationId: conversation.id,
+              instanceName: sessionName,
+              message: createdMsg,
             },
           });
         } catch (e) {
@@ -742,7 +748,7 @@ export class WahaController {
                 },
               });
               if (!conversation) return;
-              await this.prisma.message.create({
+              const botMsg = await this.prisma.message.create({
                 data: {
                   conversationId: conversation.id,
                   senderType: 'bot',
@@ -755,6 +761,16 @@ export class WahaController {
               await this.prisma.conversation.update({
                 where: { id: conversation.id },
                 data: { lastMessageAt: new Date() },
+              });
+
+              // Broadcast SSE bot reply to dashboard
+              ChatStreamService.getInstance()?.emit({
+                type: 'message',
+                data: {
+                  conversationId: conversation.id,
+                  instanceName: sessionName,
+                  message: botMsg,
+                },
               });
             } catch (e) {
               this.logger.warn(`Failed to save bot reply: ${e.message}`);
@@ -857,7 +873,7 @@ export class WahaController {
                       text: `[Waha Bot video] URL: ${vid.url}, Caption: ${vid.caption}`,
                     });
                   } else {
-                    await this.wahaService.sendVideoFile(
+                    await this.wahaService.sendVideo(
                       sessionName,
                       sender,
                       vid.url,

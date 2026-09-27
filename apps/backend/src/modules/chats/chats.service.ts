@@ -2,10 +2,12 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { WahaService } from '../waha/waha.service';
+import { ChatStreamService } from './chat-stream.service';
 
 @Injectable()
 export class ChatsService {
@@ -14,6 +16,7 @@ export class ChatsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly wahaService: WahaService,
+    private readonly chatStreamService: ChatStreamService,
   ) {}
 
   async getConversations(instanceName?: string, tenantId?: string) {
@@ -95,11 +98,23 @@ export class ChatsService {
     conversationId: string,
     skip: number = 0,
     take: number = 20,
+    tenantId?: string,
   ) {
     const conversation = await this.prisma.conversation.findUnique({
       where: { id: conversationId },
+      include: { whatsappInstance: true },
     });
     if (!conversation) throw new NotFoundException('Conversation not found');
+
+    if (
+      tenantId &&
+      conversation.whatsappInstance?.tenantId &&
+      conversation.whatsappInstance.tenantId !== tenantId
+    ) {
+      throw new ForbiddenException(
+        'Akses ditolak: Percakapan bukan milik tenant Anda',
+      );
+    }
 
     const messages = await this.prisma.message.findMany({
       where: { conversationId },
@@ -116,12 +131,22 @@ export class ChatsService {
     return messages.reverse(); // Return oldest first for chat UI
   }
 
-  async getContactProfile(conversationId: string) {
+  async getContactProfile(conversationId: string, tenantId?: string) {
     const conversation = await this.prisma.conversation.findUnique({
       where: { id: conversationId },
-      include: { contact: true },
+      include: { contact: true, whatsappInstance: true },
     });
     if (!conversation) throw new NotFoundException('Conversation not found');
+
+    if (
+      tenantId &&
+      conversation.whatsappInstance?.tenantId &&
+      conversation.whatsappInstance.tenantId !== tenantId
+    ) {
+      throw new ForbiddenException(
+        'Akses ditolak: Kontak bukan milik tenant Anda',
+      );
+    }
 
     const phone = conversation.contact?.phone || '';
     const instanceName = conversation.instanceName;
@@ -248,6 +273,17 @@ export class ChatsService {
       where: { id: conversationId },
       data: { lastMessageAt: new Date() },
     });
+
+    // Broadcast SSE live message
+    this.chatStreamService.emit({
+      type: 'message',
+      data: {
+        conversationId,
+        instanceName,
+        message,
+      },
+    });
+
     return message;
   }
 
@@ -343,8 +379,8 @@ export class ChatsService {
     // Coba kirim via WAHA
     try {
       const { default: axios } = await import('axios');
-      const wahaUrl = process.env.WAHA_API_URL || 'http://103.30.195.145:3060';
-      const apiKey = process.env.WAHA_API_KEY || 'ZafitechDunia12345#';
+      const wahaUrl = process.env.WAHA_API_URL || 'http://127.0.0.1:3000';
+      const apiKey = process.env.WAHA_API_KEY || process.env.WHATSAPP_API_KEY || '';
 
       await axios.post(
         `${wahaUrl}/api/sendImage`,
@@ -446,11 +482,12 @@ export class ChatsService {
     mimeType?: string;
   }) {
     const { default: axios } = await import('axios');
-    const wahaUrl = process.env.WAHA_API_URL || 'http://103.30.195.145:3060';
-    const apiKey = (process.env.WAHA_API_KEY || 'ZafitechDunia12345#').replace(
-      /"/g,
-      '',
-    );
+    const wahaUrl = process.env.WAHA_API_URL || 'http://127.0.0.1:3000';
+    const apiKey = (
+      process.env.WAHA_API_KEY ||
+      process.env.WHATSAPP_API_KEY ||
+      ''
+    ).replace(/"/g, '');
     const headers = {
       Accept: 'application/json',
       'Content-Type': 'application/json',

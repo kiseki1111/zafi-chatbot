@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { Save, Loader2 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
@@ -73,7 +74,28 @@ export function WarnaWebsiteTab() {
   };
 
   if (loading) {
-    return <div className="p-8 flex justify-center"><Loader2 className="animate-spin text-emerald-600" /></div>;
+    return (
+      <Card>
+        <CardHeader className="pb-3 border-b mb-4">
+          <Skeleton className="h-5 w-52" />
+          <Skeleton className="h-3.5 w-80 mt-1" />
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="space-y-3 border rounded-xl p-4 bg-muted/20">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-3 w-full" />
+                <div className="flex items-center gap-3 pt-2">
+                  <Skeleton className="w-10 h-10 rounded-lg" />
+                  <Skeleton className="h-8 flex-1" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (

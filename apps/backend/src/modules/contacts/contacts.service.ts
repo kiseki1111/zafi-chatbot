@@ -10,10 +10,25 @@ import { CreateContactDto, UpdateContactDto } from './dto/contact.dto';
 export class ContactsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listContacts(search?: string, status?: string) {
+  async listContacts(
+    search?: string,
+    status?: string,
+    tenantId?: string,
+  ) {
     const where: any = {
       phone: { not: { contains: 'broadcast' } },
     };
+
+    if (tenantId) {
+      where.conversations = {
+        some: {
+          whatsappInstance: {
+            tenantId,
+          },
+        },
+      };
+    }
+
     if (status && status !== 'ALL') {
       where.status = status;
     }
@@ -32,6 +47,9 @@ export class ContactsService {
       include: {
         tags: { include: { tag: true } },
         conversations: {
+          where: tenantId
+            ? { whatsappInstance: { tenantId } }
+            : undefined,
           take: 1,
           orderBy: { lastMessageAt: 'desc' },
           include: {
@@ -92,12 +110,26 @@ export class ContactsService {
     });
   }
 
-  async getContact(id: string) {
-    const contact = await this.prisma.contact.findUnique({
-      where: { id },
+  async getContact(id: string, tenantId?: string) {
+    const where: any = { id };
+    if (tenantId) {
+      where.conversations = {
+        some: {
+          whatsappInstance: {
+            tenantId,
+          },
+        },
+      };
+    }
+
+    const contact = await this.prisma.contact.findFirst({
+      where,
       include: {
         tags: { include: { tag: true } },
         conversations: {
+          where: tenantId
+            ? { whatsappInstance: { tenantId } }
+            : undefined,
           orderBy: { lastMessageAt: 'desc' },
           include: {
             assignedTo: { select: { id: true, name: true } },
@@ -110,7 +142,7 @@ export class ContactsService {
     return contact;
   }
 
-  async createContact(dto: CreateContactDto) {
+  async createContact(dto: CreateContactDto, tenantId?: string) {
     if (!dto.phone) throw new BadRequestException('Phone is required');
     const existing = await this.prisma.contact.findUnique({
       where: { phone: dto.phone },
@@ -118,7 +150,7 @@ export class ContactsService {
     if (existing)
       throw new BadRequestException('Nomor telepon sudah terdaftar');
 
-    return this.prisma.contact.create({
+    const contact = await this.prisma.contact.create({
       data: {
         name: dto.name || dto.phone,
         phone: dto.phone,
@@ -130,10 +162,43 @@ export class ContactsService {
         source: dto.source || 'MANUAL',
       },
     });
+
+    if (tenantId) {
+      const instance = await this.prisma.whatsappInstance.findFirst({
+        where: { tenantId },
+      });
+      if (instance) {
+        await this.prisma.conversation
+          .create({
+            data: {
+              contactId: contact.id,
+              instanceName: instance.instanceName,
+              status: 'OPEN',
+            },
+          })
+          .catch(() => null);
+      }
+    }
+
+    return contact;
   }
 
-  async updateContact(id: string, dto: UpdateContactDto) {
-    const contact = await this.prisma.contact.findUnique({ where: { id } });
+  async updateContact(
+    id: string,
+    dto: UpdateContactDto,
+    tenantId?: string,
+  ) {
+    const where: any = { id };
+    if (tenantId) {
+      where.conversations = {
+        some: {
+          whatsappInstance: {
+            tenantId,
+          },
+        },
+      };
+    }
+    const contact = await this.prisma.contact.findFirst({ where });
     if (!contact) throw new NotFoundException('Contact not found');
 
     return this.prisma.contact.update({
@@ -150,8 +215,18 @@ export class ContactsService {
     });
   }
 
-  async deleteContact(id: string) {
-    const contact = await this.prisma.contact.findUnique({ where: { id } });
+  async deleteContact(id: string, tenantId?: string) {
+    const where: any = { id };
+    if (tenantId) {
+      where.conversations = {
+        some: {
+          whatsappInstance: {
+            tenantId,
+          },
+        },
+      };
+    }
+    const contact = await this.prisma.contact.findFirst({ where });
     if (!contact) throw new NotFoundException('Contact not found');
     return this.prisma.contact.delete({ where: { id } });
   }

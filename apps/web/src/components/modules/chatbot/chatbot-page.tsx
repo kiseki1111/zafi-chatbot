@@ -830,8 +830,37 @@ export function ChatbotPage() {
       }
     };
 
-    // Poll every 5 seconds
-    const interval = setInterval(fetchLatest, 5000);
+    // SSE Live Stream Connection (Realtime instant update)
+    let eventSource: EventSource | null = null;
+    try {
+      eventSource = new EventSource(`/api/v1/chats/stream?conversationId=${activeId}`);
+      eventSource.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload?.type === 'message' && payload?.data?.message) {
+            const raw = payload.data.message;
+            if (raw.conversationId === activeId) {
+              const liveMsg: ChatMessage = {
+                id: raw.id || `live-${Date.now()}`,
+                sender: raw.senderType === 'customer' ? 'user' : 'bot',
+                text: raw.content || '',
+                time: new Date(raw.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                status: 'delivered',
+                messageType: raw.messageType?.toLowerCase(),
+                mediaUrl: (raw.metadata as any)?.localMediaUrl || (raw.metadata as any)?.mediaUrl || (raw.metadata as any)?.url,
+              };
+              setMessages((prev) => {
+                if (prev.some((p) => p.id === liveMsg.id)) return prev;
+                return [...prev, liveMsg];
+              });
+            }
+          }
+        } catch {}
+      };
+    } catch {}
+
+    // Fallback Poll every 10 seconds (as backup if connection drops)
+    const interval = setInterval(fetchLatest, 10000);
     
     // Fetch immediately when user focuses back on the tab
     const onFocus = () => fetchLatest();
@@ -840,6 +869,7 @@ export function ChatbotPage() {
     return () => {
       clearInterval(interval);
       window.removeEventListener("focus", onFocus);
+      if (eventSource) eventSource.close();
     };
   }, [sessionId, activeId, skip]);
 

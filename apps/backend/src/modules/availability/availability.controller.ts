@@ -11,6 +11,8 @@ import {
   UploadedFile,
   Req,
   BadRequestException,
+  ForbiddenException,
+  UseGuards,
   Logger,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -21,6 +23,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { AvailabilityService } from './availability.service';
 import { Public } from '../../common/decorators/public.decorator';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 const execAsync = promisify(exec);
 
@@ -139,9 +142,11 @@ export class AvailabilityController {
    * CUD (Create, Update, Delete): Dilindungi otentikasi JWT Guard
    * Hanya user berwenang (owner/admin/operator) yang bisa mengubah data
    */
+  @UseGuards(JwtAuthGuard)
   @Post('groups')
   async createGroup(
     @Query('tenantId') tenantId: string,
+    @Req() req: any,
     @Body()
     body: {
       name: string;
@@ -150,7 +155,16 @@ export class AvailabilityController {
       siteplanImage?: string;
     },
   ) {
-    return this.availabilityService.createGroup(tenantId, body);
+    const isSuper = req?.user?.roles?.includes('superadmin');
+    const effectiveTenantId = isSuper
+      ? tenantId || req?.user?.tenantId
+      : req?.user?.tenantId;
+    if (!effectiveTenantId) {
+      throw new ForbiddenException(
+        'Akses ditolak: Akun tidak terhubung dengan tenant manapun',
+      );
+    }
+    return this.availabilityService.createGroup(effectiveTenantId, body);
   }
 
   @Put('groups/:id')

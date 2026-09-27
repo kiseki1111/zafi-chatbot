@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const API_BASE = "/api/v1";
 
@@ -229,9 +230,26 @@ export function KnowledgePage() {
 
       {/* Content */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-24 gap-3">
-          <Loader2 className="h-10 w-10 animate-spin text-emerald-600" />
-          <p className="text-sm text-muted-foreground">Memuat data knowledge...</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="rounded-2xl border p-5 bg-card space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-10 w-10 rounded-xl" />
+                  <div className="space-y-1.5">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-20" />
+                  </div>
+                </div>
+                <Skeleton className="h-7 w-14 rounded-md" />
+              </div>
+              <div className="space-y-2 pt-2">
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-4/5" />
+                <Skeleton className="h-3 w-2/3" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : items.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-emerald-200 bg-emerald-50/50 dark:bg-emerald-900/10 dark:border-emerald-800 py-24 gap-4">
@@ -421,12 +439,12 @@ export function KnowledgePage() {
                             <Upload className="h-6 w-6 text-emerald-600" />
                           </div>
                           <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Klik atau seret file ke sini</p>
-                          <p className="text-xs text-muted-foreground">PDF, DOCX, atau TXT (maks 10MB)</p>
+                          <p className="text-xs text-muted-foreground">PDF, DOCX, CSV, atau XLS/XLSX (maks 10MB)</p>
                         </div>
                       )}
                       <input
                         type="file"
-                        accept=".pdf,.docx,.txt"
+                        accept=".pdf,.docx,.csv,.xls,.xlsx,.txt"
                         className="hidden"
                         onChange={e => setFile(e.target.files?.[0] || null)}
                       />

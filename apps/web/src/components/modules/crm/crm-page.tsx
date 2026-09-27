@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -252,7 +253,23 @@ export function CrmPage() {
         <Card className="flex-1 flex flex-col min-h-0 overflow-hidden">
           <div className="flex-1 overflow-auto">
             {loading ? (
-              <div className="text-center text-xs text-muted-foreground py-12">Memuat data pelanggan...</div>
+              <div className="p-4 space-y-3">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} className="flex items-center justify-between p-3 rounded-lg border border-border/40">
+                    <div className="flex items-center gap-3 w-1/3">
+                      <Skeleton className="h-8 w-8 rounded-full shrink-0" />
+                      <div className="space-y-1.5 w-full">
+                        <Skeleton className="h-3.5 w-32" />
+                        <Skeleton className="h-3 w-20" />
+                      </div>
+                    </div>
+                    <Skeleton className="h-3 w-28" />
+                    <Skeleton className="h-3 w-24 hidden md:block" />
+                    <Skeleton className="h-3 w-24 hidden lg:block" />
+                    <Skeleton className="h-6 w-16 rounded-full" />
+                  </div>
+                ))}
+              </div>
             ) : contacts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
                 <div className="h-16 w-16 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 grid place-items-center mb-4 text-emerald-600 shadow-sm">

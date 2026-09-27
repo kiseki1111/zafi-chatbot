@@ -22,6 +22,14 @@ const FollowupPage = dynamic(() => import("@/components/modules/followup/followu
 const SettingsPage = dynamic(() => import("@/components/modules/settings/settings-page").then(mod => mod.SettingsPage), { loading: Loading });
 const CrmPage = dynamic(() => import("@/components/modules/crm/crm-page").then(mod => mod.CrmPage), { loading: Loading });
 
+// Superadmin Pages
+const PlatformOverviewPage = dynamic(() => import("@/components/modules/superadmin/platform-overview-page").then(mod => mod.PlatformOverviewPage), { loading: Loading });
+const WahaMonitorPage = dynamic(() => import("@/components/modules/superadmin/waha-monitor-page").then(mod => mod.WahaMonitorPage), { loading: Loading });
+const QuotaMonitorPage = dynamic(() => import("@/components/modules/superadmin/quota-monitor-page").then(mod => mod.QuotaMonitorPage), { loading: Loading });
+const PricingPlansPage = dynamic(() => import("@/components/modules/superadmin/pricing-plans-page").then(mod => mod.PricingPlansPage), { loading: Loading });
+const AiConfigPage = dynamic(() => import("@/components/modules/superadmin/ai-config-page").then(mod => mod.AiConfigPage), { loading: Loading });
+const SystemLogsPage = dynamic(() => import("@/components/modules/superadmin/system-logs-page").then(mod => mod.SystemLogsPage), { loading: Loading });
+
 
 import { canAccess, defaultViewForRole } from "@/lib/rbac";
 import type { ViewKey } from "@/lib/types";
@@ -95,7 +103,13 @@ export function DashboardShell() {
 
   const render = () => {
     switch (view as ViewKey) {
+      case "platform_overview": return <PlatformOverviewPage />;
       case "clients": return <ClientsPage />;
+      case "waha_monitor": return <WahaMonitorPage />;
+      case "quota_monitor": return <QuotaMonitorPage />;
+      case "pricing_plans": return <PricingPlansPage />;
+      case "ai_config": return <AiConfigPage />;
+      case "system_logs": return <SystemLogsPage />;
       case "overview": return <OverviewPage />;
       case "bus_layout": return <BusLayoutPage />;
       case "availability": return <AvailabilityPage />;
@@ -105,7 +119,7 @@ export function DashboardShell() {
       case "settings": return <SettingsPage />;
       case "crm": return <CrmPage />;
 
-      default: return <OverviewPage />;
+      default: return user.role === "superadmin" ? <PlatformOverviewPage /> : <OverviewPage />;
     }
   };
 

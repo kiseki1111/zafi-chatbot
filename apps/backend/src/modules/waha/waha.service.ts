@@ -18,7 +18,7 @@ export class WahaService {
     let url =
       this.configService.get<string>('WAHA_API_URL') ||
       process.env.WAHA_API_URL ||
-      'https://waha.zafii.tech';
+      'http://127.0.0.1:3000';
     if (url.includes('waha:3000') && process.platform === 'win32') {
       url = url.replace('waha:3000', '127.0.0.1:3000');
     }
@@ -28,10 +28,7 @@ export class WahaService {
       this.configService.get<string>('WHATSAPP_API_KEY') ||
       process.env.WAHA_API_KEY ||
       process.env.WHATSAPP_API_KEY ||
-      'ZafitechDunia12345#';
-    if (key === 'ZafitechDunia12345') {
-      key = 'ZafitechDunia12345#';
-    }
+      '';
     this.apiKey = key;
     this.logger.log(`[WAHA SERVICE] Initialized with baseUrl: ${this.baseUrl} and apiKey: ${this.apiKey}`);
   }
@@ -214,16 +211,41 @@ export class WahaService {
           return finalUrl;
         });
 
+        const webhookSecret =
+          process.env.WAHA_WEBHOOK_SECRET ||
+          this.configService.get<string>('WAHA_WEBHOOK_SECRET');
+
         payload.config = {
-          webhooks: formattedUrls.map((url) => ({
-            url: url,
-            events: ['message', 'message.any', 'session.status', 'call.received', 'presence.update'],
-            retries: {
-              delaySeconds: 10,
-              attempts: 15,
-              policy: 'fixed',
-            },
-          })),
+          webhooks: formattedUrls.map((url) => {
+            const webhookUrlWithSecret =
+              webhookSecret && !url.includes('secret=')
+                ? `${url}${url.includes('?') ? '&' : '?'}secret=${encodeURIComponent(webhookSecret)}`
+                : url;
+
+            const webhookItem: any = {
+              url: webhookUrlWithSecret,
+              events: [
+                'message',
+                'message.any',
+                'session.status',
+                'call.received',
+                'presence.update',
+              ],
+              retries: {
+                delaySeconds: 10,
+                attempts: 15,
+                policy: 'fixed',
+              },
+            };
+
+            if (webhookSecret) {
+              webhookItem.customHeaders = [
+                { name: 'X-Webhook-Secret', value: webhookSecret },
+              ];
+            }
+
+            return webhookItem;
+          }),
         };
       }
 
@@ -586,7 +608,7 @@ export class WahaService {
     );
     const isVideo = /\.(mp4|mov|webm|mkv|ogg)($|\?)/i.test(mediaUrl);
     if (isVideo) {
-      return this.sendVideoFile(sessionName, chatId, mediaUrl, caption);
+      return this.sendVideo(sessionName, chatId, mediaUrl, caption);
     }
     return this.sendImage(sessionName, chatId, mediaUrl, caption);
   }
@@ -688,6 +710,7 @@ export class WahaService {
 
       let filePayload: any = {
         mimetype: 'video/mp4',
+        filename: 'video.mp4',
       };
 
       // 1. Prioritaskan baca langsung dari disk lokal jika file ada di uploads
@@ -695,7 +718,7 @@ export class WahaService {
       if (localFile) {
         const fileData = this.readLocalMediaFile(localFile, 'video/mp4');
         if (fileData) {
-          filePayload.data = `data:video/mp4;base64,${fileData.data.toString('base64')}`;
+          filePayload.data = fileData.data.toString('base64');
           this.logger.log(
             `[WAHA-SEND-VIDEO-NATIVE] Membaca video langsung dari disk lokal: ${localFile}`,
           );
@@ -711,7 +734,7 @@ export class WahaService {
             timeout: 35000,
           });
           const base64Data = Buffer.from(downloadRes.data).toString('base64');
-          filePayload.data = `data:video/mp4;base64,${base64Data}`;
+          filePayload.data = base64Data;
         } catch (dlErr) {
           filePayload.url = videoUrl;
         }
@@ -747,7 +770,8 @@ export class WahaService {
         ? JSON.stringify(error.response.data)
         : error.message;
       this.logger.error(`Failed to send native video: ${errorDetail}`);
-      throw error;
+      this.logger.warn(`[WAHA] Mencoba fallback kirim video via sendFile...`);
+      return this.sendVideoFile(sessionName, chatId, videoUrl, caption);
     }
   }
 

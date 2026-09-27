@@ -3,22 +3,42 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 
+// Ekstraktor token dari cookie 'access_token' atau header Bearer
+const cookieExtractor = (req: any): string | null => {
+  if (req?.cookies?.access_token) {
+    return req.cookies.access_token;
+  }
+  if (req?.headers?.cookie) {
+    const match = req.headers.cookie.match(/(?:^|;\s*)access_token=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+  return null;
+};
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(private readonly configService: ConfigService) {
     super({
-      //ekstraksi bearer token dari header http authorization secara stateless
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      // Ekstraksi ganda: mendukung Header Authorization Bearer maupun HttpOnly Cookie
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+        cookieExtractor,
+      ]),
       ignoreExpiration: false,
-      //membaca kunci rahasia dari env
+      // Membaca kunci rahasia dari env
       secretOrKey:
         configService.get<string>('JWT_ACCESS_SECRET') ||
-        'fallback_secret_key_sementara',
+        'rahasia_akses_sangat_kuat_super_aman_123!',
     });
   }
 
-  //memetakan isi payload token ke dalam objek request (req.user)
+  // Memetakan isi payload token ke dalam objek request (req.user)
   async validate(payload: any) {
-    return { sub: payload.sub, email: payload.email, roles: payload.roles };
+    return {
+      sub: payload.sub,
+      email: payload.email,
+      roles: payload.roles || [],
+      tenantId: payload.tenantId || null,
+    };
   }
 }

@@ -1,5 +1,5 @@
 // ===== Core Auth & RBAC =====
-export type Role = "superadmin" | "manager" | "administrator";
+export type Role = "superadmin" | "manager" | "administrator" | "operator" | "marketing" | string;
 
 export interface User {
   id: string;
@@ -24,7 +24,14 @@ export type ViewKey =
   | "knowledge"
   | "followup"
   | "settings"
-  | "crm";
+  | "crm"
+  // Superadmin modules
+  | "platform_overview"
+  | "waha_monitor"
+  | "quota_monitor"
+  | "pricing_plans"
+  | "ai_config"
+  | "system_logs";
 
 // ===== Resource & Availability (Generic Units / Slots) =====
 export type ResourceStatus = "AVAILABLE" | "BOOKED" | "OCCUPIED" | "MAINTENANCE";

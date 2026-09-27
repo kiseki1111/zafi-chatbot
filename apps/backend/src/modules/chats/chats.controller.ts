@@ -10,13 +10,31 @@ import {
   Req,
   UseGuards,
   BadRequestException,
+  ForbiddenException,
+  Sse,
 } from '@nestjs/common';
+import { Observable } from 'rxjs';
 import { ChatsService } from './chats.service';
+import { ChatStreamService } from './chat-stream.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { Public } from '../../common/decorators/public.decorator';
 
+@UseGuards(JwtAuthGuard)
 @Controller('api/v1/chats')
 export class ChatsController {
-  constructor(private readonly chatsService: ChatsService) {}
+  constructor(
+    private readonly chatsService: ChatsService,
+    private readonly chatStreamService: ChatStreamService,
+  ) {}
+
+  @Public()
+  @Sse('stream')
+  streamEvents(
+    @Query('conversationId') conversationId?: string,
+    @Query('instanceName') instanceName?: string,
+  ): Observable<MessageEvent> {
+    return this.chatStreamService.subscribe(conversationId, instanceName);
+  }
 
   @Get()
   getConversations(
@@ -24,11 +42,14 @@ export class ChatsController {
     @Query('tenantId') tenantId?: string,
     @Req() req?: any,
   ) {
-    const tId =
-      tenantId && tenantId !== 'undefined' && tenantId !== 'null'
+    const isSuperadmin = req?.user?.roles?.includes('superadmin');
+    const effectiveTenantId = isSuperadmin
+      ? tenantId && tenantId !== 'undefined' && tenantId !== 'null'
         ? tenantId
-        : req?.user?.tenantId;
-    return this.chatsService.getConversations(instanceName, tId);
+        : req?.user?.tenantId
+      : req?.user?.tenantId;
+
+    return this.chatsService.getConversations(instanceName, effectiveTenantId);
   }
 
   @Get(':id/messages')
@@ -36,33 +57,39 @@ export class ChatsController {
     @Param('id') id: string,
     @Query('skip', new DefaultValuePipe(0), ParseIntPipe) skip: number,
     @Query('take', new DefaultValuePipe(20), ParseIntPipe) take: number,
+    @Req() req?: any,
   ) {
-    return this.chatsService.getMessages(id, skip, take);
+    const isSuperadmin = req?.user?.roles?.includes('superadmin');
+    const tenantId = isSuperadmin ? undefined : req?.user?.tenantId;
+    return tenantId
+      ? this.chatsService.getMessages(id, skip, take, tenantId)
+      : this.chatsService.getMessages(id, skip, take);
   }
 
   // Get Contact Profile (Avatar, About/Bio) from WAHA
   @Get(':id/profile')
-  getContactProfile(@Param('id') id: string) {
-    return this.chatsService.getContactProfile(id);
+  getContactProfile(@Param('id') id: string, @Req() req?: any) {
+    const isSuperadmin = req?.user?.roles?.includes('superadmin');
+    const tenantId = isSuperadmin ? undefined : req?.user?.tenantId;
+    return tenantId
+      ? this.chatsService.getContactProfile(id, tenantId)
+      : this.chatsService.getContactProfile(id);
   }
 
   // Admin takeover conversation
   @Post(':id/takeover')
-  @UseGuards(JwtAuthGuard)
   takeover(@Param('id') id: string, @Req() req: any) {
     return this.chatsService.takeoverConversation(id, req.user?.sub);
   }
 
   // Release back to bot
   @Post(':id/release')
-  @UseGuards(JwtAuthGuard)
   release(@Param('id') id: string) {
     return this.chatsService.releaseConversation(id);
   }
 
   // Admin send text message
   @Post(':id/send')
-  @UseGuards(JwtAuthGuard)
   sendMessage(
     @Param('id') id: string,
     @Req() req: any,
@@ -74,7 +101,6 @@ export class ChatsController {
 
   // Admin send image (base64 or URL)
   @Post(':id/send-image')
-  @UseGuards(JwtAuthGuard)
   async sendImage(
     @Param('id') id: string,
     @Req() req: any,

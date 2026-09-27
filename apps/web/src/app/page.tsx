@@ -8,7 +8,6 @@ import { useAppStore } from "@/lib/app-store";
 import { useAuthStore } from "@/lib/auth-store";
 
 const LoginForm = nextDynamic(() => import("@/components/auth/login-form").then(m => ({ default: m.LoginForm })), { ssr: false });
-const RegisterForm = nextDynamic(() => import("@/components/auth/register-form").then(m => ({ default: m.RegisterForm })), { ssr: false });
 const ForgotPasswordForm = nextDynamic(() => import("@/components/auth/forgot-password-form").then(m => ({ default: m.ForgotPasswordForm })), { ssr: false });
 const DashboardShell = nextDynamic(() => import("@/components/dashboard/dashboard-shell").then(m => ({ default: m.DashboardShell })), { ssr: false });
 
@@ -23,7 +22,6 @@ export default function Home() {
   }, [theme]);
 
   if (!isAuthenticated) {
-    if (authView === "register") return <RegisterForm />;
     if (authView === "forgot") return <ForgotPasswordForm />;
     return <LoginForm />;
   }

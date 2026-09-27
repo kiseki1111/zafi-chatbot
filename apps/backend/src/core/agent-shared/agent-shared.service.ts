@@ -333,13 +333,13 @@ export class AgentSharedService {
       // sekaligus tambahkan header X-Api-Key (WAHA minta autentikasi)
       if (isWahaInternal) {
         const baseUrl =
-          process.env.WAHA_API_URL || 'http://103.30.195.145:3060';
+          process.env.WAHA_API_URL || 'http://127.0.0.1:3000';
         const pathPart = mediaUrl.substring(mediaUrl.indexOf('/api/files/'));
         targetUrl = `${baseUrl.replace(/\/+$/, '')}${pathPart}`;
       }
 
       const apiKey =
-        process.env.WAHA_API_KEY || 'ZafitechDunia12345#';
+        process.env.WAHA_API_KEY || process.env.WHATSAPP_API_KEY || '';
       const res = await axios.get(targetUrl, {
         responseType: 'arraybuffer',
         headers: {
