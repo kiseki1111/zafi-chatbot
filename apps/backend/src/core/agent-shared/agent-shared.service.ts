@@ -204,30 +204,53 @@ export class AgentSharedService {
       );
     }
 
-    try {
-      const response = await this.openai.chat.completions.create({
-        model: this.model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.7,
-        response_format: requireJson
-          ? { type: 'json_object' }
-          : { type: 'text' },
-      });
+    // Model text utama tetap DeepSeek, diikuti fallback dari yang termurah ke termahal:
+    // 1. deepseek/deepseek-v4-flash-0731 (Utama)
+    // 2. z-ai/glm-5.3-flash (In $0.045 / Out $0.14)
+    // 3. xiaomi/mimo-v2.5 (In $0.119 / Out $0.238)
+    // 4. openai/gpt-4o-mini (In $0.15 / Out $0.60)
+    const candidateModels = [
+      this.model,
+      'deepseek/deepseek-v4-flash-0731',
+      'z-ai/glm-5.3-flash',
+      'xiaomi/mimo-v2.5',
+      'openai/gpt-4o-mini',
+    ].filter((m, idx, arr) => Boolean(m) && arr.indexOf(m) === idx);
 
-      return response.choices[0].message?.content || '';
-    } catch (error) {
-      this.logger.error('Error in LLM call:', error);
-      throw new InternalServerErrorException(
-        'Failed to generate response from LLM',
-      );
+    let lastError: any = null;
+
+    for (const model of candidateModels) {
+      try {
+        const response = await this.openai.chat.completions.create({
+          model: model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.7,
+          response_format: requireJson
+            ? { type: 'json_object' }
+            : { type: 'text' },
+        });
+
+        const content = response.choices[0]?.message?.content || '';
+        if (content) return content;
+      } catch (error) {
+        lastError = error;
+        this.logger.warn(
+          `[AgentShared LLM Fallback] Model ${model} gagal: ${error.message}. Mencoba model cadangan...`,
+        );
+      }
     }
+
+    this.logger.error('All candidate LLM models failed:', lastError);
+    throw new InternalServerErrorException(
+      'Failed to generate response from LLM (all fallbacks exhausted)',
+    );
   }
 
   /**
-   * 4b. Wrapper untuk memanggil OpenAI secara streaming.
+   * 4b. Wrapper untuk memanggil OpenAI secara streaming dengan fallback.
    */
   async callLLMStream(
     prompt: string,
@@ -241,79 +264,125 @@ export class AgentSharedService {
       );
     }
 
-    try {
-      const stream = await this.openai.chat.completions.create({
-        model: this.model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.7,
-        response_format: requireJson
-          ? { type: 'json_object' }
-          : { type: 'text' },
-        stream: true,
-      });
+    const candidateModels = [
+      this.model,
+      'deepseek/deepseek-v4-flash-0731',
+      'z-ai/glm-5.3-flash',
+      'xiaomi/mimo-v2.5',
+      'openai/gpt-4o-mini',
+    ].filter((m, idx, arr) => Boolean(m) && arr.indexOf(m) === idx);
 
-      let fullContent = '';
-      for await (const chunk of stream) {
-        const textChunk = chunk.choices[0]?.delta?.content || '';
-        if (textChunk) {
-          fullContent += textChunk;
-          onChunk(textChunk);
+    let lastError: any = null;
+
+    for (const model of candidateModels) {
+      try {
+        const stream = await this.openai.chat.completions.create({
+          model: model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.7,
+          response_format: requireJson
+            ? { type: 'json_object' }
+            : { type: 'text' },
+          stream: true,
+        });
+
+        let fullContent = '';
+        for await (const chunk of stream) {
+          const textChunk = chunk.choices[0]?.delta?.content || '';
+          if (textChunk) {
+            fullContent += textChunk;
+            onChunk(textChunk);
+          }
         }
+        if (fullContent) return fullContent;
+      } catch (error) {
+        lastError = error;
+        this.logger.warn(
+          `[AgentShared LLM Stream Fallback] Model ${model} gagal: ${error.message}. Mencoba model cadangan...`,
+        );
       }
-      return fullContent;
-    } catch (error) {
-      this.logger.error('Error in LLM stream call:', error);
-      throw new InternalServerErrorException(
-        'Failed to generate stream response from LLM',
-      );
     }
+
+    this.logger.error('All candidate LLM stream models failed:', lastError);
+    throw new InternalServerErrorException(
+      'Failed to generate stream response from LLM (all fallbacks exhausted)',
+    );
   }
 
   async analyzeImage(
     mediaUrl: string,
-    prompt: string = 'Deskripsikan apa isi gambar ini dengan singkat dan jelas, fokus pada nama produk, merk, jumlah, atau informasi harga jika ada.',
+    prompt: string = 'Analisis dan deskripsikan isi gambar ini secara singkat, padat, dan jelas dalam Bahasa Indonesia. Identifikasi objek utama secara spesifik (misalnya: tipe/desain rumah atau properti, denah/siteplan, produk/barang dagangan, struk transfer/pembayaran, atau dokumen). Sebutkan teks yang terbaca, ciri visual utama, warna, dan kondisinya.',
   ): Promise<string> {
-    if (!this.openai) return '';
-    try {
-      // Convert media ke base64 data URI agar OpenRouter/Llama dapat baca gambar
-      // tanpa bergantung URL publik (localhost/private gagal).
-      let imageContent: any = { type: 'image_url', image_url: { url: mediaUrl } };
-      try {
-        const dataUri = await this.fetchImageAsDataUri(mediaUrl);
-        if (dataUri) {
-          imageContent = {
-            type: 'image_url',
-            image_url: { url: dataUri },
-          };
-        }
-      } catch (e) {
-        this.logger.warn(`Could not pre-fetch image, fallback URL: ${e.message}`);
-      }
-
-      const response = await this.openai.chat.completions.create({
-        // Gunakan model Vision (Llama-4-Scout) yang mendukung input gambar
-        model: this.visionModel,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: prompt },
-              imageContent,
-            ] as any, // type override for openai array content
-          },
-        ],
-        max_tokens: 400,
-      });
-      return response.choices[0].message?.content || '';
-    } catch (e) {
-      this.logger.error(
-        `Error analyzing image (model=${this.visionModel}): ${e}`,
-      );
+    if (!this.openai) {
+      this.logger.warn('[Vision AI] OpenAI client not initialized.');
       return '';
     }
+
+    let imageContent: any = { type: 'image_url', image_url: { url: mediaUrl } };
+    try {
+      const dataUri = await this.fetchImageAsDataUri(mediaUrl);
+      if (dataUri) {
+        imageContent = {
+          type: 'image_url',
+          image_url: { url: dataUri },
+        };
+      }
+    } catch (e) {
+      this.logger.warn(`Could not pre-fetch image, fallback URL: ${e.message}`);
+    }
+
+    // Daftar model Vision diurutkan dari yang termurah ke termahal:
+    // 1. z-ai/glm-5.3-flash (In $0.045 / Out $0.14) -> UTAMA
+    // 2. meta-llama/llama-3.2-11b-vision-instruct (In $0.05 / Out $0.33)
+    // 3. meta-llama/llama-4-scout (In $0.10 / Out $0.30)
+    // 4. xiaomi/mimo-v2.5 (In $0.119 / Out $0.238)
+    // 5. openai/gpt-4o-mini (In $0.15 / Out $0.60)
+    const candidateModels = [
+      this.visionModel,
+      'z-ai/glm-5.3-flash',
+      'meta-llama/llama-3.2-11b-vision-instruct',
+      'meta-llama/llama-4-scout',
+      'xiaomi/mimo-v2.5',
+      'openai/gpt-4o-mini',
+    ].filter((m, idx, arr) => Boolean(m) && arr.indexOf(m) === idx);
+
+    for (const model of candidateModels) {
+      try {
+        this.logger.log(`[Vision AI] Mencoba analisis gambar dengan model: ${model}...`);
+        const response = await this.openai.chat.completions.create({
+          model: model,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: prompt },
+                imageContent,
+              ] as any,
+            },
+          ],
+          max_tokens: 500,
+        });
+
+        const msg: any = response.choices[0]?.message;
+        const description = (msg?.content || msg?.reasoning || '').trim();
+        if (description) {
+          this.logger.log(`[Vision AI] Sukses menganalisis gambar (${model}): "${description.substring(0, 80)}..."`);
+          return description;
+        }
+        this.logger.warn(`[Vision AI] Model ${model} mengembalikan respon kosong, mencoba fallback...`);
+      } catch (e: any) {
+        const errorDetail = e.response?.data || e.message || e;
+        this.logger.warn(
+          `[Vision AI Fallback] Gagal dengan model ${model}: ${JSON.stringify(errorDetail)}. Mencoba kandidat berikutnya...`,
+        );
+      }
+    }
+
+    this.logger.error('[Vision AI] Seluruh model vision (termasuk fallback) gagal.');
+    return '';
   }
 
   /**

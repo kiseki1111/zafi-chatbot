@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import axios from 'axios';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../core/prisma/prisma.service';
@@ -6,10 +6,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 @Injectable()
-export class WahaService {
+export class WahaService implements OnApplicationBootstrap {
   private readonly logger = new Logger(WahaService.name);
   private readonly baseUrl: string;
   private readonly apiKey: string;
+  private isAutoRestoring = false;
 
   constructor(
     private readonly configService: ConfigService,
@@ -50,6 +51,66 @@ export class WahaService {
       `Sleeping for ${delay}ms before sending message (Anti-Spam)...`,
     );
     return new Promise((resolve) => setTimeout(resolve, delay));
+  }
+
+  async onApplicationBootstrap() {
+    // Jalankan auto-restore sesi di background setelah server backend selesai bootstrap
+    setTimeout(() => {
+      this.autoRestoreSessions().catch((err) => {
+        this.logger.warn(`Auto-restore sessions error: ${err.message}`);
+      });
+    }, 5000);
+  }
+
+  /**
+   * Otomatis menyalakan kembali sesi WAHA yang terdaftar di database
+   * jika WAHA aktif tetapi sesi belum berjalan (misal setelah backend deploy/restart)
+   */
+  async autoRestoreSessions(): Promise<void> {
+    if (this.isAutoRestoring) return;
+    this.isAutoRestoring = true;
+
+    try {
+      this.logger.log('[WAHA Auto-Restore] Memeriksa sesi WhatsApp yang perlu dipulihkan...');
+      let wahaSessions: any[] = [];
+      try {
+        const res = await axios.get(`${this.baseUrl}/api/sessions?all=true`, {
+          headers: this.getHeaders(),
+          timeout: 4000,
+        });
+        wahaSessions = res.data || [];
+      } catch {
+        this.logger.debug('[WAHA Auto-Restore] WAHA API belum siap, lewati auto-restore.');
+        return;
+      }
+
+      const activeNames = new Set(wahaSessions.map((s) => s.name));
+      const dbInstances = await this.prisma.whatsappInstance.findMany({
+        where: { status: { not: 'STOPPED' } },
+      });
+
+      for (const inst of dbInstances) {
+        if (!activeNames.has(inst.instanceName)) {
+          this.logger.log(
+            `[WAHA Auto-Restore] Menyalakan kembali sesi "${inst.instanceName}"...`,
+          );
+          try {
+            await this.startSession(
+              inst.instanceName,
+              undefined,
+              inst.channelAccountId || undefined,
+              inst.tenantId || undefined,
+            );
+          } catch (e: any) {
+            this.logger.warn(
+              `[WAHA Auto-Restore] Gagal memulai sesi "${inst.instanceName}": ${e.message}`,
+            );
+          }
+        }
+      }
+    } finally {
+      this.isAutoRestoring = false;
+    }
   }
 
   // Adaptive delay based on WPM (Words Per Minute)
@@ -117,16 +178,17 @@ export class WahaService {
   // Mengambil foto profil kontak dari WAHA
   async getContactProfilePicture(sessionName: string, contactPhone: string): Promise<string | null> {
     try {
-      const cleanPhone = contactPhone.replace(/@(c\.us|s\.whatsapp\.net)$/i, '').replace(/^\+/, '');
+      const cleanPhone = (contactPhone || '').replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, '').replace(/^\+/, '');
+      if (!cleanPhone || cleanPhone.length < 5 || cleanPhone === '0') return null;
+
       const contactId = `${cleanPhone}@c.us`;
       const response = await axios.get(`${this.baseUrl}/api/contacts/profile-picture`, {
         params: { session: sessionName, contactId },
         headers: this.getHeaders(),
-        timeout: 8000,
+        timeout: 4000,
       });
       return response.data?.url || response.data?.profilePicture || null;
-    } catch (error) {
-      this.logger.debug(`Could not get profile picture for ${contactPhone}: ${error.message}`);
+    } catch {
       return null;
     }
   }
@@ -134,16 +196,17 @@ export class WahaService {
   // Mengambil status bio / about kontak dari WAHA
   async getContactAbout(sessionName: string, contactPhone: string): Promise<string | null> {
     try {
-      const cleanPhone = contactPhone.replace(/@(c\.us|s\.whatsapp\.net)$/i, '').replace(/^\+/, '');
+      const cleanPhone = (contactPhone || '').replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, '').replace(/^\+/, '');
+      if (!cleanPhone || cleanPhone.length < 5 || cleanPhone === '0') return null;
+
       const contactId = `${cleanPhone}@c.us`;
       const response = await axios.get(`${this.baseUrl}/api/contacts/about`, {
         params: { session: sessionName, contactId },
         headers: this.getHeaders(),
-        timeout: 8000,
+        timeout: 4000,
       });
       return response.data?.about || response.data?.status || null;
-    } catch (error) {
-      this.logger.debug(`Could not get about for ${contactPhone}: ${error.message}`);
+    } catch {
       return null;
     }
   }
@@ -297,8 +360,14 @@ export class WahaService {
         );
       }
 
-      // If WAHA API unreachable or returned empty, fallback to database
+      // If WAHA API unreachable or returned empty, sync DB statuses with WAHA reality
       if (wahaSessions.length === 0) {
+        // Jika WAHA merespons list kosong (sesi tidak ada lagi di WAHA), tandai status di DB sebagai STOPPED
+        await this.prisma.whatsappInstance.updateMany({
+          where: { status: 'WORKING' },
+          data: { status: 'STOPPED' },
+        }).catch(() => null);
+
         const dbInstances = await this.prisma.whatsappInstance.findMany({
           where: tenantId ? { tenantId } : {},
           orderBy: { createdAt: 'desc' },
@@ -310,6 +379,16 @@ export class WahaService {
           dbStats: inst,
         }));
       }
+
+      const activeNames = new Set(wahaSessions.map((ws) => ws.name));
+      // Tandai instance DB yang tidak ada di WAHA aktif sebagai STOPPED
+      await this.prisma.whatsappInstance.updateMany({
+        where: {
+          instanceName: { notIn: Array.from(activeNames) },
+          status: 'WORKING',
+        },
+        data: { status: 'STOPPED' },
+      }).catch(() => null);
 
       const mergedSessions = await Promise.all(
         wahaSessions.map(async (ws) => {

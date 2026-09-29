@@ -63,12 +63,13 @@ export const OPENAI_VISION_MODEL = 'OPENAI_VISION_MODEL';
     },
     {
       // Model khusus untuk analisis gambar (Vision). DeepSeek tidak mendukung image input.
+      // Default: z-ai/glm-5.3-flash (Termurah: In $0.045 / Out $0.14)
       provide: OPENAI_VISION_MODEL,
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
         return (
           configService.get<string>('OPENAI_VISION_MODEL') ||
-          'meta-llama/llama-4-scout-17b-16e-instruct'
+          'z-ai/glm-5.3-flash'
         );
       },
     },

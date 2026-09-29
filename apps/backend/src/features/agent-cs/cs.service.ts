@@ -93,12 +93,11 @@ WAJIB MERESPON DALAM FORMAT JSON BERIKUT:
 
     // S-CS2: Handle image by converting to text via Vision AI
     if (mediaUrls && mediaUrls.length > 0) {
-      this.logger.log(`[CS-BOT] Menganalisis ${mediaUrls.length} gambar...`);
-      const imgDesc = await this.agentSharedService.analyzeImage(
-        mediaUrls[0],
-        'Deskripsikan barang apa ini. Sebutkan merk, model, dan warna jika terlihat jelas.',
-      );
-      text += `\n[Gambar dikirim oleh pelanggan: ${imgDesc}]`;
+      this.logger.log(`[CS-BOT] Menganalisis ${mediaUrls.length} gambar via Vision AI...`);
+      const imgDesc = await this.agentSharedService.analyzeImage(mediaUrls[0]);
+      if (imgDesc) {
+        text += `\n[Informasi Visual Gambar dari Pelanggan: ${imgDesc}]`;
+      }
     }
 
     // 1. Ambil History menggunakan utilitas terpusat
