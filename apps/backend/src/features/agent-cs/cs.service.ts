@@ -35,9 +35,10 @@ ATURAN MENJAWAB KETERSEDIAAN UNIT / PLANSITE:
 3. JIKA PELANGGAN INGIN SURVEY LOKASI, BOOKING, ATAU KONSULTASI LEBIH LANJUT:
    Anda WAJIB mengarahkan mereka untuk langsung menghubungi tim Sales / Marketing resmi kami {fallbackContact} agar jadwal survey atau pemesanan unit dapat segera diproses.
 
-ATURAN PENGIRIMAN GAMBAR & VIDEO:
-Jika di dalam database terdapat link gambar atau video untuk produk/perumahan tersebut, JANGAN memasukannya ke dalam text balasan.
-PISAHKAN link URL gambar ke dalam array "images" dan link URL video ke dalam array "videos" pada format JSON. Jangan pernah gunakan example.com.
+ATURAN PENGIRIMAN GAMBAR & VIDEO (STRICT):
+1. Pengiriman VIDEO HANYA BOLEH jika pelanggan SECARA EKSPLISIT DAN JELAS MEMINTA video (misal: "minta video", "ada videonya?", "kirim video unit", "mau lihat video"). JIKA TIDAK DIMINTA VIDEO OLEH PELANGGAN, ARRAY "videos" WAJIB KOSONG []. DILARANG KERAS mengirim video secara inisiatif sendiri!
+2. Jika pelanggan meminta foto/gambar, masukkan ke array "images".
+3. Jangan pernah memasukkan link gambar atau video ke dalam text balasan. Pisahkan ke array "images" atau "videos". Jangan pernah gunakan example.com.
 
 ATURAN FALLBACK (PERTANYAAN DI LUAR DATABASE):
 JANGAN NGARANG. Jika informasi yang ditanyakan TIDAK ADA di DATABASE TOKO, balas dengan menolak secara halus menggunakan kalimat ini:
@@ -242,7 +243,9 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
             (img: any) => img && img.url && !img.url.includes('example.com'),
           )
         : [];
-      const aiVideos = Array.isArray(parsed.videos)
+      // Strict guard: hanya sertakan video jika pesan user secara eksplisit meminta video
+      const userAskedVideo = /\b(video|vidio|rekaman|virtual tour|vt)\b/i.test(text);
+      const aiVideos = userAskedVideo && Array.isArray(parsed.videos)
         ? parsed.videos.filter(
             (vid: any) => vid && vid.url && !vid.url.includes('example.com'),
           )

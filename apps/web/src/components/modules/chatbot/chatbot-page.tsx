@@ -184,6 +184,7 @@ function MessageBubble({
   const isOut = msg.direction === "out";
   const isCall = msg.messageType === "call";
   const isImage = msg.messageType === "image" && msg.mediaUrl;
+  const isVideo = msg.messageType === "video" && msg.mediaUrl;
 
   if (isCall) {
     return (
@@ -243,10 +244,20 @@ function MessageBubble({
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
           />
         ) : null}
-        {/* Untuk pesan image: tampilkan hanya gambar (tanpa placeholder "Mengirim foto").
-            Teks hanya tampil jika ada caption/isi teks asli. */}
+        {isVideo ? (
+          <video
+            src={msg.mediaUrl}
+            controls
+            preload="metadata"
+            className="rounded-lg max-w-full max-h-64 object-cover mb-1 bg-black"
+          />
+        ) : null}
+        {/* Untuk pesan image/video: sembunyikan placeholder caption default */}
         {msg.text &&
-          !(msg.messageType === "image" && (msg.text === "Mengirim foto" || msg.text?.startsWith("Mengirim "))) && (
+          !(
+            (msg.messageType === "image" || msg.messageType === "video") &&
+            (msg.text === "Mengirim foto" || msg.text === "Mengirim video" || msg.text?.startsWith("Mengirim "))
+          ) && (
           <p className="whitespace-pre-wrap break-words">{msg.text}</p>
         )}
         <div
@@ -840,12 +851,16 @@ export function ChatbotPage() {
           if (payload?.type === 'message' && payload?.data?.message) {
             const raw = payload.data.message;
             if (raw.conversationId === activeId) {
+              const isBot = raw.senderType === 'bot' || raw.senderType === 'ai';
               const liveMsg: ChatMessage = {
                 id: raw.id || `live-${Date.now()}`,
-                sender: raw.senderType === 'customer' ? 'user' : 'bot',
+                contactId: raw.conversationId,
+                direction: raw.senderType === 'customer' ? 'in' : 'out',
                 text: raw.content || '',
-                time: new Date(raw.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                timestamp: new Date(raw.createdAt || Date.now()).toLocaleTimeString(),
                 status: 'delivered',
+                isAI: isBot,
+                senderName: raw.senderType === 'agent' ? (raw.sender?.name || 'Admin') : undefined,
                 messageType: raw.messageType?.toLowerCase(),
                 mediaUrl: (raw.metadata as any)?.localMediaUrl || (raw.metadata as any)?.mediaUrl || (raw.metadata as any)?.url,
               };
