@@ -66,25 +66,8 @@ export class ChatsService {
         .replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, '')
         .replace(/^\+/, '');
 
-      let displayName = c.contact?.name || '';
-      if (
-        !displayName ||
-        displayName.includes('@') ||
-        displayName === c.contact?.phone ||
-        displayName === cleanPhone
-      ) {
-        for (const msg of c.messages || []) {
-          const meta = msg.metadata as any;
-          const notify = meta?._data?.notifyName || meta?.sender?.pushname;
-          if (notify && typeof notify === 'string') {
-            displayName = notify;
-            break;
-          }
-        }
-        if (!displayName || displayName === c.contact?.phone) {
-          displayName = cleanPhone ? `+${cleanPhone}` : c.contact?.name || 'Pelanggan';
-        }
-      }
+      // Tampilkan nomor telepon sebagai nama kontak (mirip WhatsApp web resmi saat kontak belum disimpan di buku telepon)
+      const displayName = cleanPhone ? `+${cleanPhone}` : c.contact?.name || 'Pelanggan';
 
       return {
         ...c,
@@ -148,13 +131,30 @@ export class ChatsService {
       );
     }
 
-    const phone = conversation.contact?.phone || '';
+    let phone = conversation.contact?.phone || '';
     const instanceName = conversation.instanceName;
 
     let pfpUrl: string | null = null;
     let bio: string | null = null;
 
     if (instanceName && phone) {
+      // Jika nomor tersimpan masih berakhiran LID atau format LID, resolve ke nomor telepon asli (@c.us)
+      if (phone.includes('@lid') || phone.length > 13) {
+        try {
+          const lidId = phone.includes('@') ? phone : `${phone}@lid`;
+          const wahaContact = await this.wahaService.getContact(instanceName, lidId);
+          if (wahaContact?.id && !wahaContact.id.includes('@lid')) {
+            const realPhone = wahaContact.id.replace(/@(c\.us|s\.whatsapp\.net)$/i, '');
+            // Update juga ke DB agar permanen benar
+            await this.prisma.contact.update({
+              where: { id: conversation.contactId },
+              data: { phone: realPhone },
+            }).catch(() => null);
+            phone = realPhone;
+          }
+        } catch {}
+      }
+
       [pfpUrl, bio] = await Promise.all([
         this.wahaService.getContactProfilePicture(instanceName, phone).catch(() => null),
         this.wahaService.getContactAbout(instanceName, phone).catch(() => null),

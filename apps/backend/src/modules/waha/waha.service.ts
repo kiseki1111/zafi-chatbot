@@ -175,6 +175,20 @@ export class WahaService implements OnApplicationBootstrap {
     }
   }
 
+  // Mengambil info kontak lengkap dari WAHA (resolve LID ke nomor asli)
+  async getContact(sessionName: string, contactId: string): Promise<any> {
+    try {
+      const response = await axios.get(`${this.baseUrl}/api/contacts`, {
+        params: { session: sessionName, contactId },
+        headers: this.getHeaders(),
+        timeout: 4000,
+      });
+      return response.data;
+    } catch {
+      return null;
+    }
+  }
+
   // Mengambil foto profil kontak dari WAHA
   async getContactProfilePicture(sessionName: string, contactPhone: string): Promise<string | null> {
     try {

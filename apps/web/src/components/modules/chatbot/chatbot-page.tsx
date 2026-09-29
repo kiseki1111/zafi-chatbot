@@ -677,15 +677,7 @@ export function ChatbotPage() {
         const cleanPhone = (c.contactNumber || "")
           .replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, "")
           .replace(/^\+/, "");
-        let cleanName = c.contactName || "";
-        if (
-          !cleanName ||
-          cleanName.includes('@') ||
-          cleanName === c.contactNumber ||
-          cleanName === cleanPhone
-        ) {
-          cleanName = cleanPhone ? `+${cleanPhone}` : "Pelanggan";
-        }
+        const cleanName = cleanPhone ? `+${cleanPhone}` : (c.contactName || "Pelanggan");
         return {
           id: c.id,
           name: cleanName,

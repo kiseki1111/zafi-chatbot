@@ -511,15 +511,27 @@ export class WahaController {
         message?._data?.key?.participant;
       const realPhoneJid = rawAlt && !rawAlt.includes('@lid') ? rawAlt : null;
 
-      const rawNumber = message?.fromMe
+      let rawNumber = message?.fromMe
         ? message.to || message._data?.key?.remoteJid || message.from
         : realPhoneJid || message?.from;
+
+      // Jika nomor berupa LID (@lid), minta WAHA resolve ke nomor telepon asli (@c.us)
+      if (rawNumber && rawNumber.includes('@lid') && sessionName) {
+        try {
+          const wahaContact = await this.wahaService.getContact(sessionName, rawNumber);
+          if (wahaContact?.id && !wahaContact.id.includes('@lid')) {
+            rawNumber = wahaContact.id;
+          }
+        } catch {}
+      }
 
       const cleanNumber = (rawNumber || '')
         .replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, '')
         .replace(/^\+/, '');
 
       const contactNumber = cleanNumber || rawNumber;
+
+      let currentConversationId: string | null = null;
 
       if (sessionName && isDirectPhone(rawNumber)) {
         const contactName =
@@ -554,16 +566,13 @@ export class WahaController {
             },
           });
           let contactId;
+          const defaultPhoneName = `+${contactNumber}`;
           if (contact) {
             await this.prisma.contact.update({
               where: { id: contact.id },
               data: {
                 phone: contactNumber,
-                name:
-                  contactName ||
-                  (contact.name && !contact.name.includes('@') && contact.name !== contact.phone
-                    ? contact.name
-                    : `+${contactNumber}`),
+                name: defaultPhoneName,
               },
             });
             contactId = contact.id;
@@ -571,7 +580,7 @@ export class WahaController {
             const newContact = await this.prisma.contact.create({
               data: {
                 phone: contactNumber,
-                name: contactName || `+${contactNumber}`,
+                name: defaultPhoneName,
               },
             });
             contactId = newContact.id;
@@ -596,6 +605,7 @@ export class WahaController {
               unreadCount: message.fromMe ? 0 : 1,
             },
           });
+          currentConversationId = conversation.id;
 
           const isMediaMsg =
             Boolean(
@@ -714,11 +724,8 @@ export class WahaController {
           : [];
 
         if (text || mediaUrls.length > 0 || message.hasMedia) {
-          // Tandai pesan sudah dibaca (Blue Ticks) & munculkan status mengetik di WhatsApp
-          if (sessionName && sender) {
-            this.wahaService.sendSeen(sessionName, sender, msgId).catch(() => null);
-            this.wahaService.sendTypingPresence(sessionName, sender).catch(() => null);
-          }
+          // Tangkap ID conversation aktif dari webhook saat ini
+          const activeConvId = currentConversationId;
 
           // Helper: simpan pesan balasan bot ke database agar tampil di monitoring
           const saveBotReply = async (
@@ -727,30 +734,37 @@ export class WahaController {
             meta?: any,
           ) => {
             try {
-              const replyContactNumber = (message.from || '').replace(
-                /@c\.us|@s\.whatsapp\.net/g,
-                '',
-              );
-              const contact = await this.prisma.contact.findFirst({
-                where: {
-                  OR: [
-                    { phone: message.from },
-                    { phone: replyContactNumber },
-                    { phone: { contains: replyContactNumber } },
-                  ],
-                },
-              });
-              if (!contact) return;
-              const conversation = await this.prisma.conversation.findFirst({
-                where: {
-                  instanceName: sessionName,
-                  contactId: contact.id,
-                },
-              });
-              if (!conversation) return;
+              let targetConversationId = activeConvId;
+              if (!targetConversationId) {
+                const replyContactNumber = (message.from || '').replace(
+                  /@c\.us|@s\.whatsapp\.net|@lid/g,
+                  '',
+                );
+                const contact = await this.prisma.contact.findFirst({
+                  where: {
+                    OR: [
+                      { phone: contactNumber },
+                      { phone: rawNumber },
+                      { phone: replyContactNumber },
+                      { phone: { contains: replyContactNumber } },
+                      ...(message?.from ? [{ phone: message.from }] : []),
+                    ],
+                  },
+                });
+                if (!contact) return;
+                const conv = await this.prisma.conversation.findFirst({
+                  where: {
+                    instanceName: sessionName,
+                    contactId: contact.id,
+                  },
+                });
+                if (!conv) return;
+                targetConversationId = conv.id;
+              }
+
               const botMsg = await this.prisma.message.create({
                 data: {
-                  conversationId: conversation.id,
+                  conversationId: targetConversationId,
                   senderType: 'bot',
                   messageType: msgType,
                   content: replyText || '',
@@ -759,7 +773,7 @@ export class WahaController {
                 },
               });
               await this.prisma.conversation.update({
-                where: { id: conversation.id },
+                where: { id: targetConversationId },
                 data: { lastMessageAt: new Date() },
               });
 
@@ -767,7 +781,7 @@ export class WahaController {
               ChatStreamService.getInstance()?.emit({
                 type: 'message',
                 data: {
-                  conversationId: conversation.id,
+                  conversationId: targetConversationId,
                   instanceName: sessionName,
                   message: botMsg,
                 },
