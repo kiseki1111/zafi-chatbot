@@ -1,0 +1,29 @@
+services:
+  waha:
+    image: devlikeapro/waha:chrome
+    container_name: waha-core
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      WAHA_PORT: 3000
+      WHATSAPP_HOOK_URL: http://iqbal-backend:3030/api/v1/waha/webhook
+      WHATSAPP_API_KEY: ${WHATSAPP_API_KEY:-ZafitechDunia12345#}
+      WHATSAPP_SWAGGER_USERNAME: admin
+      WHATSAPP_SWAGGER_PASSWORD: adminpassword123
+      WAHA_WORKER_RESTART_ON_EXIT: "true"
+      WHATSAPP_RESTART_ALL_SESSIONS: "true"
+      WHATSAPP_START_SESSION: "zafi-cs"
+    ports:
+      - "3000:3000"
+    volumes:
+      - waha_sessions:/.waha/sessions
+    networks:
+      - app-network
+
+volumes:
+  waha_sessions:
+
+networks:
+  app-network:
+    name: coolify-network
+    external: true

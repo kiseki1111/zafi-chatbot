@@ -54,63 +54,8 @@ export class WahaService implements OnApplicationBootstrap {
   }
 
   async onApplicationBootstrap() {
-    // Jalankan auto-restore sesi di background setelah server backend selesai bootstrap
-    setTimeout(() => {
-      this.autoRestoreSessions().catch((err) => {
-        this.logger.warn(`Auto-restore sessions error: ${err.message}`);
-      });
-    }, 5000);
-  }
-
-  /**
-   * Otomatis menyalakan kembali sesi WAHA yang terdaftar di database
-   * jika WAHA aktif tetapi sesi belum berjalan (misal setelah backend deploy/restart)
-   */
-  async autoRestoreSessions(): Promise<void> {
-    if (this.isAutoRestoring) return;
-    this.isAutoRestoring = true;
-
-    try {
-      this.logger.log('[WAHA Auto-Restore] Memeriksa sesi WhatsApp yang perlu dipulihkan...');
-      let wahaSessions: any[] = [];
-      try {
-        const res = await axios.get(`${this.baseUrl}/api/sessions?all=true`, {
-          headers: this.getHeaders(),
-          timeout: 4000,
-        });
-        wahaSessions = res.data || [];
-      } catch {
-        this.logger.debug('[WAHA Auto-Restore] WAHA API belum siap, lewati auto-restore.');
-        return;
-      }
-
-      const activeNames = new Set(wahaSessions.map((s) => s.name));
-      const dbInstances = await this.prisma.whatsappInstance.findMany({
-        where: { status: { not: 'STOPPED' } },
-      });
-
-      for (const inst of dbInstances) {
-        if (!activeNames.has(inst.instanceName)) {
-          this.logger.log(
-            `[WAHA Auto-Restore] Menyalakan kembali sesi "${inst.instanceName}"...`,
-          );
-          try {
-            await this.startSession(
-              inst.instanceName,
-              undefined,
-              inst.channelAccountId || undefined,
-              inst.tenantId || undefined,
-            );
-          } catch (e: any) {
-            this.logger.warn(
-              `[WAHA Auto-Restore] Gagal memulai sesi "${inst.instanceName}": ${e.message}`,
-            );
-          }
-        }
-      }
-    } finally {
-      this.isAutoRestoring = false;
-    }
+    // Sesi WAHA dikelola independen di container WAHA dengan persistent storage.
+    // Tidak memicu startSession paksa saat boot agar tidak meng-overwrite sesi yang sudah berstatus WORKING.
   }
 
   // Adaptive delay based on WPM (Words Per Minute)

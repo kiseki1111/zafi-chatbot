@@ -1,0 +1,23 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg15
+    container_name: rbac-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DATABASE_USER:-postgres}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-secret_password}
+      POSTGRES_DB: ${DATABASE_NAME:-rbac_api_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+
+networks:
+  app-network:
+    name: coolify-network
+    external: true
