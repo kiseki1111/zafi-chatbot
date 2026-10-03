@@ -21,6 +21,30 @@ interface KnowledgeItem {
   createdAt: string;
 }
 
+const MOCK_KNOWLEDGE_ITEMS: KnowledgeItem[] = [
+  {
+    id: "kb-1",
+    title: "Pricelist & Spesifikasi Rumah Tipe 45/90",
+    content: "Rumah 1 lantai dengan luas bangunan 45 m2, luas tanah 90 m2. Dilengkapi 2 kamar tidur, 1 kamar mandi, carport 1 mobil, listrik 1300 VA, air PDAM. Harga mulai Rp 650.000.000.",
+    metadata: { type: "text" },
+    createdAt: "2025-05-01T08:00:00Z",
+  },
+  {
+    id: "kb-2",
+    title: "Syarat & Berkas Pengajuan KPR",
+    content: "1. KTP Pemohon & Pasangan (jika menikah)\n2. Kartu Keluarga & NPWP\n3. Slip Gaji 3 bulan terakhir\n4. Rekening Koran 3 bulan terakhir\n5. Surat Keterangan Kerja aktif.",
+    metadata: { type: "text" },
+    createdAt: "2025-05-02T10:30:00Z",
+  },
+  {
+    id: "kb-3",
+    title: "Brosur Digital Zafi Royal Residence (PDF)",
+    content: "Brosur digital memuat masterplan kawasan 5 hektar, denah tipe 36, 45, dan 60, serta fasilitas club house & one gate system.",
+    metadata: { type: "file", filename: "Brosur-Zafi-Residence-2025.pdf" },
+    createdAt: "2025-05-05T14:20:00Z",
+  },
+];
+
 type ModalMode = "create-text" | "create-file" | "edit" | null;
 
 export function KnowledgePage() {
@@ -38,24 +62,37 @@ export function KnowledgePage() {
   const [content, setContent] = useState("");
   const [file, setFile] = useState<File | null>(null);
 
-  useEffect(() => {
-    if (tenantId) fetchKnowledge();
-  }, [tenantId]);
-
   const fetchKnowledge = async () => {
+    const isDemo =
+      user?.id?.startsWith("u-") ||
+      user?.email?.includes("demo") ||
+      (process.env.NODE_ENV !== "production" && !tenantId);
+
     try {
       setLoading(true);
       const res = await fetch(`${API_BASE}/knowledge?tenantId=${tenantId}`);
       if (!res.ok) throw new Error();
       const json = await res.json();
       const data = json.data?.data || json.data || json;
-      setItems(Array.isArray(data) ? data : []);
+      if (Array.isArray(data)) {
+        if (data.length > 0) {
+          setItems(data);
+        } else {
+          setItems(isDemo ? MOCK_KNOWLEDGE_ITEMS : []);
+        }
+      } else {
+        setItems(isDemo ? MOCK_KNOWLEDGE_ITEMS : []);
+      }
     } catch {
-      toast.error("Gagal mengambil data knowledge");
+      setItems(isDemo ? MOCK_KNOWLEDGE_ITEMS : []);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (tenantId) fetchKnowledge();
+  }, [tenantId]);
 
   const openCreate = (mode: "create-text" | "create-file") => {
     setEditingItem(null);
@@ -177,54 +214,50 @@ export function KnowledgePage() {
   ];
 
   return (
-    <div className="space-y-8 p-1">
-      {/* Header */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-600 to-green-700 p-8 text-white shadow-2xl">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=%2260%22 height=%2260%22 viewBox=%220 0 60 60%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cg fill=%22none%22 fill-rule=%22evenodd%22%3E%3Cg fill=%22%23ffffff%22 fill-opacity=%220.05%22%3E%3Cpath d=%22M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')]" />
-        <div className="relative flex items-start justify-between">
-          <div className="flex items-center gap-4">
-            <div className="rounded-xl bg-white/20 p-3 backdrop-blur-sm">
-              <Brain className="h-8 w-8 text-white" />
+    <div className="space-y-4 p-1">
+      {/* Header - Minimalist & Compact (Zero Overlapping) */}
+      <div className="rounded-xl border bg-card p-3 sm:p-4 shadow-xs space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="h-8 w-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 grid place-items-center shrink-0">
+              <Brain className="h-4.5 w-4.5" />
             </div>
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">Knowledge Base</h1>
-              <p className="mt-1 text-emerald-100">
-                Kelola informasi &amp; dokumen yang akan digunakan AI Chatbot sebagai referensi jawaban.
-              </p>
-            </div>
+            <h1 className="text-sm sm:text-base font-bold tracking-tight text-foreground whitespace-nowrap">
+              Knowledge Base
+            </h1>
           </div>
-          <div className="flex gap-3">
-            <button
+
+          {/* Action buttons */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => openCreate("create-file")}
-              className="flex items-center gap-2 rounded-xl bg-white/15 px-4 py-2.5 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/25 border border-white/20"
+              className="h-7.5 text-xs gap-1 px-2 border-border"
+              title="Unggah Dokumen PDF/Docx"
             >
-              <Upload className="h-4 w-4" />
-              Unggah Dokumen
-            </button>
-            <button
+              <Upload className="h-3 w-3" />
+              <span>Dokumen</span>
+            </Button>
+            <Button
+              size="sm"
               onClick={() => openCreate("create-text")}
-              className="flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50 shadow-lg"
+              className="h-7.5 text-xs gap-1 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs font-semibold"
+              title="Tambah Teks Manual"
             >
-              <Plus className="h-4 w-4" />
-              Tambah Teks
-            </button>
+              <Plus className="h-3.5 w-3.5" />
+              <span>Teks</span>
+            </Button>
           </div>
         </div>
 
-        {/* Stats row */}
-        <div className="relative mt-6 grid grid-cols-3 gap-4">
-          <div className="rounded-xl bg-white/10 backdrop-blur-sm px-4 py-3 border border-white/15">
-            <p className="text-xs text-emerald-200">Total Knowledge</p>
-            <p className="text-2xl font-bold">{items.length}</p>
-          </div>
-          <div className="rounded-xl bg-white/10 backdrop-blur-sm px-4 py-3 border border-white/15">
-            <p className="text-xs text-emerald-200">Dari Teks</p>
-            <p className="text-2xl font-bold">{items.filter(i => i.metadata?.type !== 'file').length}</p>
-          </div>
-          <div className="rounded-xl bg-white/10 backdrop-blur-sm px-4 py-3 border border-white/15">
-            <p className="text-xs text-emerald-200">Dari Dokumen</p>
-            <p className="text-2xl font-bold">{items.filter(i => i.metadata?.type === 'file').length}</p>
-          </div>
+        {/* Dedicated stats row - cleanly underneath, zero collision */}
+        <div className="flex items-center gap-3 text-xs sm:text-sm text-muted-foreground pt-1.5 border-t border-border/50">
+          <span className="font-semibold text-foreground text-sm sm:text-base">{items.length}</span> Total
+          <span>·</span>
+          <span>{items.filter(i => i.metadata?.type !== 'file').length} Teks</span>
+          <span>·</span>
+          <span>{items.filter(i => i.metadata?.type === 'file').length} Dokumen</span>
         </div>
       </div>
 
@@ -276,7 +309,7 @@ export function KnowledgePage() {
             return (
               <div
                 key={item.id}
-                className={`group relative overflow-hidden rounded-2xl border bg-gradient-to-br ${color} p-5 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5`}
+                className={`group relative overflow-hidden rounded-2xl border bg-gradient-to-br ${color} p-4 sm:p-5 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5`}
               >
                 {/* Icon badge */}
                 <div className="flex items-start justify-between mb-4">
@@ -293,7 +326,7 @@ export function KnowledgePage() {
                 </div>
 
                 {/* Title */}
-                <h3 className="font-semibold text-foreground truncate mb-1" title={item.title}>
+                <h3 className="font-semibold text-sm sm:text-base text-foreground truncate mb-1" title={item.title}>
                   {item.title}
                 </h3>
 
@@ -334,9 +367,9 @@ export function KnowledgePage() {
 
       {/* Modal Overlay */}
       {modalMode && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={closeModal}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 sm:p-4" onClick={closeModal}>
           <div
-            className="relative w-full max-w-lg rounded-2xl bg-background shadow-2xl border border-border overflow-hidden"
+            className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-background shadow-2xl border border-border overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
             {/* Modal header */}
@@ -372,13 +405,13 @@ export function KnowledgePage() {
             </div>
 
             {/* Modal body */}
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               {(modalMode === "create-text" || modalMode === "edit") && (
                 <form onSubmit={modalMode === "edit" ? handleSubmitEdit : handleSubmitText} className="space-y-4">
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium text-foreground">Judul Topik</label>
                     <input
-                      className="w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
+                      className="w-full rounded-xl border border-input bg-background px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
                       placeholder="Contoh: Info Promo Bulan Agustus"
                       value={title}
                       onChange={e => setTitle(e.target.value)}
@@ -388,9 +421,9 @@ export function KnowledgePage() {
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium text-foreground">Isi Pengetahuan</label>
                     <textarea
-                      className="w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition resize-none"
+                      className="w-full rounded-xl border border-input bg-background px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition resize-none"
                       placeholder="Tuliskan informasi detail di sini..."
-                      rows={6}
+                      rows={7}
                       value={content}
                       onChange={e => setContent(e.target.value)}
                       required
@@ -416,7 +449,7 @@ export function KnowledgePage() {
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium text-foreground">Judul (Opsional)</label>
                     <input
-                      className="w-full rounded-xl border border-input bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
+                      className="w-full rounded-xl border border-input bg-background px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
                       placeholder="Contoh: SOP Pengembalian Barang"
                       value={title}
                       onChange={e => setTitle(e.target.value)}

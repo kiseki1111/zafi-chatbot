@@ -51,11 +51,14 @@ export function AuthShell({
 
       {/* Form panel */}
       <div className="flex flex-col min-h-screen">
-        <div className="lg:hidden flex items-center gap-2 p-6 border-b">
+        <div className="lg:hidden flex items-center gap-2 p-5 border-b bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30">
           <div className="grid place-items-center h-9 w-9 rounded-lg bg-emerald-600 text-white">
             <Building2 className="h-5 w-5" />
           </div>
-          <p className="font-bold">Chatbot Manager</p>
+          <div>
+            <p className="font-bold">Chatbot Manager</p>
+            <p className="text-xs text-muted-foreground">AI Assistant untuk WhatsApp</p>
+          </div>
         </div>
         <div className="flex-1 flex items-center justify-center p-6 sm:p-10">
           <div className="w-full max-w-md">
@@ -65,6 +68,12 @@ export function AuthShell({
             </div>
             {children}
             {footer && <div className="mt-6 text-center text-sm text-muted-foreground">{footer}</div>}
+            <div className="lg:hidden mt-6 pt-4 border-t border-border/40">
+              <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5 text-emerald-600" /> Aman & Terenkripsi</span>
+                <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5 text-emerald-600" /> Multi-tenant</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

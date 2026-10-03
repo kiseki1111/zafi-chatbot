@@ -19,10 +19,8 @@ export function Sidebar() {
   const { view, setView, setSidebarOpen, enabledMenus, setEnabledMenus } = useAppStore();
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
 
-  if (!user) return null;
-  const safeRole = (user.role || "operator").toLowerCase() as any;
-
   useEffect(() => {
+    if (!user) return;
     if (user.role === "superadmin") {
       setEnabledMenus(undefined); // Superadmin selalu melihat semua menu miliknya
       return;
@@ -38,17 +36,16 @@ export function Sidebar() {
         // Cek apakah ada menu spesifik untuk akun staf ini
         const userMenus = tenant?.metadata?.userMenus?.[user.id];
         if (Array.isArray(userMenus) && userMenus.length > 0) {
-          // Hak akses user tidak boleh melebihi menu yang diizinkan untuk perusahaannya
-          const effective = Array.isArray(tenantMenus)
-            ? userMenus.filter((m: string) => tenantMenus.includes(m))
-            : userMenus;
-          setEnabledMenus(effective);
+          setEnabledMenus(userMenus);
         } else if (Array.isArray(tenantMenus)) {
           setEnabledMenus(tenantMenus);
         }
       })
-      .catch(() => {});
-  }, [user.id, user.role, user.tenantId, setEnabledMenus]);
+      .catch(() => null);
+  }, [user, setEnabledMenus]);
+
+  if (!user) return null;
+  const safeRole = (user.role || "operator").toLowerCase() as any;
 
   const items = menuForRole(safeRole, enabledMenus, user) || [];
   const theme = ROLE_THEME[safeRole] || { bg: "bg-muted", color: "text-foreground", ring: "ring-muted" };

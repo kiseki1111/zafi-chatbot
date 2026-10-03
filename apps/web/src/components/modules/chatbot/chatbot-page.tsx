@@ -70,6 +70,7 @@ import type {
 } from "@/lib/types";
 import { useAuthStore } from "@/lib/auth-store";
 import { useAppStore } from "@/lib/app-store";
+import { MOCK_CHATS, MOCK_CHAT_MESSAGES, DEFAULT_MOCK_MESSAGES } from "@/lib/mock-data";
 
 // ---------- Helpers ----------
 
@@ -124,17 +125,17 @@ function initials(name: string): string {
 
 // Canned Indonesian AI auto-replies (used when "AI aktif" is on)
 const AI_REPLIES: string[] = [
-  "Baik, saya bantu cek ketersediaannya ya, Bapak/Ibu 🙏",
+  "Baik, saya bantu cek ketersediaannya ya, Bapak/Ibu.",
   "Untuk properti tersebut, DP mulai 20%. Mau saya kirimkan simulasi?",
   "Terima kasih infonya. Boleh saya jadwalkan survey akhir pekan ini?",
-  "Saya catat permintaan Anda dan akan koordinasi dengan agent terkait 👍",
+  "Saya catat permintaan Anda dan akan koordinasi dengan agent terkait.",
   "Harga masih dapat dibicarakan. Mau saya bantu negosiasi terbaik?",
-  "Baik, saya kirimkan brosur & foto lengkapnya sekarang ya 🏡",
+  "Baik, saya kirimkan brosur & foto lengkapnya sekarang ya.",
 ];
 
 const AI_SUGGESTIONS: string[] = [
-  "Halo! Terima kasih sudah menghubungi. Ada yang bisa saya bantu terkait properti impian Anda? 🏡",
-  "Baik, saya bantu cek ketersediaannya ya, Bapak/Ibu 🙏",
+  "Halo! Terima kasih sudah menghubungi. Ada yang bisa saya bantu terkait properti impian Anda?",
+  "Baik, saya bantu cek ketersediaannya ya, Bapak/Ibu.",
   "Untuk properti ini DP mulai 20%, tenor KPR hingga 20 tahun. Mau saya kirim simulasi?",
   "Bisa saya jadwalkan survey lokasi akhir pekan ini?",
 ];
@@ -296,7 +297,7 @@ function ContactListItem({
         }
       }}
       className={cn(
-        "w-full grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-lg p-2.5 text-left transition-all duration-150 ease-out cursor-pointer select-none outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 active:scale-[0.98]",
+        "w-full grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-lg p-3 text-left transition-all duration-150 ease-out cursor-pointer select-none outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 active:scale-[0.98]",
         active
           ? "bg-emerald-50 dark:bg-emerald-950/30 ring-1 ring-emerald-200 dark:ring-emerald-800 shadow-xs"
           : "hover:bg-muted/60 hover:translate-x-0.5",
@@ -322,21 +323,32 @@ function ContactListItem({
         <div className="min-w-0 flex-1 flex flex-col justify-center">
           <div className="grid grid-cols-[1fr_auto] items-center gap-2">
             <p className="text-sm font-medium truncate">{contact.name}</p>
-            <span className="text-[10px] text-muted-foreground">
-              {contact.lastMessageAt}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-muted-foreground">
+                {contact.lastMessageAt}
+              </span>
+              {(contact.unread ?? 0) > 0 && (
+                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
+                  {contact.unread}
+                </span>
+              )}
+            </div>
           </div>
           <p className="text-xs text-muted-foreground truncate mt-0.5">
             {contact.lastMessage}
           </p>
           <div className="flex flex-wrap gap-1 mt-1">
             {contact.mode === "human" ? (
-              <span className="inline-flex items-center rounded px-1 py-0 text-[9px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 gap-0.5">
+              <span className="inline-flex items-center rounded px-1 py-0 text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 gap-0.5">
                 <UserCog className="h-2.5 w-2.5" />
                 {contact.assignedToName ? contact.assignedToName : "Admin"}
               </span>
             ) : (
-              <span className="inline-flex items-center rounded px-1 py-0 text-[9px] font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 gap-0.5">
+              <span className="inline-flex items-center rounded px-1 py-0 text-[10px] font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 gap-0.5">
+                <span className="relative flex h-2 w-2 mr-0.5">
+                  <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                </span>
                 <Bot className="h-2.5 w-2.5" /> Bot
               </span>
             )}
@@ -588,6 +600,7 @@ export function ChatbotPage() {
   const [newTag, setNewTag] = useState("");
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [mobileShowList, setMobileShowList] = useState(false);
+  const [chatFilter, setChatFilter] = useState<"all"|"bot"|"human"|"unread">("all");
 
   // Takeover state
   const [takingOver, setTakingOver] = useState(false);
@@ -661,6 +674,11 @@ export function ChatbotPage() {
   // Fetch Conversations
   const fetchConversations = async () => {
     if (!sessionId) return;
+    const isDemo =
+      user?.id?.startsWith('u-') ||
+      user?.email?.includes('demo') ||
+      (process.env.NODE_ENV !== 'production' && !user?.tenantId);
+
     try {
       const tenantQuery = user?.tenantId && user.role !== 'superadmin' ? `&tenantId=${user.tenantId}` : '';
       const res = await fetch(`/api/v1/chats?instanceName=${sessionId}${tenantQuery}`);
@@ -669,8 +687,13 @@ export function ChatbotPage() {
       if (data && data.data && Array.isArray(data.data)) {
         chatsData = data.data;
       }
-      if (!Array.isArray(chatsData)) {
-        console.warn("Chats API did not return an array:", data);
+      if (!Array.isArray(chatsData) || chatsData.length === 0) {
+        if (isDemo) {
+          setContacts(MOCK_CHATS);
+          if (!activeId) setActiveId(MOCK_CHATS[0].id);
+        } else {
+          setContacts([]);
+        }
         return;
       }
       const mappedContacts: Contact[] = chatsData.map((c: any) => {
@@ -708,6 +731,12 @@ export function ChatbotPage() {
       }
     } catch (e) {
       console.error(e);
+      if (isDemo) {
+        setContacts(MOCK_CHATS);
+        if (!activeId) setActiveId(MOCK_CHATS[0].id);
+      } else {
+        setContacts([]);
+      }
     }
   };
 
@@ -724,8 +753,10 @@ export function ChatbotPage() {
       if (data && data.data && Array.isArray(data.data)) {
         msgsData = data.data;
       }
-      if (!Array.isArray(msgsData)) {
-        console.warn("Messages API did not return an array:", data);
+      if (!Array.isArray(msgsData) || (reset && msgsData.length === 0)) {
+        const mockMsgs = MOCK_CHAT_MESSAGES[activeId] || DEFAULT_MOCK_MESSAGES;
+        setMessages(mockMsgs);
+        setHasMore(false);
         return;
       }
       const mappedMsgs: ChatMessage[] = msgsData.map((m: any) => ({
@@ -757,6 +788,9 @@ export function ChatbotPage() {
       }
     } catch (e) {
       console.error(e);
+      const mockMsgs = MOCK_CHAT_MESSAGES[activeId] || DEFAULT_MOCK_MESSAGES;
+      setMessages(mockMsgs);
+      setHasMore(false);
     } finally {
       if (reset) setLoadingMore(false);
     }
@@ -801,7 +835,6 @@ export function ChatbotPage() {
   useEffect(() => {
     const fetchLatest = () => {
       fetchConversations();
-      fetchQuota();
       if (activeId) {
          fetch(`/api/v1/chats/${activeId}/messages?skip=0&take=20`)
           .then(r => r.json())
@@ -893,9 +926,13 @@ export function ChatbotPage() {
       if (q && !c.name.toLowerCase().includes(q) && !c.phone.includes(q))
         return false;
       if (filter === "mine") return c.assignedTo === me;
+      // Chat filter chips
+      if (chatFilter === "bot") return c.mode !== "human";
+      if (chatFilter === "human") return c.mode === "human";
+      if (chatFilter === "unread") return (c.unread ?? 0) > 0;
       return true;
     });
-  }, [contacts, search, filter, me]);
+  }, [contacts, search, filter, chatFilter, me]);
 
   // Stats
   const messagesToday = useMemo(
@@ -1074,7 +1111,21 @@ export function ChatbotPage() {
         body,
       });
     } catch (e) {
-      console.error("Failed to send message", e);
+      console.error("Failed to send message, simulating mock reply", e);
+      if (!isHuman) {
+        setTimeout(() => {
+          const botReply: ChatMessage = {
+            id: "reply-" + Date.now(),
+            contactId: activeId,
+            direction: "out",
+            text: "Terima kasih atas pesannya! Informasi ini telah dicatat oleh sistem AI dan segera ditindaklanjuti.",
+            status: "read",
+            timestamp: new Date().toLocaleTimeString(),
+            isAI: true,
+          };
+          setMessages((prev) => [...prev, botReply]);
+        }, 700);
+      }
     }
   }
 
@@ -1156,56 +1207,54 @@ export function ChatbotPage() {
 
   return (
     <div className="flex flex-col flex-1 h-full min-h-0 gap-1.5">
-      {/* ===== Top Bar Ringkas & Terpadu ===== */}
-      <Card className="px-2 py-1.5 shrink-0 shadow-xs border-muted/70">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-2">
-            <div className="h-6 w-6 rounded-md bg-emerald-600 text-white grid place-items-center">
-              <MessageCircle className="h-3.5 w-3.5" />
-            </div>
-            <span className="font-bold text-sm leading-none">Live Chat &amp; WA Bot</span>
-            {isConnected && (
-              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded-full">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Online
-              </span>
-            )}
+      {/* ===== Top Session Selector Bar (Single Streamlined Row) ===== */}
+      <div className={cn(
+        "flex items-center justify-between gap-2 px-3 py-1.5 bg-card border rounded-xl shadow-2xs shrink-0",
+        !mobileShowList && activeId ? "hidden md:flex" : "flex"
+      )}>
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <div className="h-6 w-6 rounded-md bg-emerald-600 text-white grid place-items-center shrink-0">
+            <MessageCircle className="h-3.5 w-3.5" />
           </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* WA Session selector */}
-            <Select value={sessionId} onValueChange={setSessionId}>
-              <SelectTrigger className="w-[170px] h-7 text-xs bg-muted/50 border-0 gap-2">
-                <SelectValue placeholder="Pilih sesi WAHA" />
-              </SelectTrigger>
-              <SelectContent>
-                {sessions.length === 0 && <SelectItem value="none" disabled>Tidak ada sesi aktif</SelectItem>}
-                {sessions.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={cn(
-                          "h-2 w-2 rounded-full",
-                          s.status === "working"
-                            ? "bg-emerald-500"
-                            : s.status === "starting"
-                              ? "bg-amber-500"
-                              : "bg-rose-500",
-                        )}
-                      />
-                      <span className="text-xs font-medium">{s.name}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <span className="text-[11px] text-muted-foreground hidden lg:inline pl-1 border-l">
-              <strong className="text-foreground">{contacts.length}</strong> kontak · <strong className="text-foreground">{messagesToday}</strong> pesan
-            </span>
-          </div>
+          <Select value={sessionId} onValueChange={setSessionId}>
+            <SelectTrigger className="w-[180px] sm:w-[220px] h-7 text-xs bg-muted/50 border-0 gap-1.5">
+              <SelectValue placeholder="Pilih sesi WAHA" />
+            </SelectTrigger>
+            <SelectContent>
+              {sessions.length === 0 && <SelectItem value="none" disabled>Tidak ada sesi aktif</SelectItem>}
+              {sessions.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        "h-2 w-2 rounded-full",
+                        s.status === "working"
+                          ? "bg-emerald-500"
+                          : s.status === "starting"
+                            ? "bg-amber-500"
+                            : "bg-rose-500",
+                      )}
+                    />
+                    <span className="text-xs font-medium">{s.name}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-      </Card>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-[11px] text-muted-foreground hidden lg:inline pr-1">
+            <strong className="text-foreground">{contacts.length}</strong> kontak · <strong className="text-foreground">{messagesToday}</strong> pesan
+          </span>
+          {isConnected && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Online
+            </span>
+          )}
+        </div>
+      </div>
 
       {/* ===== Main 3-column ===== */}
       <div className="flex-1 flex gap-2 min-h-0">
@@ -1227,19 +1276,29 @@ export function ChatbotPage() {
                 className="pl-8 h-8"
               />
             </div>
-            <Tabs
-              value={filter}
-              onValueChange={(v) => setFilter(v as typeof filter)}
-            >
-              <TabsList className="w-full grid grid-cols-2 h-7">
-                <TabsTrigger value="all" className="text-xs">
-                  Semua
-                </TabsTrigger>
-                <TabsTrigger value="mine" className="text-xs">
-                  Saya
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+
+            {/* Chat filter chips */}
+            <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
+              {([
+                { key: "all", label: "Semua" },
+                { key: "bot", label: "Bot Aktif" },
+                { key: "human", label: "Admin" },
+                { key: "unread", label: "Belum Dibaca" },
+              ] as const).map((f) => (
+                <button
+                  key={f.key}
+                  onClick={() => setChatFilter(f.key)}
+                  className={cn(
+                    "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium border transition-colors",
+                    chatFilter === f.key
+                      ? "bg-emerald-600 text-white border-emerald-600"
+                      : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted"
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
           </div>
           <ScrollArea className="flex-1 min-h-0">
             <div className="px-2 py-1 space-y-0.5">
@@ -1291,92 +1350,99 @@ export function ChatbotPage() {
             </div>
           ) : activeContact ? (
             <>
-              {/* Conversation header - Ultra Compact */}
-              <div className="flex items-center gap-2 px-3 h-10 border-b shrink-0 bg-background/95">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="md:hidden h-7 w-7 shrink-0"
-                  onClick={() => setMobileShowList(true)}
-                  aria-label="Kembali ke daftar"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setProfileModalOpen(true)}
-                  className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer hover:opacity-85 transition-opacity"
-                  title="Klik untuk melihat detail profil WhatsApp"
-                >
-                  <Avatar className="h-7 w-7 shrink-0 ring-1 ring-border">
-                    {activeContact.avatar && (
-                      <AvatarImage src={activeContact.avatar} alt={activeContact.name} className="object-cover" />
-                    )}
-                    <AvatarFallback className="text-[11px] bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300">
-                      {initials(activeContact.name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <p className="font-semibold text-xs truncate leading-tight">
-                        {activeContact.name}
-                      </p>
-                      <Badge
-                        variant="secondary"
-                        className={cn(
-                          "text-[9px] px-1 py-0 h-4",
-                          STAGE_META[activeContact.stage].badge,
+              {/* Conversation header - Spacious & Clean */}
+              <div className="flex items-center justify-between px-3 h-13 border-b shrink-0 bg-background/95">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="md:hidden h-11 w-11 shrink-0 -ml-1 text-muted-foreground hover:text-foreground"
+                    onClick={() => setMobileShowList(true)}
+                    aria-label="Kembali ke daftar percakapan"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </Button>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setProfileModalOpen(true)}
+                    className="flex items-center gap-2.5 min-w-0 cursor-pointer hover:opacity-85 transition-opacity"
+                    title="Klik untuk melihat detail profil WhatsApp"
+                  >
+                    <div className="relative shrink-0">
+                      <Avatar className="h-9 w-9 ring-1 ring-border">
+                        {activeContact.avatar && (
+                          <AvatarImage src={activeContact.avatar} alt={activeContact.name} className="object-cover" />
                         )}
-                      >
-                        {STAGE_META[activeContact.stage].label}
-                      </Badge>
+                        <AvatarFallback className="text-xs font-semibold bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300">
+                          {initials(activeContact.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className={cn(
+                        "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-background",
+                        activeContact.mode === "human" ? "bg-blue-500" : "bg-emerald-500"
+                      )} />
                     </div>
-                    <p className="text-[10px] text-muted-foreground leading-tight truncate">
-                      +{activeContact.phone}
-                      {activeContact.about ? (
-                        <span className="ml-1 text-emerald-600 dark:text-emerald-400 font-normal">
-                          · &ldquo;{activeContact.about}&rdquo;
-                        </span>
-                      ) : activeContact.tags.length > 0 ? (
-                        <span className="ml-1">
-                          · {activeContact.tags.join(", ")}
-                        </span>
-                      ) : null}
-                    </p>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-semibold text-xs text-foreground truncate leading-tight">
+                          {activeContact.name}
+                        </p>
+                        <Badge
+                          variant="secondary"
+                          className={cn(
+                            "text-[9px] px-1.5 py-0 h-4 font-normal hidden sm:inline-flex",
+                            STAGE_META[activeContact.stage].badge,
+                          )}
+                        >
+                          {STAGE_META[activeContact.stage].label}
+                        </Badge>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-tight truncate">
+                        +{activeContact.phone}
+                      </p>
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
+
+                {/* Right Header Actions */}
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* Takeover Toggle Pill */}
                   <Button
                     variant={activeContact.mode === "human" ? "default" : "outline"}
                     size="sm"
                     className={cn(
-                      "h-7 px-2 text-[11px] gap-1",
+                      "h-8 px-2.5 text-xs gap-1.5 font-medium shadow-2xs rounded-lg transition-all",
                       activeContact.mode === "human"
-                        ? "bg-blue-600 hover:bg-blue-700 text-white"
-                        : "border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40",
+                        ? "bg-blue-600 hover:bg-blue-700 text-white border-blue-600"
+                        : "border-emerald-600/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
                     )}
                     onClick={toggleTakeover}
                     disabled={takingOver}
+                    title={activeContact.mode === "human" ? "Klik untuk mengembalikan ke Bot AI" : "Klik untuk mengambil alih chat manual"}
                   >
-                    <UserCog className="h-3 w-3" />
-                    {takingOver
-                      ? "..."
-                      : activeContact.mode === "human"
-                        ? "Lepas ke Bot"
-                        : "Ambil Alih"}
+                    {activeContact.mode === "human" ? (
+                      <>
+                        <UserCheck className="h-3.5 w-3.5" />
+                        <span>Mode Manual</span>
+                      </>
+                    ) : (
+                      <>
+                        <Bot className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <span>Bot AI</span>
+                      </>
+                    )}
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Telepon">
-                    <Phone className="h-3.5 w-3.5" />
-                  </Button>
+
+                  {/* Info button */}
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 lg:hidden"
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground rounded-lg"
                     onClick={() => setInfoOpenMobile(true)}
                     aria-label="Info kontak"
                   >
-                    <Info className="h-3.5 w-3.5" />
+                    <Info className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
@@ -1418,8 +1484,8 @@ export function ChatbotPage() {
                 </ScrollArea>
               </div>
 
-              {/* Chat Input Area - Ultra Compact */}
-              <div className="px-3 h-10 border-t bg-background shrink-0 flex items-center">
+              {/* Chat Input Area - Mobile-friendly */}
+              <div className="px-3 py-1.5 border-t bg-background shrink-0 flex items-center">
                 {imagePreview && (
                   <div className="absolute bottom-12 left-3 right-3 flex items-center gap-2 p-1 rounded-lg bg-background border shadow-md text-xs">
                     <ImageIcon className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
@@ -1447,11 +1513,11 @@ export function ChatbotPage() {
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+                    className="h-11 w-11 shrink-0 text-muted-foreground hover:text-foreground"
                     onClick={() => imageInputRef.current?.click()}
                     title="Kirim gambar"
                   >
-                    <ImageIcon className="h-4 w-4" />
+                    <ImageIcon className="h-4.5 w-4.5" />
                   </Button>
                   <Input
                     value={input}
@@ -1464,13 +1530,13 @@ export function ChatbotPage() {
                       }
                     }}
                     placeholder="Ketik pesan / tempel screenshot (Ctrl+V)..."
-                    className="h-8 text-xs"
+                    className="h-11 text-xs"
                   />
                   <Button
                     type="button"
                     size="icon"
                     className={cn(
-                      "h-8 w-8 shrink-0 text-white",
+                      "h-11 w-11 shrink-0 text-white rounded-lg",
                       activeContact.mode === "human"
                         ? "bg-blue-600 hover:bg-blue-700"
                         : "bg-emerald-600 hover:bg-emerald-700",
@@ -1479,7 +1545,7 @@ export function ChatbotPage() {
                     disabled={!input.trim() && !imagePreview}
                     title="Kirim pesan"
                   >
-                    <Send className="h-3.5 w-3.5" />
+                    <Send className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
@@ -1507,82 +1573,7 @@ export function ChatbotPage() {
 
       </div>
 
-      {/* ===== Quota Usage Info Bar (MAU & AI Response) ===== */}
-      {quota && (
-        <Card className="p-3 bg-muted/20 border shadow-2xs shrink-0">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2.5 shrink-0">
-              <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
-                <Sparkles className="h-4 w-4" />
-              </div>
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-semibold text-foreground">Paket Chatbot:</span>
-                  <Badge variant="outline" className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300">
-                    {quota.planName}
-                  </Badge>
-                  <span className="text-muted-foreground text-[11px]">({quota.priceLabel})</span>
-                </div>
-                <p className="text-[10px] text-muted-foreground">Kuota nomor aktif (MAU) dan bubble respons AI WhatsApp</p>
-              </div>
-            </div>
-
-            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4 w-full md:w-auto">
-              {/* Kontak Unik MAU */}
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="font-medium text-muted-foreground flex items-center gap-1">
-                    <Users className="h-3 w-3 text-blue-600" />
-                    Kontak Unik (MAU)
-                  </span>
-                  <span className="font-semibold font-mono text-foreground">
-                    {quota.mauUsed.toLocaleString()} / {quota.maxMau.toLocaleString()} ({quota.mauPercent}%)
-                  </span>
-                </div>
-                <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                  <div
-                    className={cn(
-                      "h-full transition-all duration-500 rounded-full",
-                      quota.isMauExceeded
-                        ? "bg-rose-600"
-                        : quota.mauPercent >= 80
-                          ? "bg-amber-500"
-                          : "bg-blue-600"
-                    )}
-                    style={{ width: `${quota.mauPercent}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Respons AI */}
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="font-medium text-muted-foreground flex items-center gap-1">
-                    <Bot className="h-3 w-3 text-emerald-600" />
-                    Respons AI (Bubble Chat)
-                  </span>
-                  <span className="font-semibold font-mono text-foreground">
-                    {quota.aiResponsesUsed.toLocaleString()} / {quota.maxAiResponses.toLocaleString()} ({quota.aiResponsesPercent}%)
-                  </span>
-                </div>
-                <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                  <div
-                    className={cn(
-                      "h-full transition-all duration-500 rounded-full",
-                      quota.isAiResponsesExceeded
-                        ? "bg-rose-600"
-                        : quota.aiResponsesPercent >= 80
-                          ? "bg-amber-500"
-                          : "bg-emerald-600"
-                    )}
-                    style={{ width: `${quota.aiResponsesPercent}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </Card>
-      )}
+      
 
       {/* ----- Mobile info sheet ----- */}
       <Sheet open={infoOpenMobile} onOpenChange={setInfoOpenMobile}>

@@ -26,6 +26,11 @@ lerna-debug.log*
 # Tests
 /coverage
 /.nyc_output
+test-results/
+**/test-results/
+persona_reports/screenshots/
+mobile_screenshots/
+temp_screenshots/
 
 # Assets & Temp Media
 apps/image/

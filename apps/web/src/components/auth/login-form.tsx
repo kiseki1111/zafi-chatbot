@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Mail, Lock } from "lucide-react";
+import { Loader2, Mail, Lock, Sparkles, Building2, ShieldCheck } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { AuthShell, PasswordInput } from "./auth-shell";
 
 export function LoginForm() {
-  const { login } = useAuthStore();
+  const { login, loginAsPreset } = useAuthStore();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -76,6 +76,38 @@ export function LoginForm() {
         <Button type="submit" disabled={loading} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-10">
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Masuk"}
         </Button>
+
+        {/* Demo / Mockup Mode 1-Click Access - Hanya Aktif di Mode Development */}
+        {process.env.NODE_ENV !== "production" && (
+          <div className="pt-2 border-t border-border/60">
+            <div className="flex items-center gap-1.5 mb-2">
+              <Sparkles className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                Pratinjau UI & Data Mockup (Dev Mode)
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => loginAsPreset("zafi")}
+                className="h-9 text-xs border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 justify-start px-2.5 gap-1.5"
+              >
+                <Building2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                <span className="truncate">Demo Manajer</span>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => loginAsPreset("superadmin")}
+                className="h-9 text-xs border-blue-500/30 hover:bg-blue-50 dark:hover:bg-blue-950/30 text-blue-800 dark:text-blue-300 justify-start px-2.5 gap-1.5"
+              >
+                <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-blue-600" />
+                <span className="truncate">Demo Superadmin</span>
+              </Button>
+            </div>
+          </div>
+        )}
       </form>
     </AuthShell>
   );

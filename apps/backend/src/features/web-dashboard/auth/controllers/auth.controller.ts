@@ -11,6 +11,7 @@ import {
   Res,
   ForbiddenException,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { AuthService } from '../services/auth.service';
 import { LoginDto } from '../dto/login.dto';
@@ -21,7 +22,8 @@ import { JwtAuthGuard } from '../../../../common/guards/jwt-auth.guard';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  //mengatur request login
+  // Batasi percobaan login maksimal 10x per menit per IP (Anti Brute-Force)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(

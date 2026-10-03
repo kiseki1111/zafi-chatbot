@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from 'src/core/prisma/prisma.service';
+import { PrismaService } from '../../core/prisma/prisma.service';
 
 // Ponytail: Satu model generik key-value PlatformConfig untuk pricing & ai_config.
 // Upgrade ke model terpisah kalau butuh query relasional / audit per-field.

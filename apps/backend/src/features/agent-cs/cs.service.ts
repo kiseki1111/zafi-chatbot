@@ -150,22 +150,23 @@ WAJIB MERESPON DALAM FORMAT JSON BERIKUT:
       context += `\n\n=== DATA PLANSITE & KETERSEDIAAN UNIT PERUMAHAN (REAL-TIME DATABASE) ===\n${availabilityContext}\n===================================================================`;
     }
 
-    // S-CS3: Real-time stock check bypass
-    const lowerText = text.toLowerCase();
-    if (
-      lowerText.includes('stok') ||
-      lowerText.includes('sisa') ||
-      lowerText.includes('masih ada') ||
-      lowerText.includes('ready')
-    ) {
-      const products = await this.prisma.product.findMany({
+    // HYBRID DUAL-CONTEXT: Katalog produk aktif selalu disertakan ke konteks
+    // agar bot tidak buta produk saat pelanggan menanyakan daftar barang, rekomendasi, maupun stok
+    const products = await this.prisma.product
+      .findMany({
         where: { tenantId },
-        take: 20,
-      });
+        take: 30,
+      })
+      .catch(() => []);
+
+    if (products && products.length > 0) {
       const stockInfo = products
-        .map((p) => `- ${p.name}: Sisa stok ${p.stock}`)
+        .map(
+          (p) =>
+            `- ${p.name}: Harga Rp ${Number(p.price || 0).toLocaleString('id-ID')} [Sisa stok: ${p.stock}]`,
+        )
         .join('\n');
-      context += `\n\n=== INFO STOK REAL-TIME SAAT INI (PENTING) ===\n${stockInfo}`;
+      context += `\n\n=== INFO PRODUK & STOK REAL-TIME SAAT INI (PENTING) ===\n${stockInfo}`;
     }
 
     // Fetch Tenant Config

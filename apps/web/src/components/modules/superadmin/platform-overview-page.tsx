@@ -54,7 +54,7 @@ export function PlatformOverviewPage() {
           </div>
           <Skeleton className="h-9 w-24" />
         </div>
-        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
             <Card key={i} className="p-4 space-y-3">
               <Skeleton className="h-4 w-28" />
@@ -116,16 +116,16 @@ export function PlatformOverviewPage() {
       </div>
 
       {/* 4 KPI Cards */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="cursor-pointer hover:border-emerald-500 transition-colors" onClick={() => setView("clients")}>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardDescription className="text-xs">Perusahaan Klien</CardDescription>
-              <div className="h-8 w-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 grid place-items-center">
+              <div className="h-10 w-10 sm:h-8 sm:w-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 grid place-items-center">
                 <Building2 className="h-4 w-4" />
               </div>
             </div>
-            <CardTitle className="text-2xl font-bold tracking-tight mt-1">{s.totalClients}</CardTitle>
+            <CardTitle className="text-3xl sm:text-2xl font-bold tracking-tight mt-1">{s.totalClients}</CardTitle>
           </CardHeader>
           <CardContent className="pt-0 flex items-center justify-between text-xs text-muted-foreground">
             <span>Tenant terdaftar</span>
@@ -137,11 +137,11 @@ export function PlatformOverviewPage() {
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardDescription className="text-xs">Sesi WhatsApp</CardDescription>
-              <div className="h-8 w-8 rounded-lg bg-indigo-100 dark:bg-indigo-950/40 text-indigo-600 grid place-items-center">
+              <div className="h-10 w-10 sm:h-8 sm:w-8 rounded-lg bg-indigo-100 dark:bg-indigo-950/40 text-indigo-600 grid place-items-center">
                 <Smartphone className="h-4 w-4" />
               </div>
             </div>
-            <CardTitle className="text-2xl font-bold tracking-tight mt-1">
+            <CardTitle className="text-3xl sm:text-2xl font-bold tracking-tight mt-1">
               {s.activeInstances} <span className="text-sm font-normal text-muted-foreground">/ {s.totalInstances}</span>
             </CardTitle>
           </CardHeader>
@@ -157,11 +157,11 @@ export function PlatformOverviewPage() {
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardDescription className="text-xs">Pesan Diproses</CardDescription>
-              <div className="h-8 w-8 rounded-lg bg-amber-100 dark:bg-amber-950/40 text-amber-600 grid place-items-center">
+              <div className="h-10 w-10 sm:h-8 sm:w-8 rounded-lg bg-amber-100 dark:bg-amber-950/40 text-amber-600 grid place-items-center">
                 <MessageCircle className="h-4 w-4" />
               </div>
             </div>
-            <CardTitle className="text-2xl font-bold tracking-tight mt-1">{s.totalMessages}</CardTitle>
+            <CardTitle className="text-3xl sm:text-2xl font-bold tracking-tight mt-1">{s.totalMessages}</CardTitle>
           </CardHeader>
           <CardContent className="pt-0 flex items-center justify-between text-xs text-muted-foreground">
             <span>Riwayat pesan WA</span>
@@ -173,11 +173,11 @@ export function PlatformOverviewPage() {
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardDescription className="text-xs">Event Webhook</CardDescription>
-              <div className="h-8 w-8 rounded-lg bg-purple-100 dark:bg-purple-950/40 text-purple-600 grid place-items-center">
+              <div className="h-10 w-10 sm:h-8 sm:w-8 rounded-lg bg-purple-100 dark:bg-purple-950/40 text-purple-600 grid place-items-center">
                 <Activity className="h-4 w-4" />
               </div>
             </div>
-            <CardTitle className="text-2xl font-bold tracking-tight mt-1">{s.totalWebhookLogs}</CardTitle>
+            <CardTitle className="text-3xl sm:text-2xl font-bold tracking-tight mt-1">{s.totalWebhookLogs}</CardTitle>
           </CardHeader>
           <CardContent className="pt-0 flex items-center justify-between text-xs text-muted-foreground">
             <span>Log webhook tercatat</span>
@@ -207,7 +207,7 @@ export function PlatformOverviewPage() {
                 <div
                   key={mod.key}
                   onClick={() => setView(mod.key as any)}
-                  className="p-3.5 rounded-xl border hover:border-emerald-500 hover:bg-accent/40 cursor-pointer transition-all flex items-start gap-3 group"
+                  className="p-3.5 rounded-xl border hover:border-emerald-500 hover:bg-accent/40 cursor-pointer transition-all flex items-start gap-3 group min-h-[56px]"
                 >
                   <div className={`p-2.5 rounded-lg shrink-0 ${mod.color}`}>
                     <Icon className="h-5 w-5" />
@@ -237,7 +237,7 @@ export function PlatformOverviewPage() {
               { name: "NestJS Backend API", status: "ONLINE", sub: "Port 3030 (Running)" },
               { name: "Next.js Dashboard", status: "ONLINE", sub: "Port 3001" },
             ].map((svc) => (
-              <div key={svc.name} className="flex items-center justify-between p-2.5 rounded-lg border bg-muted/20">
+              <div key={svc.name} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0 p-2.5 rounded-lg border bg-muted/20">
                 <div className="space-y-0.5">
                   <p className="text-xs font-medium">{svc.name}</p>
                   <p className="text-[10px] text-muted-foreground font-mono">{svc.sub}</p>

@@ -6,6 +6,7 @@ import { useAuthStore } from "@/lib/auth-store";
 import { useAppStore } from "@/lib/app-store";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
+import { BottomNav } from "./bottom-nav";
 import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -124,23 +125,25 @@ export function DashboardShell() {
   };
 
   return (
-    <div className="h-screen flex bg-muted/30 overflow-hidden">
+    <div className="h-[100dvh] flex bg-muted/30 overflow-hidden">
       {/* Desktop sidebar */}
       <div className="hidden lg:block w-64 shrink-0 border-r bg-sidebar flex-col">
         <Sidebar />
       </div>
 
       {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         <Topbar />
         <main className={cn(
           "flex-1 overflow-x-hidden",
-          view === "chatbot" ? "p-1 lg:p-1.5 overflow-hidden flex flex-col" : "p-4 lg:p-6 overflow-y-auto"
+          view === "chatbot" ? "p-0 lg:p-2 pb-16 lg:pb-2 overflow-hidden flex flex-col" : "p-4 lg:p-6 pb-20 lg:pb-6 overflow-y-auto"
         )}>
           <div key={view} className={cn("animate-in fade-in-50 slide-in-from-bottom-2 duration-200 ease-out", view === "chatbot" && "flex-1 flex flex-col min-h-0")}>
             {render()}
           </div>
         </main>
+        {/* Mobile Bottom Navigation for PWA */}
+        <BottomNav />
       </div>
     </div>
   );

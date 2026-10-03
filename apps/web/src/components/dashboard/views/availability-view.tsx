@@ -14,7 +14,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Plus, Search, Edit3, Trash2, CheckCircle2, Clock, XCircle, Wrench, Layers, RefreshCw, Upload, Image, FileVideo, ExternalLink, Play, Copy, Check, Film, BookOpen, Sparkles, FileText,
+  Plus, Search, Edit3, Trash2, CheckCircle2, Clock, XCircle, Wrench, Layers, RefreshCw, Upload, Image, FileVideo, ExternalLink, Play, Copy, Check, Film, BookOpen, Sparkles, FileText, User,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { useToast } from "@/hooks/use-toast";
@@ -655,20 +655,20 @@ export function AvailabilityView() {
   return (
     <div className="space-y-6">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Siteplan</h2>
-          <p className="text-sm text-muted-foreground">
-            Kelola denah blok, tipe rumah, dan status ketersediaan unit perumahan.
-          </p>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className="text-lg sm:text-xl font-bold tracking-tight text-foreground truncate">Siteplan</h2>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={fetchGroups} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 mr-1.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Button variant="outline" size="sm" onClick={fetchGroups} disabled={loading} className="h-8 px-2 text-xs">
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            <span className="hidden sm:inline ml-1.5">Refresh</span>
           </Button>
-          <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setIsGroupModalOpen(true)}>
-            <Plus className="h-4 w-4 mr-1.5" /> Tambah Perumahan
+          <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-2.5 text-xs font-semibold shadow-xs" onClick={() => setIsGroupModalOpen(true)}>
+            <Plus className="h-3.5 w-3.5 mr-1" />
+            <span className="hidden sm:inline">Tambah Perumahan</span>
+            <span className="sm:hidden">Perumahan</span>
           </Button>
         </div>
       </div>
@@ -724,35 +724,32 @@ export function AvailabilityView() {
         </div>
       )}
 
-      {/* Modular Knowledge Khusus Cluster */}
+      {/* Modular Knowledge Khusus Cluster - Minimalist & Compact */}
       {activeGroup && (
-        <Card className="p-4 border bg-gradient-to-br from-background via-muted/10 to-background shadow-2xs space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2.5 border-b">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 shrink-0">
+        <Card className="p-3.5 border shadow-2xs space-y-3">
+          <div className="flex items-center justify-between gap-3 pb-2 border-b">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 shrink-0">
                 <BookOpen className="h-4 w-4" />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h4 className="font-bold text-sm text-foreground">
-                    Knowledge Khusus Cluster: {activeGroup.name}
-                  </h4>
-                  <Badge variant="secondary" className="text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
-                    {clusterKnowledgeList.length} Topik Tersimpan
-                  </Badge>
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Informasi mendalam spesifikasi rumah, fasilitas lingkungan, dan promo cluster. Digunakan otomatis oleh bot AI WhatsApp saat menjawab pembeli.
-                </p>
+              <div className="flex items-center gap-2 min-w-0">
+                <h4 className="font-bold text-sm text-foreground truncate">
+                  Knowledge: {activeGroup.name}
+                </h4>
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4.5 font-medium shrink-0">
+                  {clusterKnowledgeList.length} Topik
+                </Badge>
               </div>
             </div>
 
             <Button
               size="sm"
               onClick={() => openCreateKnowledgeModal()}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-8 px-3.5 gap-1.5 font-semibold shrink-0 shadow-2xs"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-8 px-3 gap-1.5 font-semibold shrink-0 shadow-2xs"
             >
-              <Plus className="h-3.5 w-3.5" /> Tambah Topik Knowledge
+              <Plus className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Tambah Topik</span>
+              <span className="sm:hidden">Tambah</span>
             </Button>
           </div>
 
@@ -859,22 +856,22 @@ export function AvailabilityView() {
       )}
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="p-4 flex flex-col justify-between">
-          <span className="text-xs text-muted-foreground font-medium">Total Unit</span>
-          <span className="text-2xl font-bold mt-2">{stats.total}</span>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <Card className="p-3 sm:p-4 flex flex-col justify-between">
+          <span className="text-xs sm:text-sm text-muted-foreground font-medium">Total Unit</span>
+          <span className="text-xl sm:text-2xl font-bold mt-1.5 sm:mt-2">{stats.total}</span>
         </Card>
-        <Card className="p-4 flex flex-col justify-between border-emerald-200 bg-emerald-50/40 dark:bg-emerald-950/20">
-          <span className="text-xs text-emerald-700 dark:text-emerald-400 font-medium">Unit Ready (Hijau)</span>
-          <span className="text-2xl font-bold text-emerald-600 mt-2">{stats.available}</span>
+        <Card className="p-3 sm:p-4 flex flex-col justify-between border-emerald-200 bg-emerald-50/40 dark:bg-emerald-950/20">
+          <span className="text-xs sm:text-sm text-emerald-700 dark:text-emerald-400 font-medium">Unit Ready (Hijau)</span>
+          <span className="text-xl sm:text-2xl font-bold text-emerald-600 mt-1.5 sm:mt-2">{stats.available}</span>
         </Card>
-        <Card className="p-4 flex flex-col justify-between border-orange-200 bg-orange-50/40 dark:bg-orange-950/20">
-          <span className="text-xs text-orange-700 dark:text-orange-400 font-medium">Proses Bank (Orange)</span>
-          <span className="text-2xl font-bold text-orange-600 mt-2">{stats.booked}</span>
+        <Card className="p-3 sm:p-4 flex flex-col justify-between border-orange-200 bg-orange-50/40 dark:bg-orange-950/20">
+          <span className="text-xs sm:text-sm text-orange-700 dark:text-orange-400 font-medium">Proses Bank (Orange)</span>
+          <span className="text-xl sm:text-2xl font-bold text-orange-600 mt-1.5 sm:mt-2">{stats.booked}</span>
         </Card>
-        <Card className="p-4 flex flex-col justify-between border-red-200 bg-red-50/40 dark:bg-red-950/20">
-          <span className="text-xs text-red-700 dark:text-red-400 font-medium">Sudah Terjual (Merah)</span>
-          <span className="text-2xl font-bold text-red-600 mt-2">{stats.occupied}</span>
+        <Card className="p-3 sm:p-4 flex flex-col justify-between border-red-200 bg-red-50/40 dark:bg-red-950/20">
+          <span className="text-xs sm:text-sm text-red-700 dark:text-red-400 font-medium">Sudah Terjual (Merah)</span>
+          <span className="text-xl sm:text-2xl font-bold text-red-600 mt-1.5 sm:mt-2">{stats.occupied}</span>
         </Card>
       </div>
 
@@ -896,21 +893,41 @@ export function AvailabilityView() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">Semua Status</SelectItem>
-              <SelectItem value="AVAILABLE">🟢 Unit Ready (Hijau)</SelectItem>
-              <SelectItem value="BOOKED">🟠 Proses Bank (Orange)</SelectItem>
-              <SelectItem value="OCCUPIED">🔴 Sudah Terjual (Merah)</SelectItem>
-              <SelectItem value="MAINTENANCE">⚫ Rumah Contoh (Abu Hitam)</SelectItem>
+              <SelectItem value="AVAILABLE">
+                <span className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                  <span>Unit Ready (Hijau)</span>
+                </span>
+              </SelectItem>
+              <SelectItem value="BOOKED">
+                <span className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />
+                  <span>Proses Bank (Orange)</span>
+                </span>
+              </SelectItem>
+              <SelectItem value="OCCUPIED">
+                <span className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0" />
+                  <span>Sudah Terjual (Merah)</span>
+                </span>
+              </SelectItem>
+              <SelectItem value="MAINTENANCE">
+                <span className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-slate-500 shrink-0" />
+                  <span>Rumah Contoh (Abu Hitam)</span>
+                </span>
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         {activeGroup && (
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-            <Button variant="outline" size="sm" onClick={() => setIsBatchModalOpen(true)}>
+          <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+            <Button variant="outline" size="sm" onClick={() => setIsBatchModalOpen(true)} className="h-8.5 text-xs font-medium">
               + Generate Batch
             </Button>
-            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={openCreateModal}>
-              <Plus className="h-4 w-4 mr-1" /> Tambah Unit
+            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white h-8.5 text-xs font-semibold shadow-xs" onClick={openCreateModal}>
+              <Plus className="h-3.5 w-3.5 mr-1" /> Tambah Unit
             </Button>
           </div>
         )}
@@ -926,7 +943,15 @@ export function AvailabilityView() {
           </p>
         </Card>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+        <>
+          {/* Status Legend */}
+          <div className="flex flex-wrap gap-2 text-xs mb-3">
+            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-emerald-500" /> Tersedia</span>
+            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-amber-500" /> Booking</span>
+            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-rose-500" /> Terjual</span>
+            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-zinc-800 dark:bg-zinc-200" /> Show Unit</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
           {filteredItems.map((item) => {
             const conf = STATUS_CONFIG[item.status as ResourceStatus] || STATUS_CONFIG.AVAILABLE;
             const Icon = conf.icon;
@@ -939,7 +964,7 @@ export function AvailabilityView() {
                 aria-label={`Edit unit ${item.code} tipe ${item.houseType || "-"} status ${conf.label}`}
                 onClick={() => openEditModal(item)}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openEditModal(item); }}}
-                className={`cursor-pointer rounded-xl border p-3.5 transition-colors relative flex flex-col justify-between gap-3 hover:bg-opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${conf.bg} ${conf.border}`}
+                className={`cursor-pointer rounded-xl border p-3.5 transition-colors relative flex flex-col justify-between gap-3 min-h-[44px] touch-manipulation hover:bg-opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${conf.bg} ${conf.border}`}
               >
                 <div className="flex items-start justify-between">
                   <div>
@@ -955,8 +980,9 @@ export function AvailabilityView() {
 
                 <div>
                   {item.customerName ? (
-                    <div className="text-xs font-medium truncate" title={item.customerName}>
-                      👤 {item.customerName}
+                    <div className="text-xs font-medium truncate flex items-center gap-1" title={item.customerName}>
+                      <User className="h-3 w-3 shrink-0 text-muted-foreground" />
+                      <span className="truncate">{item.customerName}</span>
                     </div>
                   ) : item.price ? (
                     <div className="text-xs font-semibold text-muted-foreground tabular-nums">
@@ -991,6 +1017,7 @@ export function AvailabilityView() {
             );
           })}
         </div>
+        </>
       )}
 
       {/* Galeri Foto & Video Properti (Di Bawah List Siteplan) */}
@@ -1361,10 +1388,30 @@ export function AvailabilityView() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="AVAILABLE">🟢 Unit Ready</SelectItem>
-                    <SelectItem value="BOOKED">🟠 Proses Bank</SelectItem>
-                    <SelectItem value="OCCUPIED">🔴 Sudah Terjual</SelectItem>
-                    <SelectItem value="MAINTENANCE">⚫ Rumah Contoh</SelectItem>
+                    <SelectItem value="AVAILABLE">
+                      <span className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                        <span>Unit Ready</span>
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="BOOKED">
+                      <span className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />
+                        <span>Proses Bank</span>
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="OCCUPIED">
+                      <span className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0" />
+                        <span>Sudah Terjual</span>
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="MAINTENANCE">
+                      <span className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-slate-500 shrink-0" />
+                        <span>Rumah Contoh</span>
+                      </span>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>

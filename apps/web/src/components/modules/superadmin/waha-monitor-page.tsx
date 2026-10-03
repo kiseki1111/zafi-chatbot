@@ -28,6 +28,8 @@ export function WahaMonitorPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [qrCodeData, setQrCodeData] = useState<{ id: string; url: string } | null>(null);
+  const [connectingSession, setConnectingSession] = useState<string | null>(null);
+  const [connectedSession, setConnectedSession] = useState<{ id: string; phone?: string; name?: string } | null>(null);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
 
   const fetchInstances = async () => {
@@ -49,8 +51,54 @@ export function WahaMonitorPage() {
     fetchInstances();
   }, []);
 
+  // Polling status koneksi WhatsApp saat QR aktif atau saat modal ditutup di latar belakang
+  useEffect(() => {
+    if (!connectingSession) return;
+
+    let isMounted = true;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/v1/waha/instances/${connectingSession}/status`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const status = (data?.status || "").toUpperCase();
+
+        if (status === "WORKING" || status === "CONNECTED") {
+          clearInterval(interval);
+          if (!isMounted) return;
+
+          const phone = (data?.me?.id || data?.phone || "").replace(/@(c\.us|s\.whatsapp\.net)$/i, "");
+          const profileName = data?.me?.pushName || data?.profileName || "";
+
+          setConnectedSession({
+            id: connectingSession,
+            phone,
+            name: profileName,
+          });
+
+          if (!qrCodeData) {
+            toast.success("WhatsApp Berhasil Terhubung", {
+              description: `Nomor WhatsApp ${phone ? "(+" + phone + ")" : ""} pada sesi "${connectingSession}" sudah aktif.`,
+              duration: 7000,
+            });
+          }
+
+          setConnectingSession(null);
+          fetchInstances();
+        }
+      } catch (err) {}
+    }, 2500);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [connectingSession, qrCodeData]);
+
   const handleScanQR = async (sessionName: string) => {
     try {
+      setConnectingSession(sessionName);
+      setConnectedSession(null);
       const res = await fetch(`/api/v1/waha/instances/${sessionName}/qr?t=${Date.now()}`);
       if (res.ok) {
         const blob = await res.blob();
@@ -242,32 +290,89 @@ export function WahaMonitorPage() {
         </div>
       )}
 
-      {/* Dialog QR Code Modal */}
-      <Dialog open={!!qrCodeData} onOpenChange={(open) => !open && setQrCodeData(null)}>
-        <DialogContent className="sm:max-w-[380px]">
-          <DialogHeader>
-            <DialogTitle>Scan QR Code WAHA</DialogTitle>
-            <DialogDescription>
-              Sesi: <span className="font-semibold text-foreground">{qrCodeData?.id}</span>
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col items-center justify-center py-4">
-            {qrCodeData && (
-              <img
-                src={qrCodeData.url}
-                alt="QR Code"
-                className="w-48 h-48 border-4 border-indigo-500 rounded-lg shadow-lg"
-              />
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground text-center">
-            Buka WhatsApp &gt; Perangkat Tertaut, lalu scan QR code ini.
-          </p>
-          <DialogFooter>
-            <Button onClick={() => setQrCodeData(null)} className="w-full">
-              Selesai
-            </Button>
-          </DialogFooter>
+      {/* Dialog QR Code Modal & Status Terhubung */}
+      <Dialog
+        open={!!qrCodeData || !!connectedSession}
+        onOpenChange={(open) => {
+          if (!open) {
+            setQrCodeData(null);
+            setConnectedSession(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[400px]">
+          {connectedSession ? (
+            <div className="flex flex-col items-center justify-center py-5 text-center space-y-4">
+              <div className="h-16 w-16 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center animate-in zoom-in-75 duration-300">
+                <CheckCircle2 className="h-10 w-10 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div className="space-y-1.5">
+                <DialogTitle className="text-lg font-bold text-foreground">WhatsApp Berhasil Terhubung!</DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground">
+                  Nomor WhatsApp pada sesi <span className="font-semibold text-emerald-600 dark:text-emerald-400">"{connectedSession.id}"</span> telah aktif.
+                </DialogDescription>
+                {connectedSession.phone && (
+                  <div className="pt-1">
+                    <span className="text-xs font-mono font-medium text-foreground bg-muted py-1 px-3 rounded-full border">
+                      +{connectedSession.phone} {connectedSession.name ? `(${connectedSession.name})` : ''}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <p className="text-[11px] text-muted-foreground/80 max-w-xs">
+                Sesi WAHA ini sekarang dalam status WORKING dan siap menerima serta membalas pesan.
+              </p>
+              <DialogFooter className="w-full sm:justify-center">
+                <Button
+                  onClick={() => {
+                    setQrCodeData(null);
+                    setConnectedSession(null);
+                  }}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+                >
+                  Selesai
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Smartphone className="h-5 w-5 text-indigo-600" />
+                  Scan QR Code WAHA
+                </DialogTitle>
+                <DialogDescription>
+                  Sesi: <span className="font-semibold text-foreground">{qrCodeData?.id}</span>
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex flex-col items-center justify-center py-4">
+                {qrCodeData && (
+                  <div className="relative p-2 bg-white rounded-xl shadow-md border-2 border-indigo-500">
+                    <img
+                      src={qrCodeData.url}
+                      alt="QR Code"
+                      className="w-48 h-48 rounded-lg"
+                    />
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground text-center">
+                Buka WhatsApp &gt; Perangkat Tertaut, lalu scan QR code ini.
+              </p>
+              <DialogFooter className="flex-col sm:flex-col gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setQrCodeData(null);
+                    toast.info("Pemindaian ditutup. Notifikasi akan muncul saat nomor terhubung.");
+                  }}
+                  className="w-full text-xs"
+                >
+                  Tutup Sementara (Cek di Latar Belakang)
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>

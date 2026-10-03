@@ -323,6 +323,7 @@ export class WahaController {
     return messages;
   }
 
+  @SkipThrottle()
   @Public()
   @Post('webhook')
   async handleWebhook(

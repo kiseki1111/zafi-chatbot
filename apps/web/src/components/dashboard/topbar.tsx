@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Menu, Bell, Sun, Moon, LogOut, User as UserIcon,
-  Settings as SettingsIcon, ChevronDown, AlertTriangle, QrCode, X, Download,
+  Settings as SettingsIcon, ChevronDown, AlertTriangle, QrCode, X, Download, Building2,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { useAppStore } from "@/lib/app-store";
@@ -104,77 +104,80 @@ export function Topbar() {
           </div>
         </div>
       )}
-      <header className="sticky top-0 z-30 h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex items-center gap-3 h-full px-4 lg:px-6">
-        {/* Mobile menu */}
-        <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="lg:hidden h-9 w-9" onClick={() => setSidebarOpen(true)}>
-              <Menu className="h-5 w-5" />
+      <header className="sticky top-0 z-30 h-14 lg:h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="flex items-center justify-between lg:justify-start gap-3 h-full px-4 lg:px-6">
+        {/* Compact Mobile Brand (No hamburger clutter) */}
+        <div className="flex items-center gap-2">
+          <div className="grid place-items-center h-8 w-8 rounded-lg bg-emerald-600 text-white shadow-xs shrink-0">
+            <Building2 className="h-4.5 w-4.5" />
+          </div>
+          <div className="min-w-0">
+            <span className="font-bold text-sm tracking-tight text-foreground truncate block leading-tight">
+              {user.tenantId ? "Zafi AI" : "Chatbot AI"}
+            </span>
+            <span className="text-[10px] text-muted-foreground block lg:hidden leading-none">
+              PWA Mobile
+            </span>
+          </div>
+        </div>
+
+        {/* Right side controls */}
+        <div className="flex items-center gap-2 ml-auto">
+          {/* PWA Install Button when available */}
+          {installPrompt && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleInstallClick}
+              className="h-8 text-xs gap-1.5 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 shrink-0 shadow-xs"
+            >
+              <Download className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Install Aplikasi</span>
+              <span className="sm:hidden">Install</span>
             </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="p-0 w-72">
-            <SheetTitle className="sr-only">Navigasi</SheetTitle>
-            <Sidebar />
-          </SheetContent>
-        </Sheet>
+          )}
 
-        {/* Title removed per user request */}
-
-        {/* PWA Install Button when available */}
-        {installPrompt && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleInstallClick}
-            className="h-8 text-xs gap-1.5 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 shrink-0 shadow-xs"
-          >
-            <Download className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Install Aplikasi</span>
-            <span className="sm:hidden">Install</span>
+          {/* Theme toggle */}
+          <Button variant="ghost" size="icon" className="h-9 w-9" onClick={toggleTheme} title="Ganti tema">
+            {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
           </Button>
-        )}
 
-        {/* Theme toggle */}
-        <Button variant="ghost" size="icon" className="h-9 w-9 ml-auto md:ml-0" onClick={toggleTheme} title="Ganti tema">
-          {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-        </Button>
-
-        {/* User menu */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-2 rounded-full pl-1 pr-2 py-1 hover:bg-muted transition-colors">
-              <Avatar className={cn("h-8 w-8 ring-1", themeColors.ring)}>
-                <AvatarFallback className={cn("text-xs font-bold", themeColors.bg, themeColors.color)}>
-                  {user.name.charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <div className="hidden lg:block text-left">
-                <p className="text-xs font-semibold leading-tight max-w-[120px] truncate">{user.name}</p>
-                <p className="text-[10px] text-muted-foreground">{ROLE_LABELS[safeRole] || "Pengguna"}</p>
+          {/* User menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-2 rounded-full pl-1 pr-2 py-1 hover:bg-muted transition-colors">
+                <Avatar className={cn("h-8 w-8 ring-1", themeColors.ring)}>
+                  <AvatarFallback className={cn("text-xs font-bold", themeColors.bg, themeColors.color)}>
+                    {user.name.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="hidden lg:block text-left">
+                  <p className="text-xs font-semibold leading-tight max-w-[120px] truncate">{user.name}</p>
+                  <p className="text-[10px] text-muted-foreground">{ROLE_LABELS[safeRole] || "Pengguna"}</p>
+                </div>
+                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground hidden lg:block" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <div className="px-2 py-1.5">
+                <p className="text-sm font-semibold">{user.name}</p>
+                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                <Badge variant="outline" className={cn("mt-1.5 text-[10px]", themeColors.color, themeColors.bg)}>{ROLE_LABELS[safeRole] || "Pengguna"}</Badge>
               </div>
-              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground hidden lg:block" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <div className="px-2 py-1.5">
-              <p className="text-sm font-semibold">{user.name}</p>
-              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-              <Badge variant="outline" className={cn("mt-1.5 text-[10px]", themeColors.color, themeColors.bg)}>{ROLE_LABELS[safeRole] || "Pengguna"}</Badge>
-            </div>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => setView("settings")}>
-              <UserIcon className="h-4 w-4" /> Profil Saya
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setView("settings")}>
-              <SettingsIcon className="h-4 w-4" /> Pengaturan
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={logout}>
-              <LogOut className="h-4 w-4" /> Keluar
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setView("settings")}>
+                <UserIcon className="h-4 w-4" /> Profil Saya
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setView("settings")}>
+                <SettingsIcon className="h-4 w-4" /> Pengaturan
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={logout}>
+                <LogOut className="h-4 w-4" /> Keluar
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </header>
     </>

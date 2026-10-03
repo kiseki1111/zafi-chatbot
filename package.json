@@ -11,7 +11,13 @@
     "build:web": "npm run build -w nextjs_tailwind_shadcn_ts",
     "dev:backend": "npm run start:dev -w rbac-service",
     "dev:web": "npm run dev -w nextjs_tailwind_shadcn_ts",
-    "prisma:generate": "npm run prisma:generate -w rbac-service"
+    "prisma:generate": "npm run prisma:generate -w rbac-service",
+    "test": "npm run test -w rbac-service",
+    "test:e2e": "npm run test:e2e -w rbac-service",
+    "test:web:e2e": "npm run test:e2e -w nextjs_tailwind_shadcn_ts",
+    "test:security": "node tests/security/penetration-test.js",
+    "test:stress": "node tests/load/stress-runner.js",
+    "test:persona": "node scripts/persona-user-tester.js"
   },
   "dependencies": {
     "class-transformer": "^0.5.1"

@@ -64,25 +64,70 @@ export class AgentSharedService {
   }
 
   /**
-   * 2. Mengambil informasi dari knowledge_base (Bukan vector/RAG lagi).
+   * 2. Mengambil informasi dari knowledge_base dengan pola Hybrid Threshold:
+   * - Jika dokumen tenant <= 15 (UMKM standar): Ambil semua langsung (100% akurat, cepat).
+   * - Jika dokumen tenant > 15 (dokumen banyak/tebal): Filter Top-5 paling relevan berbasis kata kunci & update terbaru.
    */
   async retrieveRelevantKnowledge(
     query: string,
     tenantId: string,
   ): Promise<string> {
     try {
-      // 1. Ambil semua knowledge dari tenant ini
-      const knowledges = await this.prisma.knowledgeBase.findMany({
+      const count = await this.prisma.knowledgeBase.count({
         where: { tenantId },
-        take: 50,
       });
 
-      if (knowledges.length === 0) {
+      if (count === 0) {
         return '';
       }
 
-      // Gabungkan semua isi knowledge menjadi satu teks (sebagai konteks LLM)
-      return knowledges.map((k) => k.content).join('\n\n');
+      // 1. Jika dokumen sedikit (<= 15 dokumen), gabungkan seluruhnya langsung
+      if (count <= 15) {
+        const knowledges = await this.prisma.knowledgeBase.findMany({
+          where: { tenantId },
+          take: 15,
+          orderBy: { createdAt: 'desc' },
+        });
+        return knowledges.map((k) => k.content).join('\n\n');
+      }
+
+      // 2. Jika dokumen banyak (> 15 dokumen), lakukan pencarian terseleksi berbasis kata kunci query
+      const keywords = (query || '')
+        .toLowerCase()
+        .replace(/[^a-zA-Z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter((w) => w.length >= 3);
+
+      let matchedItems: any[] = [];
+      if (keywords.length > 0) {
+        matchedItems = await this.prisma.knowledgeBase.findMany({
+          where: {
+            tenantId,
+            OR: keywords.map((k) => ({
+              content: { contains: k, mode: 'insensitive' as const },
+            })),
+          },
+          take: 5,
+        });
+      }
+
+      // Lengkapi hingga 5 dokumen menggunakan data terupdate jika keyword match < 3
+      if (matchedItems.length < 3) {
+        const needed = 5 - matchedItems.length;
+        const recentItems = await this.prisma.knowledgeBase.findMany({
+          where: { tenantId },
+          take: needed,
+          orderBy: { updatedAt: 'desc' },
+        });
+        const existingIds = new Set(matchedItems.map((m) => m.id));
+        for (const item of recentItems) {
+          if (!existingIds.has(item.id)) {
+            matchedItems.push(item);
+          }
+        }
+      }
+
+      return matchedItems.map((k) => k.content).join('\n\n');
     } catch (e) {
       this.logger.error(`Error retrieving relevant knowledge: ${e.message}`);
       return '';

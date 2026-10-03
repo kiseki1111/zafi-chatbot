@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from 'src/core/prisma/prisma.service';
+import * as bcrypt from 'bcrypt';
+import { PrismaService } from '../../../core/prisma/prisma.service';
 import { OnboardingDto } from './dto/onboarding.dto';
 import { DataAgentService } from '../../knowledge-ingest/data-agent.service';
 
@@ -875,7 +876,6 @@ export class TenantService {
     managerPassword?: string;
     enabledMenus: string[];
   }) {
-    const bcrypt = await import('bcrypt');
     const defaultPassword = data.managerPassword || 'Manager@123';
     const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 
@@ -997,7 +997,6 @@ export class TenantService {
     });
     if (!tenant) throw new NotFoundException('Tenant not found');
 
-    const bcrypt = await import('bcrypt');
     const defaultPassword = data.password || 'Staff@123';
     const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 

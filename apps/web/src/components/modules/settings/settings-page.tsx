@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Bot, Save, Smartphone, ShieldCheck, Loader2, Plus, Trash2, QrCode, Palette, Wrench } from "lucide-react";
+import { Bot, Save, Smartphone, ShieldCheck, Loader2, Plus, Trash2, QrCode, Palette, Wrench, Settings, Users, Sparkles, CheckCircle2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthStore } from "@/lib/auth-store";
 import { cn } from "@/lib/utils";
@@ -31,33 +31,30 @@ export function SettingsPage({ defaultTab = "bot" }: { defaultTab?: string }) {
   }, []);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-600 to-green-700 p-7 text-white shadow-xl">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=%2260%22 height=%2260%22 viewBox=%220 0 60 60%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cg fill=%22none%22 fill-rule=%22evenodd%22%3E%3Cg fill=%22%23ffffff%22 fill-opacity=%220.05%22%3E%3Cpath d=%22M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')]" />
-        <div className="relative flex items-center gap-4">
-          <div className="rounded-xl bg-white/20 p-3 backdrop-blur-sm">
-            <ShieldCheck className="h-7 w-7 text-white" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Pengaturan</h1>
-            <p className="mt-0.5 text-sm text-emerald-100">
-              Kelola identitas Asisten Otomatis dan koneksi WhatsApp.
-            </p>
-          </div>
+    <div className="space-y-4">
+      {/* Header - Compact & Clean */}
+      <div className="flex items-center gap-2.5 pb-1">
+        <div className="h-8.5 w-8.5 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-600 grid place-items-center shrink-0">
+          <Settings className="h-4.5 w-4.5" />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-foreground">Pengaturan</h1>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 md:w-[600px]">
-          <TabsTrigger value="bot">
-            <Bot className="h-4 w-4 mr-1.5" /> Identitas Asisten
+        <TabsList className="grid w-full grid-cols-3 h-10 p-1 bg-muted/60 rounded-xl border border-border/50 max-w-lg overflow-x-auto">
+          <TabsTrigger value="bot" className="text-xs font-semibold gap-1.5 rounded-lg py-1.5 data-[state=active]:bg-card data-[state=active]:shadow-xs whitespace-nowrap">
+            <Bot className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+            <span>Bot AI</span>
           </TabsTrigger>
-          <TabsTrigger value="koneksi">
-            <Smartphone className="h-4 w-4 mr-1.5" /> Koneksi WA
+          <TabsTrigger value="koneksi" className="text-xs font-semibold gap-1.5 rounded-lg py-1.5 data-[state=active]:bg-card data-[state=active]:shadow-xs whitespace-nowrap">
+            <Smartphone className="h-3.5 w-3.5 shrink-0 text-blue-600" />
+            <span>Koneksi WA</span>
           </TabsTrigger>
-          <TabsTrigger value="warna">
-            <Palette className="h-4 w-4 mr-1.5" /> Warna Website
+          <TabsTrigger value="warna" className="text-xs font-semibold gap-1.5 rounded-lg py-1.5 data-[state=active]:bg-card data-[state=active]:shadow-xs whitespace-nowrap">
+            <Palette className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+            <span>Tampilan</span>
           </TabsTrigger>
         </TabsList>
 
@@ -80,6 +77,39 @@ function BotSettingsTab() {
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [showPrompt, setShowPrompt] = React.useState(false);
+
+  // Quota & Billing state
+  const [quota, setQuota] = React.useState<{
+    plan: string;
+    planName: string;
+    planPrice: number;
+    priceLabel: string;
+    maxMau: number;
+    mauUsed: number;
+    mauPercent: number;
+    isMauExceeded: boolean;
+    maxAiResponses: number;
+    aiResponsesUsed: number;
+    aiResponsesPercent: number;
+    isAiResponsesExceeded: boolean;
+  } | null>(null);
+
+  React.useEffect(() => {
+    const fetchId =
+      user?.tenantId ||
+      (user?.id && !user.id.startsWith("u-") && user.role !== "superadmin"
+        ? user.id
+        : "demo");
+    if (!fetchId) return;
+    fetch(`/api/v1/tenant/clients/${fetchId}/quota`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        const data = res?.data || res;
+        if (data && data.plan) setQuota(data);
+      })
+      .catch(() => {});
+  }, [user?.tenantId, user?.id, user?.role]);
+
   
   const [settings, setSettings] = React.useState({
     agentName: "Luna",
@@ -175,7 +205,85 @@ function BotSettingsTab() {
 
   return (
     <div className="space-y-6">
+
+      {quota && (
+        <Card className="p-3 bg-muted/20 border shadow-2xs">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2.5 shrink-0">
+              <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                <Sparkles className="h-4 w-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-semibold text-foreground">Paket Chatbot:</span>
+                  <div className="inline-flex items-center rounded-md border px-2.5 py-0.5 text-[10px] font-bold bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300">
+                    {quota.planName}
+                  </div>
+                  <span className="text-muted-foreground text-[11px]">({quota.priceLabel})</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground">Kuota nomor aktif (MAU) dan bubble respons AI WhatsApp</p>
+              </div>
+            </div>
+
+            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4 w-full md:w-auto">
+              {/* Kontak Unik MAU */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="font-medium text-muted-foreground flex items-center gap-1">
+                    <Users className="h-3 w-3 text-blue-600" />
+                    Kontak Unik (MAU)
+                  </span>
+                  <span className="font-semibold font-mono text-foreground">
+                    {quota.mauUsed.toLocaleString()} / {quota.maxMau.toLocaleString()} ({quota.mauPercent}%)
+                  </span>
+                </div>
+                <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={cn(
+                      "h-full transition-all duration-500 rounded-full",
+                      quota.isMauExceeded
+                        ? "bg-rose-600"
+                        : quota.mauPercent >= 80
+                          ? "bg-amber-500"
+                          : "bg-blue-600"
+                    )}
+                    style={{ width: `${quota.mauPercent}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Respons AI */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="font-medium text-muted-foreground flex items-center gap-1">
+                    <Bot className="h-3 w-3 text-emerald-600" />
+                    Respons AI (Bubble Chat)
+                  </span>
+                  <span className="font-semibold font-mono text-foreground">
+                    {quota.aiResponsesUsed.toLocaleString()} / {quota.maxAiResponses.toLocaleString()} ({quota.aiResponsesPercent}%)
+                  </span>
+                </div>
+                <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={cn(
+                      "h-full transition-all duration-500 rounded-full",
+                      quota.isAiResponsesExceeded
+                        ? "bg-rose-600"
+                        : quota.aiResponsesPercent >= 80
+                          ? "bg-amber-500"
+                          : "bg-emerald-600"
+                    )}
+                    style={{ width: `${quota.aiResponsesPercent}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
       <Card>
+
           <CardHeader className="pb-3 border-b mb-4">
             <div>
               <CardTitle className="text-lg">Identitas Asisten Bot (Menjawab Pesan)</CardTitle>
@@ -185,7 +293,7 @@ function BotSettingsTab() {
         <CardContent className="space-y-6">
           <div className="grid gap-6 md:grid-cols-2">
             <div className="space-y-4">
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 <Label htmlFor="agentName">Nama Panggilan Asisten</Label>
                 <Input 
                   id="agentName"
@@ -194,7 +302,7 @@ function BotSettingsTab() {
                 />
                 <p className="text-[10px] text-muted-foreground">Pengguna akan disapa oleh nama ini.</p>
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 <Label htmlFor="agentPhone">Nomor WA Cadangan / Pengalihan (Admin)</Label>
                 <Input 
                   id="agentPhone"
@@ -203,7 +311,7 @@ function BotSettingsTab() {
                 />
                 <p className="text-[10px] text-muted-foreground">Jika asisten kebingungan, nomor ini akan diberikan ke pengguna.</p>
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 <Label htmlFor="operatingHours">Jam Operasional</Label>
                 <Input 
                   id="operatingHours"
@@ -212,7 +320,7 @@ function BotSettingsTab() {
                   onChange={e => setSettings({...settings, operatingHours: e.target.value})} 
                 />
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 <Label htmlFor="storeAddress">Alamat Toko</Label>
                 <Input 
                   id="storeAddress"
@@ -222,7 +330,7 @@ function BotSettingsTab() {
               </div>
             </div>
             <div className="space-y-4">
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="agentTone">Gaya Bahasa / Karakter Asisten</Label>
                   <span className="text-[10px] text-muted-foreground">Pilih cepat:</span>
@@ -251,17 +359,17 @@ function BotSettingsTab() {
                 </div>
                 <Textarea 
                   id="agentTone"
-                  className="min-h-[90px] text-sm" 
+                  className="min-h-[100px] sm:min-h-[90px] text-sm" 
                   value={settings.agentTone} 
                   onChange={e => setSettings({...settings, agentTone: e.target.value})}
                 />
                 <p className="text-[10px] text-muted-foreground">Petunjuk cara asisten berbicara ke pengguna.</p>
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 <Label htmlFor="greetingMsg">Sapaan Awal (Greeting)</Label>
                 <Textarea 
                   id="greetingMsg"
-                  className="min-h-[60px] text-sm" 
+                  className="min-h-[80px] sm:min-h-[60px] text-sm" 
                   placeholder="Contoh: Halo! Selamat datang di toko kami. Ada yang bisa dibantu?"
                   value={settings.greetingMsg} 
                   onChange={e => setSettings({...settings, greetingMsg: e.target.value})}
@@ -272,6 +380,7 @@ function BotSettingsTab() {
           </div>
 
           {/* System Prompt Editor */}
+          <div className="border-t pt-5 mt-2" />
           <div className="border rounded-xl overflow-hidden">
             <button
               type="button"
@@ -308,7 +417,7 @@ function BotSettingsTab() {
             )}
           </div>
 
-          <div className="flex justify-end pt-4 border-t">
+          <div className="flex justify-end pt-5 border-t mt-2">
             <Button onClick={handleSave} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700 text-white">
               {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />} 
               {saving ? 'Menyimpan...' : 'Simpan Pengaturan Asisten'}
@@ -325,6 +434,8 @@ function KoneksiWATab() {
   const [instances, setInstances] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [qrCodeData, setQrCodeData] = React.useState<{id: string, url: string} | null>(null);
+  const [connectingSession, setConnectingSession] = React.useState<string | null>(null);
+  const [connectedSession, setConnectedSession] = React.useState<{id: string, phone?: string, name?: string} | null>(null);
 
   // Add chatbot dialog
   const [isAddOpen, setIsAddOpen] = React.useState(false);
@@ -355,6 +466,55 @@ function KoneksiWATab() {
   React.useEffect(() => {
     fetchInstances();
   }, [user?.tenantId, user?.role]);
+
+  // Polling status koneksi WhatsApp saat QR aktif atau saat modal ditutup di latar belakang
+  React.useEffect(() => {
+    if (!connectingSession) return;
+
+    let isMounted = true;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/v1/waha/instances/${connectingSession}/status`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const status = (data?.status || "").toUpperCase();
+
+        if (status === "WORKING" || status === "CONNECTED") {
+          clearInterval(interval);
+          if (!isMounted) return;
+
+          const phone = (data?.me?.id || data?.phone || "").replace(/@(c\.us|s\.whatsapp\.net)$/i, "");
+          const profileName = data?.me?.pushName || data?.profileName || "";
+
+          // Simpan data sesi yang berhasil connect
+          setConnectedSession({
+            id: connectingSession,
+            phone,
+            name: profileName,
+          });
+
+          // Jika modal SUDAH DITUTUP oleh user saat proses scan berlangsung:
+          // Munculkan toast notifikasi keberhasilan di layar
+          if (!qrCodeData) {
+            toast.success("WhatsApp Berhasil Terhubung", {
+              description: `Nomor WhatsApp ${phone ? "(+" + phone + ")" : ""} pada sesi "${connectingSession}" sudah aktif dan siap melayani pelanggan.`,
+              duration: 7000,
+            });
+          }
+
+          setConnectingSession(null);
+          fetchInstances();
+        }
+      } catch (err) {
+        // silent polling catch
+      }
+    }, 2500);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [connectingSession, qrCodeData]);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -406,6 +566,8 @@ function KoneksiWATab() {
 
   const handleScanQR = async (sessionName: string) => {
     try {
+      setConnectingSession(sessionName);
+      setConnectedSession(null);
       const res = await fetch(`/api/v1/waha/instances/${sessionName}/qr`);
       if (res.ok) {
         const blob = await res.blob();
@@ -589,26 +751,89 @@ function KoneksiWATab() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog: Scan QR Code */}
-      <Dialog open={!!qrCodeData} onOpenChange={(open) => !open && setQrCodeData(null)}>
-        <DialogContent className="sm:max-w-[380px]">
-          <DialogHeader>
-            <DialogTitle>Scan QR Code</DialogTitle>
-            <DialogDescription>
-              Chatbot: <span className="font-medium text-slate-700">{qrCodeData?.id}</span>
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col items-center justify-center py-4">
-            {qrCodeData && (
-              <img src={qrCodeData.url} alt="QR Code" className="w-48 h-48 border-4 border-emerald-500 rounded-lg shadow-lg" />
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground text-center">Buka WhatsApp di ponsel Anda dan scan QR code ini</p>
-          <DialogFooter>
-            <Button onClick={() => setQrCodeData(null)} className="w-full bg-slate-800 text-white">
-              Selesai
-            </Button>
-          </DialogFooter>
+      {/* Dialog: Scan QR Code & Status Terhubung */}
+      <Dialog
+        open={!!qrCodeData || !!connectedSession}
+        onOpenChange={(open) => {
+          if (!open) {
+            setQrCodeData(null);
+            setConnectedSession(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[400px]">
+          {connectedSession ? (
+            <div className="flex flex-col items-center justify-center py-5 text-center space-y-4">
+              <div className="h-16 w-16 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center animate-in zoom-in-75 duration-300">
+                <CheckCircle2 className="h-10 w-10 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div className="space-y-1.5">
+                <DialogTitle className="text-lg font-bold text-foreground">WhatsApp Berhasil Terhubung!</DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground">
+                  Nomor WhatsApp pada chatbot <span className="font-semibold text-emerald-600 dark:text-emerald-400">"{connectedSession.id}"</span> kini telah aktif.
+                </DialogDescription>
+                {connectedSession.phone && (
+                  <div className="pt-1">
+                    <span className="text-xs font-mono font-medium text-foreground bg-muted py-1 px-3 rounded-full border">
+                      +{connectedSession.phone} {connectedSession.name ? `(${connectedSession.name})` : ''}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <p className="text-[11px] text-muted-foreground/80 max-w-xs">
+                Asisten bot AI Anda sudah siap membalas pertanyaan dan pesanan pelanggan secara otomatis 24/7.
+              </p>
+              <DialogFooter className="w-full sm:justify-center">
+                <Button
+                  onClick={() => {
+                    setQrCodeData(null);
+                    setConnectedSession(null);
+                  }}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+                >
+                  Selesai &amp; Mulai Gunakan
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Smartphone className="h-5 w-5 text-emerald-600" />
+                  Scan QR Code WhatsApp
+                </DialogTitle>
+                <DialogDescription>
+                  Hubungkan sesi <span className="font-semibold text-foreground">{qrCodeData?.id}</span> ke WhatsApp Anda.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex flex-col items-center justify-center py-4">
+                {qrCodeData && (
+                  <div className="relative p-2 bg-white rounded-xl shadow-md border-2 border-emerald-500">
+                    <img src={qrCodeData.url} alt="QR Code" className="w-48 h-48 rounded-lg" />
+                  </div>
+                )}
+                <div className="flex items-center gap-2 mt-4 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-600" />
+                  <span>Menunggu pemindaian ponsel...</span>
+                </div>
+              </div>
+              <p className="text-[11px] text-muted-foreground text-center">
+                Buka WhatsApp di ponsel &gt; Ketuk Perangkat Tertaut &gt; Tautkan Perangkat, lalu arahkan kamera ke kode QR di atas.
+              </p>
+              <DialogFooter className="flex-col sm:flex-col gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setQrCodeData(null);
+                    toast.info("Pemindaian ditutup. Notifikasi akan muncul otomatis saat nomor terhubung.");
+                  }}
+                  className="w-full text-xs"
+                >
+                  Tutup Sementara (Cek di Latar Belakang)
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </>

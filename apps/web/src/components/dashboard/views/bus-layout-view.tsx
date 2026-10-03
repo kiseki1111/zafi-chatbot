@@ -14,6 +14,13 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Bus,
   Armchair,
   Plus,
@@ -27,6 +34,7 @@ import {
   MapPin,
   CheckCircle2,
   Sparkles,
+  Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -343,71 +351,73 @@ export function BusLayoutView() {
         }
       }}
     >
-      {/* Header Info & Pilihan Armada Bus */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-700 via-blue-700 to-slate-900 p-6 text-white shadow-xl">
-        <div className="relative flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-white/20 p-3 backdrop-blur-sm">
-              <Bus className="h-7 w-7 text-white" />
+      {/* Header Info & Pilihan Armada Bus (Clean, Modern & Structured) */}
+      <div className="rounded-xl border bg-card p-3.5 sm:p-4 shadow-xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          {/* Armada Selector via Dropdown instead of cramped scroll tabs */}
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <div className="h-9 w-9 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-600 grid place-items-center shrink-0">
+              <Bus className="h-5 w-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold tracking-tight">{activeFleet.name}</h1>
-                <Badge className="bg-emerald-500 text-white font-semibold">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Select
+                  value={activeFleetId}
+                  onValueChange={(id) => {
+                    setActiveFleetId(id);
+                    setSelectedSeat(null);
+                  }}
+                >
+                  <SelectTrigger className="h-8 text-xs font-semibold bg-muted/50 border-border max-w-[240px] sm:max-w-[300px]">
+                    <SelectValue placeholder="Pilih Armada Bus" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {fleets.map((f) => (
+                      <SelectItem key={f.id} value={f.id} className="text-xs">
+                        {f.name} ({f.totalSeats} Seat)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4.5 font-semibold shrink-0">
                   {activeFleet.totalSeats} Kursi
                 </Badge>
               </div>
-              <p className="mt-0.5 text-xs text-blue-100 flex items-center gap-3">
-                <span className="flex items-center gap-1">
-                  <MapPin className="h-3.5 w-3.5 text-rose-300" /> {activeFleet.route}
-                </span>
-              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 shrink-0">
             <Button
               size="sm"
-              variant="outline"
-              className="bg-white/10 border-white/20 text-white hover:bg-white/20 text-xs gap-1.5"
               onClick={() => setIsNewBusOpen(true)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs min-h-[44px] h-11 sm:h-8 px-3 gap-1.5 font-semibold shadow-xs"
             >
-              <Plus className="h-4 w-4" /> Tambah Bus Baru
+              <Plus className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Tambah Bus Baru</span>
+              <span className="sm:hidden">Tambah</span>
             </Button>
             {fleets.length > 1 && (
               <Button
                 size="sm"
-                variant="ghost"
-                className="text-rose-200 hover:text-rose-100 hover:bg-rose-500/20 text-xs"
+                variant="outline"
+                className="min-h-[44px] h-11 w-11 sm:h-8 sm:w-8 p-0 text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-950/40"
                 onClick={() => handleDeleteBus(activeFleet.id)}
+                title="Hapus armada ini"
               >
-                <Trash2 className="h-4 w-4" />
+                <Trash2 className="h-3.5 w-3.5" />
               </Button>
             )}
           </div>
         </div>
 
-        {/* Tab Pilihan Armada jika lebih dari 1 */}
-        <div className="flex items-center gap-2 mt-4 pt-3 border-t border-white/10 overflow-x-auto">
-          {fleets.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => {
-                setActiveFleetId(f.id);
-                setSelectedSeat(null);
-              }}
-              className={cn(
-                "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0",
-                f.id === activeFleet.id
-                  ? "bg-white text-blue-900 shadow-sm"
-                  : "bg-white/10 text-white hover:bg-white/20",
-              )}
-            >
-              {f.name} ({f.totalSeats} Seat)
-            </button>
-          ))}
-        </div>
+        {/* Route info */}
+        {activeFleet.route && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-1.5 border-t border-border/60">
+            <MapPin className="h-3.5 w-3.5 text-rose-500 shrink-0" />
+            <span className="truncate">Rute: <strong className="text-foreground">{activeFleet.route}</strong></span>
+          </div>
+        )}
       </div>
 
       {/* Toolbar: Toggle Mode Drag & Drop vs Mode Booking */}
@@ -418,7 +428,7 @@ export function BusLayoutView() {
               size="sm"
               variant={isEditMode ? "default" : "outline"}
               className={cn(
-                "text-xs gap-1.5 h-8 font-semibold",
+                "text-xs gap-1.5 min-h-[44px] h-11 sm:h-8 font-semibold",
                 isEditMode
                   ? "bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
                   : "border-slate-300 dark:border-slate-700",
@@ -429,27 +439,33 @@ export function BusLayoutView() {
               }}
             >
               <Move className="h-3.5 w-3.5" />
-              {isEditMode ? "Selesai Atur Posisi (Simpan)" : "Atur Posisi Kursi (Drag & Drop)"}
+              {isEditMode ? "Selesai" : "Atur Posisi"}
             </Button>
-            <span className="text-[11px] text-muted-foreground">
-              {isEditMode
-                ? "💡 Geser/tarik nomor kursi secara bebas ke posisi denah yang Anda inginkan."
-                : "💡 Mode Reservasi: Klik kursi untuk melihat/mengubah status penumpang."}
-            </span>
+            {/* Logo info sederhana pengganti teks panjang */}
+            <div
+              className="grid place-items-center min-h-[44px] min-w-[44px] h-11 w-11 sm:h-8 sm:w-8 rounded-lg hover:bg-muted/80 text-muted-foreground transition-colors cursor-help"
+              title={
+                isEditMode
+                  ? "Mode Atur: Geser nomor kursi secara bebas ke posisi yang diinginkan"
+                  : "Mode Reservasi: Klik kursi untuk melihat atau mengubah status penumpang"
+              }
+            >
+              <Info className="h-4 w-4" />
+            </div>
           </div>
 
-          <div className="flex items-center gap-3 text-xs">
+          <div className="flex flex-wrap items-center gap-3 text-xs">
             <div className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded bg-emerald-500" />
-              <span className="text-[11px] text-muted-foreground">{availableCount} Kosong</span>
+              <span className="h-3 w-3 rounded-sm bg-emerald-500" />
+              <span className="text-xs text-muted-foreground">{availableCount} Tersedia</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded bg-amber-500" />
-              <span className="text-[11px] text-muted-foreground">{bookedCount} Booking</span>
+              <span className="h-3 w-3 rounded-sm bg-amber-500" />
+              <span className="text-xs text-muted-foreground">{bookedCount} Dipesan</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded bg-rose-500" />
-              <span className="text-[11px] text-muted-foreground">{occupiedCount} Terisi</span>
+              <span className="h-3 w-3 rounded-sm bg-rose-500" />
+              <span className="text-xs text-muted-foreground">{occupiedCount} Terisi</span>
             </div>
           </div>
         </div>
@@ -524,7 +540,7 @@ export function BusLayoutView() {
                       transform: "translate(-50%, -50%)",
                     }}
                     className={cn(
-                      "absolute flex flex-col items-center justify-center h-13 w-13 rounded-xl border-2 transition-transform shadow-md select-none",
+                      "absolute flex flex-col items-center justify-center h-13 w-13 min-h-[44px] min-w-[44px] rounded-xl border-2 transition-transform shadow-md select-none touch-manipulation",
                       cfg.bg,
                       cfg.border,
                       isEditMode
@@ -567,7 +583,7 @@ export function BusLayoutView() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="h-8 gap-1.5 text-xs"
+                    className="min-h-[44px] h-11 sm:h-8 gap-1.5 text-xs"
                     onClick={() => {
                       setSeatForm({
                         status: selectedSeat.status,
@@ -604,7 +620,7 @@ export function BusLayoutView() {
                 {selectedSeat.passengerPhone && (
                   <Button
                     variant="outline"
-                    className="w-full text-xs h-9 gap-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                    className="w-full text-xs min-h-[44px] h-11 sm:h-9 gap-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
                     onClick={() => {
                       window.open(`https://wa.me/${selectedSeat.passengerPhone?.replace(/\D/g, "")}`, "_blank");
                     }}
@@ -629,8 +645,9 @@ export function BusLayoutView() {
                   </p>
                 </div>
                 {!isEditMode && (
-                  <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">
-                    💡 Tips: Klik kursi hijau untuk booking
+                  <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
+                    <Info className="h-3 w-3 shrink-0" />
+                    <span>Tips: Klik kursi hijau untuk booking</span>
                   </span>
                 )}
               </div>
@@ -721,7 +738,7 @@ export function BusLayoutView() {
               <select
                 value={seatForm.status}
                 onChange={(e) => setSeatForm({ ...seatForm, status: e.target.value as SeatStatus })}
-                className="w-full h-8 mt-1 rounded-md border bg-background px-2 text-xs"
+                className="w-full min-h-[44px] h-11 sm:h-8 mt-1 rounded-md border bg-background px-2 text-xs"
               >
                 <option value="AVAILABLE">Tersedia (Kosong)</option>
                 <option value="BOOKED">Dipesan (Menunggu Pelunasan/DP)</option>

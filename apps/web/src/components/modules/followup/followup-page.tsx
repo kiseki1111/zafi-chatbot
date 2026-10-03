@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/table";
 import {
   BellRing, Clock, Users, Send, Loader2, RefreshCw, History,
-  Settings, Zap, User, Sun, Sunset, Sunrise, Moon, Sparkles, Check, Trash2, Plus,
+  Settings, Zap, User, Sun, Sunset, Sunrise, Moon, Sparkles, Check, Trash2, Plus, Save, AlertTriangle,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -292,261 +292,180 @@ export function FollowupPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Follow-Up</h2>
-          <p className="text-sm text-muted-foreground">
-            Auto follow-up pelanggan yang tidak aktif lebih dari {config.inactivityHours} jam
-          </p>
+      {/* Header - Compact & Responsive (No bloated explanation) */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground truncate">
+            Follow-Up
+          </h2>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={loadAll}>
-            <RefreshCw className="h-4 w-4 mr-1.5" />
-            Refresh
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="outline" size="sm" onClick={loadAll} className="h-8 text-xs gap-1.5 px-2.5">
+            <RefreshCw className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Refresh</span>
           </Button>
           <Button
             size="sm"
             onClick={() => setIsConfirmTriggerOpen(true)}
             disabled={triggering || !config.isEnabled}
+            className="h-8 text-xs gap-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs font-semibold"
           >
             {triggering ? (
-              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
-              <Zap className="h-4 w-4 mr-1.5" />
+              <Zap className="h-3.5 w-3.5" />
             )}
-            Trigger Sekarang
+            <span className="hidden sm:inline">Trigger Sekarang</span>
+            <span className="sm:hidden">Trigger</span>
           </Button>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="grid place-items-center h-10 w-10 rounded-lg bg-emerald-50 dark:bg-emerald-950/40">
-                <Send className="h-5 w-5 text-emerald-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{stats.totalFollowedUp}</p>
-                <p className="text-xs text-muted-foreground">Total Terkirim</p>
-              </div>
-            </div>
-          </CardContent>
+      {/* Stats Cards - Centered & Proportional (Zero empty space) */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <Card className="p-3 sm:p-4 flex flex-col items-center justify-center text-center shadow-xs">
+          <div className="h-8 w-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 grid place-items-center mb-1.5 shrink-0">
+            <Send className="h-4 w-4" />
+          </div>
+          <p className="text-xl sm:text-2xl font-bold tracking-tight text-foreground leading-tight">
+            {stats.totalFollowedUp}
+          </p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Terkirim</p>
         </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="grid place-items-center h-10 w-10 rounded-lg bg-amber-50 dark:bg-amber-950/40">
-                <Users className="h-5 w-5 text-amber-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{stats.pendingCount}</p>
-                <p className="text-xs text-muted-foreground">Menunggu Follow-Up</p>
-              </div>
-            </div>
-          </CardContent>
+        <Card className="p-3 sm:p-4 flex flex-col items-center justify-center text-center shadow-xs">
+          <div className="h-8 w-8 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 grid place-items-center mb-1.5 shrink-0">
+            <Users className="h-4 w-4" />
+          </div>
+          <p className="text-xl sm:text-2xl font-bold tracking-tight text-foreground leading-tight">
+            {stats.pendingCount}
+          </p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Menunggu</p>
         </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="grid place-items-center h-10 w-10 rounded-lg bg-blue-50 dark:bg-blue-950/40">
-                <BellRing className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">
-                  {config.isEnabled ? "Aktif" : "Nonaktif"}
-                </p>
-                <p className="text-xs text-muted-foreground">Status Schedule</p>
-              </div>
-            </div>
-          </CardContent>
+        <Card className="p-3 sm:p-4 flex flex-col items-center justify-center text-center shadow-xs">
+          <div className="h-8 w-8 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 grid place-items-center mb-1.5 shrink-0">
+            <BellRing className="h-4 w-4" />
+          </div>
+          <p className="text-base sm:text-xl font-bold tracking-tight text-foreground leading-tight truncate max-w-full">
+            {config.isEnabled ? "Aktif" : "Nonaktif"}
+          </p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Status</p>
         </Card>
       </div>
 
       {/* Config + Pending Side by Side */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Config */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Settings className="h-4 w-4" />
-              Konfigurasi
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        {/* Config - Clean & Un-crowded */}
+        <Card className="shadow-xs">
+          <CardHeader className="pb-3 border-b">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <Settings className="h-4.5 w-4.5 text-muted-foreground" />
+              Pengaturan Jadwal
             </CardTitle>
-            <CardDescription>Atur jadwal dan perilaku auto follow-up</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/20">
-              <div className="space-y-0.5">
-                <Label htmlFor="enabled" className="text-sm font-semibold">Aktifkan Follow-Up Otomatis</Label>
-                <p className="text-xs text-muted-foreground">Bot akan otomatis mengirim pesan follow-up sesuai jadwal.</p>
+          <CardContent className="p-4 sm:p-5 space-y-4">
+            {/* Toggle Row */}
+            <div className="flex items-center justify-between p-3 sm:p-3 rounded-xl border bg-muted/20">
+              <div>
+                <Label htmlFor="enabled" className="text-sm font-semibold cursor-pointer">
+                  Follow-Up Otomatis
+                </Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Kirim pesan pengingat ke prospek yang belum merespons
+                </p>
               </div>
-              <div className="flex items-center gap-2">
-                <Badge
-                  variant={config.isEnabled ? "default" : "secondary"}
-                  className={cn(
-                    "text-[10px] uppercase font-bold tracking-wider",
-                    config.isEnabled ? "bg-emerald-600 text-white" : "text-muted-foreground"
-                  )}
-                >
-                  {config.isEnabled ? "Aktif" : "Nonaktif"}
-                </Badge>
-                <Switch
-                  id="enabled"
-                  checked={config.isEnabled}
-                  onCheckedChange={(v) => setConfig({ ...config, isEnabled: v })}
-                />
+              <Switch
+                id="enabled"
+                checked={config.isEnabled}
+                onCheckedChange={(v) => setConfig({ ...config, isEnabled: v })}
+                className="scale-110"
+              />
+            </div>
+
+            {/* Jam Pengiriman */}
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5 text-emerald-600" />
+                Waktu Kirim ({config.scheduleTime || "09:00"} WIB)
+              </Label>
+              <div className="grid grid-cols-4 gap-1.5">
+                {[
+                  { label: "Pagi", time: "09:00", icon: Sunrise },
+                  { label: "Siang", time: "13:00", icon: Sun },
+                  { label: "Sore", time: "16:30", icon: Sunset },
+                  { label: "Malam", time: "19:30", icon: Moon },
+                ].map((preset) => {
+                  const Icon = preset.icon;
+                  const isSelected = config.scheduleTime === preset.time;
+                  return (
+                    <button
+                      key={preset.time}
+                      type="button"
+                      onClick={() => setConfig({ ...config, scheduleTime: preset.time })}
+                      className={`flex flex-col items-center justify-center p-2 rounded-xl border text-center transition-all min-h-[44px] ${
+                        isSelected
+                          ? "bg-emerald-600 text-white border-emerald-600 shadow-xs font-bold"
+                          : "bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground border-border/50"
+                      }`}
+                    >
+                      <Icon className="h-3.5 w-3.5 mb-0.5 shrink-0" />
+                      <span className="text-xs leading-tight">{preset.label}</span>
+                      <span className={`text-[10px] ${isSelected ? "text-emerald-100" : "text-muted-foreground"}`}>{preset.time}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
-            <div className="space-y-4 pt-1">
-              {/* Jadwal Waktu Eksekusi */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs font-semibold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5 text-emerald-600" />
-                    Jadwal Pengiriman Otomatis (WIB)
-                  </Label>
-                  <span className="text-xs font-bold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
-                    Pukul {config.scheduleTime || "09:00"} WIB
-                  </span>
-                </div>
 
-                {/* Preset Cepat Waktu Indonesia */}
-                <div className="grid grid-cols-4 gap-1.5">
-                  {[
-                    { label: "Pagi", time: "09:00", desc: "09:00 WIB", icon: Sunrise },
-                    { label: "Siang", time: "13:00", desc: "13:00 WIB", icon: Sun },
-                    { label: "Sore", time: "16:30", desc: "16:30 WIB", icon: Sunset },
-                    { label: "Malam", time: "19:30", desc: "19:30 WIB", icon: Moon },
-                  ].map((preset) => {
-                    const Icon = preset.icon;
-                    const isSelected = config.scheduleTime === preset.time;
-                    return (
-                      <button
-                        key={preset.time}
-                        type="button"
-                        onClick={() => setConfig({ ...config, scheduleTime: preset.time })}
-                        className={`flex flex-col items-center justify-center p-2 rounded-lg border text-center transition-all ${
-                          isSelected
-                            ? "bg-emerald-600 text-white border-emerald-600 shadow-sm ring-2 ring-emerald-500/20"
-                            : "bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground border-transparent hover:border-border"
-                        }`}
-                      >
-                        <Icon className="h-3.5 w-3.5 mb-1 shrink-0" />
-                        <span className="text-xs font-bold leading-none">{preset.label}</span>
-                        <span className={`text-[10px] mt-0.5 ${isSelected ? "text-emerald-100" : "text-muted-foreground"}`}>{preset.time}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Dropdown Jam & Menit Presisi */}
-                <div className="flex items-center gap-2 pt-1">
-                  <div className="flex-1 space-y-1">
-                    <span className="text-[11px] text-muted-foreground">Jam:</span>
-                    <Select
-                      value={config.scheduleTime?.split(":")[0] || "09"}
-                      onValueChange={(val) => {
-                        const mins = config.scheduleTime?.split(":")[1] || "00";
-                        setConfig({ ...config, scheduleTime: `${val}:${mins}` });
-                      }}
+            {/* Kriteria Tidak Merespons */}
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold text-foreground">
+                Kirim jika tidak merespons selama:
+              </Label>
+              <div className="grid grid-cols-4 gap-1.5">
+                {[
+                  { label: "12 Jam", hours: 12 },
+                  { label: "1 Hari", hours: 24 },
+                  { label: "2 Hari", hours: 48 },
+                  { label: "3 Hari", hours: 72 },
+                ].map((dur) => {
+                  const isSelected = config.inactivityHours === dur.hours;
+                  return (
+                    <button
+                      key={dur.hours}
+                      type="button"
+                      onClick={() => setConfig({ ...config, inactivityHours: dur.hours })}
+                      className={`py-2.5 px-1 rounded-xl border text-xs font-semibold transition-all text-center min-h-[44px] ${
+                        isSelected
+                          ? "bg-foreground text-background border-foreground shadow-xs"
+                          : "bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground border-border/50"
+                      }`}
                     >
-                      <SelectTrigger className="h-9 text-xs">
-                        <SelectValue placeholder="Jam" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-56">
-                        {Array.from({ length: 24 }).map((_, i) => {
-                          const h = String(i).padStart(2, "0");
-                          return (
-                            <SelectItem key={h} value={h} className="text-xs">
-                              Jam {h}:00
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex-1 space-y-1">
-                    <span className="text-[11px] text-muted-foreground">Menit:</span>
-                    <Select
-                      value={config.scheduleTime?.split(":")[1] || "00"}
-                      onValueChange={(val) => {
-                        const hrs = config.scheduleTime?.split(":")[0] || "09";
-                        setConfig({ ...config, scheduleTime: `${hrs}:${val}` });
-                      }}
-                    >
-                      <SelectTrigger className="h-9 text-xs">
-                        <SelectValue placeholder="Menit" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {["00", "15", "30", "45"].map((m) => (
-                          <SelectItem key={m} value={m} className="text-xs">
-                            {m} Menit
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Batas Inaktif Pelanggan */}
-              <div className="space-y-2 pt-1 border-t">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">
-                    Kriteria Tidak Merespons
-                  </Label>
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {config.inactivityHours >= 24
-                      ? `${Math.round(config.inactivityHours / 24)} hari (${config.inactivityHours} jam)`
-                      : `${config.inactivityHours} jam`}
-                  </span>
-                </div>
-
-                {/* Preset Durasi Inaktif */}
-                <div className="grid grid-cols-4 gap-1.5">
-                  {[
-                    { label: "12 Jam", hours: 12 },
-                    { label: "1 Hari", hours: 24 },
-                    { label: "2 Hari", hours: 48 },
-                    { label: "3 Hari", hours: 72 },
-                  ].map((dur) => {
-                    const isSelected = config.inactivityHours === dur.hours;
-                    return (
-                      <button
-                        key={dur.hours}
-                        type="button"
-                        onClick={() => setConfig({ ...config, inactivityHours: dur.hours })}
-                        className={`py-1.5 px-2 rounded-lg border text-xs font-semibold transition-all ${
-                          isSelected
-                            ? "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border-transparent shadow-sm"
-                            : "bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground border-transparent"
-                        }`}
-                      >
-                        {dur.label}
-                      </button>
-                    );
-                  })}
-                </div>
+                      {dur.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
+
+            {/* Prompt AI */}
             <div className="space-y-1.5">
-              <Label>Prompt AI (opsional)</Label>
+              <Label className="text-xs font-semibold text-foreground">Instruksi Pesan AI (Opsional)</Label>
               <Textarea
-                placeholder="Prompt default: buat pesan follow-up singkat untuk pelanggan yang tidak merespons..."
+                placeholder="Buat pesan follow-up ramah dan tanyakan apakah ada hal yang perlu dibantu..."
                 value={config.followUpPrompt ?? ""}
                 onChange={(e) => setConfig({ ...config, followUpPrompt: e.target.value || null })}
-                rows={3}
+                rows={2}
+                className="text-xs resize-none rounded-xl"
               />
-              <p className="text-[11px] text-muted-foreground">
-                Kosongkan untuk menggunakan prompt bawaan sistem
-              </p>
             </div>
-            <Button onClick={saveConfig} disabled={saving} className="w-full">
-              {saving ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : null}
-              Simpan Konfigurasi
+
+            <Button
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold h-9.5 rounded-xl shadow-xs"
+              onClick={saveConfig}
+              disabled={saving}
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Save className="h-4 w-4 mr-1.5" />}
+              Simpan Pengaturan
             </Button>
           </CardContent>
         </Card>
@@ -614,7 +533,7 @@ export function FollowupPage() {
                 {inactiveContacts.map((c) => (
                   <div
                     key={`${c.contactId}-${c.instanceName}`}
-                    className="flex items-center gap-3 rounded-lg border p-3 hover:bg-muted/30 transition-colors"
+                    className="flex items-center gap-3 rounded-lg border p-3 hover:bg-muted/30 transition-colors min-h-[48px]"
                   >
                     <div className="grid place-items-center h-8 w-8 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-xs font-bold shrink-0">
                       {(c.contactName ?? c.contactPhone ?? "?").charAt(0).toUpperCase()}
@@ -665,8 +584,8 @@ export function FollowupPage() {
               <p className="text-sm text-muted-foreground">Belum ada riwayat follow-up</p>
             </div>
           ) : (
-            <div className="rounded-lg border overflow-hidden">
-              <Table>
+            <div className="rounded-lg border overflow-hidden overflow-x-auto -mx-2 sm:mx-0">
+              <Table className="min-w-[500px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Pelanggan</TableHead>
@@ -725,8 +644,9 @@ export function FollowupPage() {
               Anda akan mengirim pesan follow-up otomatis berbasis AI kepada <strong>{inactiveContacts.length} kontak</strong> yang telah melewati batas inaktif <strong>{config.inactivityHours} jam</strong>.
             </DialogDescription>
           </DialogHeader>
-          <div className="bg-amber-50 dark:bg-amber-950/40 p-3 rounded-lg border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300">
-            ⚠️ Pastikan nomor WhatsApp instans aktif dan konfigurasi AI sudah tersimpan sebelum melanjutkan.
+          <div className="bg-amber-50 dark:bg-amber-950/40 p-3 rounded-lg border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+            <span>Pastikan nomor WhatsApp instans aktif dan konfigurasi AI sudah tersimpan sebelum melanjutkan.</span>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setIsConfirmTriggerOpen(false)}>Batal</Button>

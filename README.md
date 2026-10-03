@@ -1,80 +1,172 @@
-# PropertiKu - AI Agent & RBAC Management System
+# Multi-Tenant AI Chatbot & Omnichannel CRM Platform
 
-PropertiKu adalah ekosistem aplikasi tingkat industri yang memadukan sistem **Role-Based Access Control (RBAC)**, **Frontend Dashboard (Next.js)**, dan **AI Agent (Telegram & WhatsApp)** untuk otomasi pemasaran dan manajemen agen properti.
-
-Sistem ini dirancang menggunakan arsitektur berlapis yang kokoh dengan **NestJS**, **Prisma ORM**, dan database **PostgreSQL**.
+Platform produksi **Multi-Tenant WhatsApp AI Chatbot** dan **Web CMS Dashboard** yang dirancang untuk mengotomasi layanan pelanggan, manajemen prospek (CRM), serta integrasi inventaris bisnis (UMKM, Real Estate/Properti, Travel/PO Bus).
 
 ---
 
-## Struktur Proyek (NPM Workspace Monorepo)
+## 🌟 Fitur Utama
 
-Proyek ini telah dikonfigurasi ulang menjadi sebuah arsitektur *Monorepo* modern menggunakan NPM Workspaces:
-1. **`apps/backend`**: Berisi core API NestJS, integrasi AI, integrasi Telegram/WhatsApp, dan manajemen database Prisma (Port 3030).
-2. **`apps/web`**: Berisi aplikasi dashboard berbasis **Next.js** (Tailwind CSS & Shadcn UI) untuk memonitor percakapan AI dan mengatur properti (Port 3001).
+- 🤖 **Dual AI Engine:**
+  - **Bot CS (Customer Service):** Menjawab pertanyaan pelanggan WhatsApp 24/7 menggunakan RAG (*Retrieval-Augmented Generation*) dari dokumen dan katalog produk tenant.
+  - **Bot Asisten Internal:** Mendukung *tool calling* (pencatatan penjualan atomik, cek stok barang secara langsung, dan pembaruan harga massal).
+  - **Simulator Interaktif:** Sandbox pada dashboard web untuk menguji respon bot sebelum dipublikasikan.
+- 💬 **Omnichannel CRM & Live Chat:**
+  - Riwayat obrolan pelanggan *real-time* via WAHA (WhatsApp HTTP API).
+  - Peralihan otomatis **Bot vs Human Takeover** saat operator membalas chat secara manual.
+  - Manajemen kontak, tagging, pemberian catatan internal (*internal notes*), dan delegasi percakapan.
+- 📚 **Multi-Modal Knowledge Ingestion:**
+  - Ekstraksi otomatis dari dokumen `.pdf`, `.docx`, dan teks bebas.
+  - Sinkronisasi massal data inventaris/produk via file spreadsheet `.xlsx`.
+  - Ekstraksi gambar menggunakan model visi OpenAI.
+  - Penyimpanan vektor embedding menggunakan PostgreSQL + ekstensi `pgvector`.
+- 🏢 **Solusi Vertikal Spesifik:**
+  - **Siteplan Kavling / Properti (`availability`):** Visualisasi ketersediaan unit rumah/kavling tanah (Available, Reserved, Sold).
+  - **Denah Kursi Bus (`bus_layout`):** Visualisasi tata letak kursi bus untuk bisnis travel & transportasi.
+- ⏰ **Automated Follow-Up Engine:**
+  - Penjadwalan otomatis harian (default: 09:00 WIB) untuk menghubungi kembali pelanggan pasif (>24 jam) dengan pesan personalisasi AI dan pencegahan pesan ganda (*anti-duplicate*).
+- 👑 **Superadmin Platform Control:**
+  - Monitoring semua sesi WAHA aktif, penggunaan kuota token AI, manajemen paket & harga klien, serta log audit sistem.
 
 ---
 
-## Panduan Instalasi & Menjalankan Lokal
+## 🏗️ Struktur Proyek
 
-Karena ini adalah sistem *Monorepo*, Anda tidak perlu masuk ke folder satu-per-satu. Semua dapat dikendalikan dari *root* folder:
+Platform ini menggunakan arsitektur monorepo:
 
-### 1. Install Dependensi
-```bash
-npm install
 ```
-*(Perintah ini akan secara otomatis meng-install dependensi untuk Backend dan Web sekaligus)*
+├── apps/
+│   ├── backend/             # NestJS API Server (Port 3030)
+│   │   ├── src/             # Logika bisnis, Prisma, integrasi WAHA & OpenAI
+│   │   └── test/            # Unit, integration, dan E2E test suite
+│   └── web/                 # Next.js 16 Web CMS & PWA (Port 3001)
+│       └── src/             # Dashboard UI (Tailwind v4, Shadcn, Zustand)
+├── docker-compose.yml       # Konfigurasi container produksi (Coolify network)
+├── docker-compose.local.yml # Container lokal PostgreSQL + pgvector
+├── docker-compose.waha.yml  # Container WAHA WhatsApp Gateway
+├── konteks.md               # Dokumentasi detail konteks dan arsitektur
+└── PHASE-3-4-PLAN.md        # Rencana aksi perbaikan kualitas dan pengujian
+```
 
-### 2. Pengaturan Lingkungan (.env)
-Pastikan Anda telah mengisi file `.env` di folder `apps/backend/` dengan benar.
+---
 
-### 3. Generate Prisma & Migrasi Database
-Masuk sebentar ke backend untuk setup database:
+## 📋 Prasyarat Sistem
+
+- **Node.js:** Versi >= 20.x
+- **Docker & Docker Compose:** Versi terbaru
+- **PostgreSQL:** Versi 15+ dengan ekstensi `pgvector`
+- **WAHA (WhatsApp HTTP API):** Server WAHA lokal atau cloud
+- **OpenAI API Key:** Untuk engine AI, Vision, dan Vector Embeddings
+
+---
+
+## 🚀 Panduan Memulai Cepat (Pengembangan Lokal)
+
+### 1. Salin Pengaturan Lingkungan
+Duplikasi file `.env.example` atau sesuaikan `.env` pada folder root dan `apps/backend/.env`:
+
+```env
+# Database
+DATABASE_URL="postgresql://postgres:secret_password@127.0.0.1:5432/rbac_api_db?schema=public"
+
+# Backend
+PORT=3030
+JWT_SECRET="your-jwt-secret-key-change-in-production"
+JWT_EXPIRES_IN="7d"
+
+# WAHA (WhatsApp Gateway)
+WAHA_API_URL="http://localhost:3000"
+WAHA_API_KEY="your-waha-key"
+WHATSAPP_API_KEY="your-waha-key"
+
+# OpenAI
+OPENAI_API_KEY="sk-proj-xxxxxxxxxxxxxxxxxxxx"
+```
+
+### 2. Jalankan Database Lokal
+Jalankan PostgreSQL dengan ekstensi `pgvector` melalui Docker:
+
 ```bash
+docker compose -f docker-compose.local.yml up -d
+```
+
+### 3. Migrasi & Seed Database
+Jalankan migrasi database dan pembuat data awal (seed):
+
+```bash
+npm run prisma:generate
 cd apps/backend
-npx prisma generate
-npx prisma db push
+npx prisma migrate dev
+npx prisma db seed
 cd ../..
 ```
 
-### 4. Menyalakan Database Lokal (Wajib)
-Aplikasi *backend* membutuhkan PostgreSQL. Anda bisa menyalakannya dengan mudah tanpa perlu *install* PostgreSQL di komputer, yaitu dengan menggunakan fasilitas Docker:
+### 4. Jalankan Aplikasi
+Jalankan backend API dan web frontend secara bersamaan:
+
 ```bash
-docker-compose up rbac-db -d
+# Terminal 1 - Backend NestJS (http://localhost:3030)
+npm run dev:backend
+
+# Terminal 2 - Frontend Next.js (http://localhost:3001)
+npm run dev:web
 ```
-*(Perintah ini hanya akan menyalakan database di *background* pada port 5432, tanpa menyalakan aplikasi versi Docker).*
-
-### 5. Jalankan Aplikasi
-Tersedia *script* cepat di *root* direktori untuk menjalankan aplikasi secara langsung:
-- Menjalankan Backend: `npm run dev:backend` (Akses di http://localhost:3030)
-- Menjalankan Frontend: `npm run dev:web` (Akses di http://localhost:3001)
 
 ---
 
-## 🚀 Panduan Deployment ke VPS (Panel Komodo)
+## 🧪 Strategi & Pelaksanaan Pengujian (Testing)
 
-Repositori ini sudah dirancang sempurna untuk *Automated Deployment* menggunakan kombinasi **GitHub Actions** dan **Panel Komodo**. 
+Proyek ini menerapkan pengujian multi-layer komprehensif:
 
-**Konsep Arsitektur (Sesuai Standar Industri):**
-1. **GitHub Actions (Sebagai "Pemasak")**: Memisahkan *pipeline build* antara *frontend* dan *backend* (menggunakan `deploy.yml` & `deploy-web.yml`). Server GitHub akan bekerja keras melakukan kompilasi kodenya menjadi *Image* Docker, lalu menyimpannya di GHCR (GitHub Packages).
-2. **Panel Komodo (Sebagai "Penyaji")**: VPS Anda sama sekali **TIDAK** melakukan proses *build*. Melalui instruksi di `docker-compose.yml`, VPS hanya perlu melakukan *pull* (mengunduh) *Image* yang sudah matang dari GHCR. Hal ini menjamin beban CPU/RAM VPS Anda tetap sangat ringan dan stabil dari ancaman *crash*.
+### 1. Unit & Integration Testing (Jest)
+Menjalankan pengujian logika service, controller, dan integrasi modul:
 
-**Langkah-Langkah Praktis Setup di Komodo (Untuk Mentor/Admin):**
-1. **Tambahkan Repo**: Buka Panel Komodo -> Menu **Repos** -> Masukkan URL GitHub repositori ini. *(Jika repo private, masukkan Personal Access Token di kolom password).*
-2. **Buat Stack Baru**: Masuk ke menu **Stacks** -> *Create Stack* -> Beri nama bebas (misal: `zafi-app-monorepo`).
-3. **Hubungkan ke Git**: Pada bagian *Choose Mode*, pilih **Git Repo**. Pilih repo GitHub ini, isi *branch* dengan `main`, dan letak file konfigurasi dengan `docker-compose.yml`.
-4. **Penting! (Konfigurasi `.env`)**: File `docker-compose.yml` telah diinstruksikan untuk membaca rahasia dari `apps/backend/.env`. Pastikan Anda sudah membuat file ini secara manual di direktori VPS Anda, atau menyuntikkan *Environment Variables*-nya langsung melalui UI Panel Komodo.
-5. **Dapatkan Webhook**: Setelah Stack disimpan (*Save*), *scroll* ke paling bawah halaman untuk menemukan dan menyalin **URL Webhook** (serta *Secret* jika ada).
-6. **Pasang Webhook di GitHub**: Masukkan URL tadi ke pengaturan repositori GitHub Anda di menu **Settings -> Secrets and variables -> Actions** dengan nama `KOMODO_WEBHOOK_URL` dan `KOMODO_WEBHOOK_SECRET`. 
-7. **Beri Izin Akses Upload**: Tambahkan satu rahasia lagi bernama `GH_PAT` (Berisi *GitHub Personal Access Token* *Classic* dengan centang `write:packages` dan `repo`) agar mesin GitHub bisa mengunggah *Image* ke GHCR.
+```bash
+# Dari root atau folder apps/backend
+cd apps/backend
+npm test
+
+# Menjalankan pengujian dengan laporan cakupan (coverage)
+npm run test:cov
+```
+
+### 2. End-to-End (E2E) API Testing (Supertest)
+Menguji alur API lengkap dari autentikasi, manajemen knowledge base, hingga alur follow-up:
+
+```bash
+cd apps/backend
+npm run test:e2e
+```
+
+### 3. Load & Stress Testing (k6)
+Menguji ketahanan endpoint webhook dan respon bot saat menerima lonjakan pesan bersamaan:
+
+```bash
+# Menjalankan load test skenario webhook
+k6 run tests/load/webhook-load-test.js
+```
+
+### 4. Frontend Web UI Testing (Playwright)
+Menguji alur kerja antarmuka pengguna pada dashboard CMS:
+
+```bash
+cd apps/web
+npx playwright test
+```
 
 ---
 
-## Ekspor & Impor Database
+## 🚢 Panduan Deployment (Produksi)
 
-Untuk mempermudah sinkronisasi data antar *developer*, Anda dapat menggunakan *script* bawaan:
+Aplikasi telah disiapkan untuk deployment berbasis Docker / Coolify menggunakan `docker-compose.yml`:
 
-- **Ekspor Database**: `node apps/backend/scripts/export-db.js`
-- **Impor Database**: `node apps/backend/scripts/import-db.js`
+```bash
+# Build dan jalankan container backend & frontend
+docker compose up -d --build
+```
+
+Pastikan variabel `DATABASE_URL` dan `WAHA_API_URL` terhubung pada network container yang sesuai (`coolify-network` atau bridge khusus).
 
 ---
-*Dibuat oleh Tim Pengembang PropertiKu | 2026*
+
+## 📄 Lisensi
+Hak Cipta © 2026. Seluruh hak cipta dilindungi undang-undang.

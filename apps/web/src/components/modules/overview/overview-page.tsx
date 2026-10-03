@@ -7,11 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthStore } from "@/lib/auth-store";
 import { useAppStore } from "@/lib/app-store";
+import { MOCK_TENANT, MOCK_METRICS, MOCK_SESSIONS } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 import {
   Bot, Brain, MessageCircle, Phone, Smartphone,
   Settings, ArrowRight, CheckCircle2, XCircle,
-  Loader2, RefreshCw, BookOpen, Zap, Activity,
+  Loader2, RefreshCw, BookOpen, Zap, Activity, Sparkles,
 } from "lucide-react";
 
 interface TenantData {
@@ -50,42 +51,68 @@ export function OverviewPage() {
 
   async function loadAll() {
     setLoading(true);
+    let loadedTenant: TenantData | null = null;
+    let loadedMetrics: Metrics | null = null;
+    let loadedSessions: WaSession[] = [];
+    let loadedKbCount = 0;
+
     try {
       // 1. Tenant dashboard
       const dashRes = await fetch(`/api/v1/tenant/${user?.tenantId || user?.id || "demo"}/dashboard`);
       if (dashRes.ok) {
         const dash = await dashRes.json();
-        if (dash?.tenant) setTenant(dash.tenant);
-        if (dash?.metrics) setMetrics(dash.metrics);
+        if (dash?.tenant) loadedTenant = dash.tenant;
+        if (dash?.metrics) loadedMetrics = dash.metrics;
       }
+    } catch {}
 
+    try {
       // 2. WhatsApp sessions (terisolasi per tenant)
       const waQuery = user?.tenantId && user.role !== 'superadmin' ? `?tenantId=${user.tenantId}` : '';
       const waRes = await fetch(`/api/v1/waha/instances${waQuery}`);
       if (waRes.ok) {
         const waData = await waRes.json();
         const list = Array.isArray(waData) ? waData : (waData?.data ?? []);
-        setSessions(list.map((s: any) => ({
-          id: s.name,
-          name: s.name,
-          status: s.status?.toLowerCase() ?? "stopped",
-        })));
+        if (list.length > 0) {
+          loadedSessions = list.map((s: any) => ({
+            id: s.name,
+            name: s.name,
+            status: s.status?.toLowerCase() ?? "stopped",
+          }));
+        }
       }
+    } catch {}
 
+    try {
       // 3. Knowledge count (tenantId from auth)
       if (user?.tenantId) {
         const kbRes = await fetch(`/api/v1/knowledge?tenantId=${user.tenantId}`);
         if (kbRes.ok) {
           const kb = await kbRes.json();
           const data = kb?.data?.data ?? kb?.data ?? kb;
-          setKnowledgeCount(Array.isArray(data) ? data.length : 0);
+          loadedKbCount = Array.isArray(data) ? data.length : 0;
         }
       }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
+    } catch {}
+
+    const isDemo =
+      user?.id?.startsWith("u-") ||
+      user?.email?.includes("demo") ||
+      (process.env.NODE_ENV !== "production" && !user?.tenantId);
+
+    const defaultEmptyMetrics: Metrics = {
+      activeSessions: 0,
+      totalSessions: 0,
+      knowledgeCount: 0,
+      totalChats: 0,
+      botSuccessRate: 100,
+    };
+
+    setTenant(loadedTenant || (isDemo ? MOCK_TENANT : { id: user?.tenantId || "", name: user?.name || "Toko Saya" }));
+    setMetrics(loadedMetrics || (isDemo ? MOCK_METRICS : defaultEmptyMetrics));
+    setSessions(loadedSessions.length > 0 ? loadedSessions : (isDemo ? MOCK_SESSIONS : []));
+    setKnowledgeCount(loadedKbCount || (isDemo ? MOCK_METRICS.knowledgeCount : 0));
+    setLoading(false);
   }
 
   const activeSessions = sessions.filter(s => s.status === "working" || s.status === "connected");
@@ -168,30 +195,31 @@ export function OverviewPage() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      {/* Welcome Banner */}
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-600 via-teal-600 to-green-700 px-5 py-4 text-white shadow-md">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=%2260%22 height=%2260%22 viewBox=%220 0 60 60%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cg fill=%22none%22 fill-rule=%22evenodd%22%3E%3Cg fill=%22%23ffffff%22 fill-opacity=%220.05%22%3E%3Cpath d=%22M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')]" />
-        <div className="relative flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-white/20 p-2.5 backdrop-blur-sm shrink-0">
-              <Activity className="h-5 w-5 text-white" />
+      {/* Welcome Banner - Compact & Clean */}
+      <div className="rounded-xl border bg-card p-4 sm:p-5 shadow-xs">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="rounded-lg bg-emerald-100 dark:bg-emerald-950/40 p-2.5 text-emerald-600 shrink-0">
+              <Activity className="h-5 w-5" />
             </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight">
-                Halo, {user?.name?.split(" ")[0]} 👋
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-foreground truncate flex items-center gap-1.5">
+                <span>Halo, {user?.name?.split(" ")[0]}</span>
+                <Sparkles className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
               </h1>
-              <p className="text-xs text-emerald-100">
-                Berikut ringkasan sistem AI Chatbot{tenant?.name ? ` untuk ${tenant.name}` : ""}.
+              <p className="text-xs text-muted-foreground truncate">
+                {tenant?.name || "Dasbor Asisten AI"}
               </p>
             </div>
           </div>
           <Button
             onClick={loadAll}
-            className="bg-white/20 hover:bg-white/30 text-white border-0 backdrop-blur-sm shrink-0 h-8 text-xs gap-1.5"
+            variant="outline"
+            className="shrink-0 h-8 text-xs gap-1.5 px-2.5"
             size="sm"
           >
             <RefreshCw className="h-3.5 w-3.5" />
-            Refresh
+            <span className="hidden sm:inline">Refresh</span>
           </Button>
         </div>
       </div>
@@ -222,16 +250,16 @@ export function OverviewPage() {
       )}
 
       {/* KPI Cards */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="group hover:-translate-y-1 hover:shadow-md hover:border-emerald-500/40 transition-all duration-200 ease-out cursor-default">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardDescription className="text-xs">Sesi WhatsApp Aktif</CardDescription>
-              <div className="h-8 w-8 rounded-lg grid place-items-center bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 group-hover:scale-110 transition-transform duration-200 ease-out">
-                <Phone className="h-4 w-4" />
+              <div className="h-10 w-10 sm:h-8 sm:w-8 rounded-lg grid place-items-center bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 group-hover:scale-110 transition-transform duration-200 ease-out">
+                <Phone className="h-5 w-5 sm:h-4 sm:w-4" />
               </div>
             </div>
-            <CardTitle className="text-2xl font-bold tracking-tight mt-1">
+            <CardTitle className="text-3xl sm:text-2xl font-bold tracking-tight mt-1">
               {activeSessions.length}
               <span className="text-sm font-normal text-muted-foreground ml-1">/ {totalSessions}</span>
             </CardTitle>
@@ -244,6 +272,7 @@ export function OverviewPage() {
                 <span className="text-rose-500 font-medium">● Tidak ada sesi aktif</span>
               )}
             </p>
+            <p className="text-[11px] text-muted-foreground/70 mt-0.5">bulan ini</p>
           </CardContent>
         </Card>
 
@@ -251,14 +280,15 @@ export function OverviewPage() {
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardDescription className="text-xs">Knowledge Base</CardDescription>
-              <div className="h-8 w-8 rounded-lg grid place-items-center bg-teal-100 dark:bg-teal-950/40 text-teal-600 group-hover:scale-110 transition-transform duration-200 ease-out">
-                <Brain className="h-4 w-4" />
+              <div className="h-10 w-10 sm:h-8 sm:w-8 rounded-lg grid place-items-center bg-teal-100 dark:bg-teal-950/40 text-teal-600 group-hover:scale-110 transition-transform duration-200 ease-out">
+                <Brain className="h-5 w-5 sm:h-4 sm:w-4" />
               </div>
             </div>
-            <CardTitle className="text-2xl font-bold tracking-tight mt-1">{knowledgeCount}</CardTitle>
+            <CardTitle className="text-3xl sm:text-2xl font-bold tracking-tight mt-1">{knowledgeCount}</CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
             <p className="text-xs text-muted-foreground">item tersimpan untuk AI</p>
+            <p className="text-[11px] text-muted-foreground/70 mt-0.5">bulan ini</p>
           </CardContent>
         </Card>
 
@@ -266,16 +296,17 @@ export function OverviewPage() {
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardDescription className="text-xs">Total Pesan</CardDescription>
-              <div className="h-8 w-8 rounded-lg grid place-items-center bg-amber-100 dark:bg-amber-950/40 text-amber-600 group-hover:scale-110 transition-transform duration-200 ease-out">
-                <MessageCircle className="h-4 w-4" />
+              <div className="h-10 w-10 sm:h-8 sm:w-8 rounded-lg grid place-items-center bg-amber-100 dark:bg-amber-950/40 text-amber-600 group-hover:scale-110 transition-transform duration-200 ease-out">
+                <MessageCircle className="h-5 w-5 sm:h-4 sm:w-4" />
               </div>
             </div>
-            <CardTitle className="text-2xl font-bold tracking-tight mt-1">
+            <CardTitle className="text-3xl sm:text-2xl font-bold tracking-tight mt-1">
               {metrics?.totalChats != null ? metrics.totalChats : 0}
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
             <p className="text-xs text-muted-foreground">pesan masuk tercatat</p>
+            <p className="text-[11px] text-muted-foreground/70 mt-0.5">bulan ini</p>
           </CardContent>
         </Card>
 
@@ -283,11 +314,11 @@ export function OverviewPage() {
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardDescription className="text-xs">AI Success Rate</CardDescription>
-              <div className="h-8 w-8 rounded-lg grid place-items-center bg-violet-100 dark:bg-violet-950/40 text-violet-600 group-hover:scale-110 transition-transform duration-200 ease-out">
-                <Zap className="h-4 w-4" />
+              <div className="h-10 w-10 sm:h-8 sm:w-8 rounded-lg grid place-items-center bg-violet-100 dark:bg-violet-950/40 text-violet-600 group-hover:scale-110 transition-transform duration-200 ease-out">
+                <Zap className="h-5 w-5 sm:h-4 sm:w-4" />
               </div>
             </div>
-            <CardTitle className="text-2xl font-bold tracking-tight mt-1">
+            <CardTitle className="text-3xl sm:text-2xl font-bold tracking-tight mt-1">
               {metrics?.botSuccessRate != null ? (
                 <>
                   {metrics.botSuccessRate}
@@ -300,6 +331,7 @@ export function OverviewPage() {
           </CardHeader>
           <CardContent className="pt-0">
             <p className="text-xs text-muted-foreground">akurasi jawaban otomatis</p>
+            <p className="text-[11px] text-muted-foreground/70 mt-0.5">bulan ini</p>
           </CardContent>
         </Card>
       </div>
@@ -348,7 +380,7 @@ export function OverviewPage() {
                   return (
                     <div
                       key={s.id}
-                      className="flex items-center justify-between rounded-lg border p-3"
+                      className="flex items-center justify-between rounded-lg border p-3 min-h-[56px]"
                     >
                       <div className="flex items-center gap-3">
                         <div className="relative">
@@ -370,7 +402,7 @@ export function OverviewPage() {
                       <Badge
                         variant="outline"
                         className={cn(
-                          "text-[11px]",
+                          "text-xs sm:text-[11px] px-2.5 py-0.5 sm:px-2 sm:py-0",
                           isOnline
                             ? "text-emerald-600 border-emerald-200 dark:border-emerald-800"
                             : isStarting
@@ -445,9 +477,18 @@ export function OverviewPage() {
               <CardTitle className="text-base">Aksi Cepat</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
+              {/* Prominent "Mulai Chat" CTA for mobile */}
               <button
                 onClick={() => setView("chatbot")}
-                className="w-full flex items-center justify-between rounded-lg border p-3 text-sm hover:bg-muted/50 transition-colors text-left"
+                className="w-full flex items-center justify-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white p-3 min-h-[56px] text-sm font-semibold transition-colors sm:hidden"
+              >
+                <MessageCircle className="h-5 w-5" />
+                Mulai Chat
+              </button>
+
+              <button
+                onClick={() => setView("chatbot")}
+                className="w-full flex items-center justify-between rounded-lg border p-3 min-h-[56px] text-sm hover:bg-muted/50 transition-colors text-left"
               >
                 <div className="flex items-center gap-2.5">
                   <div className="h-7 w-7 rounded-md bg-emerald-100 dark:bg-emerald-950/40 grid place-items-center">
@@ -460,7 +501,7 @@ export function OverviewPage() {
 
               <button
                 onClick={() => setView("knowledge")}
-                className="w-full flex items-center justify-between rounded-lg border p-3 text-sm hover:bg-muted/50 transition-colors text-left"
+                className="w-full flex items-center justify-between rounded-lg border p-3 min-h-[56px] text-sm hover:bg-muted/50 transition-colors text-left"
               >
                 <div className="flex items-center gap-2.5">
                   <div className="h-7 w-7 rounded-md bg-teal-100 dark:bg-teal-950/40 grid place-items-center">
@@ -473,7 +514,7 @@ export function OverviewPage() {
 
               <button
                 onClick={() => setView("settings")}
-                className="w-full flex items-center justify-between rounded-lg border p-3 text-sm hover:bg-muted/50 transition-colors text-left"
+                className="w-full flex items-center justify-between rounded-lg border p-3 min-h-[56px] text-sm hover:bg-muted/50 transition-colors text-left"
               >
                 <div className="flex items-center gap-2.5">
                   <div className="h-7 w-7 rounded-md bg-amber-100 dark:bg-amber-950/40 grid place-items-center">
@@ -491,12 +532,12 @@ export function OverviewPage() {
       {/* Status ringkas bot */}
       <Card>
         <CardContent className="py-4 px-5">
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-2 text-sm">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-2 text-sm sm:text-sm">
               <Bot className="h-4 w-4 text-emerald-600" />
               <span className="font-medium">Status Sistem</span>
             </div>
-            <div className="flex items-center gap-4 flex-wrap ml-auto text-xs text-muted-foreground">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 sm:ml-auto text-sm sm:text-xs text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 {activeSessions.length > 0 ? (
                   <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
