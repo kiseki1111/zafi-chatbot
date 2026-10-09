@@ -58,6 +58,46 @@ interface BackgroundTasksState {
   }) => Promise<void>;
 }
 
+function uploadWithProgress(
+  url: string,
+  formData: FormData,
+  onProgress: (percent: number, loaded: number, total: number) => void,
+): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) {
+        const percent = Math.min(99, Math.round((event.loaded / event.total) * 100));
+        onProgress(percent, event.loaded, event.total);
+      }
+    };
+
+    xhr.onload = () => {
+      let data: any = {};
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {}
+
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(data);
+      } else {
+        const errMsg =
+          Array.isArray(data.message)
+            ? data.message[0]
+            : data.message || `Upload gagal (Status ${xhr.status})`;
+        reject(new Error(errMsg));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error("Koneksi jaringan terputus saat upload"));
+    xhr.ontimeout = () => reject(new Error("Waktu upload habis (timeout)"));
+    xhr.timeout = 300000; // 5 menit
+    xhr.send(formData);
+  });
+}
+
 export const useBackgroundTasksStore = create<BackgroundTasksState>(
   (set, get) => ({
     tasks: [],
@@ -106,47 +146,14 @@ export const useBackgroundTasksStore = create<BackgroundTasksState>(
         file.type.startsWith("image/") ||
         /\.(jpe?g|png|webp|gif|bmp)$/i.test(file.name);
       const displayTitle = title || file.name;
+      const totalMb = (file.size / 1024 / 1024).toFixed(1);
       const taskId = get().addTask({
         title: displayTitle,
         category: "knowledge",
         status: "running",
-        statusText: isImage
-          ? "Mengunggah file & menyiapkan Vision AI..."
-          : "Mengunggah & memproses dokumen...",
+        progress: 0,
+        statusText: `Mengunggah (${totalMb} MB) — 0%`,
       });
-
-      // Timer untuk memperbarui status proses secara informatif
-      let timerStage2: NodeJS.Timeout | null = null;
-      let timerStage3: NodeJS.Timeout | null = null;
-
-      if (isImage) {
-        timerStage2 = setTimeout(() => {
-          const current = get().tasks.find((t) => t.id === taskId);
-          if (current && current.status === "running") {
-            get().updateTask(taskId, {
-              statusText: "Mengekstrak teks dokumen via Vision AI OCR...",
-            });
-          }
-        }, 1800);
-
-        timerStage3 = setTimeout(() => {
-          const current = get().tasks.find((t) => t.id === taskId);
-          if (current && current.status === "running") {
-            get().updateTask(taskId, {
-              statusText: "Menyinkronkan knowledge ke Vector Database...",
-            });
-          }
-        }, 6000);
-      } else {
-        timerStage2 = setTimeout(() => {
-          const current = get().tasks.find((t) => t.id === taskId);
-          if (current && current.status === "running") {
-            get().updateTask(taskId, {
-              statusText: "Mengekstrak isi & menyinkronkan ke Vector Database...",
-            });
-          }
-        }, 2000);
-      }
 
       try {
         const formData = new FormData();
@@ -154,22 +161,24 @@ export const useBackgroundTasksStore = create<BackgroundTasksState>(
         if (title) formData.append("title", title);
         formData.append("tenantId", tenantId);
 
-        const res = await fetch("/api/v1/knowledge/file", {
-          method: "POST",
-          body: formData,
+        await uploadWithProgress(
+          "/api/v1/knowledge/file",
+          formData,
+          (percent, loaded) => {
+            const loadedMb = (loaded / 1024 / 1024).toFixed(1);
+            get().updateTask(taskId, {
+              progress: percent,
+              statusText: `Mengunggah (${loadedMb} / ${totalMb} MB) — ${percent}%`,
+            });
+          },
+        );
+
+        get().updateTask(taskId, {
+          progress: 100,
+          statusText: isImage
+            ? "Mengekstrak teks dokumen via Vision AI OCR..."
+            : "Menyinkronkan ke Vector Database...",
         });
-
-        if (timerStage2) clearTimeout(timerStage2);
-        if (timerStage3) clearTimeout(timerStage3);
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          const errMsg =
-            Array.isArray(errData.message)
-              ? errData.message[0]
-              : errData.message || "Gagal mengunggah dokumen";
-          throw new Error(errMsg);
-        }
 
         get().updateTask(taskId, {
           status: "success",
@@ -183,14 +192,10 @@ export const useBackgroundTasksStore = create<BackgroundTasksState>(
         }
         onSuccess?.();
 
-        // Bersihkan otomatis setelah 10 detik jika sukses
         setTimeout(() => {
           get().removeTask(taskId);
         }, 10000);
       } catch (err: any) {
-        if (timerStage2) clearTimeout(timerStage2);
-        if (timerStage3) clearTimeout(timerStage3);
-
         const errorMsg = err.message || "Terjadi kesalahan saat upload";
         get().updateTask(taskId, {
           status: "error",
@@ -276,31 +281,44 @@ export const useBackgroundTasksStore = create<BackgroundTasksState>(
       onSuccess,
       onError,
     }) => {
+      const totalMb = (file.size / 1024 / 1024).toFixed(1);
+      const isVideo =
+        file.type.startsWith("video/") ||
+        /\.(mov|mp4|mkv|webm|avi)$/i.test(file.name);
       const taskId = get().addTask({
         title: name,
         category: "siteplan",
         status: "running",
-        statusText: `Mengunggah media (${(file.size / 1024 / 1024).toFixed(1)} MB)...`,
+        progress: 0,
+        statusText: `Mengunggah media (${totalMb} MB) — 0%`,
       });
 
       try {
         const formData = new FormData();
         formData.append("file", file);
 
-        const uploadRes = await fetch("/api/v1/availability/upload", {
-          method: "POST",
-          body: formData,
-        });
+        const uploadData = await uploadWithProgress(
+          "/api/v1/availability/upload",
+          formData,
+          (percent, loaded) => {
+            const loadedMb = (loaded / 1024 / 1024).toFixed(1);
+            get().updateTask(taskId, {
+              progress: percent,
+              statusText: `Mengunggah (${loadedMb} / ${totalMb} MB) — ${percent}%`,
+            });
+          },
+        );
 
-        const uploadData = await uploadRes.json().catch(() => ({}));
         const resData = uploadData.data || uploadData;
-
-        if (!uploadRes.ok || !resData.url) {
+        if (!resData.url) {
           throw new Error(resData.message || "Gagal mengunggah media ke server");
         }
 
         get().updateTask(taskId, {
-          statusText: "Memperbarui data galeri media cluster...",
+          progress: 100,
+          statusText: isVideo
+            ? "Server sedang mengompresi video (FFmpeg 720p)..."
+            : "Memperbarui galeri media cluster...",
         });
 
         const newMedia = {

@@ -56,7 +56,10 @@ export function BackgroundTaskCenter() {
 
           <span className="text-xs font-semibold">
             {runningTasks.length > 0
-              ? `${runningTasks.length} Proses Berjalan`
+              ? typeof runningTasks[0].progress === "number" &&
+                runningTasks[0].progress < 100
+                ? `Upload ${runningTasks[0].progress}% (${runningTasks.length})`
+                : `${runningTasks.length} Proses Berjalan`
               : "Semua Proses Selesai"}
           </span>
 
@@ -183,22 +186,37 @@ function TaskItem({
             </div>
 
             {/* Stage text / description */}
-            <p
-              className={`text-[11px] mt-1 leading-snug ${
-                isError
-                  ? "text-destructive font-medium"
-                  : isSuccess
-                  ? "text-emerald-700 dark:text-emerald-300 font-medium"
-                  : "text-muted-foreground"
-              }`}
-            >
-              {task.statusText}
-            </p>
+            <div className="flex items-center justify-between gap-1 mt-1">
+              <p
+                className={`text-[11px] leading-snug truncate ${
+                  isError
+                    ? "text-destructive font-medium"
+                    : isSuccess
+                    ? "text-emerald-700 dark:text-emerald-300 font-medium"
+                    : "text-muted-foreground"
+                }`}
+                title={task.statusText}
+              >
+                {task.statusText}
+              </p>
+              {isRunning && typeof task.progress === "number" && (
+                <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 shrink-0 tabular-nums">
+                  {task.progress}%
+                </span>
+              )}
+            </div>
 
-            {/* Running Animation Bar */}
+            {/* Running Animation Bar or Determinate Progress Bar */}
             {isRunning && (
-              <div className="mt-2 w-full h-1 bg-emerald-100 dark:bg-emerald-950/50 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500 rounded-full animate-indeterminate-bar" />
+              <div className="mt-2 w-full h-1.5 bg-emerald-100 dark:bg-emerald-950/50 rounded-full overflow-hidden">
+                {typeof task.progress === "number" && task.progress < 100 ? (
+                  <div
+                    className="h-full bg-emerald-500 rounded-full transition-all duration-300 ease-out"
+                    style={{ width: `${task.progress}%` }}
+                  />
+                ) : (
+                  <div className="h-full bg-emerald-500 rounded-full animate-indeterminate-bar" />
+                )}
               </div>
             )}
           </div>
