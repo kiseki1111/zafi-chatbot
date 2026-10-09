@@ -29,7 +29,12 @@ async function bootstrap() {
   if (!fs.existsSync(uploadsPath)) {
     fs.mkdirSync(uploadsPath, { recursive: true });
   }
-  app.useStaticAssets(uploadsPath, { prefix: '/uploads/' });
+  app.useStaticAssets(uploadsPath, {
+    prefix: '/uploads/',
+    setHeaders: (res) => {
+      res.setHeader('Accept-Ranges', 'bytes');
+    },
+  });
   const configService = app.get(ConfigService);
 
   // 1. Mengaktifkan HTTP Security Headers sesuai panduan halaman 38

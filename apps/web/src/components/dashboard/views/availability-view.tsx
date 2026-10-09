@@ -1198,7 +1198,13 @@ export function AvailabilityView() {
               {/* Preview Media */}
               <div className="rounded-2xl border bg-black/5 dark:bg-black/30 overflow-hidden flex items-center justify-center p-2">
                 {selectedMedia.type === "video" ? (
-                  <video controls src={selectedMedia.url} className="w-full max-h-72 rounded-xl bg-black" />
+                  <video
+                    controls
+                    preload="metadata"
+                    playsInline
+                    src={selectedMedia.url}
+                    className="w-full max-h-72 rounded-xl bg-black"
+                  />
                 ) : (
                   <img src={selectedMedia.url} alt={selectedMedia.name} className="w-full max-h-72 object-contain rounded-xl" />
                 )}

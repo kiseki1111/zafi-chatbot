@@ -119,7 +119,7 @@ export class AvailabilityController {
     try {
       const startTime = Date.now();
       await execAsync(
-        `ffmpeg -y -i "${filePath}" -vf "scale='min(720,iw)':-2" -c:v libx264 -preset fast -crf 28 -c:a aac -b:a 128k -movflags +faststart "${tempOutputPath}"`,
+        `ffmpeg -y -i "${filePath}" -vf "scale='min(720,iw)':-2" -c:v libx264 -preset fast -crf 28 -g 60 -keyint_min 30 -c:a aac -b:a 128k -movflags +faststart "${tempOutputPath}"`,
         { timeout: 360000 },
       );
       const durationMs = Date.now() - startTime;
