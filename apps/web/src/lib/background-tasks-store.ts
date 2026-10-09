@@ -93,7 +93,7 @@ function uploadWithProgress(
 
     xhr.onerror = () => reject(new Error("Koneksi jaringan terputus saat upload"));
     xhr.ontimeout = () => reject(new Error("Waktu upload habis (timeout)"));
-    xhr.timeout = 300000; // 5 menit
+    xhr.timeout = 0; // 0 = tidak ada batas waktu browser; biarkan upload besar selesai alami
     xhr.send(formData);
   });
 }
@@ -166,10 +166,19 @@ export const useBackgroundTasksStore = create<BackgroundTasksState>(
           formData,
           (percent, loaded) => {
             const loadedMb = (loaded / 1024 / 1024).toFixed(1);
-            get().updateTask(taskId, {
-              progress: percent,
-              statusText: `Mengunggah (${loadedMb} / ${totalMb} MB) — ${percent}%`,
-            });
+            if (percent >= 100) {
+              get().updateTask(taskId, {
+                progress: 100,
+                statusText: isImage
+                  ? "File terkirim (100%). Sedang mengekstrak teks via Vision AI OCR..."
+                  : "File terkirim (100%). Menyinkronkan ke Vector Database...",
+              });
+            } else {
+              get().updateTask(taskId, {
+                progress: percent,
+                statusText: `Mengunggah (${loadedMb} / ${totalMb} MB) — ${percent}%`,
+              });
+            }
           },
         );
 
@@ -302,10 +311,19 @@ export const useBackgroundTasksStore = create<BackgroundTasksState>(
           formData,
           (percent, loaded) => {
             const loadedMb = (loaded / 1024 / 1024).toFixed(1);
-            get().updateTask(taskId, {
-              progress: percent,
-              statusText: `Mengunggah (${loadedMb} / ${totalMb} MB) — ${percent}%`,
-            });
+            if (percent >= 100) {
+              get().updateTask(taskId, {
+                progress: 100,
+                statusText: isVideo
+                  ? "File terkirim (100%). Server sedang mengompres video via FFmpeg..."
+                  : "File terkirim (100%). Menyimpan ke galeri...",
+              });
+            } else {
+              get().updateTask(taskId, {
+                progress: percent,
+                statusText: `Mengunggah (${loadedMb} / ${totalMb} MB) — ${percent}%`,
+              });
+            }
           },
         );
 
