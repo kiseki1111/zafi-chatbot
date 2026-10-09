@@ -58,7 +58,12 @@ export class AvailabilityController {
           const cleanName = file.originalname
             .replace(/\.[^/.]+$/, '')
             .replace(/[^a-zA-Z0-9]/g, '_');
-          cb(null, `${uniqueSuffix}-${cleanName}${ext}`);
+          // Untuk video, pastikan berformat .mp4 agar kompatibel penuh di web & WhatsApp
+          const isVideo =
+            file.mimetype.startsWith('video/') ||
+            /\.(mov|mp4|mkv|avi|webm)$/i.test(file.originalname);
+          const finalExt = isVideo ? '.mp4' : ext;
+          cb(null, `${uniqueSuffix}-${cleanName}${finalExt}`);
         },
       }),
       limits: {
@@ -74,53 +79,19 @@ export class AvailabilityController {
       throw new BadRequestException('File tidak ditemukan');
     }
 
-    let finalFilename = file.filename;
-    let finalMimetype = file.mimetype;
-    let finalSize = file.size;
-
-    // Jika video (.mov, .mp4, dll), kompres & standardisasi via ffmpeg:
-    // 720p, H.264, AAC, +faststart agar bisa diputar native di WhatsApp (< 16MB)
     const isVideo =
       file.mimetype.startsWith('video/') ||
       /\.(mov|mp4|mkv|avi|webm)$/i.test(file.originalname);
 
+    const finalFilename = file.filename;
+    const finalMimetype = isVideo ? 'video/mp4' : file.mimetype;
+    const finalSize = file.size;
+
+    // Jika video (.mov, .mp4, dll), kompres & standardisasi secara background di server.
+    // PENTING: Jangan menahan HTTP request dengan 'await' agar proxy Next.js / Cloudflare
+    // tidak mengalami timeout / socket hang up (ECONNRESET) saat FFmpeg berjalan lama.
     if (isVideo) {
-      const inputPath = file.path;
-      const optimizedFilename = `opt-${file.filename.replace(/\.[^/.]+$/, '')}.mp4`;
-      const outputPath = join(process.cwd(), 'uploads', optimizedFilename);
-
-      this.logger.log(`[FFMPEG-START] File: ${file.originalname} | Mimetype: ${file.mimetype} | Size: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
-      this.logger.log(`[FFMPEG-CMD] input="${inputPath}" -> output="${outputPath}"`);
-
-      try {
-        const startTime = Date.now();
-        await execAsync(
-          `ffmpeg -y -i "${inputPath}" -vf "scale='min(720,iw)':-2" -c:v libx264 -preset fast -crf 28 -c:a aac -b:a 128k -movflags +faststart "${outputPath}"`,
-          { timeout: 360000 }, // 6 menit
-        );
-
-        const durationMs = Date.now() - startTime;
-
-        if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {
-          finalFilename = optimizedFilename;
-          finalMimetype = 'video/mp4';
-          finalSize = fs.statSync(outputPath).size;
-
-          // Hapus file raw input untuk hemat storage
-          fs.unlink(inputPath, () => null);
-
-          this.logger.log(`[FFMPEG-SUCCESS] Video berhasil dioptimasi dalam ${durationMs}ms!`);
-          this.logger.log(`[FFMPEG-STATS] Ukuran asli: ${(file.size / 1024 / 1024).toFixed(2)} MB -> Hasil: ${(finalSize / 1024 / 1024).toFixed(2)} MB`);
-        } else {
-          this.logger.warn(`[FFMPEG-WARN] Output file tidak ditemukan atau 0 bytes. Tetap memakai file asli.`);
-        }
-      } catch (err: any) {
-        this.logger.error(`[FFMPEG-ERROR] Gagal konversi video: ${err.message}`);
-        if (err.stderr) {
-          this.logger.error(`[FFMPEG-STDERR]: ${err.stderr.slice(-500)}`);
-        }
-        this.logger.warn(`[FFMPEG-FALLBACK] Menggunakan file video asli tanpa optimasi.`);
-      }
+      this.optimizeVideoInBackground(file.path, file.originalname);
     }
 
     const host = req.get('host') || 'localhost:3000';
@@ -135,11 +106,41 @@ export class AvailabilityController {
       originalName: file.originalname,
       mimetype: finalMimetype,
       size: finalSize,
-      mediaType: finalMimetype.startsWith('video/') ? 'video' : 'image',
-      canPlayNative: finalMimetype.startsWith('video/')
-        ? finalSize <= 16 * 1024 * 1024
-        : true,
+      mediaType: isVideo ? 'video' : 'image',
+      canPlayNative: isVideo ? finalSize <= 16 * 1024 * 1024 : true,
     };
+  }
+
+  private async optimizeVideoInBackground(filePath: string, originalName: string) {
+    const tempOutputPath = `${filePath}.opt.mp4`;
+    const fileSize = fs.existsSync(filePath) ? fs.statSync(filePath).size : 0;
+    this.logger.log(`[FFMPEG-ASYNC-START] File: ${originalName} | Size: ${(fileSize / 1024 / 1024).toFixed(2)} MB`);
+
+    try {
+      const startTime = Date.now();
+      await execAsync(
+        `ffmpeg -y -i "${filePath}" -vf "scale='min(720,iw)':-2" -c:v libx264 -preset fast -crf 28 -c:a aac -b:a 128k -movflags +faststart "${tempOutputPath}"`,
+        { timeout: 360000 },
+      );
+      const durationMs = Date.now() - startTime;
+
+      if (fs.existsSync(tempOutputPath) && fs.statSync(tempOutputPath).size > 0) {
+        const finalSize = fs.statSync(tempOutputPath).size;
+        // Atomically replace file asli dengan file yang sudah teroptimasi
+        fs.unlinkSync(filePath);
+        fs.renameSync(tempOutputPath, filePath);
+
+        this.logger.log(`[FFMPEG-ASYNC-SUCCESS] Video ${originalName} berhasil dioptimasi dalam ${durationMs}ms!`);
+        this.logger.log(`[FFMPEG-ASYNC-STATS] Ukuran asli: ${(fileSize / 1024 / 1024).toFixed(2)} MB -> Hasil: ${(finalSize / 1024 / 1024).toFixed(2)} MB`);
+      } else {
+        this.logger.warn(`[FFMPEG-ASYNC-WARN] Output file tidak ditemukan atau 0 bytes. Tetap memakai file asli.`);
+      }
+    } catch (err: any) {
+      this.logger.error(`[FFMPEG-ASYNC-ERROR] Gagal konversi video ${originalName}: ${err.message}`);
+      if (fs.existsSync(tempOutputPath)) {
+        try { fs.unlinkSync(tempOutputPath); } catch {}
+      }
+    }
   }
 
   /**
