@@ -100,6 +100,17 @@ WAJIB MERESPON DALAM FORMAT JSON BERIKUT:
       }
     }
 
+    // S-CS3: Handle voice note (audio) by converting to text via OpenRouter STT
+    if (message.audioUrl) {
+      this.logger.log(`[CS-BOT] Mentranskripsi voice note via OpenRouter STT...`);
+      const transcript = await this.agentSharedService.transcribeAudio(message.audioUrl);
+      if (transcript) {
+        text = text && !text.includes('[Pelanggan mengirimkan pesan suara')
+          ? `${text}\n[Pesan Suara Pelanggan: "${transcript}"]`
+          : `[Pesan Suara Pelanggan: "${transcript}"]`;
+      }
+    }
+
     // 1. Ambil History menggunakan utilitas terpusat
     const recentMessages = await this.agentSharedService.getRecentContext(
       senderId,

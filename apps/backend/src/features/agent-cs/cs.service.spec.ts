@@ -20,6 +20,7 @@ describe('CsService', () => {
 
   const mockAgentShared = {
     analyzeImage: jest.fn(),
+    transcribeAudio: jest.fn(),
     getRecentContext: jest.fn(),
     retrieveRelevantKnowledge: jest.fn(),
     getAvailabilityContext: jest.fn(),
@@ -127,6 +128,40 @@ describe('CsService', () => {
 
       expect(mockAgentShared.analyzeImage).toHaveBeenCalledWith('http://example.com/photo.jpg');
       expect(response.text).toContain('Robusta');
+    });
+
+    it('harus mentranskripsi pesan suara via transcribeAudio dan merespons isinya', async () => {
+      mockAgentShared.getRecentContext.mockResolvedValue([]);
+      mockPrisma.whatsappInstance.findUnique.mockResolvedValue({
+        instanceName: 'main-wa',
+        tenantId: 'tenant-123',
+      });
+      mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue('');
+      mockAgentShared.getAvailabilityContext.mockResolvedValue(null);
+      mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-123' });
+      mockAgentShared.transcribeAudio.mockResolvedValue('Berapa harga kopi robusta?');
+
+      mockAgentShared.callLLM.mockResolvedValue(
+        JSON.stringify({
+          text: 'Harga kopi robusta Rp 50.000 ya Kak.',
+          images: [],
+          videos: [],
+        }),
+      );
+
+      const response = await service.handleMessage({
+        senderId: '628123456789@c.us',
+        sessionName: 'main-wa',
+        text: '',
+        audioUrl: '/uploads/incoming/voice.ogg',
+        provider: 'WAHA',
+        replyCallback: jest.fn(),
+      });
+
+      expect(mockAgentShared.transcribeAudio).toHaveBeenCalledWith(
+        '/uploads/incoming/voice.ogg',
+      );
+      expect(response.text).toContain('50.000');
     });
 
     it('harus menyertakan informasi stok real-time saat pesan menanyakan stok', async () => {

@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useAuthStore } from "@/lib/auth-store";
+import { useBackgroundTasksStore } from "@/lib/background-tasks-store";
 import { toast } from "sonner";
 import {
   Loader2, Plus, Trash2, Pencil, FileText, AlignLeft,
-  BookOpen, Upload, X, Check, Brain, AlertTriangle
+  BookOpen, Upload, X, Check, Brain, AlertTriangle, ImageIcon
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,8 @@ type ModalMode = "create-text" | "create-file" | "edit" | null;
 export function KnowledgePage() {
   const { user } = useAuthStore();
   const tenantId = user?.tenantId;
+  const { runKnowledgeFileUpload, runKnowledgeTextCreate } =
+    useBackgroundTasksStore();
 
   const [items, setItems] = useState<KnowledgeItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,6 +95,13 @@ export function KnowledgePage() {
 
   useEffect(() => {
     if (tenantId) fetchKnowledge();
+    const handleUpdate = () => {
+      fetchKnowledge();
+    };
+    window.addEventListener("knowledge-updated", handleUpdate);
+    return () => {
+      window.removeEventListener("knowledge-updated", handleUpdate);
+    };
   }, [tenantId]);
 
   const openCreate = (mode: "create-text" | "create-file") => {
@@ -112,28 +122,23 @@ export function KnowledgePage() {
 
   const closeModal = () => setModalMode(null);
 
-  const handleSubmitText = async (e: React.FormEvent) => {
+  const handleSubmitText = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !content.trim()) return toast.error("Judul dan konten harus diisi");
-    try {
-      setSubmitting(true);
-      const res = await fetch(`${API_BASE}/knowledge/text`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, content, tenantId }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message?.[0] || "Gagal menyimpan");
-      }
-      toast.success("Knowledge berhasil ditambahkan!");
-      closeModal();
-      fetchKnowledge();
-    } catch (err: any) {
-      toast.error(err.message || "Gagal menyimpan");
-    } finally {
-      setSubmitting(false);
-    }
+    if (!title.trim() || !content.trim())
+      return toast.error("Judul dan konten harus diisi");
+
+    const taskTitle = title;
+    const taskContent = content;
+    closeModal();
+
+    runKnowledgeTextCreate({
+      title: taskTitle,
+      content: taskContent,
+      tenantId: tenantId as string,
+      onSuccess: () => {
+        fetchKnowledge();
+      },
+    });
   };
 
   const handleSubmitEdit = async (e: React.FormEvent) => {
@@ -161,31 +166,22 @@ export function KnowledgePage() {
     }
   };
 
-  const handleSubmitFile = async (e: React.FormEvent) => {
+  const handleSubmitFile = (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) return toast.error("File harus diunggah");
-    try {
-      setSubmitting(true);
-      const formData = new FormData();
-      formData.append("file", file);
-      if (title) formData.append("title", title);
-      formData.append("tenantId", tenantId as string);
-      const res = await fetch(`${API_BASE}/knowledge/file`, {
-        method: "POST",
-        body: formData,
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message?.[0] || "Gagal mengunggah");
-      }
-      toast.success("Dokumen berhasil diunggah!");
-      closeModal();
-      fetchKnowledge();
-    } catch (err: any) {
-      toast.error(err.message || "Gagal mengunggah");
-    } finally {
-      setSubmitting(false);
-    }
+
+    const taskFile = file;
+    const taskTitle = title;
+    closeModal();
+
+    runKnowledgeFileUpload({
+      file: taskFile,
+      title: taskTitle,
+      tenantId: tenantId as string,
+      onSuccess: () => {
+        fetchKnowledge();
+      },
+    });
   };
 
   const [itemToDelete, setItemToDelete] = useState<{ id: string; title: string } | null>(null);
@@ -234,10 +230,10 @@ export function KnowledgePage() {
               size="sm"
               onClick={() => openCreate("create-file")}
               className="h-7.5 text-xs gap-1 px-2 border-border"
-              title="Unggah Dokumen PDF/Docx"
+              title="Unggah Dokumen PDF, Word, Excel, atau Foto/Gambar"
             >
               <Upload className="h-3 w-3" />
-              <span>Dokumen</span>
+              <span>Dokumen / Gambar</span>
             </Button>
             <Button
               size="sm"
@@ -257,7 +253,9 @@ export function KnowledgePage() {
           <span>·</span>
           <span>{items.filter(i => i.metadata?.type !== 'file').length} Teks</span>
           <span>·</span>
-          <span>{items.filter(i => i.metadata?.type === 'file').length} Dokumen</span>
+          <span>{items.filter(i => i.metadata?.type === 'file' && !/\.(jpe?g|png|webp|bmp|gif)$/i.test(i.metadata?.filename || i.title || '')).length} Dokumen</span>
+          <span>·</span>
+          <span>{items.filter(i => i.metadata?.type === 'file' && /\.(jpe?g|png|webp|bmp|gif)$/i.test(i.metadata?.filename || i.title || '')).length} Gambar</span>
         </div>
       </div>
 
@@ -306,6 +304,7 @@ export function KnowledgePage() {
           {items.map((item, idx) => {
             const color = cardColors[idx % cardColors.length];
             const isFile = item.metadata?.type === 'file';
+            const isImage = isFile && /\.(jpe?g|png|webp|bmp|gif)$/i.test(item.metadata?.filename || item.title || '');
             return (
               <div
                 key={item.id}
@@ -315,13 +314,17 @@ export function KnowledgePage() {
                 <div className="flex items-start justify-between mb-4">
                   <div className="rounded-xl bg-white/70 dark:bg-black/20 p-2.5 backdrop-blur-sm">
                     {isFile ? (
-                      <FileText className="h-5 w-5 text-emerald-600" />
+                      isImage ? (
+                        <ImageIcon className="h-5 w-5 text-emerald-600" />
+                      ) : (
+                        <FileText className="h-5 w-5 text-emerald-600" />
+                      )
                     ) : (
                       <AlignLeft className="h-5 w-5 text-emerald-600" />
                     )}
                   </div>
-                  <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${isFile ? 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'}`}>
-                    {isFile ? 'Dokumen' : 'Teks'}
+                  <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${isFile ? (isImage ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300' : 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300') : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'}`}>
+                    {isFile ? (isImage ? 'Gambar' : 'Dokumen') : 'Teks'}
                   </span>
                 </div>
 
@@ -388,12 +391,12 @@ export function KnowledgePage() {
                   <div>
                     <h2 className="text-lg font-semibold text-white">
                       {modalMode === "edit" ? "Edit Knowledge" :
-                       modalMode === "create-file" ? "Unggah Dokumen" :
+                       modalMode === "create-file" ? "Unggah Dokumen / Gambar" :
                        "Tambah Teks Knowledge"}
                     </h2>
                     <p className="text-xs text-emerald-100">
                       {modalMode === "edit" ? "Perbarui judul dan konten knowledge" :
-                       modalMode === "create-file" ? "Upload file PDF atau Word" :
+                       modalMode === "create-file" ? "Upload file PDF, Word, Excel, atau Foto/Gambar" :
                        "Masukkan teks sebagai knowledge AI"}
                     </p>
                   </div>
@@ -456,15 +459,21 @@ export function KnowledgePage() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-foreground">File Dokumen</label>
-                    <label className="flex flex-col items-center justify-center w-full h-36 rounded-xl border-2 border-dashed border-emerald-200 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-800 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition group">
+                    <label className="text-sm font-medium text-foreground">File Dokumen atau Gambar</label>
+                    <label className="flex flex-col items-center justify-center w-full min-h-[144px] p-4 rounded-xl border-2 border-dashed border-emerald-200 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-800 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition group">
                       {file ? (
                         <div className="flex flex-col items-center gap-2">
                           <div className="rounded-full bg-emerald-100 dark:bg-emerald-800 p-3">
-                            <FileText className="h-6 w-6 text-emerald-600" />
+                            {file.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|bmp)$/i.test(file.name) ? (
+                              <ImageIcon className="h-6 w-6 text-emerald-600" />
+                            ) : (
+                              <FileText className="h-6 w-6 text-emerald-600" />
+                            )}
                           </div>
-                          <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">{file.name}</p>
-                          <p className="text-xs text-muted-foreground">{(file.size / 1024).toFixed(1)} KB</p>
+                          <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300 max-w-[280px] truncate text-center">{file.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {(file.size / 1024).toFixed(1)} KB {file.type.startsWith('image/') || /\.(jpe?g|png|webp)$/i.test(file.name) ? '(Vision AI OCR)' : ''}
+                          </p>
                         </div>
                       ) : (
                         <div className="flex flex-col items-center gap-2">
@@ -472,12 +481,12 @@ export function KnowledgePage() {
                             <Upload className="h-6 w-6 text-emerald-600" />
                           </div>
                           <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Klik atau seret file ke sini</p>
-                          <p className="text-xs text-muted-foreground">PDF, DOCX, CSV, atau XLS/XLSX (maks 10MB)</p>
+                          <p className="text-xs text-muted-foreground text-center">PDF, DOCX, CSV, TXT, atau Foto/Gambar JPG/PNG/WEBP (maks 10MB)</p>
                         </div>
                       )}
                       <input
                         type="file"
-                        accept=".pdf,.docx,.csv,.xls,.xlsx,.txt"
+                        accept=".pdf,.docx,.csv,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.webp,image/*"
                         className="hidden"
                         onChange={e => setFile(e.target.files?.[0] || null)}
                       />
@@ -489,7 +498,7 @@ export function KnowledgePage() {
                     className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-3 text-sm font-semibold text-white hover:opacity-90 transition disabled:opacity-60 shadow-lg shadow-emerald-200/50"
                   >
                     {submitting ? (
-                      <><Loader2 className="h-4 w-4 animate-spin" /> Mengunggah & Memproses...</>
+                      <><Loader2 className="h-4 w-4 animate-spin" /> Mengunggah & Memproses via AI...</>
                     ) : (
                       <><Upload className="h-4 w-4" /> Unggah & Simpan Dokumen</>
                     )}

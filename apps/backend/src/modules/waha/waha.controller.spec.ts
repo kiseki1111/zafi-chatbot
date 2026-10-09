@@ -17,6 +17,7 @@ describe('WahaController - Unit Tests (Feature 6 Call Reject & Webhooks)', () =>
     sendSeen: jest.fn().mockResolvedValue(undefined),
     sendTypingPresence: jest.fn().mockResolvedValue(undefined),
     rejectCall: jest.fn().mockResolvedValue({ status: 'rejected' }),
+    downloadAndStoreMedia: jest.fn().mockResolvedValue('/uploads/incoming/voice.ogg'),
   };
 
   const mockPrismaService = {
@@ -27,9 +28,9 @@ describe('WahaController - Unit Tests (Feature 6 Call Reject & Webhooks)', () =>
       upsert: jest.fn().mockResolvedValue({}),
     },
     contact: {
-      findFirst: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
+      findFirst: jest.fn().mockResolvedValue({ id: 'contact-01', phone: '628999888777' }),
+      create: jest.fn().mockResolvedValue({ id: 'contact-01' }),
+      update: jest.fn().mockResolvedValue({ id: 'contact-01' }),
     },
     conversation: {
       findFirst: jest.fn(),
@@ -47,6 +48,7 @@ describe('WahaController - Unit Tests (Feature 6 Call Reject & Webhooks)', () =>
 
   const mockOmnichannelQueue = {
     addMessage: jest.fn(),
+    enqueue: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -110,6 +112,39 @@ describe('WahaController - Unit Tests (Feature 6 Call Reject & Webhooks)', () =>
         'zafi-cs',
         '628999888777@c.us',
         expect.stringContaining('tidak dapat menerima panggilan'),
+      );
+    });
+
+    it('harus mengenali input voice note (ptt) dengan messageType audio', async () => {
+      mockPrismaService.contact.findFirst.mockResolvedValueOnce({
+        id: 'contact-02',
+        phone: '628111222333',
+      });
+
+      const payload = {
+        session: 'zafi-cs',
+        event: 'message',
+        payload: {
+          id: 'msg-ptt-123',
+          from: '628111222333@c.us',
+          type: 'ptt',
+          hasMedia: true,
+          media: {
+            url: 'http://waha:3000/api/files/voice.ogg',
+            mimetype: 'audio/ogg; codecs=opus',
+          },
+        },
+      };
+
+      await controller.handleWebhook(payload);
+
+      expect(mockPrismaService.message.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({
+            messageType: 'audio',
+            content: 'Mengirim pesan suara',
+          }),
+        }),
       );
     });
 

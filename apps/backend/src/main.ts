@@ -14,7 +14,12 @@ async function bootstrap() {
     process.env.DATABASE_URL =
       'postgresql://postgres:secret_password@127.0.0.1:5432/rbac_api_db?schema=public';
   }
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    logger:
+      process.env.NODE_ENV === 'production'
+        ? ['log', 'warn', 'error']
+        : ['log', 'warn', 'error', 'debug'],
+  });
 
   // Serve static assets from 'public' folder
   app.useStaticAssets(join(__dirname, '..', 'public'));

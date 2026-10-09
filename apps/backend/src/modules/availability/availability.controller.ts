@@ -62,7 +62,7 @@ export class AvailabilityController {
         },
       }),
       limits: {
-        fileSize: 100 * 1024 * 1024, // 100MB
+        fileSize: 300 * 1024 * 1024, // 300MB
       },
     }),
   )
@@ -78,9 +78,13 @@ export class AvailabilityController {
     let finalMimetype = file.mimetype;
     let finalSize = file.size;
 
-    // Jika video, lakukan standardisasi otomatis dengan ffmpeg:
-    // H.264 + AAC + +faststart (agar WhatsApp mengenali durasi normal & bisa streaming)
-    if (file.mimetype.startsWith('video/')) {
+    // Jika video (.mov, .mp4, dll), kompres & standardisasi via ffmpeg:
+    // 720p, H.264, AAC, +faststart agar bisa diputar native di WhatsApp (< 16MB)
+    const isVideo =
+      file.mimetype.startsWith('video/') ||
+      /\.(mov|mp4|mkv|avi|webm)$/i.test(file.originalname);
+
+    if (isVideo) {
       const inputPath = file.path;
       const optimizedFilename = `opt-${file.filename.replace(/\.[^/.]+$/, '')}.mp4`;
       const outputPath = join(process.cwd(), 'uploads', optimizedFilename);
@@ -90,9 +94,9 @@ export class AvailabilityController {
 
       try {
         const startTime = Date.now();
-        const { stdout, stderr } = await execAsync(
-          `ffmpeg -y -i "${inputPath}" -c:v libx264 -preset fast -crf 23 -c:a aac -b:a 128k -movflags +faststart "${outputPath}"`,
-          { timeout: 90000 },
+        await execAsync(
+          `ffmpeg -y -i "${inputPath}" -vf "scale='min(720,iw)':-2" -c:v libx264 -preset fast -crf 28 -c:a aac -b:a 128k -movflags +faststart "${outputPath}"`,
+          { timeout: 180000 },
         );
 
         const durationMs = Date.now() - startTime;

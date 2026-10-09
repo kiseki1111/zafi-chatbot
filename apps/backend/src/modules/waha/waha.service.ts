@@ -66,7 +66,7 @@ export class WahaService implements OnApplicationBootstrap {
     // User requested a strict 3-4 seconds delay
     const finalDelay = Math.floor(Math.random() * (4000 - 3000 + 1)) + 3000;
 
-    this.logger.log(`Typing delay: sleeping for ${finalDelay}ms...`);
+    this.logger.debug(`Typing delay: sleeping for ${finalDelay}ms...`);
     return new Promise((resolve) => setTimeout(resolve, finalDelay));
   }
 
@@ -754,6 +754,17 @@ export class WahaService implements OnApplicationBootstrap {
       // 1. Prioritaskan baca langsung dari disk lokal jika file ada di uploads
       const localFile = this.resolveToLocalFile(videoUrl);
       if (localFile) {
+        try {
+          const stats = fs.statSync(localFile);
+          // Batas native player WhatsApp ~16MB. Di atas itu kirim via dokumen file agar tidak ditolak
+          if (stats.size > 16 * 1024 * 1024) {
+            this.logger.warn(
+              `[WAHA-SEND-VIDEO] Ukuran video (${(stats.size / 1024 / 1024).toFixed(1)} MB) > 16MB. Mengirim via dokumen file...`,
+            );
+            return this.sendVideoFile(sessionName, chatId, videoUrl, caption);
+          }
+        } catch {}
+
         const fileData = this.readLocalMediaFile(localFile, 'video/mp4');
         if (fileData) {
           filePayload.data = fileData.data.toString('base64');
@@ -845,6 +856,13 @@ export class WahaService implements OnApplicationBootstrap {
     }
   }
 
+  private getCleanExt(mimetype: string, fallback = 'jpg'): string {
+    const raw = (mimetype.split('/')[1] || fallback).split(';')[0].trim().toLowerCase();
+    if (raw === 'jpeg') return 'jpg';
+    if (raw === 'mpeg') return 'mp3';
+    return raw;
+  }
+
   /**
    * Unduh media yang diterima dan simpan ke folder uploads lokal (VPS disk),
    * agar gambar/video dapat langsung ditampilkan di dashboard monitoring.
@@ -867,7 +885,7 @@ export class WahaService implements OnApplicationBootstrap {
       if (mediaUrl && mediaUrl.startsWith('data:')) {
         const match = mediaUrl.match(/^data:([^;]+);base64,(.*)$/);
         if (match) {
-          const ext = (match[1].split('/')[1] || 'png').replace('jpeg', 'jpg');
+          const ext = this.getCleanExt(match[1], 'png');
           const buffer = Buffer.from(match[2], 'base64');
           return this.writeMediaBuffer(buffer, match[1], ext);
         }
@@ -877,7 +895,7 @@ export class WahaService implements OnApplicationBootstrap {
       if (mediaUrl && mediaUrl.includes('/api/v1/waha/media/')) {
         const file = await this.getMediaFile(sessionName, messageId);
         if (file && file.data.length > 0) {
-          const ext = (file.mimetype.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+          const ext = this.getCleanExt(file.mimetype, 'jpg');
           return this.writeMediaBuffer(file.data, file.mimetype, ext);
         }
       }
@@ -904,7 +922,7 @@ export class WahaService implements OnApplicationBootstrap {
           timeout: 30000,
         });
         const mime = String(res.headers['content-type'] || 'image/jpeg');
-        const ext = (mime.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+        const ext = this.getCleanExt(mime, 'jpg');
         return this.writeMediaBuffer(Buffer.from(res.data), mime, ext);
       }
 
@@ -939,7 +957,7 @@ export class WahaService implements OnApplicationBootstrap {
 
   async getQrCode(sessionName: string): Promise<any> {
     const url = `${this.baseUrl}/api/${sessionName}/auth/qr`;
-    this.logger.log(`[WAHA QR] Fetching QR: ${url} with apiKey: ${this.apiKey}`);
+    this.logger.debug(`[WAHA QR] Fetching QR: ${url} with apiKey: ${this.apiKey}`);
     try {
       const response = await axios.get(
         url,
@@ -953,7 +971,7 @@ export class WahaService implements OnApplicationBootstrap {
       this.logger.error(`[WAHA QR] First attempt failed: ${error.message} (status: ${error.response?.status})`);
       try {
         const fallbackUrl = `${this.baseUrl}/api/sessions/${sessionName}/auth/qr`;
-        this.logger.log(`[WAHA QR] Trying fallback: ${fallbackUrl}`);
+        this.logger.debug(`[WAHA QR] Trying fallback: ${fallbackUrl}`);
         const fallbackResponse = await axios.get(
           fallbackUrl,
           {

@@ -38,8 +38,8 @@ export class ImageParser {
       const base64Image = resizedBuffer.toString('base64');
       const response = await this.openai.chat.completions.create({
         model:
-          this.configService.get<string>('OPENAI_MODEL') ||
-          'deepseek/deepseek-v4-flash-0731',
+          this.configService.get<string>('OPENAI_VISION_MODEL') ||
+          'z-ai/glm-5.3-flash',
         messages: [
           {
             role: 'system',

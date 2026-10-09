@@ -403,7 +403,7 @@ export class WahaController {
         `\n[WAHA PESAN BARU - WHATSAPP] Waktu: ${timestamp} | Dari: ${sender} | Isi: "${text}"\n`,
       );
     } else {
-      this.logger.log(`Received WAHA webhook event: ${payload?.event}`);
+      this.logger.debug(`Received WAHA webhook event: ${payload?.event}`);
     }
 
     // Log every event into webhook_logs
@@ -533,28 +533,44 @@ export class WahaController {
       const contactNumber = cleanNumber || rawNumber;
 
       let currentConversationId: string | null = null;
+      let storedMediaUrl: string | null = null;
+      const msgId = message.id?._serialized || message.id || 'unknown';
+
+      const isAudioMsg = Boolean(
+        message.type === 'ptt' ||
+        message.type === 'audio' ||
+        message.type === 'voice' ||
+        (message._data && (message._data.mimetype?.startsWith('audio/') || message._data.type === 'ptt' || message._data.type === 'audio'))
+      );
+      const isVideoMsg = Boolean(
+        message.type === 'video' ||
+        (message._data && (message._data.mimetype?.startsWith('video/') || message._data.type === 'video'))
+      );
+      const isImageMsg = Boolean(
+        message.type === 'image' ||
+        (!isAudioMsg && !isVideoMsg && (message._data && (message._data.mimetype?.startsWith('image/') || message._data.type === 'image')))
+      );
+      const isMediaMsg = Boolean(
+        message.hasMedia ||
+        isAudioMsg ||
+        isVideoMsg ||
+        isImageMsg ||
+        message.media?.url ||
+        message.mediaUrl
+      );
+
+      let extractedMediaUrl =
+        message.media?.url ||
+        message.mediaUrl ||
+        (message.hasMedia && message.media ? message.media.url : null);
+
+      if (!extractedMediaUrl && isMediaMsg && msgId && msgId !== 'unknown') {
+        extractedMediaUrl = `/api/v1/waha/media/${sessionName}/${encodeURIComponent(msgId)}`;
+      }
 
       if (sessionName && isDirectPhone(rawNumber)) {
         const contactName =
           message._data?.notifyName || message.sender?.pushname || null;
-        const msgId = message.id?._serialized || message.id || 'unknown';
-
-        const isMediaMsg = Boolean(
-          message.hasMedia ||
-          message.type === 'image' ||
-          message.media?.url ||
-          message.mediaUrl ||
-          (message._data && (message._data.mimetype?.startsWith('image/') || message._data.type === 'image'))
-        );
-
-        let extractedMediaUrl =
-          message.media?.url ||
-          message.mediaUrl ||
-          (message.hasMedia && message.media ? message.media.url : null);
-
-        if (!extractedMediaUrl && isMediaMsg && msgId && msgId !== 'unknown') {
-          extractedMediaUrl = `/api/v1/waha/media/${sessionName}/${encodeURIComponent(msgId)}`;
-        }
 
         try {
           const contact = await this.prisma.contact.findFirst({
@@ -608,32 +624,24 @@ export class WahaController {
           });
           currentConversationId = conversation.id;
 
-          const isMediaMsg =
-            Boolean(
-              message.hasMedia ||
-              message.type === 'image' ||
-              message.media?.url ||
-              message.mediaUrl ||
-              (message._data && (message._data.mimetype?.startsWith('image/') || message._data.type === 'image'))
-            );
-
-          let extractedMediaUrl =
-            message.media?.url ||
-            message.mediaUrl ||
-            (message.hasMedia && message.media ? message.media.url : null);
-
-          // Jika WAHA menyimpan media secara lokal (WAHA media manager), buat URL proxy / langsung ke WAHA media
-          if (!extractedMediaUrl && isMediaMsg && msgId && msgId !== 'unknown') {
-            extractedMediaUrl = `/api/v1/waha/media/${sessionName}/${encodeURIComponent(msgId)}`;
-          }
-
-          const finalMessageType = isMediaMsg
+          const finalMessageType = isAudioMsg
+            ? 'audio'
+            : isVideoMsg
+            ? 'video'
+            : isImageMsg
             ? 'image'
-            : message.type || 'text';
+            : isMediaMsg
+            ? (message.type || 'media')
+            : (message.type || 'text');
+
+          let defaultContent = '';
+          if (isAudioMsg) defaultContent = 'Mengirim pesan suara';
+          else if (isVideoMsg) defaultContent = 'Mengirim video';
+          else if (isImageMsg) defaultContent = 'Mengirim foto';
+          else if (isMediaMsg) defaultContent = 'Mengirim media';
 
           // Strategi baru: unduh media yang diterima & simpan ke storage lokal
           // agar bisa langsung ditampilkan di dashboard monitoring.
-          let storedMediaUrl: string | null = null;
           if (isMediaMsg && extractedMediaUrl) {
             storedMediaUrl = await this.wahaService.downloadAndStoreMedia(
               sessionName,
@@ -652,7 +660,7 @@ export class WahaController {
               conversationId: conversation.id,
               senderType: message.fromMe ? 'bot' : 'customer',
               messageType: finalMessageType,
-              content: message.body || (isMediaMsg ? 'Mengirim foto' : ''),
+              content: message.body || defaultContent,
               status: message.fromMe ? 'SENT' : 'RECEIVED',
               metadata: {
                 ...message,
@@ -718,13 +726,25 @@ export class WahaController {
 
         const sender = message.from;
         const msgId = message.id?._serialized || message.id || 'unknown';
-        const mediaUrls = message.media?.url
-          ? [message.media.url]
-          : message.mediaUrl
-          ? [message.mediaUrl]
-          : [];
+        // Hanya media gambar yang diteruskan ke mediaUrls Vision AI agar tidak crash saat menerima audio/video
+        const mediaUrls: string[] | undefined =
+          !isAudioMsg && !isVideoMsg
+            ? message.media?.url
+              ? [message.media.url]
+              : message.mediaUrl
+              ? [message.mediaUrl]
+              : []
+            : undefined;
 
-        if (text || mediaUrls.length > 0 || message.hasMedia) {
+        const audioUrl = isAudioMsg
+          ? (storedMediaUrl || extractedMediaUrl || message.media?.url || message.mediaUrl)
+          : undefined;
+
+        if (isAudioMsg && !text) {
+          text = '[Pelanggan mengirimkan pesan suara / Voice Note]';
+        }
+
+        if (text || (mediaUrls && mediaUrls.length > 0) || audioUrl || message.hasMedia) {
           // Tangkap ID conversation aktif dari webhook saat ini
           const activeConvId = currentConversationId;
 
@@ -796,6 +816,7 @@ export class WahaController {
             senderId: sender,
             text: text,
             mediaUrls: mediaUrls,
+            audioUrl: audioUrl,
             provider: 'WAHA',
             sessionName: sessionName,
             replyCallback: async (reply) => {

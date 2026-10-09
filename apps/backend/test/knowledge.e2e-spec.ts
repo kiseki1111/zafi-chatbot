@@ -5,6 +5,7 @@ import { createTestApp, TestAppContext } from './helpers/create-test-app';
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard';
 import { OPENAI_CLIENT } from '../src/core/openai/openai.module';
 import { DataAgentService } from '../src/features/knowledge-ingest/data-agent.service';
+const sharp = require('sharp');
 
 describe('Knowledge Base Flow (e2e)', () => {
   let context: TestAppContext;
@@ -19,6 +20,11 @@ describe('Knowledge Base Flow (e2e)', () => {
 
   const mockDataAgent = {
     syncKnowledgeBase: jest.fn().mockResolvedValue({ success: true, count: 1 }),
+  };
+
+  const mockOpenAI = {
+    chat: { completions: { create: jest.fn() } },
+    embeddings: { create: jest.fn() },
   };
 
   beforeAll(async () => {
@@ -37,10 +43,7 @@ describe('Knowledge Base Flow (e2e)', () => {
             },
           })
           .overrideProvider(OPENAI_CLIENT)
-          .useValue({
-            chat: { completions: { create: jest.fn() } },
-            embeddings: { create: jest.fn() },
-          })
+          .useValue(mockOpenAI)
           .overrideProvider(DataAgentService)
           .useValue(mockDataAgent),
     );
@@ -159,6 +162,49 @@ describe('Knowledge Base Flow (e2e)', () => {
         .expect(200);
 
       expect(response.body).toEqual({ success: true });
+    });
+  });
+
+  describe('POST /api/v1/knowledge/file', () => {
+    it('harus berhasil mengunggah file gambar (JPEG) dan mengekstrak teks via Vision AI (201)', async () => {
+      const imgBuffer = await sharp({
+        create: {
+          width: 100,
+          height: 100,
+          channels: 3,
+          background: { r: 255, g: 0, b: 0 },
+        },
+      })
+        .jpeg()
+        .toBuffer();
+
+      mockOpenAI.chat.completions.create.mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: '# PT. RINDANG ALAM SEMESTA\nPERSYARATAN KPR: 1. KTP',
+            },
+          },
+        ],
+      });
+
+      context.mockPrisma.knowledgeBase.create.mockResolvedValueOnce({
+        id: 'kb-img-1',
+        content: '# PT. RINDANG ALAM SEMESTA\nPERSYARATAN KPR: 1. KTP',
+        metadata: { title: 'Syarat KPR', type: 'file', filename: 'kpr.jpg' },
+        tenantId: 'tenant-knowledge-1',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/knowledge/file')
+        .field('title', 'Syarat KPR')
+        .attach('file', imgBuffer, 'kpr.jpg')
+        .expect(201);
+
+      expect(response.body.title).toBe('Syarat KPR');
+      expect(response.body.content).toContain('PT. RINDANG ALAM SEMESTA');
     });
   });
 });

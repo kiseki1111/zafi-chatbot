@@ -10,6 +10,7 @@ export interface IncomingMessage {
   text: string;
   provider: 'TELEGRAM' | 'WAHA';
   mediaUrls?: string[];
+  audioUrl?: string;
   sessionName?: string;
   tenantId?: string;
   replyCallback: (response: AgentResponse) => Promise<void>;

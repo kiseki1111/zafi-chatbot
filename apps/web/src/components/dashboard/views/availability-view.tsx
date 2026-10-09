@@ -17,6 +17,7 @@ import {
   Plus, Search, Edit3, Trash2, CheckCircle2, Clock, XCircle, Wrench, Layers, RefreshCw, Upload, Image, FileVideo, ExternalLink, Play, Copy, Check, Film, BookOpen, Sparkles, FileText, User,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
+import { useBackgroundTasksStore } from "@/lib/background-tasks-store";
 import { useToast } from "@/hooks/use-toast";
 import type { ResourceGroup, ResourceItem, ResourceStatus } from "@/lib/types";
 
@@ -133,6 +134,7 @@ const STATUS_CONFIG: Record<ResourceStatus, { label: string; bg: string; border:
 export function AvailabilityView() {
   const { user } = useAuthStore();
   const { toast } = useToast();
+  const { runSiteplanMediaUpload } = useBackgroundTasksStore();
 
   const tenantId = user?.tenantId || "t-123";
 
@@ -192,6 +194,13 @@ export function AvailabilityView() {
 
   useEffect(() => {
     fetchGroups();
+    const handleUpdate = () => {
+      fetchGroups();
+    };
+    window.addEventListener("siteplan-updated", handleUpdate);
+    return () => {
+      window.removeEventListener("siteplan-updated", handleUpdate);
+    };
   }, [tenantId]);
 
   const activeGroup = useMemo(() => {
@@ -499,7 +508,7 @@ export function AvailabilityView() {
     }
   };
 
-  const handleUploadNewMedia = async () => {
+  const handleUploadNewMedia = () => {
     if (!uploadFile || !activeGroup) {
       toast({ title: "Pilih file", description: "Silakan pilih file gambar atau video terlebih dahulu", variant: "destructive" });
       return;
@@ -509,43 +518,28 @@ export function AvailabilityView() {
       return;
     }
 
-    const formData = new FormData();
-    formData.append("file", uploadFile);
+    const currentFile = uploadFile;
+    const currentName = uploadName.trim();
+    const currentDesc = uploadDesc.trim();
+    const currentGroupId = activeGroup.id;
+    const currentMediaList = mediaList;
 
-    setIsUploading(true);
-    try {
-      const res = await fetch("/api/v1/availability/upload", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
-      const resData = data.data || data;
+    // Tutup modal langsung agar pengguna bisa langsung melanjutkan pekerjaan
+    setIsUploadModalOpen(false);
+    setUploadFile(null);
+    setUploadName("");
+    setUploadDesc("");
 
-      if (!res.ok || !resData.url) {
-        throw new Error(resData.message || "Gagal upload media");
-      }
-
-      const newMedia: SiteplanMedia = {
-        id: "m-" + Date.now(),
-        name: uploadName.trim(),
-        url: resData.url,
-        type: resData.mediaType || (uploadFile.type.startsWith("video/") ? "video" : "image"),
-        description: uploadDesc.trim() || undefined,
-        createdAt: new Date().toISOString().slice(0, 10),
-      };
-
-      const updated = [...mediaList, newMedia];
-      await saveMediaList(updated);
-
-      setIsUploadModalOpen(false);
-      setUploadFile(null);
-      setUploadName("");
-      setUploadDesc("");
-    } catch (err: any) {
-      toast({ title: "Gagal Upload", description: err.message, variant: "destructive" });
-    } finally {
-      setIsUploading(false);
-    }
+    runSiteplanMediaUpload({
+      file: currentFile,
+      name: currentName,
+      description: currentDesc,
+      groupId: currentGroupId,
+      currentMediaList: currentMediaList,
+      onSuccess: () => {
+        fetchGroups();
+      },
+    });
   };
 
   const openMediaDetail = (m: SiteplanMedia) => {

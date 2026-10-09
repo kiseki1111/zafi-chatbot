@@ -162,3 +162,13 @@
   background-image: none !important;
   background-color: var(--brand-primary) !important;
 }
+
+@keyframes indeterminate-bar {
+  0% { transform: translateX(-100%); width: 35%; }
+  50% { width: 60%; }
+  100% { transform: translateX(350%); width: 35%; }
+}
+
+.animate-indeterminate-bar {
+  animation: indeterminate-bar 1.8s infinite ease-in-out;
+}

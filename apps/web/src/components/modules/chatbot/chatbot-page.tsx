@@ -186,6 +186,7 @@ function MessageBubble({
   const isCall = msg.messageType === "call";
   const isImage = msg.messageType === "image" && msg.mediaUrl;
   const isVideo = msg.messageType === "video" && msg.mediaUrl;
+  const isAudio = (msg.messageType === "audio" || msg.messageType === "ptt" || msg.messageType === "voice") && msg.mediaUrl;
 
   if (isCall) {
     return (
@@ -253,11 +254,19 @@ function MessageBubble({
             className="rounded-lg max-w-full max-h-64 object-cover mb-1 bg-black"
           />
         ) : null}
-        {/* Untuk pesan image/video: sembunyikan placeholder caption default */}
+        {isAudio ? (
+          <audio
+            src={msg.mediaUrl}
+            controls
+            preload="metadata"
+            className="w-full max-w-xs my-1"
+          />
+        ) : null}
+        {/* Untuk pesan image/video/audio: sembunyikan placeholder caption default */}
         {msg.text &&
           !(
-            (msg.messageType === "image" || msg.messageType === "video") &&
-            (msg.text === "Mengirim foto" || msg.text === "Mengirim video" || msg.text?.startsWith("Mengirim "))
+            (msg.messageType === "image" || msg.messageType === "video" || msg.messageType === "audio" || msg.messageType === "ptt") &&
+            (msg.text === "Mengirim foto" || msg.text === "Mengirim video" || msg.text === "Mengirim pesan suara" || msg.text?.startsWith("Mengirim "))
           ) && (
           <p className="whitespace-pre-wrap break-words">{msg.text}</p>
         )}

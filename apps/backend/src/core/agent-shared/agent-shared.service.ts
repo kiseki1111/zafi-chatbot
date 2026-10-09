@@ -6,6 +6,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import axios from 'axios';
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   OPENAI_CLIENT,
   OPENAI_MODEL,
@@ -471,5 +473,134 @@ export class AgentSharedService {
       );
       return null;
     }
+  }
+
+  /**
+   * Mengambil audio buffer baik dari file lokal (/uploads/...) atau URL eksternal/WAHA.
+   */
+  private async fetchAudioBuffer(
+    audioUrl: string,
+  ): Promise<{ buffer: Buffer; format: string } | null> {
+    try {
+      // 1. Cek file lokal di disk (/uploads/...)
+      if (audioUrl.startsWith('/uploads/')) {
+        const localPath = path.join(process.cwd(), audioUrl);
+        if (fs.existsSync(localPath)) {
+          const buffer = fs.readFileSync(localPath);
+          const ext = path.extname(localPath).replace('.', '').toLowerCase() || 'ogg';
+          return { buffer, format: ext === 'opus' ? 'ogg' : ext };
+        }
+      }
+
+      // 2. Data URI (data:audio/...)
+      if (audioUrl.startsWith('data:')) {
+        const match = audioUrl.match(/^data:audio\/([^;]+);base64,(.*)$/);
+        if (match) {
+          const format = match[1].toLowerCase();
+          const buffer = Buffer.from(match[2], 'base64');
+          return { buffer, format: format.includes('ogg') ? 'ogg' : format };
+        }
+      }
+
+      // 3. URL HTTP (WAHA internal atau eksternal)
+      let targetUrl = audioUrl;
+      const isWahaInternal =
+        audioUrl &&
+        /localhost|127\.0\.0\.1/i.test(audioUrl) &&
+        audioUrl.includes('/api/files/');
+
+      if (isWahaInternal) {
+        const baseUrl = process.env.WAHA_API_URL || 'http://127.0.0.1:3000';
+        const pathPart = audioUrl.substring(audioUrl.indexOf('/api/files/'));
+        targetUrl = `${baseUrl.replace(/\/+$/, '')}${pathPart}`;
+      }
+
+      const apiKey =
+        process.env.WAHA_API_KEY || process.env.WHATSAPP_API_KEY || '';
+      const res = await axios.get(targetUrl, {
+        responseType: 'arraybuffer',
+        headers: {
+          'User-Agent': 'Mozilla/5.0',
+          ...(isWahaInternal ? { 'X-Api-Key': apiKey } : {}),
+        },
+        timeout: 30000,
+      });
+
+      const contentType = String(res.headers['content-type'] || 'audio/ogg').toLowerCase();
+      let format = 'ogg';
+      if (contentType.includes('mp3') || contentType.includes('mpeg')) format = 'mp3';
+      else if (contentType.includes('wav')) format = 'wav';
+      else if (contentType.includes('m4a') || contentType.includes('mp4')) format = 'm4a';
+
+      return { buffer: Buffer.from(res.data), format };
+    } catch (e: any) {
+      this.logger.warn(`[STT Audio] Gagal mengambil audio dari ${audioUrl}: ${e.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Mentranskripsikan pesan suara ke teks menggunakan OpenRouter multimodal audio models (Gemini Flash).
+   */
+  async transcribeAudio(audioUrl: string): Promise<string> {
+    if (!this.openai) {
+      this.logger.warn('[STT Audio] OpenRouter client belum terkonfigurasi.');
+      return '';
+    }
+
+    const audioData = await this.fetchAudioBuffer(audioUrl);
+    if (!audioData) {
+      return '';
+    }
+
+    const candidateModels = [
+      'google/gemini-2.5-flash',
+      'google/gemini-2.5-flash-lite',
+      'google/gemini-3.5-flash-lite',
+    ];
+
+    const prompt =
+      'Transkripsikan isi rekaman suara berikut secara persis dan lengkap ke dalam teks Bahasa Indonesia. ' +
+      'Kembalikan HANYA teks transkripsinya saja tanpa tanda petik, tanpa keterangan tambahan, dan tanpa pengantar.';
+
+    for (const model of candidateModels) {
+      try {
+        this.logger.log(`[STT Audio] Mentranskripsi voice note via OpenRouter (${model})...`);
+        const response = await this.openai.chat.completions.create({
+          model: model,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: prompt },
+                {
+                  type: 'input_audio',
+                  input_audio: {
+                    data: audioData.buffer.toString('base64'),
+                    format: audioData.format,
+                  },
+                } as any,
+              ],
+            },
+          ],
+          max_tokens: 600,
+        });
+
+        const msg: any = response.choices[0]?.message;
+        const transcript = (msg?.content || msg?.reasoning || '').trim();
+        if (transcript) {
+          this.logger.log(`[STT Audio] Sukses transkripsi (${model}): "${transcript.substring(0, 80)}..."`);
+          return transcript;
+        }
+      } catch (e: any) {
+        const errorDetail = e.response?.data || e.message || e;
+        this.logger.warn(
+          `[STT Audio] Model ${model} gagal: ${JSON.stringify(errorDetail)}. Mencoba kandidat berikutnya...`,
+        );
+      }
+    }
+
+    this.logger.error('[STT Audio] Semua model transkripsi OpenRouter gagal.');
+    return '';
   }
 }

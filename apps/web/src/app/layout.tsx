@@ -3,6 +3,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { PwaRegister } from "@/components/pwa-register";
+import { BackgroundTaskCenter } from "@/components/ui/background-task-center";
 
 export const viewport: Viewport = {
   themeColor: "#059669",
@@ -50,6 +51,7 @@ export default function RootLayout({
         <PwaRegister />
         <Toaster />
         <SonnerToaster richColors position="top-right" />
+        <BackgroundTaskCenter />
       </body>
     </html>
   );
