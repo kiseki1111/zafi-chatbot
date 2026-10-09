@@ -136,6 +136,9 @@ export class AvailabilityController {
       mimetype: finalMimetype,
       size: finalSize,
       mediaType: finalMimetype.startsWith('video/') ? 'video' : 'image',
+      canPlayNative: finalMimetype.startsWith('video/')
+        ? finalSize <= 16 * 1024 * 1024
+        : true,
     };
   }
 

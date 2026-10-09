@@ -152,7 +152,7 @@ export const useBackgroundTasksStore = create<BackgroundTasksState>(
         category: "knowledge",
         status: "running",
         progress: 0,
-        statusText: `Mengunggah (${totalMb} MB) — 0%`,
+        statusText: `Mengunggah (${totalMb} MB)`,
       });
 
       try {
@@ -170,13 +170,13 @@ export const useBackgroundTasksStore = create<BackgroundTasksState>(
               get().updateTask(taskId, {
                 progress: 100,
                 statusText: isImage
-                  ? "File terkirim (100%). Sedang mengekstrak teks via Vision AI OCR..."
-                  : "File terkirim (100%). Menyinkronkan ke Vector Database...",
+                  ? "File terkirim. Sedang mengekstrak teks via Vision AI OCR..."
+                  : "File terkirim. Menyinkronkan ke Vector Database...",
               });
             } else {
               get().updateTask(taskId, {
                 progress: percent,
-                statusText: `Mengunggah (${loadedMb} / ${totalMb} MB) — ${percent}%`,
+                statusText: `Mengunggah (${loadedMb} / ${totalMb} MB)`,
               });
             }
           },
@@ -299,7 +299,7 @@ export const useBackgroundTasksStore = create<BackgroundTasksState>(
         category: "siteplan",
         status: "running",
         progress: 0,
-        statusText: `Mengunggah media (${totalMb} MB) — 0%`,
+        statusText: `Mengunggah media (${totalMb} MB)`,
       });
 
       try {
@@ -315,13 +315,13 @@ export const useBackgroundTasksStore = create<BackgroundTasksState>(
               get().updateTask(taskId, {
                 progress: 100,
                 statusText: isVideo
-                  ? "File terkirim (100%). Server sedang mengompres video via FFmpeg..."
-                  : "File terkirim (100%). Menyimpan ke galeri...",
+                  ? "File terkirim. Server sedang mengompres video via FFmpeg..."
+                  : "File terkirim. Menyimpan ke galeri...",
               });
             } else {
               get().updateTask(taskId, {
                 progress: percent,
-                statusText: `Mengunggah (${loadedMb} / ${totalMb} MB) — ${percent}%`,
+                statusText: `Mengunggah (${loadedMb} / ${totalMb} MB)`,
               });
             }
           },
@@ -359,13 +359,29 @@ export const useBackgroundTasksStore = create<BackgroundTasksState>(
           throw new Error("Gagal menyimpan galeri ke server cluster");
         }
 
+        const isVideoRes = resData.mediaType === "video" || isVideo;
+        const finalSizeMb = (resData.size ? resData.size / 1024 / 1024 : file.size / 1024 / 1024).toFixed(1);
+        const canPlayNative = resData.canPlayNative ?? (resData.size ? resData.size <= 16 * 1024 * 1024 : false);
+
+        let finalStatusText = "Media siteplan berhasil disimpan!";
+        if (isVideoRes) {
+          if (canPlayNative) {
+            finalStatusText = `Video (${finalSizeMb} MB) siap diputar native di WhatsApp!`;
+            toast.success(`Video "${name}" (${finalSizeMb} MB) berhasil dioptimasi & siap diputar langsung di WhatsApp.`);
+          } else {
+            finalStatusText = `Video (${finalSizeMb} MB > 16MB). Dikirim sebagai dokumen file (bukan native player).`;
+            toast.warning(`Video "${name}" (${finalSizeMb} MB) melebihi batas native 16MB. WAHA akan mengirimkannya via dokumen file.`);
+          }
+        } else {
+          toast.success(`Media siteplan "${name}" berhasil diunggah!`);
+        }
+
         get().updateTask(taskId, {
           status: "success",
-          statusText: "Media siteplan berhasil disimpan!",
+          statusText: finalStatusText,
           completedAt: Date.now(),
         });
 
-        toast.success(`Media siteplan "${name}" berhasil diunggah!`);
         if (typeof window !== "undefined") {
           window.dispatchEvent(new CustomEvent("siteplan-updated"));
         }
@@ -373,7 +389,7 @@ export const useBackgroundTasksStore = create<BackgroundTasksState>(
 
         setTimeout(() => {
           get().removeTask(taskId);
-        }, 10000);
+        }, 12000);
       } catch (err: any) {
         const errorMsg = err.message || "Gagal mengunggah media";
         get().updateTask(taskId, {
