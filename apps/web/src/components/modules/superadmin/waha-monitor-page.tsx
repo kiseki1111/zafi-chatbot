@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Smartphone, RefreshCw, QrCode, LogOut, CheckCircle2,
   XCircle, AlertTriangle, ShieldCheck, Power, Search,
@@ -28,6 +29,7 @@ export function WahaMonitorPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [qrCodeData, setQrCodeData] = useState<{ id: string; url: string } | null>(null);
+  const [sessionToLogout, setSessionToLogout] = useState<string | null>(null);
   const [connectingSession, setConnectingSession] = useState<string | null>(null);
   const [connectedSession, setConnectedSession] = useState<{ id: string; phone?: string; name?: string } | null>(null);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
@@ -128,8 +130,13 @@ export function WahaMonitorPage() {
     }
   };
 
-  const handleLogout = async (sessionName: string) => {
-    if (!confirm(`Yakin ingin memutuskan koneksi sesi ${sessionName}?`)) return;
+  const handleLogout = (sessionName: string) => {
+    setSessionToLogout(sessionName);
+  };
+
+  const confirmLogout = async () => {
+    if (!sessionToLogout) return;
+    const sessionName = sessionToLogout;
     setActionLoading((prev) => ({ ...prev, [sessionName]: true }));
     try {
       await fetch(`/api/v1/waha/instances/${sessionName}/logout`, { method: "POST" });
@@ -139,6 +146,7 @@ export function WahaMonitorPage() {
       toast.error("Gagal memutuskan sesi");
     } finally {
       setActionLoading((prev) => ({ ...prev, [sessionName]: false }));
+      setSessionToLogout(null);
     }
   };
 
@@ -375,6 +383,15 @@ export function WahaMonitorPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!sessionToLogout}
+        onOpenChange={(open) => !open && setSessionToLogout(null)}
+        title="Putuskan Sesi WhatsApp"
+        description={`Apakah Anda yakin ingin memutuskan koneksi sesi WhatsApp "${sessionToLogout}"? Akun WhatsApp pada sesi ini akan terputus dari bot.`}
+        confirmLabel="Ya, Putuskan"
+        onConfirm={confirmLogout}
+      />
     </div>
   );
 }

@@ -37,6 +37,8 @@ import {
   Info,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export type SeatStatus = "AVAILABLE" | "BOOKED" | "OCCUPIED";
 
@@ -196,6 +198,8 @@ const SEAT_STATUS_CONFIG: Record<SeatStatus, { label: string; badge: string; bor
 };
 
 export function BusLayoutView() {
+  const { toast } = useToast();
+  const [busToDelete, setBusToDelete] = useState<string | null>(null);
   const [fleets, setFleets] = useState<BusFleet[]>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("custom-bus-fleets");
@@ -303,13 +307,23 @@ export function BusLayoutView() {
 
   const handleDeleteBus = (fleetId: string) => {
     if (fleets.length <= 1) {
-      alert("Harus ada minimal 1 armada bus.");
+      toast({
+        title: "Peringatan",
+        description: "Harus ada minimal 1 armada bus dalam sistem.",
+        variant: "destructive",
+      });
       return;
     }
-    if (!confirm("Hapus armada bus ini beserta denah kursinya?")) return;
-    const updated = fleets.filter((f) => f.id !== fleetId);
+    setBusToDelete(fleetId);
+  };
+
+  const confirmDeleteBus = () => {
+    if (!busToDelete) return;
+    const updated = fleets.filter((f) => f.id !== busToDelete);
     saveFleets(updated);
-    setActiveFleetId(updated[0].id);
+    if (updated.length > 0) setActiveFleetId(updated[0].id);
+    setBusToDelete(null);
+    toast({ title: "Berhasil", description: "Armada bus dan denah kursi berhasil dihapus." });
   };
 
   const handleSaveSeatData = () => {
@@ -794,6 +808,15 @@ export function BusLayoutView() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!busToDelete}
+        onOpenChange={(open) => !open && setBusToDelete(null)}
+        title="Hapus Armada Bus"
+        description="Apakah Anda yakin ingin menghapus armada bus ini beserta seluruh susunan denah kursinya?"
+        confirmLabel="Ya, Hapus"
+        onConfirm={confirmDeleteBus}
+      />
     </div>
   );
 }

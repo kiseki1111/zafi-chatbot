@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cn } from "@/lib/utils";
 import {
   Users,
@@ -93,6 +94,7 @@ export function CrmPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [propertyGroups, setPropertyGroups] = useState<PropertyGroup[]>([]);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Debounce search — hanya filter setelah user berhenti mengetik 400ms
@@ -275,10 +277,16 @@ export function CrmPage() {
     } catch { /* optimistic already applied */ }
   };
 
-  const handleDeleteRow = async (id: string) => {
-    if (!confirm("Hapus baris data pelanggan ini?")) return;
+  const handleDeleteRow = (id: string) => {
+    setDeleteConfirmId(id);
+  };
+
+  const executeDeleteRow = () => {
+    if (!deleteConfirmId) return;
+    const id = deleteConfirmId;
     setAllContacts((prev) => prev.filter((c) => c.id !== id));
     fetch(`/api/v1/contacts/${id}`, { method: "DELETE" }).catch(() => {});
+    setDeleteConfirmId(null);
   };
 
   const handleExportCsv = () => {
@@ -720,6 +728,15 @@ export function CrmPage() {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={!!deleteConfirmId}
+        onOpenChange={(open) => !open && setDeleteConfirmId(null)}
+        title="Hapus Data Pelanggan"
+        description="Apakah Anda yakin ingin menghapus baris data pelanggan ini? Tindakan ini tidak dapat dibatalkan."
+        confirmLabel="Ya, Hapus"
+        onConfirm={executeDeleteRow}
+      />
     </div>
   );
 }

@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -118,6 +119,17 @@ export function ClientsPage() {
   // State untuk Halaman Detail Klien (Master-Detail Pattern)
   const [selectedClient, setSelectedClient] = useState<any | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [deleteConfirmState, setDeleteConfirmState] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void;
+  }>({
+    open: false,
+    title: "",
+    description: "",
+    onConfirm: () => {},
+  });
 
   // Dialog Tambah Klien Baru
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -289,25 +301,30 @@ export function ClientsPage() {
   };
 
   // Handler: Hapus Klien
-  const handleDeleteClient = async (clientId: string, clientName: string) => {
-    if (!confirm(`YAKIN ingin menghapus klien "${clientName}"? Seluruh akun pengguna, data chatbot, dan histori akan dihapus permanen.`)) return;
+  const handleDeleteClient = (clientId: string, clientName: string) => {
+    setDeleteConfirmState({
+      open: true,
+      title: "Hapus Klien Perusahaan",
+      description: `Apakah Anda yakin ingin menghapus klien "${clientName}"? Seluruh akun pengguna, data chatbot, dan histori akan dihapus permanen.`,
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/v1/tenant/clients/${clientId}`, {
+            method: "DELETE",
+          });
 
-    try {
-      const res = await fetch(`/api/v1/tenant/clients/${clientId}`, {
-        method: "DELETE",
-      });
-
-      if (res.ok) {
-        toast.success(`Klien "${clientName}" berhasil dihapus.`);
-        setSelectedClient(null);
-        fetchClients();
-      } else {
-        const err = await res.json().catch(() => ({}));
-        toast.error(err.message || "Gagal menghapus klien.");
-      }
-    } catch (e: any) {
-      toast.error(e.message || "Gagal menghapus klien.");
-    }
+          if (res.ok) {
+            toast.success(`Klien "${clientName}" berhasil dihapus.`);
+            setSelectedClient(null);
+            fetchClients();
+          } else {
+            const err = await res.json().catch(() => ({}));
+            toast.error(err.message || "Gagal menghapus klien.");
+          }
+        } catch (e: any) {
+          toast.error(e.message || "Gagal menghapus klien.");
+        }
+      },
+    });
   };
 
   // Handler: Buka Modal Edit Klien
@@ -481,26 +498,31 @@ export function ClientsPage() {
   };
 
   // Handler: Hapus Akun Staf
-  const handleDeleteStaff = async (userId: string, userName: string) => {
+  const handleDeleteStaff = (userId: string, userName: string) => {
     if (!selectedClient) return;
-    if (!confirm(`Hapus akun pengguna "${userName}" dari klien ini?`)) return;
+    setDeleteConfirmState({
+      open: true,
+      title: "Hapus Akun Pengguna",
+      description: `Apakah Anda yakin ingin menghapus akun staf "${userName}" dari perusahaan ini?`,
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/v1/tenant/clients/${selectedClient.id}/users/${userId}`, {
+            method: "DELETE",
+          });
 
-    try {
-      const res = await fetch(`/api/v1/tenant/clients/${selectedClient.id}/users/${userId}`, {
-        method: "DELETE",
-      });
-
-      if (res.ok) {
-        toast.success("Akun berhasil dihapus!");
-        fetchClientDetail(selectedClient.id);
-        fetchClients();
-      } else {
-        const err = await res.json().catch(() => ({}));
-        toast.error(err.message || "Gagal menghapus akun");
-      }
-    } catch (e: any) {
-      toast.error(e.message || "Gagal menghapus akun");
-    }
+          if (res.ok) {
+            toast.success("Akun berhasil dihapus!");
+            fetchClientDetail(selectedClient.id);
+            fetchClients();
+          } else {
+            const err = await res.json().catch(() => ({}));
+            toast.error(err.message || "Gagal menghapus akun");
+          }
+        } catch (e: any) {
+          toast.error(e.message || "Gagal menghapus akun");
+        }
+      },
+    });
   };
 
   // Handler: Masuk / Impersonate Langsung sebagai Pengguna Tertentu
@@ -1573,6 +1595,15 @@ export function ClientsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <ConfirmDialog
+          open={deleteConfirmState.open}
+          onOpenChange={(open) => setDeleteConfirmState((prev) => ({ ...prev, open }))}
+          title={deleteConfirmState.title}
+          description={deleteConfirmState.description}
+          confirmLabel="Ya, Hapus"
+          onConfirm={deleteConfirmState.onConfirm}
+        />
       </div>
     );
   }
@@ -1777,7 +1808,7 @@ export function ClientsPage() {
             </div>
           </div>
 
-          <DialogFooter>
+            <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setIsAddModalOpen(false)}>Batal</Button>
             <Button size="sm" onClick={handleCreateClient} className="bg-emerald-600 hover:bg-emerald-700 text-white">
               Simpan Perusahaan
@@ -1785,6 +1816,15 @@ export function ClientsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={deleteConfirmState.open}
+        onOpenChange={(open) => setDeleteConfirmState((prev) => ({ ...prev, open }))}
+        title={deleteConfirmState.title}
+        description={deleteConfirmState.description}
+        confirmLabel="Ya, Hapus"
+        onConfirm={deleteConfirmState.onConfirm}
+      />
     </div>
   );
 }

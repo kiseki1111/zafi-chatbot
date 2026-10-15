@@ -19,6 +19,7 @@ import {
 import { useAuthStore } from "@/lib/auth-store";
 import { useBackgroundTasksStore } from "@/lib/background-tasks-store";
 import { useToast } from "@/hooks/use-toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { ResourceGroup, ResourceItem, ResourceStatus } from "@/lib/types";
 
 /**
@@ -143,6 +144,17 @@ export function AvailabilityView() {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
+  const [deleteConfirmState, setDeleteConfirmState] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void;
+  }>({
+    open: false,
+    title: "",
+    description: "",
+    onConfirm: () => {},
+  });
 
   // Modal State
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
@@ -450,17 +462,22 @@ export function AvailabilityView() {
     }
   };
 
-  const handleDeleteKnowledgeItem = async (id: string, title: string) => {
+  const handleDeleteKnowledgeItem = (id: string, title: string) => {
     if (!activeGroup) return;
-    if (!confirm(`Hapus knowledge "${title}"?`)) return;
-
-    try {
-      const updated = clusterKnowledgeList.filter((k) => k.id !== id);
-      await saveClusterKnowledgeList(updated);
-      toast({ title: "Dihapus", description: "Knowledge cluster berhasil dihapus" });
-    } catch (e: any) {
-      toast({ title: "Error", description: e.message, variant: "destructive" });
-    }
+    setDeleteConfirmState({
+      open: true,
+      title: "Hapus Panduan Knowledge",
+      description: `Apakah Anda yakin ingin menghapus knowledge "${title}" dari cluster ini?`,
+      onConfirm: async () => {
+        try {
+          const updated = clusterKnowledgeList.filter((k) => k.id !== id);
+          await saveClusterKnowledgeList(updated);
+          toast({ title: "Dihapus", description: "Knowledge cluster berhasil dihapus" });
+        } catch (e: any) {
+          toast({ title: "Error", description: e.message, variant: "destructive" });
+        }
+      },
+    });
   };
 
   const saveClusterKnowledgeList = async (list: ClusterKnowledgeItem[]) => {
@@ -571,20 +588,25 @@ export function AvailabilityView() {
     }
   };
 
-  const handleDeleteMedia = async () => {
+  const handleDeleteMedia = () => {
     if (!selectedMedia || !activeGroup) return;
-    if (!confirm(`Hapus media "${selectedMedia.name}" dari cluster ini?`)) return;
-
-    setIsSavingMedia(true);
-    try {
-      const updated = mediaList.filter((m) => m.id !== selectedMedia.id);
-      await saveMediaList(updated);
-      setSelectedMedia(null);
-    } catch (err: any) {
-      toast({ title: "Gagal Menghapus", description: err.message, variant: "destructive" });
-    } finally {
-      setIsSavingMedia(false);
-    }
+    setDeleteConfirmState({
+      open: true,
+      title: "Hapus Media Visual",
+      description: `Apakah Anda yakin ingin menghapus media "${selectedMedia.name}" dari cluster ini?`,
+      onConfirm: async () => {
+        setIsSavingMedia(true);
+        try {
+          const updated = mediaList.filter((m) => m.id !== selectedMedia.id);
+          await saveMediaList(updated);
+          setSelectedMedia(null);
+        } catch (err: any) {
+          toast({ title: "Gagal Menghapus", description: err.message, variant: "destructive" });
+        } finally {
+          setIsSavingMedia(false);
+        }
+      },
+    });
   };
 
   const saveMediaList = async (list: SiteplanMedia[]) => {
@@ -603,17 +625,23 @@ export function AvailabilityView() {
     }
   };
 
-  const handleDeleteItem = async (itemId: string) => {
-    if (!confirm("Hapus unit/slot ini?")) return;
-    try {
-      const res = await fetch(`/api/v1/availability/items/${itemId}`, { method: "DELETE" });
-      if (res.ok) {
-        toast({ title: "Dihapus", description: "Unit/slot berhasil dihapus" });
-        fetchGroups();
-      }
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    }
+  const handleDeleteItem = (itemId: string) => {
+    setDeleteConfirmState({
+      open: true,
+      title: "Hapus Unit / Slot",
+      description: "Apakah Anda yakin ingin menghapus unit kavling/slot ini?",
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/v1/availability/items/${itemId}`, { method: "DELETE" });
+          if (res.ok) {
+            toast({ title: "Dihapus", description: "Unit/slot berhasil dihapus" });
+            fetchGroups();
+          }
+        } catch (err: any) {
+          toast({ title: "Error", description: err.message, variant: "destructive" });
+        }
+      },
+    });
   };
 
   const openEditModal = (item: ResourceItem) => {
@@ -698,18 +726,25 @@ export function AvailabilityView() {
               variant="ghost"
               size="sm"
               className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 shrink-0"
-              onClick={async () => {
-                if (!confirm(`Hapus seluruh grup/proyek "${activeGroup.name}" beserta semua unit di dalamnya?`)) return;
-                try {
-                  const res = await fetch(`/api/v1/availability/groups/${activeGroup.id}`, { method: "DELETE" });
-                  if (res.ok) {
-                    toast({ title: "Dihapus", description: "Proyek/Grup berhasil dihapus" });
-                    setSelectedGroupId(null);
-                    fetchGroups();
-                  }
-                } catch (e: any) {
-                  toast({ title: "Error", description: e.message, variant: "destructive" });
-                }
+              onClick={() => {
+                if (!activeGroup) return;
+                setDeleteConfirmState({
+                  open: true,
+                  title: "Hapus Grup / Cluster",
+                  description: `Apakah Anda yakin ingin menghapus seluruh proyek/cluster "${activeGroup.name}" beserta SEMUA unit di dalamnya? Tindakan ini tidak dapat dibatalkan.`,
+                  onConfirm: async () => {
+                    try {
+                      const res = await fetch(`/api/v1/availability/groups/${activeGroup.id}`, { method: "DELETE" });
+                      if (res.ok) {
+                        toast({ title: "Dihapus", description: "Proyek/Grup berhasil dihapus" });
+                        setSelectedGroupId(null);
+                        fetchGroups();
+                      }
+                    } catch (e: any) {
+                      toast({ title: "Error", description: e.message, variant: "destructive" });
+                    }
+                  },
+                });
               }}
             >
               <Trash2 className="h-3.5 w-3.5 mr-1" /> Hapus Grup Aktif
@@ -1663,9 +1698,18 @@ export function AvailabilityView() {
             >
               {isSavingKnowledge ? "Menyimpan..." : "Simpan Topik Knowledge"}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <ConfirmDialog
+          open={deleteConfirmState.open}
+          onOpenChange={(open) => setDeleteConfirmState((prev) => ({ ...prev, open }))}
+          title={deleteConfirmState.title}
+          description={deleteConfirmState.description}
+          confirmLabel="Ya, Hapus"
+          onConfirm={deleteConfirmState.onConfirm}
+        />
+      </div>
+    );
+  }
