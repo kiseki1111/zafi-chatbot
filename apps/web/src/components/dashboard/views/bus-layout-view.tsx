@@ -735,15 +735,16 @@ export function BusLayoutView() {
           <div className="space-y-3.5 text-xs">
             <div>
               <Label className="font-medium">Status Ketersediaan</Label>
-              <select
-                value={seatForm.status}
-                onChange={(e) => setSeatForm({ ...seatForm, status: e.target.value as SeatStatus })}
-                className="w-full min-h-[44px] h-11 sm:h-8 mt-1 rounded-md border bg-background px-2 text-xs"
-              >
-                <option value="AVAILABLE">Tersedia (Kosong)</option>
-                <option value="BOOKED">Dipesan (Menunggu Pelunasan/DP)</option>
-                <option value="OCCUPIED">Terisi / Lunas</option>
-              </select>
+              <Select value={seatForm.status} onValueChange={(v) => setSeatForm({ ...seatForm, status: v as SeatStatus })}>
+                <SelectTrigger size="sm" className="mt-1 h-9 sm:h-8 w-full text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="text-xs">
+                  <SelectItem value="AVAILABLE" className="text-xs">Tersedia (Kosong)</SelectItem>
+                  <SelectItem value="BOOKED" className="text-xs">Dipesan (Menunggu Pelunasan/DP)</SelectItem>
+                  <SelectItem value="OCCUPIED" className="text-xs">Terisi / Lunas</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             {seatForm.status !== "AVAILABLE" && (

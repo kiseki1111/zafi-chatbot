@@ -16,6 +16,11 @@ describe('CsService', () => {
     product: {
       findMany: jest.fn(),
     },
+    contact: {
+      findFirst: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+    },
   };
 
   const mockAgentShared = {
@@ -196,6 +201,124 @@ describe('CsService', () => {
         take: 30,
       });
       expect(response.text).toContain('ready 15 bungkus');
+    });
+
+    it('harus mengekstrak profil lead dan menyimpan kontak dengan nama Anonim jika belum menyebut nama', async () => {
+      mockAgentShared.getRecentContext.mockResolvedValue([]);
+      mockPrisma.whatsappInstance.findUnique.mockResolvedValue({
+        instanceName: 'wa-property',
+        tenantId: 'tenant-property',
+      });
+      mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-property' });
+      mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue('');
+      mockAgentShared.getAvailabilityContext.mockResolvedValue(null);
+      mockPrisma.contact.findFirst.mockResolvedValue(null);
+      mockPrisma.contact.create.mockResolvedValue({
+        id: 'contact-anon-1',
+        name: 'Anonim',
+        phone: '628123456789',
+        status: 'Follow-Up',
+      });
+
+      mockAgentShared.callLLM.mockResolvedValue(
+        JSON.stringify({
+          text: 'Untuk Griya Amanah 2 Tipe 40 harganya Rp 295.000.000 ya Kak.',
+          images: [],
+          videos: [],
+          lead: {
+            customerName: 'Anonim',
+            perumahan: 'Griya Amanah 2',
+            tipeUnit: 'Tipe 40',
+            hargaUnit: 295000000,
+            status: 'Follow-Up',
+            notes: 'Tanya harga Griya Amanah 2 Tipe 40',
+          },
+        }),
+      );
+
+      const response = await service.handleMessage({
+        senderId: '628123456789@c.us',
+        sessionName: 'wa-property',
+        text: 'halo min, griya amanah 2 tipe 40 harganya berapa ya?',
+      });
+
+      expect(response.lead).toBeDefined();
+      expect(response.lead?.customerName).toBe('Anonim');
+      expect(response.lead?.perumahan).toBe('Griya Amanah 2');
+      expect(mockPrisma.contact.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            name: 'Anonim',
+            status: 'Follow-Up',
+            metadata: expect.objectContaining({
+              perumahan: 'Griya Amanah 2',
+              tipeUnit: 'Tipe 40',
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('harus mengupdate nama dari Anonim ke nama asli saat pelanggan memperkenalkan diri di chat', async () => {
+      mockAgentShared.getRecentContext.mockResolvedValue([
+        { senderType: 'customer', content: 'Griya Amanah 2 masih ada?' },
+        { senderType: 'bot', content: 'Masih ready Kak.' },
+      ]);
+      mockPrisma.whatsappInstance.findUnique.mockResolvedValue({
+        instanceName: 'wa-property',
+        tenantId: 'tenant-property',
+      });
+      mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-property' });
+      mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue('');
+      mockAgentShared.getAvailabilityContext.mockResolvedValue(null);
+
+      // Kontak sebelumnya bernama Anonim
+      mockPrisma.contact.findFirst.mockResolvedValue({
+        id: 'contact-anon-1',
+        name: 'Anonim',
+        phone: '628123456789',
+        status: 'Follow-Up',
+        metadata: { perumahan: 'Griya Amanah 2' },
+        notes: 'Tanya unit',
+      });
+      mockPrisma.contact.update.mockResolvedValue({
+        id: 'contact-anon-1',
+        name: 'Hendra Wijaya',
+        status: 'Survey',
+      });
+
+      mockAgentShared.callLLM.mockResolvedValue(
+        JSON.stringify({
+          text: 'Baik Kak Hendra, sampai ketemu hari Sabtu untuk survey lokasi.',
+          images: [],
+          videos: [],
+          lead: {
+            customerName: 'Hendra Wijaya',
+            perumahan: 'Griya Amanah 2',
+            tipeUnit: 'Tipe 40',
+            status: 'Survey',
+            notes: 'Minta survey hari Sabtu',
+          },
+        }),
+      );
+
+      const response = await service.handleMessage({
+        senderId: '628123456789@c.us',
+        sessionName: 'wa-property',
+        text: 'kenalin saya Hendra Wijaya, mau survey hari Sabtu ya',
+      });
+
+      expect(response.lead?.customerName).toBe('Hendra Wijaya');
+      expect(response.lead?.status).toBe('Survey');
+      expect(mockPrisma.contact.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'contact-anon-1' },
+          data: expect.objectContaining({
+            name: 'Hendra Wijaya',
+            status: 'Survey',
+          }),
+        }),
+      );
     });
   });
 });

@@ -204,6 +204,45 @@ export class SimulatorController {
 
             // SalesRecord disimpan secara otomatis oleh CsService, jadi tidak perlu save manual di sini.
           }
+
+          if (parsed.lead) {
+            try {
+              const cleanChatId = chatId.replace('-customer', '');
+              const contact = await this.prisma.contact.findFirst({
+                where: {
+                  OR: [
+                    { phone: cleanChatId },
+                    { phone: { contains: cleanChatId } },
+                  ],
+                },
+              });
+              const existingMeta = (contact?.metadata as Record<string, any>) || {};
+              const updatedMeta = {
+                ...existingMeta,
+                ...(parsed.lead.perumahan && { perumahan: parsed.lead.perumahan }),
+                ...(parsed.lead.tipeUnit && { tipeUnit: parsed.lead.tipeUnit }),
+                ...(parsed.lead.hargaUnit && { hargaUnit: parsed.lead.hargaUnit }),
+              };
+              if (contact) {
+                const combinedNotes = parsed.lead.notes
+                  ? contact.notes
+                    ? `${contact.notes}\n${parsed.lead.notes}`
+                    : parsed.lead.notes
+                  : contact.notes;
+                await this.prisma.contact.update({
+                  where: { id: contact.id },
+                  data: {
+                    ...(parsed.lead.customerName && { name: parsed.lead.customerName }),
+                    ...(parsed.lead.status && { status: parsed.lead.status }),
+                    ...(combinedNotes && { notes: combinedNotes }),
+                    metadata: updatedMeta,
+                  },
+                });
+              }
+            } catch (err: any) {
+              this.logger.warn(`Simulator lead update failed: ${err.message}`);
+            }
+          }
         } catch (e) {
           // If parse fails, save raw
         }

@@ -3,6 +3,14 @@ export interface AgentResponse {
   images: { url: string; caption: string }[];
   videos?: { url: string; caption: string }[];
   order?: any;
+  lead?: {
+    customerName?: string;
+    perumahan?: string;
+    tipeUnit?: string;
+    hargaUnit?: number;
+    status?: string;
+    notes?: string;
+  };
 }
 
 export interface IncomingMessage {

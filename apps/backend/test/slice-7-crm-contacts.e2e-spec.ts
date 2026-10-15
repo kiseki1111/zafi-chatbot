@@ -111,6 +111,29 @@ describe('Slice-7: CRM Contacts (CRUD + Search Filter + Tenant Isolation)', () =
       expect(res.body.status).toBe('WON');
     });
 
+    it('Berhasil memperbarui metadata perumahan, tipeUnit, dan status prospek (200)', async () => {
+      context.mockPrisma.contact.findFirst.mockResolvedValue({ id: 'c1', phone: '62811' });
+      context.mockPrisma.contact.update.mockResolvedValue({
+        id: 'c1',
+        name: 'Andi',
+        phone: '62811',
+        status: 'Booking',
+        metadata: { perumahan: 'Griya Amanah 2', tipeUnit: 'Tipe 40', hargaUnit: 295000000 },
+      });
+
+      const res = await request(app.getHttpServer())
+        .patch('/api/v1/contacts/c1')
+        .send({
+          status: 'Booking',
+          metadata: { perumahan: 'Griya Amanah 2', tipeUnit: 'Tipe 40', hargaUnit: 295000000 },
+        })
+        .expect(200);
+
+      expect(res.body.status).toBe('Booking');
+      expect(res.body.metadata.perumahan).toBe('Griya Amanah 2');
+      expect(res.body.metadata.hargaUnit).toBe(295000000);
+    });
+
     it('Menolak update jika kontak tidak ada di tenant bersangkutan (404)', async () => {
       context.mockPrisma.contact.findFirst.mockResolvedValue(null);
 

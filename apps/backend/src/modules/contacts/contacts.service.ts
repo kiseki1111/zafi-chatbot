@@ -85,7 +85,8 @@ export class ContactsService {
         !displayName ||
         displayName.includes('@') ||
         displayName === c.phone ||
-        displayName === cleanPhone
+        displayName === cleanPhone ||
+        displayName.startsWith('+')
       ) {
         for (const msg of msgs) {
           const meta = msg.metadata as any;
@@ -95,8 +96,8 @@ export class ContactsService {
             break;
           }
         }
-        if (!displayName || displayName === c.phone) {
-          displayName = cleanPhone ? `+${cleanPhone}` : c.name;
+        if (!displayName || displayName === c.phone || displayName.startsWith('+')) {
+          displayName = 'Anonim';
         }
       }
 
@@ -160,6 +161,7 @@ export class ContactsService {
         notes: dto.notes,
         status: dto.status || 'NEW',
         source: dto.source || 'MANUAL',
+        metadata: dto.metadata || {},
       },
     });
 
@@ -211,6 +213,7 @@ export class ContactsService {
         ...(dto.address !== undefined && { address: dto.address }),
         ...(dto.notes !== undefined && { notes: dto.notes }),
         ...(dto.status !== undefined && { status: dto.status }),
+        ...(dto.metadata !== undefined && { metadata: dto.metadata }),
       },
     });
   }

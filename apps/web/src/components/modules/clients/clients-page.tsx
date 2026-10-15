@@ -10,6 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -1341,14 +1344,15 @@ export function ClientsPage() {
                 </div>
                 <div className="space-y-1">
                   <Label>Status Akun</Label>
-                  <select
-                    value={editStaffForm.isActive ? "true" : "false"}
-                    onChange={(e) => setEditStaffForm({ ...editStaffForm, isActive: e.target.value === "true" })}
-                    className="w-full h-8 mt-1 rounded-md border bg-background px-2 text-xs"
-                  >
-                    <option value="true">Aktif</option>
-                    <option value="false">Nonaktif / Suspended</option>
-                  </select>
+                  <Select value={editStaffForm.isActive ? "true" : "false"} onValueChange={(v) => setEditStaffForm({ ...editStaffForm, isActive: v === "true" })}>
+                    <SelectTrigger size="sm" className="mt-1 h-8 w-full text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="text-xs">
+                      <SelectItem value="true" className="text-xs">Aktif</SelectItem>
+                      <SelectItem value="false" className="text-xs">Nonaktif / Suspended</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -1440,15 +1444,16 @@ export function ClientsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Kategori Bisnis</Label>
-                  <select
-                    value={editClientForm.category}
-                    onChange={(e) => setEditClientForm({ ...editClientForm, category: e.target.value })}
-                    className="w-full h-8 mt-1 rounded-md border bg-background px-2 text-xs"
-                  >
-                    <option value="general">General / UMKM</option>
-                    <option value="properti">Developer Properti</option>
-                    <option value="transport">Transportasi / Bus</option>
-                  </select>
+                  <Select value={editClientForm.category} onValueChange={(v) => setEditClientForm({ ...editClientForm, category: v })}>
+                    <SelectTrigger size="sm" className="mt-1 h-8 w-full text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="text-xs">
+                      <SelectItem value="general" className="text-xs">General / UMKM</SelectItem>
+                      <SelectItem value="properti" className="text-xs">Developer Properti</SelectItem>
+                      <SelectItem value="transport" className="text-xs">Transportasi / Bus</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label>Nomor WhatsApp Bisnis</Label>
@@ -1725,15 +1730,16 @@ export function ClientsPage() {
 
             <div>
               <Label>Kategori Bisnis</Label>
-              <select
-                value={addForm.category}
-                onChange={(e) => setAddForm({ ...addForm, category: e.target.value })}
-                className="w-full h-8 mt-1 rounded-md border bg-background px-2 text-xs"
-              >
-                <option value="general">General / UMKM</option>
-                <option value="properti">Developer Properti</option>
-                <option value="transport">Transportasi / Bus</option>
-              </select>
+              <Select value={addForm.category} onValueChange={(v) => setAddForm({ ...addForm, category: v })}>
+                <SelectTrigger size="sm" className="mt-1 h-8 w-full text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="text-xs">
+                  <SelectItem value="general" className="text-xs">General / UMKM</SelectItem>
+                  <SelectItem value="properti" className="text-xs">Developer Properti</SelectItem>
+                  <SelectItem value="transport" className="text-xs">Transportasi / Bus</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="pt-2 border-t space-y-2">

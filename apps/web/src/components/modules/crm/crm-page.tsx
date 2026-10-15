@@ -1,283 +1,386 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import {
   Users,
   Search,
   Plus,
   Phone,
-  Mail,
-  MapPin,
-  Building2,
   MessageCircle,
   Trash2,
-  Edit2,
-  FileText,
-  Calendar,
-  Clock,
-  ChevronRight,
-  Copy,
+  Download,
+  ChevronDown,
+  Home,
+  FileSpreadsheet,
 } from "lucide-react";
 import { useAppStore } from "@/lib/app-store";
 import { useAuthStore } from "@/lib/auth-store";
 import { MOCK_CRM_CONTACTS } from "@/lib/mock-data";
 
-interface ContactData {
+export interface ContactData {
   id: string;
   name: string;
   phone: string;
   email?: string | null;
-  company?: string | null; // Perusahaan / Instansi / Kategori
-  address?: string | null; // Alamat / Domisili / Lokasi
-  notes?: string | null;   // Catatan kebutuhan / interaksi
-  status: string;          // NEW, INQUIRY, BOOKED, COMPLETED, CANCELLED
-  source: string;
+  company?: string | null;
+  address?: string | null;
+  notes?: string | null;
+  status: string;
+  source?: string;
+  metadata?: {
+    perumahan?: string;
+    tipeUnit?: string;
+    hargaUnit?: number | string;
+    [key: string]: any;
+  } | null;
   createdAt: string;
   updatedAt: string;
   conversations?: any[];
 }
 
-const CONTACT_STATUS_CONFIG: Record<string, { label: string; badge: string }> = {
-  NEW: {
-    label: "Kontak Baru",
-    badge: "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300",
-  },
-  INQUIRY: {
-    label: "Prospek / Diskusi",
-    badge: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
-  },
-  BOOKED: {
-    label: "Negosiasi / Booking",
-    badge: "bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300",
-  },
-  COMPLETED: {
-    label: "Pelanggan Aktif / Closing",
-    badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
-  },
-  CANCELLED: {
-    label: "Batal / Tidak Aktif",
-    badge: "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300",
-  },
-};
+export interface PropertyGroup {
+  id: string;
+  name: string;
+  category?: string;
+  items: { id: string; code: string; houseType?: string; price?: number; status: string }[];
+}
 
-const STATUS_FILTER_CHIPS = [
-  { key: "ALL", label: "Semua" },
-  { key: "NEW", label: "Baru" },
-  { key: "INQUIRY", label: "Prospek" },
-  { key: "BOOKED", label: "Negosiasi" },
-  { key: "COMPLETED", label: "Aktif" },
-  { key: "CANCELLED", label: "Batal" },
-] as const;
+const DEFAULT_PERUMAHAN_CATALOG = [
+  { name: "Griya Amanah 2", types: [{ name: "Tipe 40", price: 295000000 }, { name: "Tipe 36", price: 192800000 }] },
+  { name: "Zafi Residence", types: [{ name: "Tipe 36", price: 192800000 }, { name: "Tipe 45", price: 260000000 }] },
+  { name: "Kahyana Residence", types: [{ name: "Tipe 36", price: 192800000 }, { name: "Tipe 40", price: 245000000 }] },
+];
 
-function formatRelativeTime(dateStr: string | null | undefined): string {
-  if (!dateStr) return "-";
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  if (isNaN(then)) return "-";
-  const diffMs = now - then;
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return "Baru saja";
-  if (diffMin < 60) return `${diffMin} menit lalu`;
-  const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) return `${diffHour} jam lalu`;
-  const diffDay = Math.floor(diffHour / 24);
-  if (diffDay < 30) return `${diffDay} hari lalu`;
-  const diffMonth = Math.floor(diffDay / 30);
-  if (diffMonth < 12) return `${diffMonth} bulan lalu`;
-  return `${Math.floor(diffMonth / 12)} tahun lalu`;
+const PROSPECT_STATUS_OPTIONS = [
+  { value: "Follow-Up", label: "Follow-Up" },
+  { value: "Survey", label: "Survey Lokasi" },
+  { value: "SLIK", label: "Cek SLIK / Bank" },
+  { value: "Booking", label: "Booking Unit" },
+  { value: "Closing", label: "Closing / Akad" },
+  { value: "Batal", label: "Batal / Pending" },
+];
+
+function formatRupiah(val: number | string | undefined | null): string {
+  if (val === undefined || val === null || val === "") return "";
+  const num = typeof val === "number" ? val : Number(String(val).replace(/\D/g, ""));
+  if (isNaN(num) || num === 0) return "";
+  return num.toLocaleString("id-ID");
+}
+
+function parseRupiahNumber(val: string): number {
+  const digits = val.replace(/\D/g, "");
+  return digits ? Number(digits) : 0;
 }
 
 export function CrmPage() {
   const { setView, setActiveContactId } = useAppStore();
   const { user } = useAuthStore();
-  const [contacts, setContacts] = useState<ContactData[]>([]);
+  const [allContacts, setAllContacts] = useState<ContactData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [selectedContact, setSelectedContact] = useState<ContactData | null>(null);
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [propertyGroups, setPropertyGroups] = useState<PropertyGroup[]>([]);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [isAddOpen, setIsAddOpen] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [form, setForm] = useState({
-    name: "",
-    phone: "",
-    email: "",
-    company: "",
-    address: "",
-    notes: "",
-    status: "NEW",
-  });
+  // Debounce search — hanya filter setelah user berhenti mengetik 400ms
+  const handleSearchChange = (val: string) => {
+    setSearchInput(val);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setDebouncedSearch(val), 400);
+  };
 
-  // Derived: contacts filtered by status chip (mobile filter)
-  const filteredContacts = statusFilter === "ALL"
-    ? contacts
-    : contacts.filter((c) => c.status === statusFilter);
+  // Fetch katalog perumahan (sekali saat mount)
+  const fetchPropertyGroups = useCallback(async () => {
+    try {
+      const tenantId = user?.tenantId || "";
+      const res = await fetch(`/api/v1/availability/groups?tenantId=${tenantId}`);
+      if (res.ok) {
+        const json = await res.json();
+        const list: PropertyGroup[] = Array.isArray(json) ? json : (json?.data ?? []);
+        setPropertyGroups(list);
+      }
+    } catch { /* gunakan fallback */ }
+  }, [user?.tenantId]);
 
-  const fetchContacts = async () => {
+  // Fetch semua kontak sekali — tidak membawa search ke server
+  const fetchContacts = useCallback(async () => {
     setLoading(true);
     let list: ContactData[] = [];
     try {
-      const params = new URLSearchParams();
-      if (search) params.set("search", search);
-      const res = await fetch(`/api/v1/contacts?${params.toString()}`);
+      const res = await fetch("/api/v1/contacts");
       if (res.ok) {
         const data = await res.json();
-        list = Array.isArray(data) ? data : data.data || [];
+        list = Array.isArray(data) ? data : (data.data ?? []);
       }
-    } catch (e) {
-      console.error("Gagal load kontak CRM, gunakan data mockup", e);
-    } finally {
-      const isDemoAccount =
-        user?.id?.startsWith("u-") ||
-        user?.email?.includes("demo") ||
-        (process.env.NODE_ENV !== "production" && !user?.tenantId);
+    } catch { /* fall through to mock */ }
 
-      if (list.length === 0 && isDemoAccount) {
-        // Mock fallback filtered by search untuk mode demo / preview
-        let mockFiltered = MOCK_CRM_CONTACTS;
-        if (search) {
-          const q = search.toLowerCase();
-          mockFiltered = mockFiltered.filter(
-            (c) =>
-              c.name.toLowerCase().includes(q) ||
-              c.phone.includes(q) ||
-              (c.company && c.company.toLowerCase().includes(q)) ||
-              (c.notes && c.notes.toLowerCase().includes(q))
-          );
-        }
-        setContacts(mockFiltered);
-      } else {
-        setContacts(list);
-      }
-      setLoading(false);
-    }
-  };
+    const isDemoAccount =
+      user?.id?.startsWith("u-") ||
+      user?.email?.includes("demo") ||
+      (process.env.NODE_ENV !== "production" && !user?.tenantId);
+
+    setAllContacts(list.length === 0 && isDemoAccount ? (MOCK_CRM_CONTACTS as ContactData[]) : list);
+    setLoading(false);
+  }, [user]);
 
   useEffect(() => {
+    fetchPropertyGroups();
     fetchContacts();
-  }, [search]);
+  }, [fetchPropertyGroups, fetchContacts]);
 
-  const handleCreate = async () => {
-    if (!form.name.trim() || !form.phone.trim()) return;
+  // Katalog perumahan dari database atau fallback
+  const perumahanCatalog = useMemo(() => {
+    if (propertyGroups.length > 0) {
+      return propertyGroups.map((g) => {
+        const typesMap = new Map<string, number>();
+        g.items?.forEach((item) => {
+          if (item.houseType && !typesMap.has(item.houseType)) {
+            typesMap.set(item.houseType, item.price ? Number(item.price) : 0);
+          }
+        });
+        const types = Array.from(typesMap.entries()).map(([name, price]) => ({ name, price }));
+        return { name: g.name, types: types.length > 0 ? types : [{ name: "Tipe Standar", price: 0 }] };
+      });
+    }
+    return DEFAULT_PERUMAHAN_CATALOG;
+  }, [propertyGroups]);
+
+  // Filter client-side: search (debounced) + status
+  const filteredContacts = useMemo(() => {
+    let list = allContacts;
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase();
+      list = list.filter(
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          (c.phone || "").includes(q) ||
+          (c.metadata?.perumahan ?? "").toLowerCase().includes(q) ||
+          (c.notes ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (statusFilter !== "ALL") {
+      list = list.filter((c) => {
+        if (statusFilter === "Follow-Up") return ["Follow-Up", "INQUIRY", "NEW"].includes(c.status);
+        return c.status === statusFilter;
+      });
+    }
+    return list;
+  }, [allContacts, debouncedSearch, statusFilter]);
+
+  // Optimistic field update + fire-and-forget PATCH
+  const handleFieldChange = async (contactId: string, fieldPath: string, value: any) => {
+    setAllContacts((prev) =>
+      prev.map((c) => {
+        if (c.id !== contactId) return c;
+        if (fieldPath.startsWith("metadata.")) {
+          const key = fieldPath.split(".")[1];
+          return { ...c, metadata: { ...(c.metadata ?? {}), [key]: value } };
+        }
+        return { ...c, [fieldPath]: value };
+      })
+    );
+    const target = allContacts.find((c) => c.id === contactId);
+    let payload: any;
+    if (fieldPath.startsWith("metadata.")) {
+      const key = fieldPath.split(".")[1];
+      payload = { metadata: { ...(target?.metadata ?? {}), [key]: value } };
+    } else {
+      payload = { [fieldPath]: value };
+    }
+    fetch(`/api/v1/contacts/${contactId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }).catch(() => {});
+  };
+
+  const handlePerumahanSelect = (contactId: string, perumahanName: string) => {
+    const cluster = perumahanCatalog.find((p) => p.name === perumahanName);
+    const defaultType = cluster?.types?.[0]?.name ?? "";
+    const defaultPrice = cluster?.types?.[0]?.price ?? 0;
+    const target = allContacts.find((c) => c.id === contactId);
+    const newMeta = {
+      ...(target?.metadata ?? {}),
+      perumahan: perumahanName,
+      tipeUnit: defaultType,
+      hargaUnit: defaultPrice > 0 ? defaultPrice : (target?.metadata?.hargaUnit ?? ""),
+    };
+    setAllContacts((prev) =>
+      prev.map((c) => (c.id === contactId ? { ...c, metadata: newMeta } : c))
+    );
+    fetch(`/api/v1/contacts/${contactId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ metadata: newMeta }),
+    }).catch(() => {});
+  };
+
+  const handleTipeUnitSelect = (contactId: string, perumahanName: string, tipeName: string) => {
+    const cluster = perumahanCatalog.find((p) => p.name === perumahanName);
+    const suggestedPrice = cluster?.types?.find((t) => t.name === tipeName)?.price ?? 0;
+    const target = allContacts.find((c) => c.id === contactId);
+    const newMeta = {
+      ...(target?.metadata ?? {}),
+      tipeUnit: tipeName,
+      ...(suggestedPrice > 0 ? { hargaUnit: suggestedPrice } : {}),
+    };
+    setAllContacts((prev) =>
+      prev.map((c) => (c.id === contactId ? { ...c, metadata: newMeta } : c))
+    );
+    fetch(`/api/v1/contacts/${contactId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ metadata: newMeta }),
+    }).catch(() => {});
+  };
+
+  const handleAddRow = async () => {
+    const def = perumahanCatalog[0];
+    const tempId = `crm-${Date.now()}`;
+    const newContact: ContactData = {
+      id: tempId,
+      name: "Anonim",
+      phone: `08${Math.floor(100000000 + Math.random() * 900000000)}`,
+      email: null,
+      status: "Follow-Up",
+      notes: "",
+      metadata: { perumahan: def?.name ?? "", tipeUnit: def?.types?.[0]?.name ?? "", hargaUnit: def?.types?.[0]?.price ?? 0 },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setAllContacts((prev) => [newContact, ...prev]);
     try {
       const res = await fetch("/api/v1/contacts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: form.name.trim(),
-          phone: form.phone.trim(),
-          email: form.email.trim() || null,
-          company: form.company.trim() || null,
-          address: form.address.trim() || null,
-          notes: form.notes.trim() || null,
-          status: form.status,
-          source: "CRM",
-        }),
+        body: JSON.stringify({ name: newContact.name, phone: newContact.phone, status: newContact.status, metadata: newContact.metadata, source: "CRM" }),
       });
       if (res.ok) {
-        setIsAddOpen(false);
-        setForm({ name: "", phone: "", email: "", company: "", address: "", notes: "", status: "NEW" });
-        fetchContacts();
-        return;
+        const data = await res.json().then((d) => d.data ?? d);
+        if (data?.id) setAllContacts((prev) => prev.map((c) => (c.id === tempId ? { ...c, id: data.id } : c)));
       }
-    } catch (e) {
-      console.error(e);
-    }
-    // Mock fallback creation
-    const newMock: ContactData = {
-      id: "crm-mock-" + Date.now(),
-      name: form.name.trim(),
-      phone: form.phone.trim(),
-      email: form.email.trim() || null,
-      company: form.company.trim() || null,
-      address: form.address.trim() || null,
-      notes: form.notes.trim() || null,
-      status: form.status,
-      source: "Manual",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    setContacts((prev) => [newMock, ...prev]);
-    setIsAddOpen(false);
-    setForm({ name: "", phone: "", email: "", company: "", address: "", notes: "", status: "NEW" });
+    } catch { /* optimistic already applied */ }
   };
 
-  const handleUpdate = async () => {
-    if (!selectedContact) return;
-    try {
-      const res = await fetch(`/api/v1/contacts/${selectedContact.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: form.name.trim(),
-          phone: form.phone.trim(),
-          email: form.email.trim() || null,
-          company: form.company.trim() || null,
-          address: form.address.trim() || null,
-          notes: form.notes.trim() || null,
-          status: form.status,
-        }),
-      });
-      if (res.ok) {
-        setIsEditOpen(false);
-        const updated = await res.json();
-        const data = updated.data || updated;
-        setSelectedContact(data);
-        fetchContacts();
-      }
-    } catch (e) {
-      console.error(e);
-    }
+  const handleDeleteRow = async (id: string) => {
+    if (!confirm("Hapus baris data pelanggan ini?")) return;
+    setAllContacts((prev) => prev.filter((c) => c.id !== id));
+    fetch(`/api/v1/contacts/${id}`, { method: "DELETE" }).catch(() => {});
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Hapus data pelanggan ini?")) return;
-    try {
-      await fetch(`/api/v1/contacts/${id}`, { method: "DELETE" });
-      setSelectedContact(null);
-      fetchContacts();
-    } catch (e) {
-      console.error(e);
-    }
-  };
+  const handleExportCsv = () => {
+    const headers = ["No.", "Nama Pelanggan", "No. WhatsApp", "Perumahan", "Tipe Unit", "Harga Unit (Rp)", "Status", "Catatan"];
+    const rows = filteredContacts.map((c, idx) => {
+      const cleanPhone = (c.phone || "").replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, "").replace(/^\+/, "");
+      const selectedPerumahan = c.metadata?.perumahan || perumahanCatalog[0]?.name || "";
+      const cluster = perumahanCatalog.find((p) => p.name === selectedPerumahan);
+      const selectedTipe = c.metadata?.tipeUnit || cluster?.types?.[0]?.name || "";
+      const displayPrice = c.metadata?.hargaUnit ? formatRupiah(c.metadata.hargaUnit) : (cluster?.types?.[0]?.price ? formatRupiah(cluster.types[0].price) : "");
 
-  const openEdit = (c: ContactData) => {
-    setForm({
-      name: c.name || "",
-      phone: c.phone || "",
-      email: c.email || "",
-      company: c.company || "",
-      address: c.address || "",
-      notes: c.notes || "",
-      status: c.status || "NEW",
+      return [
+        idx + 1,
+        `"${(c.name ?? "").replace(/"/g, '""')}"`,
+        `"${cleanPhone}"`,
+        `"${selectedPerumahan.replace(/"/g, '""')}"`,
+        `"${selectedTipe.replace(/"/g, '""')}"`,
+        `"${displayPrice}"`,
+        `"${c.status ?? ""}"`,
+        `"${(c.notes ?? "").replace(/\r?\n/g, " ").replace(/"/g, '""')}"`,
+      ].join(",");
     });
-    setIsEditOpen(true);
+    const csv = "\uFEFF" + [headers.join(","), ...rows].join("\r\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Data_Pelanggan_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
+
+  // ─── Komponen inline untuk dropdown sel tabel ─────────────────────────────
+  function CellSelect({
+    value,
+    options,
+    onValueChange,
+    placeholder,
+  }: {
+    value: string;
+    options: { value: string; label: string }[];
+    onValueChange: (v: string) => void;
+    placeholder?: string;
+  }) {
+    const allOptions = options.some((o) => o.value === value)
+      ? options
+      : [...options, { value, label: value }];
+
+    return (
+      <Select value={value} onValueChange={onValueChange}>
+        <SelectTrigger
+          size="sm"
+          className="h-7 w-full min-w-0 text-xs border-transparent bg-transparent hover:bg-muted/60 hover:border-border focus:border-emerald-500 focus-visible:ring-emerald-500/30 focus-visible:border-emerald-500 shadow-none px-2 gap-1 [&>span]:truncate [&>span]:block"
+        >
+          <SelectValue placeholder={placeholder ?? "Pilih..."} />
+        </SelectTrigger>
+        <SelectContent className="text-xs">
+          {allOptions.map((o) => (
+            <SelectItem key={o.value} value={o.value} className="text-xs">
+              {o.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  }
+
+  // ─── Komponen inline untuk dropdown mobile ────────────────────────────────
+  function MobileCellSelect({
+    label,
+    value,
+    options,
+    onValueChange,
+  }: {
+    label: string;
+    value: string;
+    options: { value: string; label: string }[];
+    onValueChange: (v: string) => void;
+  }) {
+    const allOptions = options.some((o) => o.value === value)
+      ? options
+      : [...options, { value, label: value }];
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-[11px] text-muted-foreground w-24 shrink-0">{label}:</span>
+        <Select value={value} onValueChange={onValueChange}>
+          <SelectTrigger size="sm" className="flex-1 h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="text-xs">
+            {allOptions.map((o) => (
+              <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-6.5rem)] lg:h-[calc(100dvh-5rem)] gap-3">
-      {/* Header - Compact & Clean (No bloated explanation) */}
+    <div className="flex flex-col flex-1 min-h-0 gap-3 p-4 lg:p-2 pb-20 lg:pb-2 overflow-hidden">
+      {/* HEADER */}
       <div className="rounded-xl border bg-card p-4 sm:p-5 shadow-xs shrink-0">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
@@ -285,669 +388,338 @@ export function CrmPage() {
               <Users className="h-5 w-5" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-foreground truncate">
-                Pelanggan &amp; Leads
-              </h1>
-              <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                {contacts.length} kontak terdaftar
-              </p>
+              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-foreground truncate">Pelanggan</h1>
+              <p className="text-xs text-muted-foreground mt-0.5 truncate">{filteredContacts.length} data pelanggan terdaftar</p>
             </div>
           </div>
-          <Button
-            size="sm"
-            className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-xs text-xs font-semibold h-8 px-3 shrink-0"
-            onClick={() => {
-              setForm({ name: "", phone: "", email: "", company: "", address: "", notes: "", status: "NEW" });
-              setIsAddOpen(true);
-            }}
-          >
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Tambah Pelanggan</span>
-            <span className="sm:hidden">Tambah</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={handleExportCsv} className="h-8 px-3 text-xs font-semibold gap-1.5 shadow-xs">
+              <Download className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Unduh Excel (.csv)</span>
+              <span className="sm:hidden">Excel</span>
+            </Button>
+            <Button size="sm" onClick={handleAddRow} className="h-8 px-3 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs gap-1.5">
+              <Plus className="h-3.5 w-3.5" />
+              <span>Tambah Pelanggan</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* Search + filter chips DALAM header card, tanpa gap ekstra */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              value={searchInput}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Cari nama, nomor, perumahan, atau catatan..."
+              className="pl-8 h-8 text-xs bg-background border rounded-lg"
+            />
+          </div>
+          <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
+            {[
+              { key: "ALL", label: "Semua" },
+              { key: "Follow-Up", label: "Follow-Up" },
+              { key: "Survey", label: "Survey" },
+              { key: "SLIK", label: "SLIK" },
+              { key: "Booking", label: "Booking" },
+              { key: "Closing", label: "Closing" },
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setStatusFilter(tab.key)}
+                className={cn(
+                  "px-2.5 py-1 rounded-md text-xs font-medium border transition-colors shrink-0",
+                  statusFilter === tab.key
+                    ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                    : "bg-transparent text-muted-foreground border-border hover:bg-muted/70"
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Search bar - General (Tanpa klasifikasi/tab yang meluber) */}
-      <div className="relative shrink-0">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Cari nama pelanggan, nomor WhatsApp, atau catatan..."
-          className="pl-9 h-10 text-xs bg-card border rounded-xl shadow-2xs"
-        />
-      </div>
-
-      {/* Mobile Status Filter Chips (md:hidden) */}
-      <div className="md:hidden shrink-0 -mx-1 px-1 overflow-x-auto scrollbar-none">
-        <div className="flex items-center gap-1.5 pb-0.5">
-          {STATUS_FILTER_CHIPS.map((chip) => (
-            <button
-              key={chip.key}
-              onClick={() => setStatusFilter(chip.key)}
-              className={cn(
-                "shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
-                statusFilter === chip.key
-                  ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
-                  : "bg-card text-muted-foreground border-border hover:bg-muted/60"
-              )}
-            >
-              {chip.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Main Grid: List + Detail */}
-      <div className="flex-1 flex gap-3 min-h-0">
-        <Card className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          <div className="flex-1 overflow-auto">
-            {loading ? (
-              <div className="p-4 space-y-3">
-                {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <div key={i} className="flex items-center justify-between p-3 rounded-lg border border-border/40">
-                    <div className="flex items-center gap-3 w-1/3">
-                      <Skeleton className="h-8 w-8 rounded-full shrink-0" />
-                      <div className="space-y-1.5 w-full">
-                        <Skeleton className="h-3.5 w-32" />
-                        <Skeleton className="h-3 w-20" />
-                      </div>
-                    </div>
-                    <Skeleton className="h-3 w-28" />
-                    <Skeleton className="h-3 w-24 hidden md:block" />
-                    <Skeleton className="h-3 w-24 hidden lg:block" />
-                    <Skeleton className="h-6 w-16 rounded-full" />
-                  </div>
-                ))}
-              </div>
-            ) : contacts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-                <div className="h-16 w-16 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 grid place-items-center mb-4 text-emerald-600 shadow-sm">
-                  <Users className="h-8 w-8" />
+      {/* Main Container: Tabel mengisi seluruh div tanpa gap / padding padding internal */}
+      <div className="rounded-xl border bg-card flex-1 flex flex-col min-h-0 overflow-hidden shadow-xs">
+        <div className="flex-1 min-h-0 overflow-auto">
+          {loading ? (
+            <div className="p-4 space-y-3">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="flex items-center gap-3 p-3 rounded-lg border">
+                  <Skeleton className="h-6 w-8" />
+                  <Skeleton className="h-6 w-36" />
+                  <Skeleton className="h-6 w-28" />
+                  <Skeleton className="h-6 w-32" />
+                  <Skeleton className="h-6 w-24" />
+                  <Skeleton className="h-6 flex-1" />
                 </div>
-                <h4 className="text-sm font-semibold text-foreground">Belum Ada Data Pelanggan</h4>
-                <p className="text-xs text-muted-foreground max-w-sm mt-1 mb-5 leading-relaxed">
-                  Semua nomor WhatsApp yang menghubungi asisten bot Anda akan dicatat otomatis di sini. Anda juga dapat menambahkan kontak pelanggan baru secara manual.
-                </p>
-                <Button
-                  size="sm"
-                  onClick={() => setIsAddOpen(true)}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5 shadow-sm"
-                >
-                  <Plus className="h-3.5 w-3.5" /> Tambah Pelanggan Pertama
-                </Button>
+              ))}
+            </div>
+          ) : filteredContacts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+              <div className="h-14 w-14 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 grid place-items-center mb-3">
+                <FileSpreadsheet className="h-7 w-7" />
               </div>
-            ) : (
-              <>
-                {/* Mobile Touch Cards View (md:hidden) */}
-                <div className="md:hidden divide-y">
-                  {filteredContacts.map((c) => {
-                    const statusMeta = CONTACT_STATUS_CONFIG[c.status] || {
-                      label: c.status,
-                      badge: "bg-muted text-foreground",
-                    };
-                    const isSelected = selectedContact?.id === c.id;
-                    const cleanPhone = (c.phone || "")
-                      .replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, "")
-                      .replace(/^\+/, "");
-                    const lastChat = (c as any).lastChatAt || c.conversations?.[0]?.lastMessageAt || c.updatedAt;
-
-                    return (
-                      <div
-                        key={c.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => setSelectedContact(c)}
-                        className={cn(
-                          "p-3.5 flex items-center justify-between transition-colors active:bg-muted/70 cursor-pointer select-none min-h-[64px]",
-                          isSelected ? "bg-emerald-500/10" : ""
-                        )}
-                      >
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <Avatar className="h-11 w-11 shrink-0 ring-1 ring-border">
-                            <AvatarFallback className="text-sm font-bold bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300">
-                              {c.name ? c.name.charAt(0).toUpperCase() : "P"}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="min-w-0 flex-1 pr-2">
-                            <p className="font-semibold text-sm text-foreground truncate">{c.name || `+${cleanPhone}`}</p>
-                            <p className="font-mono text-xs text-muted-foreground mt-0.5">+{cleanPhone}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <Badge variant="secondary" className={cn("text-[9px] px-1.5 py-0 h-4 shrink-0 font-medium", statusMeta.badge)}>
-                                {statusMeta.label}
-                              </Badge>
-                              {c.company && (
-                                <span className="flex items-center gap-1 text-[10px] text-muted-foreground truncate">
-                                  <Building2 className="h-3 w-3 shrink-0" />
-                                  <span className="truncate">{c.company}</span>
-                                </span>
-                              )}
-                            </div>
-                            {lastChat && (
-                              <p className="text-[10px] text-muted-foreground/70 mt-0.5 flex items-center gap-1">
-                                <Clock className="h-2.5 w-2.5 shrink-0" />
-                                {formatRelativeTime(lastChat)}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                      </div>
-                    );
-                  })}
-                  {filteredContacts.length === 0 && statusFilter !== "ALL" && (
-                    <div className="py-10 text-center text-xs text-muted-foreground">
-                      Tidak ada kontak dengan status ini.
-                    </div>
-                  )}
-                </div>
-
-                {/* Desktop Table View (hidden md:table) */}
-                <table className="hidden md:table w-full text-left text-xs border-collapse">
-                  <thead className="sticky top-0 bg-muted/50 border-b text-muted-foreground">
-                    <tr>
-                      <th className="p-3">Nama Pelanggan</th>
-                      <th className="p-3">Nomor WhatsApp</th>
-                      <th className="p-3">Pertama Kali Chat</th>
-                      <th className="p-3">Terakhir Kali Chat</th>
-                      <th className="p-3">Status</th>
+              <h4 className="text-sm font-semibold text-foreground">Belum Ada Data Pelanggan</h4>
+              <p className="text-xs text-muted-foreground max-w-sm mt-1 mb-4">
+                Setiap percakapan pelanggan di WhatsApp akan tercatat otomatis di sini.
+              </p>
+              <Button size="sm" onClick={handleAddRow} className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5">
+                <Plus className="h-3.5 w-3.5" /> Tambah Pelanggan Pertama
+              </Button>
+            </div>
+          ) : (
+            <>
+              {/* ── DESKTOP TABLE ── */}
+              <div className="hidden md:block w-full overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse table-fixed">
+                  <colgroup>
+                    <col style={{ width: "48px" }} />
+                    <col style={{ width: "170px" }} />
+                    <col style={{ width: "140px" }} />
+                    <col style={{ width: "170px" }} />
+                    <col style={{ width: "120px" }} />
+                    <col style={{ width: "130px" }} />
+                    <col style={{ width: "145px" }} />
+                    <col style={{ minWidth: "220px" }} />
+                    <col style={{ width: "64px" }} />
+                  </colgroup>
+                  <thead className="sticky top-0 z-10 bg-muted/60 backdrop-blur-xs border-b text-muted-foreground">
+                    <tr className="divide-x divide-border font-semibold text-[11px]">
+                      <th style={{ width: "48px" }} className="py-2.5 px-2 text-center shrink-0">No.</th>
+                      <th style={{ width: "170px" }} className="py-2.5 px-3 shrink-0">Nama Pelanggan</th>
+                      <th style={{ width: "140px" }} className="py-2.5 px-3 shrink-0">No. WhatsApp</th>
+                      <th style={{ width: "170px" }} className="py-2.5 px-3 shrink-0">
+                        <div className="flex items-center gap-1">Perumahan <ChevronDown className="h-3 w-3 opacity-50 shrink-0" /></div>
+                      </th>
+                      <th style={{ width: "120px" }} className="py-2.5 px-3 shrink-0">
+                        <div className="flex items-center gap-1">Tipe Unit <ChevronDown className="h-3 w-3 opacity-50 shrink-0" /></div>
+                      </th>
+                      <th style={{ width: "130px" }} className="py-2.5 px-3 text-right shrink-0">Harga Unit (Rp)</th>
+                      <th style={{ width: "145px" }} className="py-2.5 px-3 shrink-0">
+                        <div className="flex items-center gap-1">Status <ChevronDown className="h-3 w-3 opacity-50 shrink-0" /></div>
+                      </th>
+                      <th className="py-2.5 px-3">Catatan</th>
+                      <th style={{ width: "64px" }} className="py-2.5 px-2 text-center shrink-0">Aksi</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
-                    {contacts.map((c) => {
-                      const statusMeta = CONTACT_STATUS_CONFIG[c.status] || {
-                        label: c.status,
-                        badge: "bg-muted text-foreground",
-                      };
-                      const isSelected = selectedContact?.id === c.id;
-                      const cleanPhone = (c.phone || "")
+                  <tbody className="divide-y divide-border">
+                    {filteredContacts.map((c, index) => {
+                      const selectedPerumahan = c.metadata?.perumahan ?? perumahanCatalog[0]?.name ?? "";
+                      const cluster = perumahanCatalog.find((p) => p.name === selectedPerumahan);
+                      const unitTypes = cluster?.types ?? [];
+                      const selectedTipe = c.metadata?.tipeUnit ?? unitTypes[0]?.name ?? "";
+                      const cleanPhone = (c.phone ?? "")
                         .replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, "")
                         .replace(/^\+/, "");
-                      const firstChat = (c as any).firstChatAt || c.createdAt;
-                      const lastChat = (c as any).lastChatAt || c.conversations?.[0]?.lastMessageAt || c.updatedAt;
 
                       return (
-                        <tr
-                          key={c.id}
-                          onClick={() => setSelectedContact(c)}
-                          className={`cursor-pointer transition-all duration-150 ease-out select-none ${
-                            isSelected ? "bg-emerald-50 dark:bg-emerald-950/30" : "hover:bg-muted/60"
-                          }`}
-                        >
-                          <td className="p-3">
-                            <p className="font-semibold text-foreground">{c.name || `+${cleanPhone}`}</p>
-                            <p className="text-[11px] text-muted-foreground">{c.email || c.notes || "Pelanggan WhatsApp"}</p>
+                        <tr key={c.id} className="group transition-colors divide-x divide-border hover:bg-muted/40">
+                          <td style={{ width: "48px", maxWidth: "48px" }} className="py-2 px-2 text-center text-muted-foreground align-middle overflow-hidden">{index + 1}</td>
+
+                          <td style={{ width: "170px", maxWidth: "170px" }} className="py-1 px-2 overflow-hidden align-middle">
+                            <input
+                              type="text"
+                              value={c.name ?? ""}
+                              onChange={(e) => handleFieldChange(c.id, "name", e.target.value)}
+                              placeholder="Nama pelanggan..."
+                              className="w-full bg-transparent px-2 py-1 rounded text-xs font-medium border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background outline-none transition-colors"
+                            />
                           </td>
-                          <td className="p-3">
-                            <p className="font-mono text-muted-foreground font-medium">+{cleanPhone}</p>
+
+                          <td style={{ width: "140px", maxWidth: "140px" }} className="py-1 px-2 overflow-hidden align-middle">
+                            <input
+                              type="text"
+                              value={cleanPhone}
+                              onChange={(e) => handleFieldChange(c.id, "phone", e.target.value)}
+                              placeholder="08xxxxxxxxxx"
+                              className="w-full bg-transparent px-2 py-1 rounded text-xs font-mono border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background outline-none transition-colors"
+                            />
                           </td>
-                          <td className="p-3 text-muted-foreground">
-                            {firstChat ? new Date(firstChat).toLocaleString("id-ID", {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            }) : "-"}
+
+                          <td style={{ width: "170px", maxWidth: "170px" }} className="py-1 px-1 overflow-hidden align-middle">
+                            <CellSelect
+                              value={selectedPerumahan}
+                              options={perumahanCatalog.map((p) => ({ value: p.name, label: p.name }))}
+                              onValueChange={(v) => handlePerumahanSelect(c.id, v)}
+                            />
                           </td>
-                          <td className="p-3 text-muted-foreground">
-                            {lastChat ? new Date(lastChat).toLocaleString("id-ID", {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            }) : "-"}
+
+                          <td style={{ width: "120px", maxWidth: "120px" }} className="py-1 px-1 overflow-hidden align-middle">
+                            <CellSelect
+                              value={selectedTipe}
+                              options={unitTypes.map((t) => ({ value: t.name, label: t.name }))}
+                              onValueChange={(v) => handleTipeUnitSelect(c.id, selectedPerumahan, v)}
+                            />
                           </td>
-                          <td className="p-3">
-                            <Badge variant="secondary" className={`text-[10px] ${statusMeta.badge}`}>
-                              {statusMeta.label}
-                            </Badge>
+
+                          <td style={{ width: "130px", maxWidth: "130px" }} className="py-1 px-2 overflow-hidden align-middle">
+                            <input
+                              type="text"
+                              value={formatRupiah(c.metadata?.hargaUnit)}
+                              onChange={(e) => handleFieldChange(c.id, "metadata.hargaUnit", parseRupiahNumber(e.target.value))}
+                              placeholder="0"
+                              className="w-full text-right bg-transparent px-2 py-1 rounded text-xs font-mono border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background outline-none transition-colors"
+                            />
+                          </td>
+
+                          <td style={{ width: "145px", maxWidth: "145px" }} className="py-1 px-1 overflow-hidden align-middle">
+                            <CellSelect
+                              value={c.status ?? "Follow-Up"}
+                              options={PROSPECT_STATUS_OPTIONS}
+                              onValueChange={(v) => handleFieldChange(c.id, "status", v)}
+                            />
+                          </td>
+
+                          <td className="py-1 px-2 overflow-hidden align-middle">
+                            <textarea
+                              value={c.notes ?? ""}
+                              onChange={(e) => handleFieldChange(c.id, "notes", e.target.value)}
+                              placeholder="Catatan kebutuhan..."
+                              className="w-full h-[3.25rem] bg-transparent px-2 py-1 rounded text-xs leading-relaxed border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background outline-none resize-none transition-colors"
+                            />
+                          </td>
+
+                          <td style={{ width: "64px", maxWidth: "64px" }} className="py-1 px-2 text-center align-middle overflow-hidden">
+                            <div className="flex items-center justify-center gap-1">
+                              <Button
+                                variant="ghost" size="icon"
+                                className="h-7 w-7 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                                title="Buka percakapan WhatsApp"
+                                onClick={() => { if (c.conversations?.[0]?.id) setActiveContactId(c.conversations[0].id); setView("chatbot"); }}
+                              >
+                                <MessageCircle className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost" size="icon"
+                                className="h-7 w-7 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                                title="Hapus baris"
+                                onClick={() => handleDeleteRow(c.id)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
-              </>
-            )}
-          </div>
-        </Card>
-
-        {/* Desktop Detail Panel (hidden on mobile) */}
-        {selectedContact && (
-          <Card className="hidden md:flex w-80 lg:w-96 shrink-0 flex-col min-h-0 p-4 overflow-y-auto space-y-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="font-bold text-base leading-tight">{selectedContact.name}</h3>
-                <div className="flex items-center gap-1.5 mt-1">
-                  <Badge
-                    variant="secondary"
-                    className={`text-[10px] ${(CONTACT_STATUS_CONFIG[selectedContact.status] || {}).badge}`}
-                  >
-                    {(CONTACT_STATUS_CONFIG[selectedContact.status] || {}).label || selectedContact.status}
-                  </Badge>
-                </div>
-              </div>
-              <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(selectedContact)}>
-                  <Edit2 className="h-3.5 w-3.5" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-600" onClick={() => handleDelete(selectedContact.id)}>
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-
-            {/* Info Pelanggan */}
-            <div className="space-y-2.5 text-xs border rounded-lg p-3 bg-muted/20">
-              <div className="space-y-1">
-                <span className="text-[10px] font-semibold text-muted-foreground uppercase">Kontak WhatsApp</span>
-                <div className="flex items-center gap-1.5 font-mono text-foreground font-medium">
-                  <Phone className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                  <span>+{(selectedContact.phone || "").replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, "").replace(/^\+/, "")}</span>
-                </div>
               </div>
 
-              <div className="space-y-1 pt-1 border-t">
-                <span className="text-[10px] font-semibold text-muted-foreground uppercase">Pertama Kali Chat</span>
-                <div className="flex items-center gap-1.5 text-foreground">
-                  <Calendar className="h-3.5 w-3.5 text-blue-600 shrink-0" />
-                  <span>
-                    {((selectedContact as any).firstChatAt || selectedContact.createdAt)
-                      ? new Date((selectedContact as any).firstChatAt || selectedContact.createdAt).toLocaleString("id-ID", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
-                      : "-"}
-                  </span>
-                </div>
+              {/* ── MOBILE CARDS ── */}
+              <div className="md:hidden divide-y divide-border">
+                {filteredContacts.map((c, idx) => {
+                  const selectedPerumahan = c.metadata?.perumahan ?? perumahanCatalog[0]?.name ?? "";
+                  const cluster = perumahanCatalog.find((p) => p.name === selectedPerumahan);
+                  const unitTypes = cluster?.types ?? [];
+                  const cleanPhone = (c.phone ?? "")
+                    .replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, "")
+                    .replace(/^\+/, "");
+
+                  return (
+                    <div key={c.id} className="p-3.5 space-y-3 bg-card">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="h-6 w-6 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-[11px] font-bold grid place-items-center shrink-0">
+                            {idx + 1}
+                          </span>
+                          <input
+                            type="text"
+                            value={c.name ?? ""}
+                            onChange={(e) => handleFieldChange(c.id, "name", e.target.value)}
+                            placeholder="Nama pelanggan..."
+                            className="font-bold text-sm text-foreground bg-transparent border-b border-dashed border-border focus:border-emerald-500 outline-none"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600"
+                            onClick={() => { if (c.conversations?.[0]?.id) setActiveContactId(c.conversations[0].id); setView("chatbot"); }}>
+                            <MessageCircle className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500" onClick={() => handleDeleteRow(c.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-muted-foreground w-24 shrink-0 flex items-center gap-1">
+                          <Phone className="h-3 w-3" /> No. WhatsApp:
+                        </span>
+                        <input
+                          type="text"
+                          value={cleanPhone}
+                          onChange={(e) => handleFieldChange(c.id, "phone", e.target.value)}
+                          placeholder="08xxxxxxxxxx"
+                          className="flex-1 font-mono text-xs bg-muted/30 px-2 py-1 rounded border border-border"
+                        />
+                      </div>
+
+                      <MobileCellSelect
+                        label="Perumahan"
+                        value={selectedPerumahan}
+                        options={perumahanCatalog.map((p) => ({ value: p.name, label: p.name }))}
+                        onValueChange={(v) => handlePerumahanSelect(c.id, v)}
+                      />
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-muted-foreground font-medium">Tipe Unit:</span>
+                          <Select
+                            value={c.metadata?.tipeUnit ?? unitTypes[0]?.name ?? ""}
+                            onValueChange={(v) => handleTipeUnitSelect(c.id, selectedPerumahan, v)}
+                          >
+                            <SelectTrigger size="sm" className="h-8 text-xs w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="text-xs">
+                              {unitTypes.map((t) => (
+                                <SelectItem key={t.name} value={t.name} className="text-xs">{t.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-muted-foreground font-medium">Harga Unit (Rp):</span>
+                          <input
+                            type="text"
+                            value={formatRupiah(c.metadata?.hargaUnit)}
+                            onChange={(e) => handleFieldChange(c.id, "metadata.hargaUnit", parseRupiahNumber(e.target.value))}
+                            placeholder="0"
+                            className="w-full text-xs font-mono bg-muted/30 px-2 py-1 rounded border border-border"
+                          />
+                        </div>
+                      </div>
+
+                      <MobileCellSelect
+                        label="Status"
+                        value={c.status ?? "Follow-Up"}
+                        options={PROSPECT_STATUS_OPTIONS}
+                        onValueChange={(v) => handleFieldChange(c.id, "status", v)}
+                      />
+
+                      <div className="space-y-1">
+                        <span className="text-[10px] text-muted-foreground font-medium">Catatan:</span>
+                        <textarea
+                          rows={2}
+                          value={c.notes ?? ""}
+                          onChange={(e) => handleFieldChange(c.id, "notes", e.target.value)}
+                          placeholder="Catatan kebutuhan pelanggan..."
+                          className="w-full text-xs bg-muted/20 px-2.5 py-1.5 rounded-lg border border-border leading-relaxed resize-none outline-none"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-
-              <div className="space-y-1 pt-1 border-t">
-                <span className="text-[10px] font-semibold text-muted-foreground uppercase">Terakhir Kali Chat</span>
-                <div className="flex items-center gap-1.5 text-foreground">
-                  <Clock className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                  <span>
-                    {((selectedContact as any).lastChatAt || selectedContact.conversations?.[0]?.lastMessageAt || selectedContact.updatedAt)
-                      ? new Date((selectedContact as any).lastChatAt || selectedContact.conversations?.[0]?.lastMessageAt || selectedContact.updatedAt).toLocaleString("id-ID", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
-                      : "-"}
-                  </span>
-                </div>
-              </div>
-
-              {selectedContact.email && (
-                <div className="space-y-1 pt-1 border-t">
-                  <span className="text-[10px] font-semibold text-muted-foreground uppercase">Email</span>
-                  <div className="flex items-center gap-1.5 text-foreground">
-                    <Mail className="h-3.5 w-3.5 text-blue-600 shrink-0" />
-                    <span>{selectedContact.email}</span>
-                  </div>
-                </div>
-              )}
-
-              {selectedContact.address && (
-                <div className="space-y-1 pt-1 border-t">
-                  <span className="text-[10px] font-semibold text-muted-foreground uppercase">Alamat / Lokasi</span>
-                  <div className="flex items-center gap-1.5 text-foreground">
-                    <MapPin className="h-3.5 w-3.5 text-rose-600 shrink-0" />
-                    <span>{selectedContact.address}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Quick Actions */}
-            <Button
-              variant="outline"
-              className="w-full justify-start text-xs h-9 gap-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 font-medium"
-              onClick={() => {
-                if (selectedContact.conversations?.[0]?.id) {
-                  setActiveContactId(selectedContact.conversations[0].id);
-                }
-                setView("chatbot");
-              }}
-            >
-              <MessageCircle className="h-3.5 w-3.5" />
-              Chat WhatsApp Pelanggan
-            </Button>
-
-            {/* Catatan Pelanggan */}
-            <div className="space-y-1">
-              <span className="text-xs font-semibold text-muted-foreground">Catatan / Detail Interaksi:</span>
-              <div className="p-3 bg-muted/40 rounded-lg text-xs min-h-[70px] whitespace-pre-wrap leading-relaxed">
-                {selectedContact.notes || "Belum ada catatan khusus untuk pelanggan ini."}
-              </div>
-            </div>
-          </Card>
-        )}
+            </>
+          )}
+        </div>
       </div>
-
-      {/* Mobile Contact Detail Sheet (md:hidden) */}
-      <Sheet open={!!selectedContact} onOpenChange={(open) => !open && setSelectedContact(null)}>
-        <SheetContent side="bottom" className="p-4 rounded-t-2xl max-h-[85vh] overflow-y-auto md:hidden space-y-4">
-          {selectedContact && (() => {
-            const mobileCleanPhone = (selectedContact.phone || "")
-              .replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, "")
-              .replace(/^\+/, "");
-            const mobileFirstChat = (selectedContact as any).firstChatAt || selectedContact.createdAt;
-            const mobileLastChat = (selectedContact as any).lastChatAt || selectedContact.conversations?.[0]?.lastMessageAt || selectedContact.updatedAt;
-
-            return (
-              <>
-                <SheetHeader className="text-left pb-2 border-b">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <SheetTitle className="text-base font-bold leading-tight">{selectedContact.name}</SheetTitle>
-                      <Badge
-                        variant="secondary"
-                        className={`text-[10px] mt-1 ${(CONTACT_STATUS_CONFIG[selectedContact.status] || {}).badge}`}
-                      >
-                        {(CONTACT_STATUS_CONFIG[selectedContact.status] || {}).label || selectedContact.status}
-                      </Badge>
-                    </div>
-                  </div>
-                </SheetHeader>
-
-                {/* Quick Action Buttons Row */}
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 h-10 text-xs gap-1.5 border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 font-medium"
-                    onClick={() => {
-                      if (selectedContact.conversations?.[0]?.id) {
-                        setActiveContactId(selectedContact.conversations[0].id);
-                      }
-                      setSelectedContact(null);
-                      setView("chatbot");
-                    }}
-                  >
-                    <MessageCircle className="h-4 w-4" />
-                    WhatsApp
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-10 w-10 p-0 shrink-0"
-                    onClick={() => {
-                      navigator.clipboard.writeText(`+${mobileCleanPhone}`);
-                    }}
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-10 w-10 p-0 shrink-0"
-                    onClick={() => openEdit(selectedContact)}
-                  >
-                    <Edit2 className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                {/* Contact Info */}
-                <div className="space-y-2.5 text-xs border rounded-xl p-3 bg-muted/20">
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-semibold text-muted-foreground uppercase">Kontak WhatsApp</span>
-                    <div className="flex items-center gap-1.5 font-mono text-foreground font-medium text-base">
-                      <Phone className="h-4 w-4 text-emerald-600 shrink-0" />
-                      <span>+{mobileCleanPhone}</span>
-                    </div>
-                  </div>
-
-                  {selectedContact.email && (
-                    <div className="space-y-1 pt-1.5 border-t">
-                      <span className="text-[10px] font-semibold text-muted-foreground uppercase">Email</span>
-                      <div className="flex items-center gap-1.5 text-foreground">
-                        <Mail className="h-3.5 w-3.5 text-blue-600 shrink-0" />
-                        <span>{selectedContact.email}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedContact.company && (
-                    <div className="space-y-1 pt-1.5 border-t">
-                      <span className="text-[10px] font-semibold text-muted-foreground uppercase">Perusahaan</span>
-                      <div className="flex items-center gap-1.5 text-foreground">
-                        <Building2 className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
-                        <span>{selectedContact.company}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedContact.address && (
-                    <div className="space-y-1 pt-1.5 border-t">
-                      <span className="text-[10px] font-semibold text-muted-foreground uppercase">Lokasi / Alamat</span>
-                      <div className="flex items-center gap-1.5 text-foreground">
-                        <MapPin className="h-3.5 w-3.5 text-rose-600 shrink-0" />
-                        <span>{selectedContact.address}</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Activity Timeline */}
-                <div className="space-y-2 border rounded-xl p-3 bg-muted/20">
-                  <span className="text-[10px] font-semibold text-muted-foreground uppercase">Riwayat Aktivitas</span>
-                  <div className="space-y-2 text-xs">
-                    <div className="flex items-center gap-2 text-foreground">
-                      <Calendar className="h-3.5 w-3.5 text-blue-600 shrink-0" />
-                      <span className="text-muted-foreground">Pertama kali chat:</span>
-                      <span className="font-medium">
-                        {mobileFirstChat
-                          ? new Date(mobileFirstChat).toLocaleString("id-ID", {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            })
-                          : "-"}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-foreground">
-                      <Clock className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                      <span className="text-muted-foreground">Terakhir kali chat:</span>
-                      <span className="font-medium">
-                        {mobileLastChat
-                          ? new Date(mobileLastChat).toLocaleString("id-ID", {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            })
-                          : "-"}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-foreground">
-                      <FileText className="h-3.5 w-3.5 text-amber-600 shrink-0" />
-                      <span className="text-muted-foreground">Sumber:</span>
-                      <span className="font-medium">{selectedContact.source || "-"}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Notes */}
-                <div className="space-y-1">
-                  <span className="text-xs font-semibold text-muted-foreground">Catatan Prospek:</span>
-                  <div className="p-3 bg-muted/40 rounded-xl text-xs min-h-[60px] whitespace-pre-wrap leading-relaxed">
-                    {selectedContact.notes || "Belum ada catatan khusus untuk pelanggan ini."}
-                  </div>
-                </div>
-
-                {/* Delete Button */}
-                <Button
-                  variant="outline"
-                  className="w-full text-xs h-10 gap-2 border-rose-200 dark:border-rose-800 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 font-medium mt-2"
-                  onClick={() => handleDelete(selectedContact.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Hapus Pelanggan
-                </Button>
-              </>
-            );
-          })()}
-        </SheetContent>
-      </Sheet>
-
-      {/* Add Dialog */}
-      <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-emerald-600" />
-              Tambah Pelanggan Baru
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 text-xs">
-            <div>
-              <label className="font-medium">Nama Pelanggan (Wajib)</label>
-              <Input
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Contoh: Budi Santoso"
-                className="h-8 mt-1"
-              />
-            </div>
-            <div>
-              <label className="font-medium">Nomor WhatsApp (Wajib)</label>
-              <Input
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                placeholder="6281234567890"
-                className="h-8 mt-1 font-mono"
-              />
-            </div>
-            <div>
-              <label className="font-medium">Email</label>
-              <Input
-                type="email"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                placeholder="nama@email.com"
-                className="h-8 mt-1"
-              />
-            </div>
-            <div>
-              <label className="font-medium">Alamat / Lokasi</label>
-              <Input
-                value={form.address}
-                onChange={(e) => setForm({ ...form, address: e.target.value })}
-                placeholder="Contoh: Jl. Ahmad Yani No. 12, Bandung"
-                className="h-8 mt-1"
-              />
-            </div>
-            <div>
-              <label className="font-medium">Status Pelanggan</label>
-              <select
-                value={form.status}
-                onChange={(e) => setForm({ ...form, status: e.target.value })}
-                className="w-full h-8 mt-1 rounded-md border bg-background px-2 text-xs"
-              >
-                <option value="NEW">Kontak Baru</option>
-                <option value="INQUIRY">Prospek / Diskusi</option>
-                <option value="BOOKED">Negosiasi / Booking</option>
-                <option value="COMPLETED">Pelanggan Aktif / Closing</option>
-                <option value="CANCELLED">Batal / Tidak Aktif</option>
-              </select>
-            </div>
-            <div>
-              <label className="font-medium">Catatan / Detail Interaksi</label>
-              <Textarea
-                value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                placeholder="Catatan preferensi, kebutuhan produk/layanan, atau jadwal follow-up..."
-                className="min-h-[70px] mt-1"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" size="sm" onClick={() => setIsAddOpen(false)}>Batal</Button>
-            <Button size="sm" onClick={handleCreate} className="bg-emerald-600 hover:bg-emerald-700 text-white">Simpan Pelanggan</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Dialog */}
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-emerald-600" />
-              Edit Data Pelanggan
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 text-xs">
-            <div>
-              <label className="font-medium">Nama Pelanggan</label>
-              <Input
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="h-8 mt-1"
-              />
-            </div>
-            <div>
-              <label className="font-medium">Nomor WhatsApp</label>
-              <Input
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                className="h-8 mt-1 font-mono"
-              />
-            </div>
-            <div>
-              <label className="font-medium">Email</label>
-              <Input
-                type="email"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="h-8 mt-1"
-              />
-            </div>
-            <div>
-              <label className="font-medium">Alamat / Lokasi</label>
-              <Input
-                value={form.address}
-                onChange={(e) => setForm({ ...form, address: e.target.value })}
-                className="h-8 mt-1"
-              />
-            </div>
-            <div>
-              <label className="font-medium">Status Pelanggan</label>
-              <select
-                value={form.status}
-                onChange={(e) => setForm({ ...form, status: e.target.value })}
-                className="w-full h-8 mt-1 rounded-md border bg-background px-2 text-xs"
-              >
-                <option value="NEW">Kontak Baru</option>
-                <option value="INQUIRY">Prospek / Diskusi</option>
-                <option value="BOOKED">Negosiasi / Booking</option>
-                <option value="COMPLETED">Pelanggan Aktif / Closing</option>
-                <option value="CANCELLED">Batal / Tidak Aktif</option>
-              </select>
-            </div>
-            <div>
-              <label className="font-medium">Catatan / Detail Interaksi</label>
-              <Textarea
-                value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                className="min-h-[70px] mt-1"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" size="sm" onClick={() => setIsEditOpen(false)}>Batal</Button>
-            <Button size="sm" onClick={handleUpdate} className="bg-emerald-600 hover:bg-emerald-700 text-white">Simpan Perubahan</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

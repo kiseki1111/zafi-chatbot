@@ -44,6 +44,42 @@ ATURAN FALLBACK (PERTANYAAN DI LUAR DATABASE):
 JANGAN NGARANG. Jika informasi yang ditanyakan TIDAK ADA di DATABASE TOKO, balas dengan menolak secara halus menggunakan kalimat ini:
 "Maaf Kak, untuk info detail tersebut saya kurang tahu. Kakak bisa chat {fallbackContact} ya, agar bisa dibantu lebih lanjut!"
 
+ATURAN IDENTIFIKASI PROSPEK (LEAD PROFILING BERTAHAP):
+Pelanggan biasanya mengobrol santai dan informasi mereka terungkap bertahap di sepanjang percakapan.
+Anda WAJIB menganalisis SELURUH riwayat chat + pesan saat ini untuk mengekstrak data prospek pada property "lead".
+
+Aturan Akurasi Ekstraksi:
+1. customerName:
+   - Jika pelanggan pernah menyebutkan nama mereka di percakapan (contoh: "saya Budi", "nama saya Hendra Wijaya", "dengan Ibu Rini", "panggil saya Joko"), ekstrak nama tersebut.
+   - JIKA PELANGGAN BELUM MENYEBUTKAN NAMA di sepanjang percakapan, ISI "Anonim".
+   - DILARANG menggunakan nama Anda ('{agentName}') atau nomor telepon.
+2. perumahan:
+   - Nama cluster/perumahan dari database yang diminati/dibahas pelanggan (contoh: 'Griya Amanah 2', 'Zafi Residence', 'Kahyana Residence').
+   - Jika sudah pernah dibahas di riwayat pesan sebelumnya, TETAP PERTAHANKAN nama perumahan tersebut meskipun pesan terbaru sedang membahas hal lain. Jika belum dibahas sama sekali, isi null.
+3. tipeUnit:
+   - Tipe unit yang diminati (contoh: 'Tipe 36', 'Tipe 40', 'Tipe 45'). Pertahankan dari riwayat jika sudah pernah ditentukan. Jika belum ada, isi null.
+4. hargaUnit:
+   - Angka nominal rupiah harga unit yang sedang dibahas berdasarkan database (contoh: 192800000, 295000000). Jika belum ada harga pasti, isi null.
+5. status (Fase Prospek Saat Ini):
+   - 'Follow-Up': Customer masih bertanya-tanya santai, konsultasi lokasi, minta brosur, atau cek perbandingan tipe rumah.
+   - 'SLIK': Customer mulai membahas kelayakan finansial, syarat pengajuan KPR, BI Checking / SLIK OJK, slip gaji, kemampuan angsuran, atau tenor cicilan bank.
+   - 'Survey': Customer menyatakan ingin cek fisik ke lapangan, tanya jadwal lihat unit, minta diantar marketing ke perumahan, atau atur janji survey.
+   - 'Booking': Customer ingin mengunci kavling/nomor unit tertentu, menanyakan nomor rekening transfer DP/tanda jadi, atau menyatakan fix pesan unit.
+   - 'Closing': Customer sudah mengonfirmasi transfer pembayaran DP / lunas / tanda tangan akad jual beli.
+   - 'Batal': Customer menyatakan batal, tidak jadi ambil, atau merasa tidak cocok.
+6. notes:
+   - Rangkuman padat 1-2 kalimat berisi poin-poin penting kebutuhan pelanggan yang terungkap selama ini (pekerjaan/penghasilan, preferensi cara bayar KPR/tempo, kondisi keluarga, kendala SLIK, atau tanggal rencana survey).
+
+Format property "lead":
+{
+  "customerName": "Anonim", // atau nama asli jika sudah disebutkan
+  "perumahan": "Griya Amanah 2",
+  "tipeUnit": "Tipe 40",
+  "hargaUnit": 295000000,
+  "status": "Follow-Up",
+  "notes": "Rangkuman padat preferensi dan kebutuhan customer"
+}
+
 WAJIB MERESPON DALAM FORMAT JSON BERIKUT:
 {
   "text": "Balasan teks untuk pelanggan",
@@ -59,7 +95,15 @@ WAJIB MERESPON DALAM FORMAT JSON BERIKUT:
     "quantity": 1,
     "totalPrice": 50000,
     "notes": "Catatan tambahan misal waktu ambil"
-  } // opsional, HANYA DISERTAKAN jika pelanggan MEMFIXKAN pesanan
+  }, // opsional, HANYA DISERTAKAN jika pelanggan MEMFIXKAN pesanan
+  "lead": {
+    "customerName": "Nama Pelanggan",
+    "perumahan": "Nama Perumahan",
+    "tipeUnit": "Tipe 36",
+    "hargaUnit": 192800000,
+    "status": "Follow-Up",
+    "notes": "Ringkasan ringkas preferensi/kondisi prospek"
+  } // opsional, sertakan jika ada info prospek yang terdeteksi
 }`;
 
   constructor(
@@ -111,11 +155,11 @@ WAJIB MERESPON DALAM FORMAT JSON BERIKUT:
       }
     }
 
-    // 1. Ambil History menggunakan utilitas terpusat
+    // 1. Ambil History menggunakan utilitas terpusat (16 pesan agar profil terakumulasi kuat)
     const recentMessages = await this.agentSharedService.getRecentContext(
       senderId,
       effectiveSessionName,
-      8,
+      16,
     );
 
     // SANITASI: Hapus pesan halusinasi example.com
@@ -262,11 +306,18 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
           )
         : [];
       const order = parsed.order || null;
+      const lead = parsed.lead || null;
+
+      if (lead) {
+        await this.saveLeadToContact(senderId, effectiveSessionName, lead);
+      }
+
       return {
         text: aiText,
         images: aiImages,
         videos: aiVideos,
         order: order,
+        lead: lead,
       };
     } catch (e) {
       this.logger.error(`Error parsing LLM JSON: ${e.message}`);
@@ -275,6 +326,97 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
         images: [],
         videos: [],
       };
+    }
+  }
+
+  private async saveLeadToContact(
+    senderId: string,
+    sessionName: string,
+    lead: any,
+  ) {
+    if (!lead || typeof lead !== 'object') return;
+    try {
+      const cleanPhone = (senderId || '')
+        .replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, '')
+        .replace(/^\+/, '')
+        .replace('-customer', '');
+
+      let contact = await this.prisma.contact.findFirst({
+        where: {
+          OR: [
+            { phone: senderId },
+            { phone: cleanPhone },
+            { phone: { contains: cleanPhone } },
+          ],
+        },
+      });
+
+      const existingMeta = (contact?.metadata as Record<string, any>) || {};
+      const updatedMeta = {
+        ...existingMeta,
+        ...(lead.perumahan ? { perumahan: lead.perumahan } : {}),
+        ...(lead.tipeUnit ? { tipeUnit: lead.tipeUnit } : {}),
+        ...(lead.hargaUnit ? { hargaUnit: Number(lead.hargaUnit) || lead.hargaUnit } : {}),
+      };
+
+      if (!contact) {
+        if (!cleanPhone) return;
+        const initialName = (lead.customerName && lead.customerName !== 'Anonim')
+          ? lead.customerName
+          : 'Anonim';
+        contact = await this.prisma.contact.create({
+          data: {
+            phone: cleanPhone,
+            name: initialName,
+            status: lead.status || 'Follow-Up',
+            notes: lead.notes || null,
+            metadata: updatedMeta,
+          },
+        });
+        this.logger.log(
+          `[CS-LEAD] Kontak prospek baru otomatis terdata: ${contact.name} (${contact.phone})`,
+        );
+        return;
+      }
+
+      const existingNotes = contact.notes || '';
+      let combinedNotes = existingNotes;
+      if (lead.notes && typeof lead.notes === 'string') {
+        const cleanNewNotes = lead.notes.trim();
+        if (cleanNewNotes && !existingNotes.includes(cleanNewNotes)) {
+          combinedNotes = existingNotes
+            ? `${existingNotes}\n${cleanNewNotes}`
+            : cleanNewNotes;
+        }
+      }
+
+      const isCurrentlyAnon =
+        !contact.name ||
+        contact.name === 'Anonim' ||
+        contact.name === contact.phone ||
+        contact.name.startsWith('+') ||
+        contact.name === 'Pelanggan Baru' ||
+        contact.name === 'Pelanggan Simulator';
+
+      const shouldUpdateName =
+        lead.customerName &&
+        lead.customerName !== 'Anonim' &&
+        isCurrentlyAnon;
+
+      await this.prisma.contact.update({
+        where: { id: contact.id },
+        data: {
+          ...(shouldUpdateName && { name: lead.customerName }),
+          ...(lead.status && { status: lead.status }),
+          ...(combinedNotes && { notes: combinedNotes }),
+          metadata: updatedMeta,
+        },
+      });
+      this.logger.log(
+        `[CS-LEAD] Berhasil update prospek ${contact.phone}: ${lead.customerName || contact.name} [Status: ${lead.status || contact.status}]`,
+      );
+    } catch (err: any) {
+      this.logger.warn(`[CS-LEAD] Gagal simpan data prospek: ${err.message}`);
     }
   }
 }

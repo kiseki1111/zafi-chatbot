@@ -1618,17 +1618,18 @@ export function AvailabilityView() {
 
             <div className="space-y-1">
               <Label>Kategori Topik</Label>
-              <select
-                value={knowledgeForm.category}
-                onChange={(e) => setKnowledgeForm({ ...knowledgeForm, category: e.target.value })}
-                className="w-full h-8 mt-1 rounded-md border bg-background px-2 text-xs"
-              >
-                <option value="Spesifikasi Bangunan">Spesifikasi Bangunan (Material, Pondasi, Listrik, Air)</option>
-                <option value="Fasilitas & Lingkungan">Fasilitas &amp; Lingkungan (Keamanan, Taman, One Gate)</option>
-                <option value="Akses & Lokasi">Akses &amp; Lokasi (Dekat Tol, Stasiun, Sekolah)</option>
-                <option value="Promo & Ketentuan KPR">Promo &amp; Ketentuan KPR (DP 0%, Subsidi, Akad)</option>
-                <option value="Umum / Lainnya">Umum / Lainnya</option>
-              </select>
+              <Select value={knowledgeForm.category} onValueChange={(v) => setKnowledgeForm({ ...knowledgeForm, category: v })}>
+                <SelectTrigger size="sm" className="mt-1 h-8 w-full text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="text-xs">
+                  <SelectItem value="Spesifikasi Bangunan" className="text-xs">Spesifikasi Bangunan (Material, Pondasi, Listrik, Air)</SelectItem>
+                  <SelectItem value="Fasilitas & Lingkungan" className="text-xs">Fasilitas &amp; Lingkungan (Keamanan, Taman, One Gate)</SelectItem>
+                  <SelectItem value="Akses & Lokasi" className="text-xs">Akses &amp; Lokasi (Dekat Tol, Stasiun, Sekolah)</SelectItem>
+                  <SelectItem value="Promo & Ketentuan KPR" className="text-xs">Promo &amp; Ketentuan KPR (DP 0%, Subsidi, Akad)</SelectItem>
+                  <SelectItem value="Umum / Lainnya" className="text-xs">Umum / Lainnya</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-1">

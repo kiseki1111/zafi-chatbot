@@ -30,6 +30,9 @@ export class CreateContactDto {
   @IsOptional()
   @IsString()
   source?: string;
+
+  @IsOptional()
+  metadata?: any;
 }
 
 export class UpdateContactDto {
@@ -60,4 +63,7 @@ export class UpdateContactDto {
   @IsOptional()
   @IsString()
   status?: string;
+
+  @IsOptional()
+  metadata?: any;
 }

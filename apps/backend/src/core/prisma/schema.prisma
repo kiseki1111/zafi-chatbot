@@ -153,6 +153,7 @@ model Contact {
   company   String?  @db.VarChar(100)
   address   String?  @db.Text
   notes     String?  @db.Text
+  metadata  Json?    @default("{}")
   source    String   @default("WHATSAPP") @db.VarChar(50)
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

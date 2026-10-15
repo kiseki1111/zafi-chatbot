@@ -583,13 +583,19 @@ export class WahaController {
             },
           });
           let contactId;
-          const defaultPhoneName = `+${contactNumber}`;
+          const defaultAnonName = 'Anonim';
           if (contact) {
+            const hasRealName =
+              contact.name &&
+              contact.name !== 'Anonim' &&
+              !contact.name.startsWith('+') &&
+              contact.name !== contact.phone &&
+              contact.name !== 'Pelanggan Baru';
             await this.prisma.contact.update({
               where: { id: contact.id },
               data: {
                 phone: contactNumber,
-                name: defaultPhoneName,
+                ...(!hasRealName && { name: contactName || contact.name || defaultAnonName }),
               },
             });
             contactId = contact.id;
@@ -597,7 +603,7 @@ export class WahaController {
             const newContact = await this.prisma.contact.create({
               data: {
                 phone: contactNumber,
-                name: defaultPhoneName,
+                name: contactName || defaultAnonName,
               },
             });
             contactId = newContact.id;
@@ -877,6 +883,55 @@ export class WahaController {
                       );
                     }
                   }
+                }
+              }
+              if (reply.lead) {
+                try {
+                  const replyContactNumber = (message.from || '').replace(
+                    /@c\.us|@s\.whatsapp\.net|@lid/g,
+                    '',
+                  );
+                  const contact = await this.prisma.contact.findFirst({
+                    where: {
+                      OR: [
+                        { phone: contactNumber },
+                        { phone: rawNumber },
+                        { phone: replyContactNumber },
+                        { phone: { contains: replyContactNumber } },
+                        ...(message?.from ? [{ phone: message.from }] : []),
+                      ],
+                    },
+                  });
+                  if (contact) {
+                    const existingMeta = (contact.metadata as Record<string, any>) || {};
+                    const updatedMeta = {
+                      ...existingMeta,
+                      ...(reply.lead.perumahan && { perumahan: reply.lead.perumahan }),
+                      ...(reply.lead.tipeUnit && { tipeUnit: reply.lead.tipeUnit }),
+                      ...(reply.lead.hargaUnit && { hargaUnit: reply.lead.hargaUnit }),
+                    };
+                    const leadNotes = reply.lead.notes;
+                    const combinedNotes = leadNotes
+                      ? contact.notes
+                        ? `${contact.notes}\n${leadNotes}`
+                        : leadNotes
+                      : contact.notes;
+
+                    await this.prisma.contact.update({
+                      where: { id: contact.id },
+                      data: {
+                        ...(reply.lead.customerName &&
+                          (!contact.name || contact.name === contact.phone || contact.name.startsWith('+')) && {
+                            name: reply.lead.customerName,
+                          }),
+                        ...(reply.lead.status && { status: reply.lead.status }),
+                        ...(combinedNotes && { notes: combinedNotes }),
+                        metadata: updatedMeta,
+                      },
+                    });
+                  }
+                } catch (e) {
+                  this.logger.warn(`Lead auto-update failed: ${e.message}`);
                 }
               }
               if (reply.images && reply.images.length > 0) {
