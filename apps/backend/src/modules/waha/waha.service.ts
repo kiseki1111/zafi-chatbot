@@ -654,7 +654,88 @@ export class WahaService implements OnApplicationBootstrap {
     if (isVideo) {
       return this.sendVideo(sessionName, chatId, mediaUrl, caption);
     }
+    const isPdfOrDoc = /\.(pdf|doc|docx|xls|xlsx|csv|txt)($|\?)/i.test(mediaUrl);
+    if (isPdfOrDoc) {
+      return this.sendDocument(sessionName, chatId, mediaUrl, caption);
+    }
     return this.sendImage(sessionName, chatId, mediaUrl, caption);
+  }
+
+  async sendDocument(
+    sessionName: string,
+    chatId: string,
+    documentUrl: string,
+    caption?: string,
+  ): Promise<any> {
+    try {
+      documentUrl = this.resolveMediaUrl(documentUrl);
+      this.logger.log(
+        `[WAHA-SEND-DOC] Sesi=${sessionName} | Chat=${chatId} | URL: ${documentUrl}`,
+      );
+      await this.sendTypingPresence(sessionName, chatId);
+
+      const isPdf = /\.pdf($|\?)/i.test(documentUrl);
+      const defaultMime = isPdf ? 'application/pdf' : 'application/octet-stream';
+      const cleanFilename =
+        documentUrl.split('/').pop()?.split('?')[0] || (isPdf ? 'document.pdf' : 'document');
+
+      const filePayload: any = {
+        mimetype: defaultMime,
+        filename: cleanFilename,
+      };
+
+      const localFile = this.resolveToLocalFile(documentUrl);
+      if (localFile && fs.existsSync(localFile)) {
+        const fileBuffer = fs.readFileSync(localFile);
+        filePayload.data = fileBuffer.toString('base64');
+      } else {
+        try {
+          const downloadRes = await axios.get(documentUrl, {
+            responseType: 'arraybuffer',
+            timeout: 25000,
+          });
+          filePayload.data = Buffer.from(downloadRes.data).toString('base64');
+          if (downloadRes.headers['content-type']) {
+            filePayload.mimetype = downloadRes.headers['content-type'];
+          }
+        } catch (e: any) {
+          filePayload.url = documentUrl;
+        }
+      }
+
+      const payload: any = {
+        session: sessionName,
+        chatId: chatId,
+        file: filePayload,
+      };
+      if (caption) payload.caption = caption;
+
+      const response = await axios.post(
+        `${this.baseUrl}/api/sendFile`,
+        payload,
+        {
+          headers: this.getHeaders(),
+          timeout: 45000,
+        },
+      );
+
+      await this.prisma.whatsappInstance
+        .update({
+          where: { instanceName: sessionName },
+          data: { messagesSent: { increment: 1 } },
+        })
+        .catch(() => null);
+
+      return response.data;
+    } catch (error: any) {
+      const errorDetail = error.response?.data
+        ? JSON.stringify(error.response.data)
+        : error.message;
+      this.logger.error(
+        `Failed to send document. URL=${documentUrl} | Error: ${errorDetail}`,
+      );
+      throw error;
+    }
   }
 
   // Kirim video sebagai file/dokumen MP4 (kompatibel penuh dengan semua perangkat

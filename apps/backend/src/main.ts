@@ -21,6 +21,16 @@ async function bootstrap() {
         : ['log', 'warn', 'error', 'debug'],
   });
 
+  // Normalisasi url webhook WAHA yang berulang atau memiliki prefix ganda
+  app.use((req: any, res: any, next: any) => {
+    if (req.url && req.url.startsWith('/api/waha/webhook')) {
+      const queryIdx = req.url.indexOf('?');
+      const query = queryIdx !== -1 ? req.url.substring(queryIdx) : '';
+      req.url = '/api/v1/waha/webhook' + query;
+    }
+    next();
+  });
+
   // Serve static assets from 'public' folder
   app.useStaticAssets(join(__dirname, '..', 'public'));
 
@@ -57,21 +67,9 @@ async function bootstrap() {
   } else {
     app.use(helmet());
   }
-  // 2. Mengaktifkan CORS Whitelist fleksibel untuk lokal & domain resmi
+  // 2. Mengaktifkan CORS fleksibel untuk frontend & webhook client
   app.enableCors({
-    origin: (origin, callback) => {
-      if (
-        !origin ||
-        origin.includes('localhost') ||
-        origin.includes('127.0.0.1') ||
-        origin.includes('192.168.') ||
-        origin.includes('zafiproperti.com') ||
-        origin.includes('zafii.tech')
-      ) {
-        return callback(null, true);
-      }
-      return callback(null, true);
-    },
+    origin: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     credentials: true,
   });

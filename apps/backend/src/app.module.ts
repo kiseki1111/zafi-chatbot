@@ -15,8 +15,6 @@ import { KnowledgeIngestModule } from './features/knowledge-ingest/knowledge-ing
 import { AppController } from './app.controller';
 import { OpenAiModule } from './core/openai/openai.module';
 import { OmnichannelModule } from './core/omnichannel/omnichannel.module';
-import { AgentAssistantModule } from './features/agent-assistant/agent-assistant.module';
-import { SimulatorModule } from './features/simulator/simulator.module';
 import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 import { AvailabilityModule } from './modules/availability/availability.module';
 import { ContactsModule } from './modules/contacts/contacts.module';
@@ -47,8 +45,6 @@ import { PlatformModule } from './modules/platform/platform.module';
     KnowledgeIngestModule,
     OpenAiModule,
     OmnichannelModule,
-    AgentAssistantModule,
-    SimulatorModule,
     KnowledgeModule,
     AvailabilityModule,
   ],

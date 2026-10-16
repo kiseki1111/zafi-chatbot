@@ -9,7 +9,6 @@ import {
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { OPENAI_CLIENT, OPENAI_VISION_MODEL } from '../../core/openai/openai.module';
 import { OpenAI } from 'openai';
-import { v4 as uuidv4 } from 'uuid';
 import { DataAgentService } from '../../features/knowledge-ingest/data-agent.service';
 const pdfParse = require('pdf-parse');
 import * as mammoth from 'mammoth';

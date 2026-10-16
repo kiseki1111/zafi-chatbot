@@ -18,8 +18,5 @@
     "test:security": "node tests/security/penetration-test.js",
     "test:stress": "node tests/load/stress-runner.js",
     "test:persona": "node scripts/persona-user-tester.js"
-  },
-  "dependencies": {
-    "class-transformer": "^0.5.1"
   }
 }

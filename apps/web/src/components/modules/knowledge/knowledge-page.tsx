@@ -279,10 +279,10 @@ export function KnowledgePage() {
               size="sm"
               onClick={() => openCreate("create-media")}
               className="h-7.5 text-xs gap-1 px-2 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 bg-emerald-50/50 dark:bg-emerald-950/20 hover:bg-emerald-100"
-              title="Unggah File / Media Perusahaan (Foto, Video, Brosur PDF tanpa OCR, siap dikirim bot WhatsApp)"
+              title="Unggah File / Media Perusahaan (Foto, Video, Brosur PDF tanpa OCR)"
             >
               <Paperclip className="h-3 w-3" />
-              <span>Media / File Bot</span>
+              <span>Media / File</span>
             </Button>
             <Button
               variant="outline"
@@ -310,7 +310,7 @@ export function KnowledgePage() {
         <div className="flex items-center gap-3 text-xs sm:text-sm text-muted-foreground pt-1.5 border-t border-border/50 flex-wrap">
           <span className="font-semibold text-foreground text-sm sm:text-base">{items.length}</span> Total
           <span>·</span>
-          <span>{items.filter(i => i.metadata?.type === 'media').length} File Media Bot</span>
+          <span>{items.filter(i => i.metadata?.type === 'media').length} File Media</span>
           <span>·</span>
           <span>{items.filter(i => i.metadata?.type === 'file').length} Dokumen OCR</span>
           <span>·</span>
@@ -376,16 +376,16 @@ export function KnowledgePage() {
             let badgeClass = "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300";
             if (isMedia) {
               if (isVideo) {
-                badgeText = "Video Bot";
+                badgeText = "Video";
                 badgeClass = "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300";
               } else if (isMediaImage) {
-                badgeText = "Foto Bot";
+                badgeText = "Foto";
                 badgeClass = "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300";
               } else if (isPdf) {
                 badgeText = "Brosur PDF";
                 badgeClass = "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300";
               } else {
-                badgeText = "File Bot";
+                badgeText = "File";
                 badgeClass = "bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300";
               }
             } else if (isFile) {
@@ -878,7 +878,7 @@ export function KnowledgePage() {
               <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground border-t border-border/50 pt-2.5">
                 <div>
                   <span className="font-semibold text-foreground">Tipe: </span>
-                  {previewItem.metadata?.type === 'media' ? `Media Bot (${previewItem.metadata.mediaType || 'file'})` : previewItem.metadata?.type === 'file' ? 'Dokumen OCR' : 'Teks Manual'}
+                  {previewItem.metadata?.type === 'media' ? `File Media (${previewItem.metadata.mediaType || 'file'})` : previewItem.metadata?.type === 'file' ? 'Dokumen OCR' : 'Teks Manual'}
                 </div>
                 {previewItem.metadata?.filename && (
                   <div className="truncate">

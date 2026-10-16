@@ -328,16 +328,6 @@ model Note {
   @@map("notes")
 }
 
-model Broadcast {
-  id        String   @id @default(uuid())
-  name      String   @db.VarChar(150)
-  content   String   @db.Text
-  status    String   @default("DRAFT") @db.VarChar(50)
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@map("broadcasts")
-}
-
 // --- MASTER DATA LISTING (UMKM) ---
 model Product {
   id          String  @id @default(uuid())
@@ -454,7 +444,6 @@ model Tenant {
   knowledgeBases    KnowledgeBase[]
   vectorKnowledge   VectorKnowledge[]
   salesRecords      SalesRecord[]
-  onboardingSession OnboardingSession?
   whatsappInstances WhatsappInstance[]
   resourceGroups    ResourceGroup[]
   followUpConfig    FollowUpConfig?
@@ -497,48 +486,6 @@ model ResourceItem {
 
   @@unique([groupId, code])
   @@map("resource_items")
-}
-
-model OnboardingSession {
-  id        String   @id @default(uuid())
-  tenantId  String?  @unique @map("tenant_id")
-  chatId    String   @unique @map("chat_id")
-  platform  String   @default("TELEGRAM") @db.VarChar(20)
-  state     String   @default("SECTION_A") @db.VarChar(50)
-  data      Json     @default("{}")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("onboarding_sessions")
-}
-
-// --- DESIGN BOT (telegram-ai-bot merged) ---
-
-model DesignSession {
-  id         String   @id @default(uuid())
-  userId     String   @unique @map("user_id")
-  step       String   @default("prompting") @db.VarChar(50)
-  data       Json     @default("{}")
-  lastActive DateTime @default(now()) @map("last_active")
-  expiresAt  DateTime @map("expires_at")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
-
-  @@map("design_sessions")
-}
-
-model DesignGeneration {
-  id         String   @id @default(uuid())
-  userId     String   @map("user_id")
-  prompt     String?  @db.Text
-  imageUrl   String?  @map("image_url") @db.Text
-  designType String?  @map("design_type") @db.VarChar(50)
-  status     String   @default("success") @db.VarChar(20)
-  createdAt  DateTime @default(now()) @map("created_at")
-
-  @@map("design_generations")
 }
 
 // --- PLATFORM-LEVEL CONFIG (superadmin) ---

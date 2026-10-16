@@ -326,7 +326,7 @@ export class WahaController {
 
   @SkipThrottle()
   @Public()
-  @Post(['webhook', '/api/waha/webhook', '/api/waha/webhook/api/v1/waha/webhook'])
+  @Post('webhook')
   async handleWebhook(
     @Body() payload: any,
     @Headers('x-webhook-secret') headerSecret?: string,
@@ -943,15 +943,16 @@ export class WahaController {
                       text: `[Waha Bot img] URL: ${img.url}, Caption: ${img.caption}`,
                     });
                   } else {
-                    await this.wahaService.sendImage(
+                    const isDoc = /\.(pdf|doc|docx|xls|xlsx|csv|txt)($|\?)/i.test(img.url);
+                    await this.wahaService.sendMedia(
                       sessionName,
                       sender,
                       img.url,
                       img.caption || '',
                     );
                     await saveBotReply(
-                      img.caption || 'Mengirim gambar',
-                      'image',
+                      img.caption || (isDoc ? 'Mengirim dokumen' : 'Mengirim gambar'),
+                      isDoc ? 'document' : 'image',
                       { mediaUrl: img.url },
                     );
                   }
