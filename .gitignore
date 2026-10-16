@@ -34,6 +34,8 @@ temp_screenshots/
 
 # Assets & Temp Media
 apps/image/
+uploads/
+**/uploads/
 
 # IDEs and editors
 /.idea

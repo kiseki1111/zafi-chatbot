@@ -129,6 +129,27 @@ export class AgentSharedService {
         }
       }
 
+      // Selalu sertakan Media Perusahaan jika customer menanyakan brosur, foto, video, profil, atau file
+      const isMediaIntent =
+        /\b(brosur|foto|gambar|video|dokumen|profil|legalitas|sertifikat|katalog|file|pricelist)\b/i.test(
+          query || '',
+        );
+      if (isMediaIntent) {
+        const mediaItems = await this.prisma.knowledgeBase.findMany({
+          where: {
+            tenantId,
+            content: { contains: '[MEDIA_PERUSAHAAN]' },
+          },
+          take: 5,
+        });
+        const existingIds = new Set(matchedItems.map((m) => m.id));
+        for (const item of mediaItems) {
+          if (!existingIds.has(item.id)) {
+            matchedItems.push(item);
+          }
+        }
+      }
+
       return matchedItems.map((k) => k.content).join('\n\n');
     } catch (e) {
       this.logger.error(`Error retrieving relevant knowledge: ${e.message}`);

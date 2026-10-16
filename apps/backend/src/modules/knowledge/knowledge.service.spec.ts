@@ -179,5 +179,46 @@ describe('KnowledgeService', () => {
         'tenant-123',
       );
     });
+
+    it('Berhasil menyimpan file media perusahaan (createMedia) tanpa blocking OCR', async () => {
+      const mockMediaFile = {
+        originalname: 'brosur-perusahaan-2026.pdf',
+        filename: '1700000000-brosur.pdf',
+        mimetype: 'application/pdf',
+        size: 204800,
+        path: '/tmp/1700000000-brosur.pdf',
+      } as Express.Multer.File;
+
+      mockPrismaService.knowledgeBase.create.mockResolvedValueOnce({
+        id: 'kb-media-1',
+        content: `[MEDIA_PERUSAHAAN]\nJudul: Brosur Perusahaan 2026\nTipe: DOKUMEN_PDF\nURL: /uploads/1700000000-brosur.pdf\nKeterangan: Company profile resmi`,
+        tenantId: 'tenant-123',
+        metadata: {
+          type: 'media',
+          mediaType: 'pdf',
+          title: 'Brosur Perusahaan 2026',
+          name: 'Brosur Perusahaan 2026',
+          description: 'Company profile resmi',
+          url: '/uploads/1700000000-brosur.pdf',
+        },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const res = await service.createMedia(
+        'tenant-123',
+        mockMediaFile,
+        'Brosur Perusahaan 2026',
+        'Company profile resmi',
+      );
+
+      expect(res.id).toBe('kb-media-1');
+      expect(res.title).toBe('Brosur Perusahaan 2026');
+      expect(res.metadata.type).toBe('media');
+      expect(res.url).toBe('/uploads/1700000000-brosur.pdf');
+      expect(mockDataAgentService.syncKnowledgeBase).toHaveBeenCalledWith(
+        'tenant-123',
+      );
+    });
   });
 });

@@ -6,7 +6,8 @@ services:
     environment:
       PORT: 3000
       WAHA_PORT: 3000
-      WHATSAPP_HOOK_URL: http://iqbal-backend:3030/api/v1/waha/webhook
+      WAHA_PRINT_QR: "false"
+      WHATSAPP_HOOK_URL: http://backend:3030/api/v1/waha/webhook
       WHATSAPP_API_KEY: ${WHATSAPP_API_KEY:-ZafitechDunia12345#}
       WHATSAPP_SWAGGER_USERNAME: admin
       WHATSAPP_SWAGGER_PASSWORD: adminpassword123

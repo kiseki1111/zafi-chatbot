@@ -31,8 +31,12 @@ async function bootstrap() {
   }
   app.useStaticAssets(uploadsPath, {
     prefix: '/uploads/',
-    setHeaders: (res) => {
+    setHeaders: (res, path) => {
       res.setHeader('Accept-Ranges', 'bytes');
+      if (path && path.toLowerCase().endsWith('.pdf')) {
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'inline');
+      }
     },
   });
   const configService = app.get(ConfigService);
@@ -86,6 +90,12 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter());
 
   const port = process.env.PORT || 3030;
-  await app.listen(port, '0.0.0.0');
+  const server = await app.listen(port, '0.0.0.0');
+  if (server) {
+    // Mencegah socket hang up (ECONNRESET) saat AI Vision atau upload file besar berjalan lama
+    server.keepAliveTimeout = 120000;
+    server.headersTimeout = 125000;
+    server.timeout = 300000;
+  }
 }
 bootstrap();

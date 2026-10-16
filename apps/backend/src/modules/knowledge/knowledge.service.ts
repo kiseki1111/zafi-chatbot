@@ -15,6 +15,12 @@ const pdfParse = require('pdf-parse');
 import * as mammoth from 'mammoth';
 import * as xlsx from 'xlsx';
 const sharp = require('sharp');
+import * as fs from 'fs';
+import { join } from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 @Injectable()
 export class KnowledgeService {
@@ -73,10 +79,10 @@ export class KnowledgeService {
           metadata: { title, type: 'text' },
         },
       });
-      // Sync to vector DB so agent can use it immediately
-      await this.dataAgentService
+      // Sync to vector DB secara background agar HTTP response langsung kembali cepat
+      this.dataAgentService
         .syncKnowledgeBase(tenantId)
-        .catch((e) => console.warn('Knowledge sync warning:', e.message));
+        .catch((e) => this.logger.warn(`Knowledge sync warning: ${e.message}`));
       return {
         id: result.id,
         title,
@@ -159,14 +165,16 @@ export class KnowledgeService {
 
       const candidateModels = isOpenRouter
         ? [
-            this.visionModel,
-            'z-ai/glm-5.3-flash',
-            'meta-llama/llama-3.2-11b-vision-instruct',
-            'meta-llama/llama-4-scout',
-            'xiaomi/mimo-v2.5',
-            'openai/gpt-4o-mini',
+            this.visionModel && this.visionModel !== 'z-ai/glm-5.3-flash'
+              ? this.visionModel
+              : null,
+            'google/gemini-2.0-flash-001',
             'google/gemini-2.5-flash',
-          ].filter((m, idx, arr) => Boolean(m) && arr.indexOf(m) === idx)
+            'openai/gpt-4o-mini',
+            'meta-llama/llama-3.2-11b-vision-instruct',
+            'z-ai/glm-5.3-flash',
+            'xiaomi/mimo-v2.5',
+          ].filter((m, idx, arr): m is string => Boolean(m) && arr.indexOf(m) === idx)
         : [
             this.visionModel || 'gpt-4o-mini',
             'gpt-4o-mini',
@@ -191,7 +199,10 @@ Tugas Anda:
           this.logger.log(
             `[KnowledgeService] Ekstraksi gambar via AI Vision: model ${model}...`,
           );
-          const response = await this.openai.chat.completions.create({
+          const isReasoningModel =
+            String(model).toLowerCase().includes('glm') ||
+            String(model).toLowerCase().includes('r1');
+          const requestPayload: any = {
             model: model as string,
             messages: [
               {
@@ -206,7 +217,12 @@ Tugas Anda:
               },
             ],
             max_tokens: 3500,
-          });
+          };
+          if (isOpenRouter && isReasoningModel) {
+            requestPayload.extra_body = { reasoning: { effort: 'low' } };
+          }
+          const response =
+            await this.openai.chat.completions.create(requestPayload);
 
           const msg: any = response.choices?.[0]?.message;
           const content = (msg?.content || msg?.reasoning || '').trim();
@@ -329,6 +345,24 @@ Tugas Anda:
     const content = await this.processFile(file);
     const finalTitle = title || file.originalname;
 
+    // Simpan salinan file ke folder uploads agar dapat dilihat / diunduh pengguna di modal preview
+    let relativeUrl: string | undefined = undefined;
+    if (file.buffer) {
+      try {
+        const uploadPath = join(process.cwd(), 'uploads');
+        if (!fs.existsSync(uploadPath)) {
+          fs.mkdirSync(uploadPath, { recursive: true });
+        }
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+        const cleanName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const filename = `${uniqueSuffix}-${cleanName}`;
+        fs.writeFileSync(join(uploadPath, filename), file.buffer);
+        relativeUrl = `/uploads/${filename}`;
+      } catch (e: any) {
+        this.logger.warn(`Could not save file copy to uploads: ${e.message}`);
+      }
+    }
+
     try {
       const result = await this.prisma.knowledgeBase.create({
         data: {
@@ -338,13 +372,14 @@ Tugas Anda:
             title: finalTitle,
             type: 'file',
             filename: file.originalname,
+            url: relativeUrl,
           },
         },
       });
-      // Sync to vector DB so agent can use it immediately
-      await this.dataAgentService
+      // Sync to vector DB secara background agar HTTP response tidak tertahan dan tidak timeout / socket hang up (ECONNRESET)
+      this.dataAgentService
         .syncKnowledgeBase(tenantId)
-        .catch((e) => console.warn('Knowledge sync warning:', e.message));
+        .catch((e) => this.logger.warn(`Knowledge sync warning: ${e.message}`));
       return {
         id: result.id,
         title: finalTitle,
@@ -357,6 +392,146 @@ Tugas Anda:
     } catch (error: any) {
       console.error('DB Insert Error:', error);
       throw new BadRequestException('Database insert failed: ' + error.message);
+    }
+  }
+
+  async createMedia(
+    tenantId: string,
+    file: Express.Multer.File,
+    name?: string,
+    description?: string,
+    req?: any,
+  ) {
+    if (!file) throw new BadRequestException('File is required');
+
+    const isVideo =
+      file.mimetype.startsWith('video/') ||
+      /\.(mov|mp4|mkv|avi|webm)$/i.test(file.originalname);
+    const isImage =
+      file.mimetype.startsWith('image/') ||
+      /\.(jpe?g|png|webp|bmp|gif)$/i.test(file.originalname);
+    const isPdf =
+      file.mimetype.includes('pdf') || /\.pdf$/i.test(file.originalname);
+
+    const mediaType = isVideo
+      ? 'video'
+      : isImage
+        ? 'image'
+        : isPdf
+          ? 'pdf'
+          : 'document';
+    const finalTitle =
+      (name || '').trim() ||
+      file.originalname.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+    const cleanDesc = (description || '').trim();
+
+    if (isVideo && file.path) {
+      this.optimizeVideoInBackground(file.path, file.originalname);
+    }
+
+    const host =
+      req?.get ? req.get('host') || 'localhost:3000' : 'localhost:3000';
+    const protocol =
+      req?.headers && req.headers['x-forwarded-proto']
+        ? req.headers['x-forwarded-proto']
+        : req?.protocol || 'http';
+    const baseUrl = process.env.PUBLIC_URL || `${protocol}://${host}`;
+    const relativeUrl = `/uploads/${file.filename}`;
+
+    const typeLabel = isVideo
+      ? 'VIDEO'
+      : isImage
+        ? 'FOTO/GAMBAR'
+        : isPdf
+          ? 'DOKUMEN_PDF'
+          : 'FILE';
+
+    const content = `[MEDIA_PERUSAHAAN]
+Judul: ${finalTitle}
+Tipe: ${typeLabel}
+URL: ${relativeUrl}
+${cleanDesc ? `Keterangan: ${cleanDesc}` : ''}`.trim();
+
+    try {
+      const result = await this.prisma.knowledgeBase.create({
+        data: {
+          tenantId,
+          content,
+          metadata: {
+            type: 'media',
+            mediaType,
+            title: finalTitle,
+            name: finalTitle,
+            description: cleanDesc,
+            url: relativeUrl,
+            fullUrl: `${baseUrl}${relativeUrl}`,
+            filename: file.filename,
+            originalName: file.originalname,
+            size: file.size,
+          },
+        },
+      });
+
+      this.dataAgentService
+        .syncKnowledgeBase(tenantId)
+        .catch((e) => this.logger.warn(`Knowledge sync warning: ${e.message}`));
+
+      return {
+        id: result.id,
+        title: finalTitle,
+        content,
+        metadata: result.metadata,
+        url: relativeUrl,
+        fullUrl: `${baseUrl}${relativeUrl}`,
+        mediaType,
+        tenantId,
+        createdAt: result.createdAt,
+        updatedAt: result.updatedAt,
+      };
+    } catch (error: any) {
+      this.logger.error('DB Insert Error:', error);
+      throw new BadRequestException('Database insert failed: ' + error.message);
+    }
+  }
+
+  private async optimizeVideoInBackground(
+    filePath: string,
+    originalName: string,
+  ) {
+    const tempOutputPath = `${filePath}.opt.mp4`;
+    const fileSize = fs.existsSync(filePath) ? fs.statSync(filePath).size : 0;
+    this.logger.log(
+      `[FFMPEG-ASYNC-START] File: ${originalName} | Size: ${(fileSize / 1024 / 1024).toFixed(2)} MB`,
+    );
+
+    try {
+      const startTime = Date.now();
+      await execAsync(
+        `ffmpeg -y -i "${filePath}" -vf "scale='min(720,iw)':-2" -c:v libx264 -preset fast -crf 28 -g 60 -keyint_min 30 -c:a aac -b:a 128k -movflags +faststart "${tempOutputPath}"`,
+        { timeout: 360000 },
+      );
+      const durationMs = Date.now() - startTime;
+
+      if (
+        fs.existsSync(tempOutputPath) &&
+        fs.statSync(tempOutputPath).size > 0
+      ) {
+        fs.unlinkSync(filePath);
+        fs.renameSync(tempOutputPath, filePath);
+
+        this.logger.log(
+          `[FFMPEG-ASYNC-SUCCESS] Video ${originalName} berhasil dioptimasi dalam ${durationMs}ms!`,
+        );
+      }
+    } catch (err: any) {
+      this.logger.error(
+        `[FFMPEG-ASYNC-ERROR] Gagal konversi video ${originalName}: ${err.message}`,
+      );
+      if (fs.existsSync(tempOutputPath)) {
+        try {
+          fs.unlinkSync(tempOutputPath);
+        } catch {}
+      }
     }
   }
 
@@ -378,10 +553,10 @@ Tugas Anda:
       tenantId,
     );
 
-    // Sync to vector DB so agent gets updated knowledge
-    await this.dataAgentService
+    // Sync to vector DB secara background
+    this.dataAgentService
       .syncKnowledgeBase(tenantId)
-      .catch((e) => console.warn('Knowledge sync warning:', e.message));
+      .catch((e) => this.logger.warn(`Knowledge sync warning: ${e.message}`));
 
     return this.findOne(id, tenantId);
   }

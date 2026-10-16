@@ -37,6 +37,11 @@ export async function GET(
       if (val) responseHeaders.set(h, val);
     }
 
+    if (filePath.toLowerCase().endsWith(".pdf")) {
+      responseHeaders.set("content-type", "application/pdf");
+      responseHeaders.set("content-disposition", "inline");
+    }
+
     if (!responseHeaders.has("accept-ranges")) {
       responseHeaders.set("accept-ranges", "bytes");
     }

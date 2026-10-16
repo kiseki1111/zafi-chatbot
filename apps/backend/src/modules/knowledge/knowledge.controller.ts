@@ -15,6 +15,9 @@ import {
 } from '@nestjs/common';
 import { KnowledgeService } from './knowledge.service';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname, join } from 'path';
+import * as fs from 'fs';
 import { DataAgentService } from '../../features/knowledge-ingest/data-agent.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
@@ -66,6 +69,53 @@ export class KnowledgeController {
     const tenantId = this.resolveTenantId(req);
     if (!file) throw new BadRequestException('File is required');
     return this.knowledgeService.createFile(tenantId, file, title);
+  }
+
+  @Post('media')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (req, file, cb) => {
+          const uploadPath = join(process.cwd(), 'uploads');
+          if (!fs.existsSync(uploadPath)) {
+            fs.mkdirSync(uploadPath, { recursive: true });
+          }
+          cb(null, uploadPath);
+        },
+        filename: (req, file, cb) => {
+          const uniqueSuffix =
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
+          const ext = extname(file.originalname).toLowerCase();
+          const cleanName = file.originalname
+            .replace(/\.[^/.]+$/, '')
+            .replace(/[^a-zA-Z0-9]/g, '_');
+          const isVideo =
+            file.mimetype.startsWith('video/') ||
+            /\.(mov|mp4|mkv|avi|webm)$/i.test(file.originalname);
+          const finalExt = isVideo ? '.mp4' : ext;
+          cb(null, `${uniqueSuffix}-${cleanName}${finalExt}`);
+        },
+      }),
+      limits: {
+        fileSize: 300 * 1024 * 1024, // 300MB
+      },
+    }),
+  )
+  async uploadMedia(
+    @Req() req: any,
+    @UploadedFile() file: Express.Multer.File,
+    @Body('name') name?: string,
+    @Body('description') description?: string,
+  ) {
+    const tenantId = this.resolveTenantId(req);
+    if (!file) throw new BadRequestException('File is required');
+    return this.knowledgeService.createMedia(
+      tenantId,
+      file,
+      name,
+      description,
+      req,
+    );
   }
 
   @Put(':id')

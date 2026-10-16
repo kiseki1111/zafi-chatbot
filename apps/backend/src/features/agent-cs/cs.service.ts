@@ -37,7 +37,7 @@ ATURAN MENJAWAB KETERSEDIAAN UNIT / PLANSITE:
 
 ATURAN PENGIRIMAN GAMBAR & VIDEO (STRICT):
 1. Pengiriman VIDEO HANYA BOLEH jika pelanggan SECARA EKSPLISIT DAN JELAS MEMINTA video (misal: "minta video", "ada videonya?", "kirim video unit", "mau lihat video"). JIKA TIDAK DIMINTA VIDEO OLEH PELANGGAN, ARRAY "videos" WAJIB KOSONG []. DILARANG KERAS mengirim video secara inisiatif sendiri!
-2. Jika pelanggan meminta foto/gambar, masukkan ke array "images".
+2. Jika pelanggan meminta foto/gambar atau brosur perusahaan (termasuk dari daftar [MEDIA_PERUSAHAAN] atau siteplan), masukkan ke array "images" dengan format { "url": "URL_DARI_DATABASE", "caption": "Nama Media" }.
 3. Jangan pernah memasukkan link gambar atau video ke dalam text balasan. Pisahkan ke array "images" atau "videos". Jangan pernah gunakan example.com.
 
 ATURAN FALLBACK (PERTANYAAN DI LUAR DATABASE):

@@ -47,6 +47,15 @@ interface BackgroundTasksState {
     onError?: (err: Error) => void;
   }) => Promise<void>;
 
+  runKnowledgeMediaUpload: (params: {
+    file: File;
+    name: string;
+    description?: string;
+    tenantId: string;
+    onSuccess?: () => void;
+    onError?: (err: Error) => void;
+  }) => Promise<void>;
+
   runSiteplanMediaUpload: (params: {
     file: File;
     name: string;
@@ -277,6 +286,88 @@ export const useBackgroundTasksStore = create<BackgroundTasksState>(
           completedAt: Date.now(),
         });
         toast.error(`Gagal menyimpan "${title}": ${errorMsg}`);
+        onError?.(err);
+      }
+    },
+
+    runKnowledgeMediaUpload: async ({
+      file,
+      name,
+      description,
+      tenantId,
+      onSuccess,
+      onError,
+    }) => {
+      const totalMb = (file.size / 1024 / 1024).toFixed(1);
+      const isVideo =
+        file.type.startsWith("video/") ||
+        /\.(mov|mp4|mkv|webm|avi)$/i.test(file.name);
+      const isPdf =
+        file.type.includes("pdf") || /\.pdf$/i.test(file.name);
+      const taskId = get().addTask({
+        title: name,
+        category: "knowledge",
+        status: "running",
+        progress: 0,
+        statusText: `Mengunggah (${totalMb} MB)`,
+      });
+
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("name", name);
+        if (description) formData.append("description", description);
+        formData.append("tenantId", tenantId);
+
+        await uploadWithProgress(
+          "/api/v1/knowledge/media",
+          formData,
+          (percent, loaded) => {
+            const loadedMb = (loaded / 1024 / 1024).toFixed(1);
+            if (percent >= 100) {
+              get().updateTask(taskId, {
+                progress: 100,
+                statusText: isVideo
+                  ? "File terkirim. Server sedang mengompres video via FFmpeg..."
+                  : "File terkirim. Menyimpan ke Knowledge Base...",
+              });
+            } else {
+              get().updateTask(taskId, {
+                progress: percent,
+                statusText: `Mengunggah (${loadedMb} / ${totalMb} MB)`,
+              });
+            }
+          },
+        );
+
+        get().updateTask(taskId, {
+          status: "success",
+          statusText: isVideo
+            ? "Video berhasil diunggah & siap dikirim bot WhatsApp!"
+            : isPdf
+            ? "Dokumen PDF berhasil disimpan ke Knowledge!"
+            : "Media berhasil disimpan ke Knowledge!",
+          completedAt: Date.now(),
+        });
+
+        toast.success(`Media "${name}" berhasil disimpan ke Knowledge!`);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("knowledge-updated"));
+        }
+        onSuccess?.();
+
+        setTimeout(() => {
+          get().removeTask(taskId);
+        }, 10000);
+      } catch (err: any) {
+        const errorMsg = err.message || "Gagal mengunggah media";
+        get().updateTask(taskId, {
+          status: "error",
+          statusText: "Gagal: " + errorMsg,
+          error: errorMsg,
+          completedAt: Date.now(),
+        });
+        toast.error(`Gagal upload "${name}": ${errorMsg}`);
         onError?.(err);
       }
     },

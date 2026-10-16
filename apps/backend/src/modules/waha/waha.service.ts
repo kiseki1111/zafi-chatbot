@@ -225,13 +225,19 @@ export class WahaService implements OnApplicationBootstrap {
 
       if (webhookUrls) {
         const urls = Array.isArray(webhookUrls) ? webhookUrls : [webhookUrls];
-        const formattedUrls = urls.map((url) => {
-          let finalUrl = url.trim();
-          if (!finalUrl.endsWith('/api/v1/waha/webhook')) {
-            finalUrl = finalUrl.replace(/\/$/, '') + '/api/v1/waha/webhook';
-          }
-          return finalUrl;
-        });
+        const formattedUrls = Array.from(
+          new Set(
+            urls.map((url) => {
+              let finalUrl = url.trim().replace(/\/$/, '');
+              // Bersihkan variasi path webhook agar tidak terjadi duplikasi
+              finalUrl = finalUrl
+                .replace(/\/api\/waha\/webhook/g, '')
+                .replace(/\/api\/v1\/waha\/webhook/g, '');
+              finalUrl = `${finalUrl}/api/v1/waha/webhook`;
+              return finalUrl;
+            }),
+          ),
+        );
 
         const webhookSecret =
           process.env.WAHA_WEBHOOK_SECRET ||
@@ -254,8 +260,8 @@ export class WahaService implements OnApplicationBootstrap {
                 'presence.update',
               ],
               retries: {
-                delaySeconds: 10,
-                attempts: 15,
+                delaySeconds: 5,
+                attempts: 3,
                 policy: 'fixed',
               },
             };

@@ -75,26 +75,27 @@ export class WahaController {
         );
       }
 
-      const webhooks: string[] = [];
+      const rawWebhooks: string[] = [];
 
       if (process.env.WEBHOOK_URL) {
-        webhooks.push(process.env.WEBHOOK_URL);
+        rawWebhooks.push(process.env.WEBHOOK_URL);
       }
       if (
         webhookUrl &&
         !webhookUrl.includes('localhost') &&
         !webhookUrl.includes('127.0.0.1')
       ) {
-        webhooks.push(webhookUrl);
+        rawWebhooks.push(webhookUrl);
       }
 
-      // Perlindungan webhook internal docker & localhost
-      webhooks.push('http://backend:3030/api/v1/waha/webhook');
-      webhooks.push('http://iqbal-backend:3030/api/v1/waha/webhook');
-      webhooks.push('http://172.17.0.1:3030/api/v1/waha/webhook'); // Docker default gateway
+      // Webhook internal Docker network (primary & fast)
+      rawWebhooks.push('http://backend:3030/api/v1/waha/webhook');
+
+      // Deduplikasi webhook URL agar tidak mendaftarkan endpoint yang sama berulang kali
+      const webhooks = Array.from(new Set(rawWebhooks.filter(Boolean)));
 
       this.logger.log(
-        `[WAHA] Mendaftarkan total ${webhooks.length} Webhook sekaligus: ${webhooks.join(', ')}`,
+        `[WAHA] Mendaftarkan webhook aktif: ${webhooks.join(', ')}`,
       );
 
       return await this.wahaService.startSession(
@@ -325,7 +326,7 @@ export class WahaController {
 
   @SkipThrottle()
   @Public()
-  @Post('webhook')
+  @Post(['webhook', '/api/waha/webhook', '/api/waha/webhook/api/v1/waha/webhook'])
   async handleWebhook(
     @Body() payload: any,
     @Headers('x-webhook-secret') headerSecret?: string,
