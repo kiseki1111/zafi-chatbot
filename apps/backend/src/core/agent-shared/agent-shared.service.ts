@@ -200,7 +200,12 @@ export class AgentSharedService {
           take: 15,
           orderBy: { createdAt: 'desc' },
         });
-        return knowledges.map((k) => k.content).join('\n\n');
+        return knowledges
+          .map((k) => {
+            const title = (k.metadata as any)?.title;
+            return title ? `[DOKUMEN PENGETAHUAN: ${title}]\n${k.content}` : k.content;
+          })
+          .join('\n\n');
       }
 
       // 2. Jika dokumen banyak (> 15 dokumen), lakukan pencarian terseleksi berbasis kata kunci query
@@ -260,7 +265,14 @@ export class AgentSharedService {
         }
       }
 
-      return matchedItems.map((k) => k.content).join('\n\n');
+      return matchedItems
+        .map((k) => {
+          const title = (k.metadata as any)?.title;
+          return title
+            ? `[DOKUMEN PENGETAHUAN: ${title}]\n${k.content}`
+            : k.content;
+        })
+        .join('\n\n');
     } catch (e) {
       this.logger.error(`Error retrieving relevant knowledge: ${e.message}`);
       return '';

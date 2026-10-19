@@ -418,12 +418,18 @@ export class WahaService implements OnApplicationBootstrap {
     text: string,
   ): Promise<any> {
     try {
+      this.logger.log(
+        `[WahaService] Menyiapkan pengiriman balasan ke ${chatId} (Sesi: ${sessionName})...`,
+      );
       // Simulate human typing presence
       await this.sendTypingPresence(sessionName, chatId);
 
       // Apply Adaptive WPM Delay (around 70 WPM)
       await this.adaptiveWpmDelay(text, 70);
 
+      this.logger.log(
+        `[WahaService] Mengirim teks ke endpoint WAHA /api/sendText...`,
+      );
       const response = await axios.post(
         `${this.baseUrl}/api/sendText`,
         { session: sessionName, chatId: chatId, text: text },

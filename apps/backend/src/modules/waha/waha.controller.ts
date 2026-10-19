@@ -839,6 +839,9 @@ export class WahaController {
             provider: 'WAHA',
             sessionName: sessionName,
             replyCallback: async (reply) => {
+              this.logger.log(
+                `[WahaController] AI selesai menyusun balasan (${reply.text?.length || 0} karakter), mengirim ke ${sender}...`,
+              );
               if (reply.text && reply.text.length > 0) {
                 if (sessionName === 'CLI_TEST_SESSION') {
                   this.cliOutputQueue.push({

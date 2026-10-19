@@ -62,18 +62,20 @@ jobs:
     steps:
       - name: Trigger Coolify Deployment (Force Without Cache)
         env:
-          COOLIFY_URL: ${{ secrets.COOLIFY_WEBHOOK_URL || 'https://coolify.zafii.tech/api/v1/deploy?uuid=hqcqrwm4b5gxzbvrwrw3g73m' }}
+          COOLIFY_WEB_URL: ${{ secrets.COOLIFY_WEBHOOK_URL || 'https://coolify.zafii.tech/api/v1/deploy?uuid=hqcqrwm4b5gxzbvrwrw3g73m' }}
+          COOLIFY_BACKEND_URL: ${{ secrets.COOLIFY_BACKEND_WEBHOOK_URL }}
         run: |
-          TARGET_URL="$COOLIFY_URL"
-          # Ganti force=false menjadi force=true jika ada
-          TARGET_URL=$(echo "$TARGET_URL" | sed 's/force=false/force=true/g')
-          # Tambahkan force=true jika belum ada
-          if [[ "$TARGET_URL" != *"force=true"* ]]; then
-            if [[ "$TARGET_URL" == *"?"* ]]; then
-              TARGET_URL="${TARGET_URL}&force=true"
-            else
-              TARGET_URL="${TARGET_URL}?force=true"
+          for URL in "$COOLIFY_WEB_URL" "$COOLIFY_BACKEND_URL"; do
+            if [ -n "$URL" ]; then
+              TARGET_URL=$(echo "$URL" | sed 's/force=false/force=true/g')
+              if [[ "$TARGET_URL" != *"force=true"* ]]; then
+                if [[ "$TARGET_URL" == *"?"* ]]; then
+                  TARGET_URL="${TARGET_URL}&force=true"
+                else
+                  TARGET_URL="${TARGET_URL}?force=true"
+                fi
+              fi
+              echo "Memanggil Webhook Coolify: $TARGET_URL"
+              curl -f -sSL "$TARGET_URL" || echo "Panggilan webhook selesai."
             fi
-          fi
-          echo "Memanggil Webhook Coolify: $TARGET_URL"
-          curl -f -sSL "$TARGET_URL" || echo "Panggilan webhook selesai."
+          done
