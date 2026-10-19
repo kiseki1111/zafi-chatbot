@@ -112,32 +112,40 @@ export class OmnichannelQueueService {
             continue; // Skip reply AI
           }
 
+          let isResponseHandled = false;
           const processPromise = (async () => {
             const response = await this.csService.handleMessage(task);
+            if (response && response.text) {
+              isResponseHandled = true;
+            }
             await task.replyCallback(response);
+            isResponseHandled = true;
           })();
 
           const timeoutPromise = new Promise((_, reject) =>
             setTimeout(
               () =>
                 reject(
-                  new Error('Batas waktu pemrosesan pesan habis (Timeout 35s)'),
+                  new Error('Batas waktu pemrosesan pesan habis (Timeout 60s)'),
                 ),
-              35000,
+              60000,
             ),
           );
 
           await Promise.race([processPromise, timeoutPromise]);
-        } catch (error) {
+        } catch (error: any) {
           this.logger.error(
             `[Omnichannel] Error memproses chat ${task.senderId} pada bot ${botKey}: ${error.message}`,
           );
-          try {
-            await task.replyCallback({
-              text: 'Maaf, sistem sedang sibuk. Mohon coba beberapa saat lagi.',
-              images: [],
-            });
-          } catch (e) {}
+          // Jangan pernah kirim "Maaf, sistem sibuk" jika AI sudah berhasil merespons atau sedang mengirim
+          if (!isResponseHandled) {
+            try {
+              await task.replyCallback({
+                text: 'Maaf, sistem sedang sibuk. Mohon coba beberapa saat lagi.',
+                images: [],
+              });
+            } catch (e) {}
+          }
         }
       }
     } finally {

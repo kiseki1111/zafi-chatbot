@@ -204,11 +204,11 @@ WAJIB MERESPON DALAM FORMAT JSON BERIKUT:
       }
     }
 
-    // 1. Ambil History menggunakan utilitas terpusat (16 pesan agar profil terakumulasi kuat)
+    // 1. Ambil History percakapan (8 pesan agar hemat token & respons AI jauh lebih cepat)
     const recentMessages = await this.agentSharedService.getRecentContext(
       senderId,
       effectiveSessionName,
-      16,
+      8,
     );
 
     // SANITASI: Hapus pesan halusinasi example.com
