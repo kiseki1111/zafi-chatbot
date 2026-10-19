@@ -151,9 +151,33 @@ describe('Potongan 6: Superadmin Platform Monitoring & Quota Limits (Boundary Te
 
       expect(res.body).toEqual({ pro: 1500000, business: 2500000 });
     });
+
+    it('Superadmin berhasil membaca statistik & log OpenRouter AI (200)', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/platform/openrouter/stats')
+        .expect(200);
+
+      expect(res.body).toHaveProperty('recentLogs');
+      expect(Array.isArray(res.body.recentLogs)).toBe(true);
+    });
   });
 
   describe('4. Batas Keamanan RBAC (Non-Superadmin Access Prevention)', () => {
+    it('Manager biasa DITOLAK saat mencoba membaca statistik OpenRouter (403)', async () => {
+      currentUser = {
+        sub: 'manager-user',
+        email: 'manager@tenant.com',
+        roles: ['manager'],
+        tenantId: 'tenant-1',
+      };
+
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/platform/openrouter/stats')
+        .expect(403);
+
+      expect(res.body.message).toContain('Hanya Superadmin');
+    });
+
     it('Manager biasa DITOLAK saat mencoba membaca quota overview platform (403)', async () => {
       currentUser = {
         sub: 'manager-user',

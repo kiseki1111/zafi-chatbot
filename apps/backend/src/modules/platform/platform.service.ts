@@ -1,11 +1,23 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
+import { AgentSharedService } from '../../core/agent-shared/agent-shared.service';
 
 // Ponytail: Satu model generik key-value PlatformConfig untuk pricing & ai_config.
 // Upgrade ke model terpisah kalau butuh query relasional / audit per-field.
 @Injectable()
 export class PlatformService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly agentSharedService: AgentSharedService,
+  ) {}
+
+  async getOpenRouterStats() {
+    return this.agentSharedService.getOpenRouterAccountStats();
+  }
+
+  async getOpenRouterGeneration(id: string) {
+    return this.agentSharedService.getOpenRouterGeneration(id);
+  }
 
   async getConfig(key: string) {
     const row = await this.prisma.platformConfig

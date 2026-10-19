@@ -3,7 +3,9 @@ import {
   Logger,
   Inject,
   InternalServerErrorException,
+  Optional,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import axios from 'axios';
 import * as fs from 'fs';
@@ -15,12 +17,25 @@ import {
 } from '../openai/openai.module';
 import { OpenAI } from 'openai';
 
+export interface AiLogItem {
+  id: string;
+  model: string;
+  durationMs: number;
+  totalTokens: number;
+  promptTokens: number;
+  completionTokens: number;
+  status: 'SUCCESS' | 'FAILED';
+  error?: string;
+  timestamp: string;
+}
+
 @Injectable()
 export class AgentSharedService {
   private readonly logger = new Logger(AgentSharedService.name);
   private openai: OpenAI | null;
   private model: string;
   private visionModel: string;
+  private readonly recentLogs: AiLogItem[] = [];
 
   constructor(
     private readonly prisma: PrismaService,
@@ -28,12 +43,107 @@ export class AgentSharedService {
     @Inject(OPENAI_MODEL) private readonly injectedModel: string,
     @Inject(OPENAI_VISION_MODEL)
     private readonly injectedVisionModel: string,
+    @Optional() private readonly configService?: ConfigService,
   ) {
     this.openai = this.injectedOpenai;
     this.model = this.injectedModel;
     this.visionModel = this.injectedVisionModel;
     this.logger.log(`[AgentShared] Using model: ${this.model}`);
     this.logger.log(`[AgentShared] Vision model: ${this.visionModel}`);
+  }
+
+  recordLog(log: AiLogItem) {
+    this.recentLogs.unshift(log);
+    if (this.recentLogs.length > 60) {
+      this.recentLogs.pop();
+    }
+  }
+
+  getRecentLogs(): AiLogItem[] {
+    return this.recentLogs;
+  }
+
+  async getOpenRouterAccountStats() {
+    const apiKey =
+      process.env.OPENROUTER_API_KEY ||
+      this.configService?.get<string>('OPENROUTER_API_KEY');
+
+    if (!apiKey) {
+      return {
+        configured: false,
+        totalCredits: 0,
+        totalUsage: 0,
+        remainingCredits: 0,
+        dailyUsage: 0,
+        weeklyUsage: 0,
+        monthlyUsage: 0,
+        freeModelRemaining: 0,
+        recentLogs: this.getRecentLogs(),
+      };
+    }
+
+    try {
+      const [creditsRes, keyRes] = await Promise.all([
+        axios
+          .get('https://openrouter.ai/api/v1/credits', {
+            headers: { Authorization: `Bearer ${apiKey}` },
+            timeout: 6000,
+          })
+          .catch(() => null),
+        axios
+          .get('https://openrouter.ai/api/v1/auth/key', {
+            headers: { Authorization: `Bearer ${apiKey}` },
+            timeout: 6000,
+          })
+          .catch(() => null),
+      ]);
+
+      const creditsData = creditsRes?.data?.data || {};
+      const keyData = keyRes?.data?.data || {};
+
+      const totalCredits = creditsData.total_credits || 0;
+      const totalUsage = creditsData.total_usage || keyData.usage || 0;
+      const remainingCredits = Math.max(0, totalCredits - totalUsage);
+
+      return {
+        configured: true,
+        label: keyData.label || 'OpenRouter API Key',
+        totalCredits: Number(totalCredits.toFixed(4)),
+        totalUsage: Number(totalUsage.toFixed(4)),
+        remainingCredits: Number(remainingCredits.toFixed(4)),
+        dailyUsage: Number((keyData.usage_daily || 0).toFixed(4)),
+        weeklyUsage: Number((keyData.usage_weekly || 0).toFixed(4)),
+        monthlyUsage: Number((keyData.usage_monthly || 0).toFixed(4)),
+        freeModelRemaining: keyData.free_model_daily_requests?.remaining ?? 50,
+        recentLogs: this.getRecentLogs(),
+      };
+    } catch (e: any) {
+      return {
+        configured: true,
+        error: e.message,
+        recentLogs: this.getRecentLogs(),
+      };
+    }
+  }
+
+  async getOpenRouterGeneration(id: string) {
+    const apiKey =
+      process.env.OPENROUTER_API_KEY ||
+      this.configService?.get<string>('OPENROUTER_API_KEY');
+    if (!apiKey) return null;
+
+    try {
+      const res = await axios.get(
+        `https://openrouter.ai/api/v1/generation?id=${encodeURIComponent(id)}`,
+        {
+          headers: { Authorization: `Bearer ${apiKey}` },
+          timeout: 8000,
+        },
+      );
+      return res.data?.data || res.data;
+    } catch (e: any) {
+      return { error: e.response?.data || e.message };
+    }
   }
 
   /**
@@ -288,6 +398,7 @@ export class AgentSharedService {
     let lastError: any = null;
 
     for (const model of candidateModels) {
+      const startTime = Date.now();
       try {
         const response = await this.openai.chat.completions.create(
           {
@@ -304,13 +415,46 @@ export class AgentSharedService {
           { timeout: 25000 },
         );
 
+        const durationMs = Date.now() - startTime;
+        const totalTokens = response.usage?.total_tokens || 0;
+        const promptTokens = response.usage?.prompt_tokens || 0;
+        const completionTokens = response.usage?.completion_tokens || 0;
+        const genId = response.id || `gen-${Date.now()}`;
+        this.logger.log(
+          `[OpenRouter LLM] Sukses via "${model}" (${durationMs}ms) | ID: ${genId} | Tokens: ${totalTokens}`,
+        );
+
+        this.recordLog({
+          id: genId,
+          model,
+          durationMs,
+          totalTokens,
+          promptTokens,
+          completionTokens,
+          status: 'SUCCESS',
+          timestamp: new Date().toISOString(),
+        });
+
         const content = response.choices[0]?.message?.content || '';
         if (content) return content;
-      } catch (error) {
+      } catch (error: any) {
+        const durationMs = Date.now() - startTime;
         lastError = error;
         this.logger.warn(
-          `[AgentShared LLM Fallback] Model ${model} gagal: ${error.message}. Mencoba model cadangan...`,
+          `[AgentShared LLM Fallback] Model "${model}" gagal (${durationMs}ms): ${error.message}. Mencoba model cadangan...`,
         );
+
+        this.recordLog({
+          id: `err-${Date.now()}`,
+          model,
+          durationMs,
+          totalTokens: 0,
+          promptTokens: 0,
+          completionTokens: 0,
+          status: 'FAILED',
+          error: error.message,
+          timestamp: new Date().toISOString(),
+        });
       }
     }
 
@@ -346,6 +490,7 @@ export class AgentSharedService {
     let lastError: any = null;
 
     for (const model of candidateModels) {
+      const startTime = Date.now();
       try {
         const stream = await this.openai.chat.completions.create(
           {
@@ -371,12 +516,35 @@ export class AgentSharedService {
             onChunk(textChunk);
           }
         }
-        if (fullContent) return fullContent;
-      } catch (error) {
+        if (fullContent) {
+          this.recordLog({
+            id: `stream-${Date.now()}`,
+            model,
+            durationMs: Date.now() - startTime,
+            totalTokens: Math.ceil(fullContent.length / 4),
+            promptTokens: Math.ceil(prompt.length / 4),
+            completionTokens: Math.ceil(fullContent.length / 4),
+            status: 'SUCCESS',
+            timestamp: new Date().toISOString(),
+          });
+          return fullContent;
+        }
+      } catch (error: any) {
         lastError = error;
         this.logger.warn(
           `[AgentShared LLM Stream Fallback] Model ${model} gagal: ${error.message}. Mencoba model cadangan...`,
         );
+        this.recordLog({
+          id: `err-stream-${Date.now()}`,
+          model,
+          durationMs: Date.now() - startTime,
+          totalTokens: 0,
+          promptTokens: 0,
+          completionTokens: 0,
+          status: 'FAILED',
+          error: error.message,
+          timestamp: new Date().toISOString(),
+        });
       }
     }
 

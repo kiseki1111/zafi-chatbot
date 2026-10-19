@@ -59,4 +59,16 @@ export class PlatformController {
     this.ensureSuperadmin(req);
     return this.platformService.webhookLogs();
   }
+
+  @Get('openrouter/stats')
+  async openRouterStats(@Req() req: any) {
+    this.ensureSuperadmin(req);
+    return this.platformService.getOpenRouterStats();
+  }
+
+  @Get('openrouter/generation/:id')
+  async openRouterGeneration(@Param('id') id: string, @Req() req: any) {
+    this.ensureSuperadmin(req);
+    return this.platformService.getOpenRouterGeneration(id);
+  }
 }
