@@ -124,18 +124,23 @@ function BotSettingsTab() {
   React.useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(`/api/v1/tenant/${user?.tenantId || user?.id || 'demo'}/dashboard`);
-        const data = await res.json();
-        if (data && data.tenant) {
-          setSettings({
-            agentName: data.tenant.agentName || "Luna",
-            phone: data.tenant.phone || "",
-            agentTone: data.tenant.agentTone || "ramah dan profesional",
-            operatingHours: data.tenant.operatingHours || "",
-            address: data.tenant.address || "",
-            greetingMsg: data.tenant.greetingMsg || "",
-            systemPrompt: data.tenant.systemPrompt || "",
-          });
+        const fetchId = user?.tenantId || (user?.id?.startsWith('u-') ? 'demo' : user?.id) || 'demo';
+        const res = await fetch(`/api/v1/tenant/${fetchId}/dashboard`);
+        if (res.ok) {
+          const json = await res.json();
+          const data = json?.data || json;
+          const tenant = data?.tenant;
+          if (tenant) {
+            setSettings({
+              agentName: tenant.agentName || "Luna",
+              phone: tenant.phone || "",
+              agentTone: tenant.agentTone || "ramah dan profesional",
+              operatingHours: tenant.operatingHours || "",
+              address: tenant.address || "",
+              greetingMsg: tenant.greetingMsg || "",
+              systemPrompt: tenant.systemPrompt || "",
+            });
+          }
         }
       } catch (e) {
         console.error(e);
@@ -143,20 +148,24 @@ function BotSettingsTab() {
       setLoading(false);
     }
     load();
-  }, [user?.id]);
+  }, [user?.id, user?.tenantId]);
 
   async function handleSave() {
     setSaving(true);
     try {
-      const targetId = user?.tenantId || user?.id || 'demo';
-      await fetch(`/api/v1/tenant/${targetId}/settings`, {
+      const targetId = user?.tenantId || (user?.id?.startsWith('u-') ? 'demo' : user?.id) || 'demo';
+      const res = await fetch(`/api/v1/tenant/${targetId}/settings`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(settings)
       });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => null);
+        throw new Error(errJson?.message || "Gagal menyimpan pengaturan ke server");
+      }
       toast.success("Pengaturan asisten berhasil disimpan!");
-    } catch(e) {
-      toast.error("Gagal menyimpan pengaturan");
+    } catch(e: any) {
+      toast.error(e?.message || "Gagal menyimpan pengaturan");
     }
     setSaving(false);
   }

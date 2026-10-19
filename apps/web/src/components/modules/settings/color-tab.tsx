@@ -26,15 +26,19 @@ export function WarnaWebsiteTab() {
   React.useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(`/api/v1/tenant/${user?.tenantId || user?.id || 'demo'}/dashboard`);
-        const data = await res.json();
-        const savedColors = data?.tenant?.metadata?.colorPalette;
-        if (savedColors) {
-          setColors({
-            primary: savedColors.primary || "#059669",
-            secondary: savedColors.secondary || "#0d9488",
-            accent: savedColors.accent || "#3b82f6",
-          });
+        const fetchId = user?.tenantId || (user?.id?.startsWith('u-') ? 'demo' : user?.id) || 'demo';
+        const res = await fetch(`/api/v1/tenant/${fetchId}/dashboard`);
+        if (res.ok) {
+          const json = await res.json();
+          const data = json?.data || json;
+          const savedColors = data?.tenant?.metadata?.colorPalette;
+          if (savedColors) {
+            setColors({
+              primary: savedColors.primary || "#059669",
+              secondary: savedColors.secondary || "#0d9488",
+              accent: savedColors.accent || "#3b82f6",
+            });
+          }
         }
       } catch (e) {
         console.error(e);
@@ -42,7 +46,7 @@ export function WarnaWebsiteTab() {
       setLoading(false);
     }
     load();
-  }, [user?.id]);
+  }, [user?.id, user?.tenantId]);
 
   const applyColorsLocally = (palette: typeof colors) => {
     document.documentElement.style.setProperty("--brand-primary", palette.primary);
@@ -54,15 +58,19 @@ export function WarnaWebsiteTab() {
     setSaving(true);
     try {
       const targetId = user?.tenantId || (user?.id?.startsWith('u-') ? 'demo' : user?.id) || 'demo';
-      await fetch(`/api/v1/tenant/${targetId}/settings`, {
+      const res = await fetch(`/api/v1/tenant/${targetId}/settings`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ colorPalette: colors }),
       });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => null);
+        throw new Error(errJson?.message || "Gagal menyimpan palet warna");
+      }
       applyColorsLocally(colors);
       toast.success("Warna tema akun ini berhasil disimpan!");
-    } catch (e) {
-      toast.error("Gagal menyimpan palet warna");
+    } catch (e: any) {
+      toast.error(e?.message || "Gagal menyimpan palet warna");
     }
     setSaving(false);
   };

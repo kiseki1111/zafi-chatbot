@@ -58,9 +58,11 @@ export function OverviewPage() {
 
     try {
       // 1. Tenant dashboard
-      const dashRes = await fetch(`/api/v1/tenant/${user?.tenantId || user?.id || "demo"}/dashboard`);
+      const fetchId = user?.tenantId || (user?.id?.startsWith("u-") ? "demo" : user?.id) || "demo";
+      const dashRes = await fetch(`/api/v1/tenant/${fetchId}/dashboard`);
       if (dashRes.ok) {
-        const dash = await dashRes.json();
+        const raw = await dashRes.json();
+        const dash = raw?.data || raw;
         if (dash?.tenant) loadedTenant = dash.tenant;
         if (dash?.metrics) loadedMetrics = dash.metrics;
       }
