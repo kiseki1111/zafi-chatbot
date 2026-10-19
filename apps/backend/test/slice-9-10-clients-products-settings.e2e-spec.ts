@@ -278,6 +278,85 @@ describe('Slice-9: Superadmin Kelola Klien & Slice-10: Tenant Products + Setting
         expect(res.body.agentName).toBe('Hana');
         expect(res.body.agentTone).toBe('profesional');
       });
+
+      it('Berhasil menyimpan seluruh field pengaturan termasuk gaya bahasa panjang (>100 char) (200)', async () => {
+        currentUser = { sub: 'manager-2', roles: ['manager'], tenantId: 't-prod' };
+        context.mockPrisma.user.findUnique.mockResolvedValue({ id: 'manager-2', tenantId: 't-prod' });
+
+        const longTone = 'Sopan, ramah, hangat, menggunakan emotikon senyum dan bahasa Indonesia yang santun. Selalu bantu pelanggan dengan sabar dan beri rekomendasi produk yang paling cocok.';
+        const settingsPayload = {
+          agentName: 'Zafira',
+          agentTone: longTone,
+          phone: '081234567890',
+          operatingHours: 'Senin - Sabtu 08:00 - 20:00 WIB',
+          address: 'Jl. Sudirman No. 45, Jakarta',
+          greetingMsg: 'Halo! Selamat datang di Toko Kami. Ada yang bisa kami bantu?',
+          systemPrompt: 'Anda adalah {agentName}. Gaya bicara: {botTone}. Jam kerja: {operatingHours}. Alamat: {storeAddress}. Kontak darurat: {fallbackContact}.',
+        };
+
+        context.mockPrisma.tenant.update.mockResolvedValue({
+          id: 't-prod',
+          ...settingsPayload,
+        });
+
+        const res = await request(app.getHttpServer())
+          .patch('/api/v1/tenant/manager-2/settings')
+          .send(settingsPayload)
+          .expect(200);
+
+        expect(res.body.agentName).toBe('Zafira');
+        expect(res.body.agentTone).toBe(longTone);
+        expect(res.body.phone).toBe('081234567890');
+        expect(res.body.operatingHours).toBe('Senin - Sabtu 08:00 - 20:00 WIB');
+        expect(res.body.address).toBe('Jl. Sudirman No. 45, Jakarta');
+        expect(res.body.greetingMsg).toBe('Halo! Selamat datang di Toko Kami. Ada yang bisa kami bantu?');
+      });
+
+      it('Berhasil merender system prompt efektif dengan substitusi variabel dinamis (200)', async () => {
+        currentUser = { sub: 'manager-2', roles: ['manager'], tenantId: 't-prod' };
+        context.mockPrisma.user.findUnique.mockResolvedValue({ id: 'manager-2', tenantId: 't-prod' });
+        context.mockPrisma.tenant.findUnique.mockResolvedValue({
+          id: 't-prod',
+          name: 'PT Zafi Digital',
+          agentName: 'Zafira AI',
+          agentTone: 'Sopan dan sangat bersahabat',
+          phone: '08551234567',
+          operatingHours: '08:00 - 17:00 WIB',
+          address: 'Gedung Cyber Lt. 3',
+          systemPrompt: 'Anda adalah CS bernama {agentName} dari {tenantName}. Nada: {botTone}. Jam: {operatingHours}. Alamat: {storeAddress}. Hubungi: {fallbackContact}.',
+        });
+
+        const res = await request(app.getHttpServer())
+          .get('/api/v1/tenant/manager-2/effective-prompt')
+          .expect(200);
+
+        expect(res.body.prompt).toContain('Zafira AI');
+        expect(res.body.prompt).toContain('PT Zafi Digital');
+        expect(res.body.prompt).toContain('Sopan dan sangat bersahabat');
+        expect(res.body.prompt).toContain('08:00 - 17:00 WIB');
+        expect(res.body.prompt).toContain('Gedung Cyber Lt. 3');
+        expect(res.body.prompt).toContain('08551234567');
+      });
+
+      it('Fail-safe: otomatis menginjeksi gaya bahasa jika systemPrompt custom lupa menyertakan {botTone}', async () => {
+        currentUser = { sub: 'manager-2', roles: ['manager'], tenantId: 't-prod' };
+        context.mockPrisma.user.findUnique.mockResolvedValue({ id: 'manager-2', tenantId: 't-prod' });
+        context.mockPrisma.tenant.findUnique.mockResolvedValue({
+          id: 't-prod',
+          name: 'Klinik Sehat',
+          agentName: 'Dokter AI',
+          agentTone: 'Empatik dan menenangkan',
+          systemPrompt: 'Jawab semua pertanyaan pasien mengenai jadwal dokter secara singkat.',
+        });
+
+        const res = await request(app.getHttpServer())
+          .get('/api/v1/tenant/manager-2/effective-prompt')
+          .expect(200);
+
+        expect(res.body.prompt).toContain('Jawab semua pertanyaan pasien');
+        expect(res.body.prompt).toContain('[GAYA BAHASA & NADA BICARA CS]:');
+        expect(res.body.prompt).toContain('Empatik dan menenangkan');
+      });
     });
   });
 });

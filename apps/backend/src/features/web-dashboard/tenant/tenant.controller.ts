@@ -82,6 +82,12 @@ export class TenantController {
     return this.tenantService.updateTenantSettings(targetId, body);
   }
 
+  @Get(':userId/effective-prompt')
+  async getEffectivePrompt(@Param('userId') userId: string, @Req() req: any) {
+    const targetId = this.resolveTenantUserId(userId, req);
+    return { prompt: await this.tenantService.getEffectivePrompt(targetId) };
+  }
+
   @Get(':userId/report')
   async getAgentReport(@Param('userId') userId: string, @Req() req: any) {
     const targetId = this.resolveTenantUserId(userId, req);

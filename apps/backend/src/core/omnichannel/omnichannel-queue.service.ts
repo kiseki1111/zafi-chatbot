@@ -112,8 +112,22 @@ export class OmnichannelQueueService {
             continue; // Skip reply AI
           }
 
-          const response = await this.csService.handleMessage(task);
-          await task.replyCallback(response);
+          const processPromise = (async () => {
+            const response = await this.csService.handleMessage(task);
+            await task.replyCallback(response);
+          })();
+
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(
+              () =>
+                reject(
+                  new Error('Batas waktu pemrosesan pesan habis (Timeout 35s)'),
+                ),
+              35000,
+            ),
+          );
+
+          await Promise.race([processPromise, timeoutPromise]);
         } catch (error) {
           this.logger.error(
             `[Omnichannel] Error memproses chat ${task.senderId} pada bot ${botKey}: ${error.message}`,

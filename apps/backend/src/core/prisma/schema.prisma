@@ -418,7 +418,7 @@ model Tenant {
   description     String? @db.Text
   address         String? @db.Text
   phone           String? @db.VarChar(50)
-  operatingHours  String? @db.VarChar(200)
+  operatingHours  String? @db.Text
   socialLinks     Json?
   paymentMethods  String? @db.Text
   shippingMethods String? @db.Text
@@ -428,7 +428,7 @@ model Tenant {
   metadata        Json?   @default("{}")
 
   agentName   String  @default("Luna") @db.VarChar(50)
-  agentTone   String  @default("friendly") @db.VarChar(100)
+  agentTone   String  @default("friendly") @db.Text
   greetingMsg String? @db.Text
   systemPrompt String? @db.Text
 

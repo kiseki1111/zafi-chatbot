@@ -427,7 +427,7 @@ export class WahaService implements OnApplicationBootstrap {
       const response = await axios.post(
         `${this.baseUrl}/api/sendText`,
         { session: sessionName, chatId: chatId, text: text },
-        { headers: this.getHeaders() },
+        { headers: this.getHeaders(), timeout: 15000 },
       );
 
       // Increment messagesSent

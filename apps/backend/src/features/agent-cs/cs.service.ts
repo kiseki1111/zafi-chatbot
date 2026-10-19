@@ -122,6 +122,50 @@ WAJIB MERESPON DALAM FORMAT JSON BERIKUT:
     return result;
   }
 
+  async buildSystemPrompt(tenantId: string): Promise<string> {
+    let tenantConfig: any = null;
+    if (tenantId) {
+      tenantConfig = await this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+      });
+    }
+
+    const agentName = tenantConfig?.agentName || 'Luna';
+    const botTone = tenantConfig?.agentTone || 'ramah dan profesional';
+    const tenantName = tenantConfig?.name || 'Perusahaan Kami';
+
+    const fallbackContact = tenantConfig?.phone
+      ? `di nomor WA: ${tenantConfig.phone}`
+      : 'langsung ke tim marketing kami';
+    const operatingHours = tenantConfig?.operatingHours || 'Setiap Hari';
+    const storeAddress = tenantConfig?.address || 'Hanya Online';
+    const currentTime = new Date().toLocaleString('id-ID', {
+      timeZone: 'Asia/Jakarta',
+    });
+
+    const promptTemplate =
+      tenantConfig?.systemPrompt || this.DEFAULT_SYSTEM_PROMPT;
+    let systemPrompt = this.resolvePrompt(promptTemplate, {
+      agentName,
+      tenantName,
+      botTone,
+      currentTime,
+      operatingHours,
+      storeAddress,
+      fallbackContact,
+    });
+
+    if (
+      tenantConfig?.systemPrompt &&
+      !tenantConfig.systemPrompt.includes('{botTone}') &&
+      botTone
+    ) {
+      systemPrompt += `\n\n[GAYA BAHASA & NADA BICARA CS]:\n${botTone}`;
+    }
+
+    return systemPrompt;
+  }
+
   async handleMessage(
     message: IncomingMessage,
     onChunk?: (chunk: string) => void,
@@ -224,38 +268,7 @@ WAJIB MERESPON DALAM FORMAT JSON BERIKUT:
       context += `\n\n=== INFO PRODUK & STOK REAL-TIME SAAT INI (PENTING) ===\n${stockInfo}`;
     }
 
-    // Fetch Tenant Config
-    let tenantConfig: any = null;
-    if (tenantId) {
-      tenantConfig = await this.prisma.tenant.findUnique({
-        where: { id: tenantId },
-      });
-    }
-
-    const agentName = tenantConfig?.agentName || 'Luna';
-    const botTone = tenantConfig?.agentTone || 'ramah dan profesional';
-    const tenantName = tenantConfig?.name || 'Perusahaan Kami';
-
-    const fallbackContact = tenantConfig?.phone
-      ? `di nomor WA: ${tenantConfig.phone}`
-      : 'langsung ke tim marketing kami';
-    const operatingHours = tenantConfig?.operatingHours || 'Setiap Hari';
-    const storeAddress = tenantConfig?.address || 'Hanya Online';
-    const currentTime = new Date().toLocaleString('id-ID', {
-      timeZone: 'Asia/Jakarta',
-    });
-
-    const promptTemplate =
-      tenantConfig?.systemPrompt || this.DEFAULT_SYSTEM_PROMPT;
-    let systemPrompt = this.resolvePrompt(promptTemplate, {
-      agentName,
-      tenantName,
-      botTone,
-      currentTime,
-      operatingHours,
-      storeAddress,
-      fallbackContact,
-    });
+    let systemPrompt = await this.buildSystemPrompt(tenantId);
 
     if (context) {
       systemPrompt += `\n\n=== DATABASE TOKO (GUNAKAN INFO INI SAJA) ===\n${context}\n=============================================`;

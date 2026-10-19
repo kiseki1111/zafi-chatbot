@@ -289,17 +289,20 @@ export class AgentSharedService {
 
     for (const model of candidateModels) {
       try {
-        const response = await this.openai.chat.completions.create({
-          model: model,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: prompt },
-          ],
-          temperature: 0.7,
-          response_format: requireJson
-            ? { type: 'json_object' }
-            : { type: 'text' },
-        });
+        const response = await this.openai.chat.completions.create(
+          {
+            model: model,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: prompt },
+            ],
+            temperature: 0.7,
+            response_format: requireJson
+              ? { type: 'json_object' }
+              : { type: 'text' },
+          },
+          { timeout: 25000 },
+        );
 
         const content = response.choices[0]?.message?.content || '';
         if (content) return content;
@@ -344,18 +347,21 @@ export class AgentSharedService {
 
     for (const model of candidateModels) {
       try {
-        const stream = await this.openai.chat.completions.create({
-          model: model,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: prompt },
-          ],
-          temperature: 0.7,
-          response_format: requireJson
-            ? { type: 'json_object' }
-            : { type: 'text' },
-          stream: true,
-        });
+        const stream = await this.openai.chat.completions.create(
+          {
+            model: model,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: prompt },
+            ],
+            temperature: 0.7,
+            response_format: requireJson
+              ? { type: 'json_object' }
+              : { type: 'text' },
+            stream: true,
+          },
+          { timeout: 25000 },
+        );
 
         let fullContent = '';
         for await (const chunk of stream) {

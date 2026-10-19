@@ -406,18 +406,43 @@ export class TenantService {
         });
         if (owner) userId = owner.id;
       } else if (userId === 'demo' || userId.startsWith('u-')) {
-        const firstOwner = await this.prisma.user.findFirst({
-          where: { role: { in: ['manager', 'owner', 'ADMIN'] } },
-        });
-        if (firstOwner) userId = firstOwner.id;
+        const potentialTenantId = userId.startsWith('u-')
+          ? userId.replace('u-', '')
+          : null;
+        if (potentialTenantId) {
+          const matchedTenant = await this.prisma.tenant.findUnique({
+            where: { id: potentialTenantId },
+          });
+          if (matchedTenant) {
+            resolvedTenantId = matchedTenant.id;
+          }
+        }
+        if (!resolvedTenantId) {
+          const firstOwner = await this.prisma.user.findFirst({
+            where: {
+              role: { in: ['manager', 'owner', 'ADMIN', 'administrator'] },
+              tenantId: { not: null },
+            },
+          });
+          if (firstOwner && firstOwner.tenantId) {
+            resolvedTenantId = firstOwner.tenantId;
+          }
+        }
       }
 
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        include: { tenant: true },
-      });
-      if (user && user.tenantId) {
-        resolvedTenantId = user.tenantId;
+      if (!resolvedTenantId) {
+        const user = await this.prisma.user.findUnique({
+          where: { id: userId },
+          include: { tenant: true },
+        });
+        if (user && user.tenantId) {
+          resolvedTenantId = user.tenantId;
+        } else {
+          const fallbackTenant = await this.prisma.tenant.findFirst();
+          if (fallbackTenant) {
+            resolvedTenantId = fallbackTenant.id;
+          }
+        }
       }
     }
 
@@ -443,6 +468,67 @@ export class TenantService {
       where: { id: resolvedTenantId },
       data: updatePayload,
     });
+  }
+
+  async getEffectivePrompt(userId: string): Promise<string> {
+    let resolvedTenantId: string | null = null;
+    const directTenant = await this.prisma.tenant.findUnique({
+      where: { id: userId },
+    });
+    if (directTenant) {
+      resolvedTenantId = directTenant.id;
+    } else {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+      resolvedTenantId =
+        user?.tenantId || (await this.prisma.tenant.findFirst())?.id || null;
+    }
+
+    if (!resolvedTenantId) throw new NotFoundException('Tenant not found');
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: resolvedTenantId },
+    });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+
+    const agentName = tenant.agentName || 'Luna';
+    const botTone = tenant.agentTone || 'ramah dan profesional';
+    const tenantName = tenant.name || 'Perusahaan Kami';
+    const fallbackContact = tenant.phone
+      ? `di nomor WA: ${tenant.phone}`
+      : 'langsung ke tim marketing kami';
+    const operatingHours = tenant.operatingHours || 'Setiap Hari';
+    const storeAddress = tenant.address || 'Hanya Online';
+    const currentTime = new Date().toLocaleString('id-ID', {
+      timeZone: 'Asia/Jakarta',
+    });
+
+    const defaultPrompt = `Anda adalah Customer Service bernama {agentName} dari toko {tenantName}. Tugas Anda adalah melayani pelanggan terkait produk dan layanan kami.
+Gaya bahasa Anda: {botTone}.
+Waktu saat ini: {currentTime}. Jam Operasional Toko: {operatingHours}. Alamat Toko: {storeAddress}.
+Jika pelanggan menghubungi di luar jam operasional, infokan dengan ramah bahwa toko sedang tutup atau admin sedang istirahat dan akan segera dibalas saat jam buka.
+Berikan jawaban yang natural seperti CS manusia sungguhan. Jangan menggunakan bahasa kaku atau gaya bahasa AI.`;
+
+    let prompt = tenant.systemPrompt || defaultPrompt;
+    prompt = prompt
+      .replaceAll('{agentName}', agentName)
+      .replaceAll('{tenantName}', tenantName)
+      .replaceAll('{botTone}', botTone)
+      .replaceAll('{currentTime}', currentTime)
+      .replaceAll('{operatingHours}', operatingHours)
+      .replaceAll('{storeAddress}', storeAddress)
+      .replaceAll('{fallbackContact}', fallbackContact);
+
+    if (
+      tenant.systemPrompt &&
+      !tenant.systemPrompt.includes('{botTone}') &&
+      botTone
+    ) {
+      prompt += `\n\n[GAYA BAHASA & NADA BICARA CS]:\n${botTone}`;
+    }
+
+    return prompt;
   }
 
   async getAgentReport(userId: string) {
