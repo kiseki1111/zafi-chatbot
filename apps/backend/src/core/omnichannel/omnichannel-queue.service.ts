@@ -81,6 +81,7 @@ export class OmnichannelQueueService {
         const task = queue.shift();
         if (!task) continue;
 
+        let isResponseHandled = false;
         try {
           this.logger.log(
             `[Omnichannel] Chatbot "${botKey}" memproses pesan dari ${task.senderId} (Sisa antrean bot ini: ${queue.length})`,
@@ -112,7 +113,6 @@ export class OmnichannelQueueService {
             continue; // Skip reply AI
           }
 
-          let isResponseHandled = false;
           const processPromise = (async () => {
             const response = await this.csService.handleMessage(task);
             if (response && response.text) {

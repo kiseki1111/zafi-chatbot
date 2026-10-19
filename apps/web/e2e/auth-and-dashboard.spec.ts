@@ -29,6 +29,6 @@ test.describe('Web CMS & Dashboard Authentication Flow', () => {
     await demoSuperadminBtn.click();
 
     // Superadmin diarahkan ke menu manajemen platform
-    await expect(page.locator('text=Ringkasan Platform').or(page.locator('text=Kelola Klien'))).toBeVisible();
+    await expect(page.locator('text=Ringkasan Platform').or(page.locator('text=Kelola Klien')).first()).toBeVisible();
   });
 });

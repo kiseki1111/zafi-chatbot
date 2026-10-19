@@ -569,4 +569,161 @@ ${cleanDesc ? `Keterangan: ${cleanDesc}` : ''}`.trim();
 
     return { success: true };
   }
+
+  /**
+   * AI-powered Knowledge Segmentation (Split Preview)
+   * Membaca isi dokumen pengetahuan dan membaginya menjadi potongan-potongan topik mandiri.
+   */
+  async previewSplitKnowledge(id: string, tenantId: string) {
+    const item = await this.findOne(id, tenantId);
+    return this.splitContentWithAi(item.content, item.title, id);
+  }
+
+  /**
+   * AI-powered Text Segmentation langsung dari string konten (sebelum disimpan).
+   */
+  async previewSplitRawText(content: string, title?: string) {
+    if (!content || content.trim().length < 40) {
+      throw new BadRequestException(
+        'Konten terlalu pendek untuk dipecah (minimal 40 karakter)',
+      );
+    }
+    return this.splitContentWithAi(content, title || 'Dokumen');
+  }
+
+  private async splitContentWithAi(
+    content: string,
+    defaultTitle: string,
+    originalId?: string,
+  ) {
+    if (!this.openai) {
+      throw new BadRequestException('OpenAI/LLM client belum terkonfigurasi');
+    }
+
+    const systemPrompt = `Anda adalah AI Knowledge Architect ahli manajemen basis pengetahuan.
+Tugas Anda adalah membedah satu dokumen pengetahuan bisnis/toko yang panjang atau berisi banyak topik menjadi beberapa segmen pengetahuan mandiri (modular) yang rapi dan terpisah.
+
+ATURAN SEGMENTASI:
+1. Pisahkan menjadi 2 sampai 6 topik mandiri yang logis (misal: "Profil Perusahaan & Kontak", "Pricelist & Skema Pembayaran", "Spesifikasi Teknis Bangunan", "Persyaratan Berkas KPR", "Tata Tertib & Kebijakan", dll).
+2. Setiap topik WAJIB memiliki "title" yang singkat, padat, dan jelas (maksimal 60 karakter).
+3. "content" harus memuat informasi lengkap topik tersebut tanpa menghilangkan detail angka, nomor kontak, spesifikasi teknis, atau poin penting dari teks aslinya.
+4. Format respon WAJIB berupa JSON valid:
+{
+  "topics": [
+    {
+      "title": "Nama Topik Spesifik",
+      "content": "Isi lengkap materi topik ini..."
+    }
+  ]
+}`;
+
+    const userPrompt = `Judul Dokumen Asal: "${defaultTitle}"\n\nIsi Dokumen yang akan dipecah:\n"""\n${content}\n"""\n\nBedah dokumen di atas menjadi topik-topik mandiri dalam format JSON yang diminta.`;
+
+    const candidateModels = [
+      process.env.OPENAI_MODEL || 'deepseek/deepseek-v4-flash-0731',
+      'deepseek/deepseek-v4-flash-0731',
+      'openai/gpt-4o-mini',
+      'z-ai/glm-5.3-flash',
+    ].filter((m, idx, arr) => Boolean(m) && arr.indexOf(m) === idx);
+
+    let lastError: any = null;
+
+    for (const model of candidateModels) {
+      try {
+        const response = await this.openai.chat.completions.create({
+          model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0.3,
+        });
+
+        const raw = response.choices?.[0]?.message?.content || '{}';
+        const parsed = JSON.parse(raw);
+        const topics = Array.isArray(parsed.topics) ? parsed.topics : [];
+
+        if (topics.length > 0) {
+          return {
+            originalId,
+            originalTitle: defaultTitle,
+            topics: topics.map((t: any) => ({
+              title: String(t.title || 'Topik Tanpa Judul').trim(),
+              content: String(t.content || '').trim(),
+            })),
+          };
+        }
+      } catch (err: any) {
+        lastError = err;
+        this.logger.warn(`Split AI model ${model} gagal: ${err.message}`);
+      }
+    }
+
+    throw new BadRequestException(
+      `Gagal memproses pemecahan AI: ${lastError?.message || 'Format tidak valid'}`,
+    );
+  }
+
+  /**
+   * Menerapkan hasil pemecahan: menyimpan topik-topik baru ke knowledge_base dan mengarsipkan/menghapus dokumen asal.
+   */
+  async applySplitKnowledge(
+    id: string,
+    tenantId: string,
+    topics: { title: string; content: string }[],
+    keepOriginal: boolean = false,
+  ) {
+    if (!topics || !Array.isArray(topics) || topics.length === 0) {
+      throw new BadRequestException(
+        'Daftar topik hasil pemecahan wajib disertakan',
+      );
+    }
+
+    const item = await this.findOne(id, tenantId); // Validasi kepemilikan
+
+    // Buat item-item baru secara paralel
+    const createdItems = await Promise.all(
+      topics.map((t) =>
+        this.prisma.knowledgeBase.create({
+          data: {
+            tenantId,
+            content: t.content,
+            metadata: {
+              title: t.title,
+              type: 'text',
+              splitFrom: id,
+              splitFromTitle: item.title,
+            },
+          },
+        }),
+      ),
+    );
+
+    // Hapus dokumen lama jika keepOriginal false
+    if (!keepOriginal) {
+      await this.prisma.knowledgeBase.deleteMany({
+        where: { id, tenantId },
+      });
+    }
+
+    // Sync vector knowledge di background
+    this.dataAgentService
+      .syncKnowledgeBase(tenantId)
+      .catch((e) => this.logger.warn(`Knowledge sync warning: ${e.message}`));
+
+    return {
+      success: true,
+      originalId: id,
+      deletedOriginal: !keepOriginal,
+      count: createdItems.length,
+      items: createdItems.map((ci) => ({
+        id: ci.id,
+        title: (ci.metadata as any)?.title || 'Untitled',
+        content: ci.content,
+        metadata: ci.metadata,
+        createdAt: ci.createdAt,
+      })),
+    };
+  }
 }

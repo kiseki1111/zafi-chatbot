@@ -19,6 +19,7 @@ import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 import { AvailabilityModule } from './modules/availability/availability.module';
 import { ContactsModule } from './modules/contacts/contacts.module';
 import { PlatformModule } from './modules/platform/platform.module';
+import { SearchModule } from './modules/search/search.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { PlatformModule } from './modules/platform/platform.module';
     ChatsModule,
     ContactsModule,
     PlatformModule,
+    SearchModule,
     FollowUpModule,
     KnowledgeIngestModule,
     OpenAiModule,

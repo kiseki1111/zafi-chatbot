@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import {
   Loader2, Plus, Trash2, Pencil, FileText, AlignLeft,
   BookOpen, Upload, X, Check, Brain, AlertTriangle, ImageIcon,
-  Video, Paperclip, ExternalLink, Copy, Eye, Download
+  Video, Paperclip, ExternalLink, Copy, Eye, Download, Search, Sparkles
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -71,6 +71,19 @@ export function KnowledgePage() {
   const [submitting, setSubmitting] = useState(false);
   const [editingItem, setEditingItem] = useState<KnowledgeItem | null>(null);
   const [previewItem, setPreviewItem] = useState<KnowledgeItem | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // AI Knowledge Split state
+  interface SplitTopic {
+    title: string;
+    content: string;
+  }
+  const [splitModalOpen, setSplitModalOpen] = useState(false);
+  const [splittingItem, setSplittingItem] = useState<KnowledgeItem | null>(null);
+  const [splittingLoading, setSplittingLoading] = useState(false);
+  const [splitTopics, setSplitTopics] = useState<SplitTopic[]>([]);
+  const [keepOriginalDoc, setKeepOriginalDoc] = useState(false);
+  const [applyingSplit, setApplyingSplit] = useState(false);
 
   // Form state untuk teks & dokumen OCR
   const [title, setTitle] = useState("");
@@ -120,6 +133,71 @@ export function KnowledgePage() {
       window.removeEventListener("knowledge-updated", handleUpdate);
     };
   }, [tenantId]);
+
+  const handleStartSplit = async (item: KnowledgeItem) => {
+    setSplittingItem(item);
+    setSplitModalOpen(true);
+    setSplittingLoading(true);
+    setSplitTopics([]);
+    setKeepOriginalDoc(false);
+
+    try {
+      const res = await fetch(`${API_BASE}/knowledge/${item.id}/split-preview`, {
+        method: "POST",
+      });
+      const json = await res.json();
+      const data = json?.data || json;
+      if (res.ok && data?.topics && Array.isArray(data.topics)) {
+        setSplitTopics(data.topics);
+      } else {
+        toast.error(data?.message || "Gagal membedah materi dengan AI");
+        setSplitModalOpen(false);
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Terjadi kesalahan jaringan");
+      setSplitModalOpen(false);
+    } finally {
+      setSplittingLoading(false);
+    }
+  };
+
+  const handleApplySplit = async () => {
+    if (!splittingItem) return;
+    if (splitTopics.length === 0) {
+      return toast.error("Minimal harus ada 1 topik hasil pemecahan");
+    }
+    for (const t of splitTopics) {
+      if (!t.title.trim() || !t.content.trim()) {
+        return toast.error("Semua judul dan konten topik wajib diisi");
+      }
+    }
+
+    setApplyingSplit(true);
+    try {
+      const res = await fetch(`${API_BASE}/knowledge/${splittingItem.id}/split-apply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topics: splitTopics,
+          keepOriginal: keepOriginalDoc,
+        }),
+      });
+      const json = await res.json();
+      const data = json?.data || json;
+      if (res.ok && data?.success) {
+        toast.success(`Berhasil memecah dokumen menjadi ${splitTopics.length} materi terpisah!`);
+        setSplitModalOpen(false);
+        setPreviewItem(null);
+        fetchKnowledge();
+      } else {
+        toast.error(data?.message || "Gagal menerapkan pemecahan dokumen");
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Terjadi kesalahan saat menyimpan materi baru");
+    } finally {
+      setApplyingSplit(false);
+    }
+  };
 
   const openCreate = (mode: ModalMode) => {
     setEditingItem(null);
@@ -306,15 +384,49 @@ export function KnowledgePage() {
           </div>
         </div>
 
-        {/* Dedicated stats row - cleanly underneath, zero collision */}
-        <div className="flex items-center gap-3 text-xs sm:text-sm text-muted-foreground pt-1.5 border-t border-border/50 flex-wrap">
-          <span className="font-semibold text-foreground text-sm sm:text-base">{items.length}</span> Total
-          <span>·</span>
-          <span>{items.filter(i => i.metadata?.type === 'media').length} File Media</span>
-          <span>·</span>
-          <span>{items.filter(i => i.metadata?.type === 'file').length} Dokumen OCR</span>
-          <span>·</span>
-          <span>{items.filter(i => !i.metadata?.type || i.metadata?.type === 'text').length} Teks</span>
+        {/* Search Bar + Dedicated stats row */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-border/50">
+          <div className="flex items-center gap-2.5 text-xs text-muted-foreground flex-wrap">
+            <span className="font-semibold text-foreground text-sm">
+              {items.filter((item) => {
+                if (!searchQuery.trim()) return true;
+                const q = searchQuery.toLowerCase();
+                return (
+                  (item.title || "").toLowerCase().includes(q) ||
+                  (item.content || "").toLowerCase().includes(q) ||
+                  (item.metadata?.filename || item.metadata?.name || "").toLowerCase().includes(q)
+                );
+              }).length}
+            </span>{" "}
+            Total
+            <span>·</span>
+            <span>{items.filter(i => i.metadata?.type === 'media').length} File Media</span>
+            <span>·</span>
+            <span>{items.filter(i => i.metadata?.type === 'file').length} Dokumen OCR</span>
+            <span>·</span>
+            <span>{items.filter(i => !i.metadata?.type || i.metadata?.type === 'text').length} Teks</span>
+          </div>
+
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cari materi / file..."
+              className="w-full h-8 pl-8 pr-7 text-xs rounded-lg border bg-background placeholder:text-muted-foreground focus:outline-hidden focus:ring-1 focus:ring-emerald-500"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
+                title="Hapus filter"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -358,9 +470,36 @@ export function KnowledgePage() {
             Tambah Knowledge Pertama
           </button>
         </div>
+      ) : items.filter((item) => {
+          if (!searchQuery.trim()) return true;
+          const q = searchQuery.toLowerCase();
+          return (
+            (item.title || "").toLowerCase().includes(q) ||
+            (item.content || "").toLowerCase().includes(q) ||
+            (item.metadata?.filename || item.metadata?.name || "").toLowerCase().includes(q)
+          );
+        }).length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed py-16 gap-3 text-center">
+          <Search className="h-8 w-8 text-muted-foreground/40" />
+          <p className="text-sm font-semibold text-foreground">Tidak ada dokumen yang cocok dengan "{searchQuery}"</p>
+          <button
+            onClick={() => setSearchQuery("")}
+            className="text-xs text-emerald-600 hover:underline font-medium"
+          >
+            Bersihkan pencarian
+          </button>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {items.map((item, idx) => {
+          {items.filter((item) => {
+            if (!searchQuery.trim()) return true;
+            const q = searchQuery.toLowerCase();
+            return (
+              (item.title || "").toLowerCase().includes(q) ||
+              (item.content || "").toLowerCase().includes(q) ||
+              (item.metadata?.filename || item.metadata?.name || "").toLowerCase().includes(q)
+            );
+          }).map((item, idx) => {
             const color = cardColors[idx % cardColors.length];
             const isMedia = item.metadata?.type === 'media';
             const isFile = item.metadata?.type === 'file';
@@ -471,6 +610,18 @@ export function KnowledgePage() {
                     >
                       <Eye className="h-3.5 w-3.5" />
                     </button>
+                    {item.content && item.content.length > 50 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStartSplit(item);
+                        }}
+                        className="rounded-lg bg-white/80 dark:bg-black/30 p-2 text-foreground hover:bg-indigo-50 dark:hover:bg-indigo-950/40 hover:text-indigo-600 transition backdrop-blur-sm"
+                        title="Pecah Materi ini dengan AI"
+                      >
+                        <Sparkles className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                      </button>
+                    )}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -896,6 +1047,20 @@ export function KnowledgePage() {
             </Button>
             {previewItem && (
               <div className="flex items-center gap-2">
+                {previewItem.content && previewItem.content.length > 50 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const toSplit = previewItem;
+                      setPreviewItem(null);
+                      handleStartSplit(toSplit);
+                    }}
+                    className="gap-1.5 text-xs text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-800 bg-indigo-50/60 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-950/80 font-medium"
+                  >
+                    <Sparkles className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" /> Pecah Topik (AI)
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
@@ -922,6 +1087,168 @@ export function KnowledgePage() {
                 </Button>
               </div>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal AI Split Segmentation */}
+      <Dialog
+        open={splitModalOpen}
+        onOpenChange={(v) => !v && !applyingSplit && setSplitModalOpen(false)}
+      >
+        <DialogContent
+          showCloseButton={!applyingSplit}
+          className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0 rounded-2xl"
+        >
+          {/* Header */}
+          <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 p-5 text-white">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-white/20 backdrop-blur-sm">
+                <Sparkles className="h-5 w-5 text-amber-300" />
+              </div>
+              <div className="min-w-0">
+                <DialogTitle className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                  <span>Pecah Dokumen Menjadi Topik Mandiri (AI)</span>
+                </DialogTitle>
+                <DialogDescription className="text-xs text-indigo-100 truncate mt-0.5">
+                  Dokumen asal: <strong>"{splittingItem?.title}"</strong> ({splittingItem?.content.length || 0} karakter)
+                </DialogDescription>
+              </div>
+            </div>
+          </div>
+
+          {/* Body */}
+          <div className="p-5 overflow-y-auto flex-1 space-y-4 max-h-[58vh]">
+            {splittingLoading ? (
+              <div className="py-16 flex flex-col items-center justify-center gap-3 text-center">
+                <Loader2 className="h-8 w-8 text-indigo-600 animate-spin" />
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-foreground">Sedang Menganalisis & Membedah Dokumen...</p>
+                  <p className="text-xs text-muted-foreground max-w-sm">
+                    AI sedang mengidentifikasi bagian-bagian topik mandiri agar materi dapat diedit atau dihapus secara terpisah.
+                  </p>
+                </div>
+              </div>
+            ) : splitTopics.length === 0 ? (
+              <div className="py-12 text-center text-muted-foreground text-xs">
+                Tidak ada topik yang terdeteksi dari dokumen ini.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-foreground">
+                    Terdeteksi {splitTopics.length} Topik Mandiri:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSplitTopics([
+                        ...splitTopics,
+                        { title: `Topik ${splitTopics.length + 1}`, content: "" },
+                      ])
+                    }
+                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Tambah Topik Manual
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {splitTopics.map((topic, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3.5 rounded-xl border bg-muted/20 space-y-2.5 relative group transition-all hover:border-indigo-300 dark:hover:border-indigo-800"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-1">
+                          <span className="h-5 w-5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 text-[11px] font-bold grid place-items-center shrink-0">
+                            {idx + 1}
+                          </span>
+                          <input
+                            type="text"
+                            value={topic.title}
+                            onChange={(e) => {
+                              const next = [...splitTopics];
+                              next[idx].title = e.target.value;
+                              setSplitTopics(next);
+                            }}
+                            placeholder="Judul Topik..."
+                            className="font-semibold text-xs sm:text-sm bg-transparent border-b border-transparent hover:border-border focus:border-indigo-500 focus:outline-hidden flex-1 py-0.5"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSplitTopics(splitTopics.filter((_, i) => i !== idx))
+                          }
+                          className="text-muted-foreground hover:text-destructive p-1 rounded-md transition"
+                          title="Hapus topik ini"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+
+                      <textarea
+                        value={topic.content}
+                        onChange={(e) => {
+                          const next = [...splitTopics];
+                          next[idx].content = e.target.value;
+                          setSplitTopics(next);
+                        }}
+                        rows={3}
+                        placeholder="Rincian konten topik ini..."
+                        className="w-full text-xs font-mono rounded-lg border bg-background p-2.5 resize-y focus:outline-hidden focus:ring-1 focus:ring-indigo-500 leading-relaxed"
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Option to keep original doc */}
+                <div className="pt-2 border-t flex items-center gap-2.5">
+                  <input
+                    type="checkbox"
+                    id="keepOriginalDoc"
+                    checked={keepOriginalDoc}
+                    onChange={(e) => setKeepOriginalDoc(e.target.checked)}
+                    className="h-4 w-4 rounded accent-indigo-600 cursor-pointer"
+                  />
+                  <label
+                    htmlFor="keepOriginalDoc"
+                    className="text-xs text-muted-foreground cursor-pointer select-none"
+                  >
+                    Tetap simpan dokumen lama (jika tidak dicentang, 1 dokumen bertumpuk lama akan digantikan oleh {splitTopics.length} topik baru ini).
+                  </label>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <DialogFooter className="p-4 border-t bg-muted/20 gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={applyingSplit}
+              onClick={() => setSplitModalOpen(false)}
+            >
+              Batal
+            </Button>
+            <Button
+              size="sm"
+              disabled={splittingLoading || applyingSplit || splitTopics.length === 0}
+              onClick={handleApplySplit}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 text-xs font-semibold"
+            >
+              {applyingSplit ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Menerapkan...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-3.5 w-3.5" /> Terapkan & Simpan ({splitTopics.length} Materi)
+                </>
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

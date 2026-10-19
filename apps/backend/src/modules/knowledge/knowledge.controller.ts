@@ -136,6 +136,36 @@ export class KnowledgeController {
     return this.knowledgeService.remove(id, tenantId);
   }
 
+  @Post('split-text-preview')
+  async previewSplitText(@Body() body: { content: string; title?: string }) {
+    return this.knowledgeService.previewSplitRawText(body.content, body.title);
+  }
+
+  @Post(':id/split-preview')
+  async previewSplit(@Param('id') id: string, @Req() req: any) {
+    const tenantId = this.resolveTenantId(req);
+    return this.knowledgeService.previewSplitKnowledge(id, tenantId);
+  }
+
+  @Post(':id/split-apply')
+  async applySplit(
+    @Param('id') id: string,
+    @Req() req: any,
+    @Body()
+    body: {
+      topics: { title: string; content: string }[];
+      keepOriginal?: boolean;
+    },
+  ) {
+    const tenantId = this.resolveTenantId(req);
+    return this.knowledgeService.applySplitKnowledge(
+      id,
+      tenantId,
+      body.topics,
+      body.keepOriginal,
+    );
+  }
+
   @Post('sync-vector')
   async syncVectorKnowledge(@Req() req: any) {
     const tenantId = this.resolveTenantId(req);

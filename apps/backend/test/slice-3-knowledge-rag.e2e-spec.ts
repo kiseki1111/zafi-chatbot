@@ -211,4 +211,97 @@ describe('Potongan 3: Knowledge Base RAG Ingestion (Boundary & Multi-Tenant Isol
       );
     });
   });
+
+  describe('5. Pemecahan Dokumen Bertumpuk via AI (Knowledge Split)', () => {
+    it('Berhasil mendapatkan preview pemecahan topik mandiri via AI (200)', async () => {
+      currentUser = {
+        sub: 'user-tenant-a',
+        email: 'admin@tenant-a.com',
+        roles: ['manager'],
+        tenantId: 'tenant-A',
+      };
+
+      context.mockPrisma.knowledgeBase.findFirst.mockResolvedValueOnce({
+        id: 'kb-doc-1',
+        title: 'Buku Katalog Lengkap',
+        content: 'Isi katalog lengkap properti dan syarat KPR serta spesifikasi unit.',
+        tenantId: 'tenant-A',
+        metadata: { title: 'Buku Katalog Lengkap' },
+      });
+
+      const mockOpenAI = context.module.get(OPENAI_CLIENT);
+      mockOpenAI.chat.completions.create.mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                topics: [
+                  { title: 'Tipe & Harga', content: 'Rincian harga tipe 36 dan 45' },
+                  { title: 'Spesifikasi', content: 'Listrik 1300W, 2 kamar tidur' },
+                ],
+              }),
+            },
+          },
+        ],
+      });
+
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/knowledge/kb-doc-1/split-preview')
+        .expect(201);
+
+      expect(res.body.originalId).toBe('kb-doc-1');
+      expect(res.body.topics.length).toBe(2);
+      expect(res.body.topics[0].title).toBe('Tipe & Harga');
+    });
+
+    it('Berhasil menerapkan pemecahan: membuat item-item baru dan menghapus dokumen asal (200)', async () => {
+      currentUser = {
+        sub: 'user-tenant-a',
+        email: 'admin@tenant-a.com',
+        roles: ['manager'],
+        tenantId: 'tenant-A',
+      };
+
+      context.mockPrisma.knowledgeBase.findFirst.mockResolvedValueOnce({
+        id: 'kb-doc-1',
+        title: 'Buku Katalog Lengkap',
+        tenantId: 'tenant-A',
+      });
+
+      context.mockPrisma.knowledgeBase.create
+        .mockResolvedValueOnce({
+          id: 'kb-new-1',
+          content: 'Rincian harga tipe 36 dan 45',
+          metadata: { title: 'Tipe & Harga', splitFrom: 'kb-doc-1' },
+          createdAt: new Date(),
+        })
+        .mockResolvedValueOnce({
+          id: 'kb-new-2',
+          content: 'Listrik 1300W, 2 kamar tidur',
+          metadata: { title: 'Spesifikasi', splitFrom: 'kb-doc-1' },
+          createdAt: new Date(),
+        });
+
+      context.mockPrisma.knowledgeBase.deleteMany.mockResolvedValueOnce({ count: 1 });
+
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/knowledge/kb-doc-1/split-apply')
+        .send({
+          topics: [
+            { title: 'Tipe & Harga', content: 'Rincian harga tipe 36 dan 45' },
+            { title: 'Spesifikasi', content: 'Listrik 1300W, 2 kamar tidur' },
+          ],
+          keepOriginal: false,
+        })
+        .expect(201);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.count).toBe(2);
+      expect(res.body.deletedOriginal).toBe(true);
+      expect(context.mockPrisma.knowledgeBase.create).toHaveBeenCalledTimes(2);
+      expect(context.mockPrisma.knowledgeBase.deleteMany).toHaveBeenCalledWith({
+        where: { id: 'kb-doc-1', tenantId: 'tenant-A' },
+      });
+    });
+  });
 });

@@ -13,13 +13,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Menu, Bell, Sun, Moon, LogOut, User as UserIcon,
-  Settings as SettingsIcon, ChevronDown, AlertTriangle, QrCode, X, Download, Building2,
+  Settings as SettingsIcon, ChevronDown, AlertTriangle, QrCode, X, Download, Building2, Search,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { useAppStore } from "@/lib/app-store";
 import { ROLE_LABELS, ROLE_THEME } from "@/lib/rbac";
 import { cn } from "@/lib/utils";
 import { Sidebar } from "./sidebar";
+import { GlobalSearchDialog, useGlobalSearchShortcut } from "./global-search-dialog";
 
 export function Topbar() {
   const { user, logout } = useAuthStore();
@@ -27,6 +28,9 @@ export function Topbar() {
   const [offlineInstances, setOfflineInstances] = useState<{ instanceName: string; status: string }[]>([]);
   const [dismissed, setDismissed] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  useGlobalSearchShortcut(searchOpen, setSearchOpen);
 
   useEffect(() => {
     const handler = (e: any) => {
@@ -121,8 +125,30 @@ export function Topbar() {
           </div>
         </div>
 
+        {/* Global Omnisearch Trigger (Desktop) */}
+        <button
+          onClick={() => setSearchOpen(true)}
+          className="hidden md:flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground bg-muted/60 hover:bg-muted border border-border/50 hover:border-border rounded-xl transition-all cursor-pointer w-64 lg:w-80 ml-2"
+        >
+          <Search className="h-3.5 w-3.5 shrink-0" />
+          <span className="flex-1 text-left truncate">Cari kontak, chat, unit...</span>
+          <kbd className="inline-flex items-center gap-0.5 rounded border border-border/60 bg-background px-1.5 font-mono text-[10px] text-muted-foreground">
+            Ctrl K
+          </kbd>
+        </button>
+
         {/* Right side controls */}
         <div className="flex items-center gap-2 ml-auto">
+          {/* Mobile Search Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 md:hidden"
+            onClick={() => setSearchOpen(true)}
+            title="Cari (Ctrl+K)"
+          >
+            <Search className="h-4 w-4" />
+          </Button>
           {/* PWA Install Button when available */}
           {installPrompt && (
             <Button
@@ -180,6 +206,9 @@ export function Topbar() {
         </div>
       </div>
     </header>
+
+    {/* Global Omnisearch Dialog */}
+    <GlobalSearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
     </>
   );
 }
