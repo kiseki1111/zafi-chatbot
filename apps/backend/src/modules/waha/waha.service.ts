@@ -430,6 +430,14 @@ export class WahaService implements OnApplicationBootstrap {
         { headers: this.getHeaders(), timeout: 15000 },
       );
 
+      const resData = response.data || {};
+      const wahaMsgId = resData.id?._serialized || resData.id || 'OK';
+      const wahaBody = resData.body || text;
+      this.logger.log(
+        `\n[WAHA KONFIRMASI TERKIRIM] Sesi: "${sessionName}" | Ke: ${chatId} | ID Pesan: ${wahaMsgId}\n` +
+          `[RESPON DARI WAHA]:\n"${wahaBody}"\n`,
+      );
+
       // Increment messagesSent
       await this.prisma.whatsappInstance
         .update({

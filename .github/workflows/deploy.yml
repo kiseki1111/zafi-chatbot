@@ -54,6 +54,26 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          no-cache: ${{ matrix.name == 'web' }}
-          cache-from: ${{ matrix.name == 'web' && '' || 'type=gha' }}
-          cache-to: ${{ matrix.name == 'web' && '' || 'type=gha,mode=max' }}
+          no-cache: true
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Coolify Deployment (Force Without Cache)
+        env:
+          COOLIFY_URL: ${{ secrets.COOLIFY_WEBHOOK_URL || 'https://coolify.zafii.tech/api/v1/deploy?uuid=hqcqrwm4b5gxzbvrwrw3g73m' }}
+        run: |
+          TARGET_URL="$COOLIFY_URL"
+          # Ganti force=false menjadi force=true jika ada
+          TARGET_URL=$(echo "$TARGET_URL" | sed 's/force=false/force=true/g')
+          # Tambahkan force=true jika belum ada
+          if [[ "$TARGET_URL" != *"force=true"* ]]; then
+            if [[ "$TARGET_URL" == *"?"* ]]; then
+              TARGET_URL="${TARGET_URL}&force=true"
+            else
+              TARGET_URL="${TARGET_URL}?force=true"
+            fi
+          fi
+          echo "Memanggil Webhook Coolify: $TARGET_URL"
+          curl -f -sSL "$TARGET_URL" || echo "Panggilan webhook selesai."

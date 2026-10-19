@@ -400,9 +400,15 @@ export class WahaController {
             timeZone: 'Asia/Jakarta',
           })
         : new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
-      this.logger.log(
-        `\n[WAHA PESAN BARU - WHATSAPP] Waktu: ${timestamp} | Dari: ${sender} | Isi: "${text}"\n`,
-      );
+      if (message?.fromMe) {
+        this.logger.log(
+          `\n[WAHA BALASAN BOT KELUAR] Waktu: ${timestamp} | Sesi: ${payload.session} | Ke: ${message?.to || sender} | Isi:\n"${text}"\n`,
+        );
+      } else {
+        this.logger.log(
+          `\n[WAHA PESAN BARU - WHATSAPP] Waktu: ${timestamp} | Dari: ${sender} | Isi: "${text}"\n`,
+        );
+      }
     } else {
       this.logger.debug(`Received WAHA webhook event: ${payload?.event}`);
     }
@@ -731,7 +737,13 @@ export class WahaController {
           text = `[Membalas pesan: "${quotedText}"]\n\n${text}`;
         }
 
-        const sender = message.from;
+        const deliverableSender =
+          (realPhoneJid && realPhoneJid.includes('@c.us'))
+            ? realPhoneJid
+            : (rawNumber && rawNumber.includes('@c.us'))
+            ? rawNumber
+            : message.from;
+        const sender = deliverableSender;
         const msgId = message.id?._serialized || message.id || 'unknown';
         // Hanya media gambar yang diteruskan ke mediaUrls Vision AI agar tidak crash saat menerima audio/video
         const mediaUrls: string[] | undefined =
