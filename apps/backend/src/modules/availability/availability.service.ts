@@ -39,6 +39,7 @@ export class AvailabilityService {
       category?: string;
       description?: string;
       siteplanImage?: string;
+      pricingTemplates?: any;
     },
   ) {
     try {
@@ -59,7 +60,8 @@ export class AvailabilityService {
           category: data.category || 'properti',
           description: data.description || null,
           siteplanImage: data.siteplanImage || null,
-        },
+          pricingTemplates: (data.pricingTemplates || []) as any,
+        } as any,
         include: { items: true },
       });
     } catch (error: any) {
@@ -75,6 +77,7 @@ export class AvailabilityService {
       category?: string;
       description?: string;
       siteplanImage?: string;
+      pricingTemplates?: any;
     },
     tenantId?: string,
   ) {
@@ -86,7 +89,7 @@ export class AvailabilityService {
     }
     return this.prisma.resourceGroup.update({
       where: { id },
-      data,
+      data: data as any,
       include: { items: true },
     });
   }

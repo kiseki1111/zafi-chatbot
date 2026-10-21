@@ -25,6 +25,18 @@ ENV NODE_ENV=development
 COPY . .
 
 RUN npm run prisma:generate -w rbac-service
+RUN if [ -d "/workspace/apps/backend/node_modules/.prisma" ]; then \
+      mkdir -p /workspace/node_modules/.prisma && \
+      cp -r /workspace/apps/backend/node_modules/.prisma/* /workspace/node_modules/.prisma/ && \
+      mkdir -p /workspace/node_modules/@prisma/client && \
+      cp -r /workspace/apps/backend/node_modules/@prisma/client/* /workspace/node_modules/@prisma/client/; \
+    fi
+RUN if [ -d "/workspace/node_modules/.prisma" ]; then \
+      mkdir -p /workspace/apps/backend/node_modules/.prisma && \
+      cp -r /workspace/node_modules/.prisma/* /workspace/apps/backend/node_modules/.prisma/ && \
+      mkdir -p /workspace/apps/backend/node_modules/@prisma/client && \
+      cp -r /workspace/node_modules/@prisma/client/* /workspace/apps/backend/node_modules/@prisma/client/; \
+    fi
 RUN npm run build -w rbac-service
 RUN mkdir -p /workspace/apps/backend/node_modules
 
@@ -46,6 +58,8 @@ COPY --from=builder /workspace/apps/backend/package.json ./package.json
 COPY --from=builder /workspace/apps/backend/src/core/prisma ./src/core/prisma
 COPY --from=builder /workspace/apps/backend/scripts ./scripts
 
+RUN chmod +x ./scripts/*.sh 2>/dev/null || true
+
 EXPOSE 3030
 
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss --schema=src/core/prisma/schema.prisma && (node dist/main.js || node dist/src/main.js)"]
+CMD ["/bin/sh", "scripts/docker-entrypoint.sh"]

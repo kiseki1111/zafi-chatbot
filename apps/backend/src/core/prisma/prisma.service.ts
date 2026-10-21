@@ -28,6 +28,44 @@ export class PrismaService
   // Mengontrol pemutusan koneksi otomatis saat modul NestJS diinisialisasi
   async onModuleInit() {
     await this.$connect();
+    await this.ensureSchemaCompatibility();
+  }
+
+  /**
+   * Safety net: Memastikan kolom-kolom baru krusial telah dibuat di PostgreSQL
+   * jika proses db push mengalami jeda atau bypass di lingkungan runtime.
+   */
+  private async ensureSchemaCompatibility() {
+    try {
+      await this.$executeRawUnsafe(`
+        DO $$
+        BEGIN
+          -- 1. Kolom property_type pada resource_items
+          IF EXISTS (
+            SELECT 1 FROM information_schema.tables 
+            WHERE table_schema = 'public' AND table_name = 'resource_items'
+          ) AND NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_schema = 'public' AND table_name = 'resource_items' AND column_name = 'property_type'
+          ) THEN
+            ALTER TABLE "resource_items" ADD COLUMN "property_type" VARCHAR(50) DEFAULT 'BANGUNAN';
+          END IF;
+
+          -- 2. Kolom pricing_templates pada resource_groups
+          IF EXISTS (
+            SELECT 1 FROM information_schema.tables 
+            WHERE table_schema = 'public' AND table_name = 'resource_groups'
+          ) AND NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_schema = 'public' AND table_name = 'resource_groups' AND column_name = 'pricing_templates'
+          ) THEN
+            ALTER TABLE "resource_groups" ADD COLUMN "pricing_templates" JSONB DEFAULT '[]'::jsonb;
+          END IF;
+        END $$;
+      `);
+    } catch (e: any) {
+      // Tidak blocking agar aplikasi tetap berjalan meski database berbeda dialect/mock
+    }
   }
 
   // Mengontrol pemutusan koneksi saat aplikasi ditutup (mencegah memory leak / open handles di Jest)

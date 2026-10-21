@@ -8,7 +8,10 @@ on:
     paths:
       - "apps/backend/**"
       - "apps/web/**"
-      - ".github/workflows/deploy.yml"
+      - ".github/workflows/**"
+      - "Dockerfile*"
+      - "docker-compose*"
+      - "package*.json"
 
 permissions:
   contents: read
@@ -62,10 +65,10 @@ jobs:
     steps:
       - name: Trigger Coolify Deployment (Force Without Cache)
         env:
-          COOLIFY_WEB_URL: ${{ secrets.COOLIFY_WEBHOOK_URL || 'https://coolify.zafii.tech/api/v1/deploy?uuid=hqcqrwm4b5gxzbvrwrw3g73m' }}
+          COOLIFY_URL: ${{ secrets.COOLIFY_WEBHOOK_URL || 'https://coolify.zafii.tech/api/v1/deploy?uuid=hqcqrwm4b5gxzbvrwrw3g73m' }}
           COOLIFY_BACKEND_URL: ${{ secrets.COOLIFY_BACKEND_WEBHOOK_URL }}
         run: |
-          for URL in "$COOLIFY_WEB_URL" "$COOLIFY_BACKEND_URL"; do
+          for URL in "$COOLIFY_URL" "$COOLIFY_BACKEND_URL"; do
             if [ -n "$URL" ]; then
               TARGET_URL=$(echo "$URL" | sed 's/force=false/force=true/g')
               if [[ "$TARGET_URL" != *"force=true"* ]]; then
@@ -79,3 +82,6 @@ jobs:
               curl -f -sSL "$TARGET_URL" || echo "Panggilan webhook selesai."
             fi
           done
+          if [ -z "$COOLIFY_BACKEND_URL" ]; then
+            echo "::warning title=COOLIFY_BACKEND_WEBHOOK_URL Not Found::Secret COOLIFY_BACKEND_WEBHOOK_URL belum diset di GitHub Secrets. Jika backend dan web terpisah di Coolify, pastikan menambahkan secret webhook backend di GitHub agar backend ter-deploy otomatis."
+          fi

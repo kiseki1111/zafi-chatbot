@@ -1,6 +1,7 @@
 services:
   backend:
     image: ghcr.io/kiseki1111/zafi-backend:latest
+    pull_policy: always
     container_name: iqbal-backend
     restart: unless-stopped
     env_file:
@@ -23,6 +24,7 @@ services:
 
   web:
     image: ghcr.io/kiseki1111/zafi-web:latest
+    pull_policy: always
     container_name: iqbal-web
     restart: unless-stopped
     depends_on:

@@ -422,5 +422,156 @@ describe('Chaos & E2E Suite: Jenis Unit (propertyType: BANGUNAN vs TANAH)', () =
         }),
       );
     });
+
+    it('[Feature 3: Single-Config Siteplan Pricing + TANAH_BANGUNAN in AI Agent Context]', async () => {
+      const singleConfig = {
+        landArea: '120 m2',
+        landPrice: 90000000,
+        buildingType: '36',
+        buildingPrice: 160000000,
+        packageType: '36/120',
+        packagePrice: 250000000,
+      };
+
+      context.mockPrisma.resourceGroup.findMany.mockResolvedValue([
+        {
+          id: 'g-cluster-1',
+          name: 'Griya Amanah 2',
+          category: 'properti',
+          pricingTemplates: singleConfig,
+          items: [
+            {
+              id: 'it-1',
+              code: 'C-20',
+              propertyType: 'TANAH_BANGUNAN',
+              houseType: '36/120',
+              price: 250000000,
+              status: 'AVAILABLE',
+            },
+            {
+              id: 'it-2',
+              code: 'C-21',
+              propertyType: 'TANAH',
+              houseType: '120 m2',
+              price: 90000000,
+              status: 'AVAILABLE',
+            },
+          ],
+        },
+      ]);
+
+      const contextOutput = await agentSharedService.getAvailabilityContext('tenant-proper-1');
+
+      expect(contextOutput).toContain('Acuan Tipe & Rincian Harga di Perumahan ini');
+      expect(contextOutput).toContain('Harga Tanah Saja (Luas 120 m2): Rp 90.000.000');
+      expect(contextOutput).toContain('Harga Bangunan Saja (Biaya Bangun) (Tipe 36): Rp 160.000.000');
+      expect(contextOutput).toContain('Paket Lengkap (Tanah + Bangunan) (Tipe 36/120): Rp 250.000.000');
+      expect(contextOutput).toContain('C-20 [Paket Lengkap: Tanah + Bangunan] (Tipe 36/120)');
+      expect(contextOutput).toContain('C-21 [Tanah Kosong] (Luas 120 m2)');
+    });
+
+    it('[Feature 4: Update Group with Siteplan Pricing Object]', async () => {
+      const pricingPayload = {
+        landArea: '100 m2',
+        landPrice: 85000000,
+        buildingType: '45',
+        buildingPrice: 140000000,
+        packageType: '45/100',
+        packagePrice: 225000000,
+      };
+
+      context.mockPrisma.resourceGroup.findFirst.mockResolvedValue({
+        id: 'group-proper-1',
+        tenantId: 'tenant-proper-1',
+      });
+      context.mockPrisma.resourceGroup.update.mockResolvedValue({
+        id: 'group-proper-1',
+        name: 'Griya Amanah Update',
+        pricingTemplates: pricingPayload,
+        items: [],
+      });
+
+      const res = await request(app.getHttpServer())
+        .put('/api/v1/availability/groups/group-proper-1')
+        .send({
+          pricingTemplates: pricingPayload,
+        })
+        .expect(200);
+
+      expect(res.body.pricingTemplates).toEqual(pricingPayload);
+    });
+
+    it('[Chaos 6: Resilience on Malformed or Partial Pricing Configuration]', async () => {
+      // 1. Partial: hanya tanah
+      context.mockPrisma.resourceGroup.findMany.mockResolvedValueOnce([
+        {
+          id: 'g-partial',
+          name: 'Cluster Tanah Saja',
+          pricingTemplates: { landArea: '150 m2', landPrice: 75000000 },
+          items: [],
+        },
+      ]);
+      const partialOutput = await agentSharedService.getAvailabilityContext('tenant-proper-1');
+      expect(partialOutput).toContain('Harga Tanah Saja (Luas 150 m2): Rp 75.000.000');
+      expect(partialOutput).not.toContain('Harga Bangunan Saja');
+
+      // 2. Corrupted JSON / empty object
+      context.mockPrisma.resourceGroup.findMany.mockResolvedValueOnce([
+        {
+          id: 'g-empty',
+          name: 'Cluster Kosong',
+          pricingTemplates: {},
+          items: [],
+        },
+      ]);
+      const emptyOutput = await agentSharedService.getAvailabilityContext('tenant-proper-1');
+      expect(emptyOutput).toContain('Perumahan: "Cluster Kosong"');
+
+      // 3. String serialized JSON
+      context.mockPrisma.resourceGroup.findMany.mockResolvedValueOnce([
+        {
+          id: 'g-string-json',
+          name: 'Cluster String JSON',
+          pricingTemplates: JSON.stringify({ packageType: '36/72', packagePrice: 180000000 }),
+          items: [],
+        },
+      ]);
+      const stringOutput = await agentSharedService.getAvailabilityContext('tenant-proper-1');
+      expect(stringOutput).toContain('Paket Lengkap (Tanah + Bangunan) (Tipe 36/72): Rp 180.000.000');
+    });
+
+    it('[Chaos 7: Extreme Price Values (Trillions) and Zero / Null Handling]', async () => {
+      const extremeConfig = {
+        landArea: '10.000 m2',
+        landPrice: 5000000000000, // 5 Triliun
+        buildingType: 'Penthouse',
+        buildingPrice: 2000000000000, // 2 Triliun
+        packageType: 'Mega-Cluster',
+        packagePrice: 7000000000000, // 7 Triliun
+      };
+
+      context.mockPrisma.resourceGroup.findMany.mockResolvedValueOnce([
+        {
+          id: 'g-extreme',
+          name: 'Kawasan Sultan',
+          pricingTemplates: extremeConfig,
+          items: [
+            {
+              id: 'it-sultan',
+              code: 'VVIP-01',
+              propertyType: 'TANAH_BANGUNAN',
+              houseType: 'Mega-Cluster',
+              price: 7000000000000,
+              status: 'AVAILABLE',
+            },
+          ],
+        },
+      ]);
+
+      const output = await agentSharedService.getAvailabilityContext('tenant-proper-1');
+      expect(output).toContain('Rp 5.000.000.000.000');
+      expect(output).toContain('Rp 7.000.000.000.000');
+      expect(output).toContain('VVIP-01 [Paket Lengkap: Tanah + Bangunan]');
+    });
   });
 });

@@ -14,7 +14,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Plus, Search, Edit3, Trash2, CheckCircle2, Clock, XCircle, Wrench, Layers, RefreshCw, Upload, Image, FileVideo, ExternalLink, Play, Copy, Check, Film, BookOpen, Sparkles, FileText, User, AlertTriangle, Home, LandPlot
+  Plus, Search, Edit3, Trash2, CheckCircle2, Clock, XCircle, Wrench, Layers, RefreshCw, Upload, Image, FileVideo, ExternalLink, Play, Copy, Check, Film, BookOpen, Sparkles, FileText, User, AlertTriangle, Home, LandPlot, Building2, SlidersHorizontal, Calculator, Tag
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { useBackgroundTasksStore } from "@/lib/background-tasks-store";
@@ -22,7 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { checkWahaMediaLink } from "@/lib/waha-link-validator";
 import { cn } from "@/lib/utils";
-import type { ResourceGroup, ResourceItem, ResourceStatus, PropertyType } from "@/lib/types";
+import type { ResourceGroup, ResourceItem, ResourceStatus, PropertyType, PricingTemplate } from "@/lib/types";
 
 /**
  * Membersihkan format harga (menerima "3500000", "3.500.000", maupun "Rp 3.500.000") menjadi angka murni
@@ -193,6 +193,18 @@ export function AvailabilityView() {
   const [batchError, setBatchError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
+  // Acuan Tipe & Harga Modal State (1 Siteplan = 1 Template)
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [isSavingTemplates, setIsSavingTemplates] = useState(false);
+  const [pricingForm, setPricingForm] = useState({
+    landArea: "",
+    landPrice: "",
+    buildingType: "",
+    buildingPrice: "",
+    packageType: "",
+    packagePrice: "",
+  });
+
   // Fetch groups
   const fetchGroups = async () => {
     setLoading(true);
@@ -250,6 +262,29 @@ export function AvailabilityView() {
     });
   }, [activeGroup, searchQuery, filterStatus, filterPropertyType]);
 
+  // Memoized siteplan pricing config (1 siteplan = 1 acuan harga)
+  const siteplanPricing: SiteplanPricingConfig = useMemo(() => {
+    if (!activeGroup?.pricingTemplates) return {};
+    try {
+      const raw = activeGroup.pricingTemplates;
+      const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+      if (Array.isArray(parsed)) {
+        const first = parsed[0] || {};
+        return {
+          landArea: first.landArea || first.houseType || "",
+          landPrice: first.landPrice,
+          buildingType: first.buildingType || first.houseType || "",
+          buildingPrice: first.buildingPrice,
+          packageType: first.packageType || first.houseType || "",
+          packagePrice: first.packagePrice,
+        };
+      }
+      return parsed || {};
+    } catch {
+      return {};
+    }
+  }, [activeGroup?.pricingTemplates]);
+
   // Statistics
   const stats = useMemo(() => {
     const items = activeGroup?.items || [];
@@ -258,8 +293,109 @@ export function AvailabilityView() {
     const occupied = items.filter((i) => i.status === "OCCUPIED").length;
     const buildingCount = items.filter((i) => ((i as any).propertyType || "BANGUNAN") === "BANGUNAN").length;
     const landCount = items.filter((i) => (i as any).propertyType === "TANAH").length;
-    return { total: items.length, available, booked, occupied, buildingCount, landCount };
+    const landBuildingCount = items.filter((i) => (i as any).propertyType === "TANAH_BANGUNAN").length;
+    return { total: items.length, available, booked, occupied, buildingCount, landCount, landBuildingCount };
   }, [activeGroup]);
+
+  // Pricing Handlers (1 Siteplan = 1 Template)
+  const openPricingModal = () => {
+    setPricingForm({
+      landArea: siteplanPricing.landArea || "",
+      landPrice: siteplanPricing.landPrice ? formatIdr(siteplanPricing.landPrice) : "",
+      buildingType: siteplanPricing.buildingType || "",
+      buildingPrice: siteplanPricing.buildingPrice ? formatIdr(siteplanPricing.buildingPrice) : "",
+      packageType: siteplanPricing.packageType || "",
+      packagePrice: siteplanPricing.packagePrice ? formatIdr(siteplanPricing.packagePrice) : "",
+    });
+    setIsTemplateModalOpen(true);
+  };
+
+  const handleSavePricingConfig = async () => {
+    if (!activeGroup) return;
+    setIsSavingTemplates(true);
+    const payload: SiteplanPricingConfig = {
+      landArea: pricingForm.landArea.trim(),
+      landPrice: parseIdrPrice(pricingForm.landPrice),
+      buildingType: pricingForm.buildingType.trim(),
+      buildingPrice: parseIdrPrice(pricingForm.buildingPrice),
+      packageType: pricingForm.packageType.trim(),
+      packagePrice: parseIdrPrice(pricingForm.packagePrice),
+    };
+    try {
+      const res = await fetch(`/api/v1/availability/groups/${activeGroup.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pricingTemplates: payload }),
+      });
+      if (res.ok) {
+        toast({ title: "Acuan Harga Tersimpan", description: "Acuan tipe dan harga untuk perumahan ini berhasil disimpan." });
+        setGroups((prev) =>
+          prev.map((g) => (g.id === activeGroup.id ? { ...g, pricingTemplates: payload } : g)),
+        );
+        setIsTemplateModalOpen(false);
+      } else {
+        toast({ title: "Gagal menyimpan", description: "Terjadi kesalahan saat menyimpan acuan harga.", variant: "destructive" });
+      }
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setIsSavingTemplates(false);
+    }
+  };
+
+  const handleItemPropertyTypeChange = (newType: string) => {
+    let newPrice = itemForm.price;
+    let newHouseType = itemForm.houseType;
+    if (newType === "TANAH") {
+      if (siteplanPricing.landPrice) newPrice = formatIdr(siteplanPricing.landPrice);
+      if (siteplanPricing.landArea && (!newHouseType || newHouseType === siteplanPricing.buildingType || newHouseType === siteplanPricing.packageType)) {
+        newHouseType = siteplanPricing.landArea;
+      }
+    } else if (newType === "BANGUNAN") {
+      if (siteplanPricing.buildingPrice) newPrice = formatIdr(siteplanPricing.buildingPrice);
+      if (siteplanPricing.buildingType && (!newHouseType || newHouseType === siteplanPricing.landArea || newHouseType === siteplanPricing.packageType)) {
+        newHouseType = siteplanPricing.buildingType;
+      }
+    } else if (newType === "TANAH_BANGUNAN") {
+      if (siteplanPricing.packagePrice) newPrice = formatIdr(siteplanPricing.packagePrice);
+      if (siteplanPricing.packageType && (!newHouseType || newHouseType === siteplanPricing.landArea || newHouseType === siteplanPricing.buildingType)) {
+        newHouseType = siteplanPricing.packageType;
+      }
+    }
+    setItemForm((prev) => ({
+      ...prev,
+      propertyType: newType,
+      houseType: newHouseType,
+      price: newPrice,
+    }));
+  };
+
+  const handleBatchPropertyTypeChange = (newType: string) => {
+    let newPrice = batchForm.price;
+    let newHouseType = batchForm.houseType;
+    if (newType === "TANAH") {
+      if (siteplanPricing.landPrice) newPrice = formatIdr(siteplanPricing.landPrice);
+      if (siteplanPricing.landArea && (!newHouseType || newHouseType === siteplanPricing.buildingType || newHouseType === siteplanPricing.packageType)) {
+        newHouseType = siteplanPricing.landArea;
+      }
+    } else if (newType === "BANGUNAN") {
+      if (siteplanPricing.buildingPrice) newPrice = formatIdr(siteplanPricing.buildingPrice);
+      if (siteplanPricing.buildingType && (!newHouseType || newHouseType === siteplanPricing.landArea || newHouseType === siteplanPricing.packageType)) {
+        newHouseType = siteplanPricing.buildingType;
+      }
+    } else if (newType === "TANAH_BANGUNAN") {
+      if (siteplanPricing.packagePrice) newPrice = formatIdr(siteplanPricing.packagePrice);
+      if (siteplanPricing.packageType && (!newHouseType || newHouseType === siteplanPricing.landArea || newHouseType === siteplanPricing.buildingType)) {
+        newHouseType = siteplanPricing.packageType;
+      }
+    }
+    setBatchForm((prev) => ({
+      ...prev,
+      propertyType: newType,
+      houseType: newHouseType,
+      price: newPrice,
+    }));
+  };
 
   // Handlers — with inline validation (F1) + anti-double-submit (F2)
   const handleSaveGroup = async () => {
@@ -685,9 +821,9 @@ export function AvailabilityView() {
       code: "",
       name: "",
       propertyType: "BANGUNAN",
-      houseType: "",
+      houseType: siteplanPricing.buildingType || "",
       status: "AVAILABLE",
-      price: "",
+      price: siteplanPricing.buildingPrice ? formatIdr(siteplanPricing.buildingPrice) : "",
       customerName: "",
       customerPhone: "",
       notes: "",
@@ -970,7 +1106,7 @@ export function AvailabilityView() {
             </SelectContent>
           </Select>
           <Select value={filterPropertyType} onValueChange={setFilterPropertyType}>
-            <SelectTrigger className="w-[140px] h-9">
+            <SelectTrigger className="w-[155px] h-9">
               <SelectValue placeholder="Jenis" />
             </SelectTrigger>
             <SelectContent>
@@ -978,13 +1114,19 @@ export function AvailabilityView() {
               <SelectItem value="BANGUNAN">
                 <span className="flex items-center gap-2">
                   <Home className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                  <span>Bangunan Rumah</span>
+                  <span>Bangunan Rumah ({stats.buildingCount})</span>
                 </span>
               </SelectItem>
               <SelectItem value="TANAH">
                 <span className="flex items-center gap-2">
                   <LandPlot className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                  <span>Tanah Kosong</span>
+                  <span>Tanah Kosong ({stats.landCount})</span>
+                </span>
+              </SelectItem>
+              <SelectItem value="TANAH_BANGUNAN">
+                <span className="flex items-center gap-2">
+                  <Building2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                  <span>Tanah + Bangunan ({stats.landBuildingCount})</span>
                 </span>
               </SelectItem>
             </SelectContent>
@@ -992,7 +1134,16 @@ export function AvailabilityView() {
         </div>
 
         {activeGroup && (
-          <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={openPricingModal}
+              className="h-8.5 text-xs font-semibold border-emerald-300 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5 mr-1 text-emerald-600" />
+              Acuan Tipe &amp; Harga
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setIsBatchModalOpen(true)} className="h-8.5 text-xs font-medium">
               + Generate Batch
             </Button>
@@ -1022,9 +1173,10 @@ export function AvailabilityView() {
               <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-rose-500" /> Terjual</span>
               <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-zinc-800 dark:bg-zinc-200" /> Show Unit</span>
             </div>
-            <div className="flex items-center gap-3 text-muted-foreground">
+            <div className="flex items-center gap-3 text-muted-foreground flex-wrap">
               <span className="flex items-center gap-1 font-medium"><Home className="h-3.5 w-3.5 text-blue-500" /> Rumah: {stats.buildingCount}</span>
               <span className="flex items-center gap-1 font-medium"><LandPlot className="h-3.5 w-3.5 text-amber-500" /> Tanah: {stats.landCount}</span>
+              <span className="flex items-center gap-1 font-medium"><Building2 className="h-3.5 w-3.5 text-emerald-500" /> Paket: {stats.landBuildingCount}</span>
             </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
@@ -1049,6 +1201,10 @@ export function AvailabilityView() {
                       {item.propertyType === "TANAH" ? (
                         <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
                           Tanah
+                        </span>
+                      ) : item.propertyType === "TANAH_BANGUNAN" ? (
+                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
+                          Tanah + Rumah
                         </span>
                       ) : null}
                     </div>
@@ -1558,7 +1714,7 @@ export function AvailabilityView() {
                 <Label htmlFor="propertyType">Jenis</Label>
                 <Select
                   value={itemForm.propertyType}
-                  onValueChange={(val: string) => setItemForm({ ...itemForm, propertyType: val })}
+                  onValueChange={handleItemPropertyTypeChange}
                 >
                   <SelectTrigger id="propertyType">
                     <SelectValue />
@@ -1576,13 +1732,19 @@ export function AvailabilityView() {
                         <span>Tanah Kosong</span>
                       </span>
                     </SelectItem>
+                    <SelectItem value="TANAH_BANGUNAN">
+                      <span className="flex items-center gap-2">
+                        <Building2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                        <span>Tanah + Bangunan</span>
+                      </span>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-1.5">
                 <Label htmlFor="houseType">
-                  {itemForm.propertyType === "TANAH" ? "Luas / Tipe Kavling" : "Tipe Rumah"}
+                  {itemForm.propertyType === "TANAH" ? "Luas / Tipe Kavling" : itemForm.propertyType === "TANAH_BANGUNAN" ? "Tipe Rumah & Kavling" : "Tipe Rumah"}
                 </Label>
                 <Input
                   id="houseType"
@@ -1727,7 +1889,7 @@ export function AvailabilityView() {
                 <Label htmlFor="batchPropertyType">Jenis Default</Label>
                 <Select
                   value={batchForm.propertyType}
-                  onValueChange={(val: string) => setBatchForm({ ...batchForm, propertyType: val })}
+                  onValueChange={handleBatchPropertyTypeChange}
                 >
                   <SelectTrigger id="batchPropertyType">
                     <SelectValue />
@@ -1745,13 +1907,19 @@ export function AvailabilityView() {
                         <span>Tanah Kosong</span>
                       </span>
                     </SelectItem>
+                    <SelectItem value="TANAH_BANGUNAN">
+                      <span className="flex items-center gap-2">
+                        <Building2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                        <span>Tanah + Bangunan</span>
+                      </span>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-1.5">
                 <Label htmlFor="batchHouseType">
-                  {batchForm.propertyType === "TANAH" ? "Luas / Tipe Default" : "Tipe Rumah Default"}
+                  {batchForm.propertyType === "TANAH" ? "Luas / Tipe Default" : batchForm.propertyType === "TANAH_BANGUNAN" ? "Tipe Rumah & Kavling" : "Tipe Rumah Default"}
                 </Label>
                 <Input
                   id="batchHouseType"
@@ -1859,6 +2027,136 @@ export function AvailabilityView() {
             >
               {isSavingKnowledge ? "Menyimpan..." : "Simpan Topik Knowledge"}
             </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* DIALOG: ACUAN TIPE & HARGA PERUMAHAN (1 Siteplan = 1 Template) */}
+        <Dialog open={isTemplateModalOpen} onOpenChange={setIsTemplateModalOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader className="pb-1">
+              <DialogTitle className="flex items-center gap-2 text-base font-bold">
+                <SlidersHorizontal className="h-5 w-5 text-emerald-600" />
+                Acuan Tipe &amp; Harga ({activeGroup?.name})
+              </DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground leading-relaxed">
+                Tentukan luas, tipe, dan harga acuan perumahan ini. Form unit otomatis mengisi nilai ini dan Bot AI WhatsApp menjadikannya acuan resmi.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2">
+              {/* 1. Tanah Saja */}
+              <div className="p-3.5 rounded-xl border bg-amber-50/40 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800 space-y-2.5">
+                <div className="flex items-center gap-2">
+                  <LandPlot className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  <span className="font-bold text-xs text-amber-900 dark:text-amber-200">1. Tanah Kosong Saja</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="cfgLandArea" className="text-xs">Luas / Kavling</Label>
+                    <Input
+                      id="cfgLandArea"
+                      placeholder="misal: 120 m² / 10x12"
+                      value={pricingForm.landArea}
+                      onChange={(e) => setPricingForm({ ...pricingForm, landArea: e.target.value })}
+                      className="h-8 text-xs bg-background"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="cfgLandPrice" className="text-xs">Harga Tanah (Rp)</Label>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">Rp</span>
+                      <Input
+                        id="cfgLandPrice"
+                        placeholder="80.000.000"
+                        value={pricingForm.landPrice}
+                        onChange={(e) => setPricingForm({ ...pricingForm, landPrice: formatIdr(e.target.value) })}
+                        className="h-8 pl-8 font-mono text-xs bg-background"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Bangunan Saja */}
+              <div className="p-3.5 rounded-xl border bg-blue-50/40 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800 space-y-2.5">
+                <div className="flex items-center gap-2">
+                  <Home className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <span className="font-bold text-xs text-blue-900 dark:text-blue-200">2. Bangunan Rumah Saja</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="cfgBuildingType" className="text-xs">Tipe Bangunan</Label>
+                    <Input
+                      id="cfgBuildingType"
+                      placeholder="misal: 36, 45, dsb"
+                      value={pricingForm.buildingType}
+                      onChange={(e) => setPricingForm({ ...pricingForm, buildingType: e.target.value })}
+                      className="h-8 text-xs bg-background"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="cfgBuildingPrice" className="text-xs">Harga Bangunan (Rp)</Label>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">Rp</span>
+                      <Input
+                        id="cfgBuildingPrice"
+                        placeholder="102.000.000"
+                        value={pricingForm.buildingPrice}
+                        onChange={(e) => setPricingForm({ ...pricingForm, buildingPrice: formatIdr(e.target.value) })}
+                        className="h-8 pl-8 font-mono text-xs bg-background"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Paket Tanah + Bangunan */}
+              <div className="p-3.5 rounded-xl border bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800 space-y-2.5">
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  <span className="font-bold text-xs text-emerald-900 dark:text-emerald-200">3. Paket (Tanah + Bangunan)</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="cfgPackageType" className="text-xs">Tipe Rumah &amp; Kavling</Label>
+                    <Input
+                      id="cfgPackageType"
+                      placeholder="misal: 36/120"
+                      value={pricingForm.packageType}
+                      onChange={(e) => setPricingForm({ ...pricingForm, packageType: e.target.value })}
+                      className="h-8 text-xs bg-background"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="cfgPackagePrice" className="text-xs">Harga Paket (Rp)</Label>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">Rp</span>
+                      <Input
+                        id="cfgPackagePrice"
+                        placeholder="182.000.000"
+                        value={pricingForm.packagePrice}
+                        onChange={(e) => setPricingForm({ ...pricingForm, packagePrice: formatIdr(e.target.value) })}
+                        className="h-8 pl-8 font-mono text-xs font-bold bg-background"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button variant="outline" size="sm" onClick={() => setIsTemplateModalOpen(false)}>
+                Batal
+              </Button>
+              <Button
+                size="sm"
+                disabled={isSavingTemplates}
+                onClick={handleSavePricingConfig}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs"
+              >
+                {isSavingTemplates ? "Menyimpan..." : "Simpan Acuan Harga"}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

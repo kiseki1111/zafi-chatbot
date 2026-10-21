@@ -306,10 +306,55 @@ export class AgentSharedService {
         const booked = g.items.filter((i) => i.status === 'BOOKED').length;
         const occupied = g.items.filter((i) => i.status === 'OCCUPIED').length;
 
+        const rawTemplates = (g as any).pricingTemplates;
+        let templatesStr = '';
+        if (rawTemplates) {
+          try {
+            const parsed =
+              typeof rawTemplates === 'string'
+                ? JSON.parse(rawTemplates)
+                : rawTemplates;
+            const config = Array.isArray(parsed) ? parsed[0] : parsed;
+            if (config && typeof config === 'object') {
+              const lines: string[] = [];
+              if (config.landPrice || config.landArea) {
+                const areaStr = config.landArea ? ` (Luas ${config.landArea})` : '';
+                const priceStr = config.landPrice ? `: Rp ${Number(config.landPrice).toLocaleString('id-ID')}` : '';
+                lines.push(`* Harga Tanah Saja${areaStr}${priceStr}`);
+              }
+              if (config.buildingPrice || config.buildingType) {
+                const typeStr = config.buildingType ? ` (Tipe ${config.buildingType})` : '';
+                const priceStr = config.buildingPrice ? `: Rp ${Number(config.buildingPrice).toLocaleString('id-ID')}` : '';
+                lines.push(`* Harga Bangunan Saja (Biaya Bangun)${typeStr}${priceStr}`);
+              }
+              const pkgPrice = config.packagePrice || ((Number(config.landPrice) || 0) + (Number(config.buildingPrice) || 0));
+              if (pkgPrice || config.packageType) {
+                const typeStr = config.packageType ? ` (Tipe ${config.packageType})` : '';
+                const priceStr = pkgPrice ? `: Rp ${Number(pkgPrice).toLocaleString('id-ID')}` : '';
+                lines.push(`* Paket Lengkap (Tanah + Bangunan)${typeStr}${priceStr}`);
+              }
+              if (lines.length > 0) {
+                templatesStr =
+                  '\nAcuan Tipe & Rincian Harga di Perumahan ini:\n  ' +
+                  lines.join('\n  ') +
+                  '\n';
+              }
+            }
+          } catch (e) {}
+        }
+
         const itemList = g.items
           .map((i) => {
-            const jenisStr = i.propertyType === 'TANAH' ? ' [Tanah Kosong]' : ' [Bangunan Rumah]';
-            const typeStr = i.houseType ? ` (${i.propertyType === 'TANAH' ? 'Luas ' : 'Tipe '}${i.houseType})` : '';
+            let jenisStr = ' [Bangunan Rumah]';
+            if (i.propertyType === 'TANAH') {
+              jenisStr = ' [Tanah Kosong]';
+            } else if (i.propertyType === 'TANAH_BANGUNAN') {
+              jenisStr = ' [Paket Lengkap: Tanah + Bangunan]';
+            }
+
+            const typeStr = i.houseType
+              ? ` (${i.propertyType === 'TANAH' ? 'Luas ' : 'Tipe '}${i.houseType})`
+              : '';
             const priceStr = i.price
               ? ` - Rp ${Number(i.price).toLocaleString('id-ID')}`
               : '';
@@ -371,7 +416,7 @@ export class AgentSharedService {
           }
         }
 
-        return `Perumahan: "${g.name}" (Total ${total} Unit | Unit Ready: ${available} | Proses Bank: ${booked} | Sudah Terjual: ${occupied})${descStr}\nDaftar Unit/Blok:\n${itemList}${mediaStr}`;
+        return `Perumahan: "${g.name}" (Total ${total} Unit | Unit Ready: ${available} | Proses Bank: ${booked} | Sudah Terjual: ${occupied})${descStr}${templatesStr}\nDaftar Unit/Blok:\n${itemList}${mediaStr}`;
       });
 
       return summaries.join('\n\n');

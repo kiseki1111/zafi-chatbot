@@ -452,14 +452,15 @@ model Tenant {
 }
 
 model ResourceGroup {
-  id            String         @id @default(uuid())
-  tenantId      String?        @map("tenant_id")
-  name          String         @db.VarChar(150)
-  category      String         @default("properti") @db.VarChar(50)
-  description   String?        @db.Text
-  siteplanImage String?        @map("siteplan_image") @db.Text
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
+  id               String         @id @default(uuid())
+  tenantId         String?        @map("tenant_id")
+  name             String         @db.VarChar(150)
+  category         String         @default("properti") @db.VarChar(50)
+  description      String?        @db.Text
+  siteplanImage    String?        @map("siteplan_image") @db.Text
+  pricingTemplates Json?          @default("[]") @map("pricing_templates")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
 
   tenant Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   items  ResourceItem[]
@@ -472,7 +473,7 @@ model ResourceItem {
   groupId       String        @map("group_id")
   code          String        @db.VarChar(50)
   name          String?       @db.VarChar(100)
-  propertyType  String?       @default("BANGUNAN") @map("property_type") @db.VarChar(50) // "BANGUNAN" (Bangunan Rumah) atau "TANAH" (Tanah Kosong)
+  propertyType  String?       @default("BANGUNAN") @map("property_type") @db.VarChar(50) // "BANGUNAN" (Bangunan Rumah), "TANAH" (Tanah Kosong), atau "TANAH_BANGUNAN" (Paket Tanah + Bangunan)
   houseType     String?       @map("house_type") @db.VarChar(50) // Tipe rumah: "36/72", "45/90", dll
   status        String        @default("AVAILABLE") @db.VarChar(20) // AVAILABLE, BOOKED, OCCUPIED, MAINTENANCE
   capacity      Int?          @default(1)

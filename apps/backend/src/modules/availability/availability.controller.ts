@@ -167,6 +167,7 @@ export class AvailabilityController {
       category?: string;
       description?: string;
       siteplanImage?: string;
+      pricingTemplates?: any;
     },
   ) {
     const isSuper = req?.user?.roles?.includes('superadmin');
@@ -191,6 +192,7 @@ export class AvailabilityController {
       category?: string;
       description?: string;
       siteplanImage?: string;
+      pricingTemplates?: any;
     },
   ) {
     const tenantId = this.resolveTenantId(req);
