@@ -472,6 +472,7 @@ model ResourceItem {
   groupId       String        @map("group_id")
   code          String        @db.VarChar(50)
   name          String?       @db.VarChar(100)
+  propertyType  String?       @default("BANGUNAN") @map("property_type") @db.VarChar(50) // "BANGUNAN" (Bangunan Rumah) atau "TANAH" (Tanah Kosong)
   houseType     String?       @map("house_type") @db.VarChar(50) // Tipe rumah: "36/72", "45/90", dll
   status        String        @default("AVAILABLE") @db.VarChar(20) // AVAILABLE, BOOKED, OCCUPIED, MAINTENANCE
   capacity      Int?          @default(1)

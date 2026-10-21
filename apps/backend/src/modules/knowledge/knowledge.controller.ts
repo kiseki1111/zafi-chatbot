@@ -34,12 +34,18 @@ export class KnowledgeController {
     if (isSuperadmin && (req.query?.tenantId || req.body?.tenantId)) {
       return (req.query?.tenantId || req.body?.tenantId) as string;
     }
-    if (!req.user?.tenantId) {
-      throw new ForbiddenException(
-        'Akses ditolak: Akun Anda tidak terhubung dengan tenant manapun',
-      );
+    if (req.user?.tenantId) {
+      return req.user.tenantId;
     }
-    return req.user.tenantId;
+    if (req.query?.tenantId) {
+      return req.query.tenantId as string;
+    }
+    if (req.body?.tenantId) {
+      return req.body.tenantId as string;
+    }
+    throw new ForbiddenException(
+      'Akses ditolak: Akun Anda tidak terhubung dengan tenant manapun',
+    );
   }
 
   @Get()
@@ -147,13 +153,35 @@ export class KnowledgeController {
     return this.knowledgeService.previewSplitKnowledge(id, tenantId);
   }
 
+  @Post('move-to-siteplan')
+  async moveToSiteplan(
+    @Req() req: any,
+    @Body()
+    body: {
+      groupId: string;
+      title: string;
+      category?: string;
+      content: string;
+      sourceKnowledgeId?: string;
+    },
+  ) {
+    const tenantId = this.resolveTenantId(req);
+    return this.knowledgeService.moveToSiteplan(tenantId, body);
+  }
+
   @Post(':id/split-apply')
   async applySplit(
     @Param('id') id: string,
     @Req() req: any,
     @Body()
     body: {
-      topics: { title: string; content: string }[];
+      topics: {
+        title: string;
+        content: string;
+        target?: 'knowledge' | 'siteplan';
+        targetGroupId?: string;
+        targetCategory?: string;
+      }[];
       keepOriginal?: boolean;
     },
   ) {

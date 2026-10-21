@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import { toast } from "sonner";
 
-export type TaskStatus = "pending" | "running" | "success" | "error";
+export type TaskStatus = "pending" | "running" | "needs_action" | "success" | "error";
 
 export interface BackgroundTask {
   id: string;
@@ -15,6 +15,8 @@ export interface BackgroundTask {
   error?: string;
   createdAt: number;
   completedAt?: number;
+  actionLabel?: string;
+  actionData?: any;
 }
 
 interface BackgroundTasksState {
@@ -63,6 +65,14 @@ interface BackgroundTasksState {
     groupId: string;
     currentMediaList: any[];
     onSuccess?: () => void;
+    onError?: (err: Error) => void;
+  }) => Promise<void>;
+
+  runKnowledgeSplitAi: (params: {
+    item: { id: string; title: string; content: string; tenantId?: string };
+    keepOriginal?: boolean;
+    tenantId?: string;
+    onSuccess?: (topicsCount: number) => void;
     onError?: (err: Error) => void;
   }) => Promise<void>;
 }
@@ -490,6 +500,93 @@ export const useBackgroundTasksStore = create<BackgroundTasksState>(
           completedAt: Date.now(),
         });
         toast.error(`Gagal upload siteplan "${name}": ${errorMsg}`);
+        onError?.(err);
+      }
+    },
+
+    runKnowledgeSplitAi: async ({ item, keepOriginal = false, tenantId, onSuccess, onError }) => {
+      const taskId = get().addTask({
+        title: `Pecah Materi: ${item.title}`,
+        category: "knowledge",
+        status: "running",
+        statusText: "AI menganalisis & membedah topik materi...",
+      });
+
+      try {
+        const effectiveTenantId = tenantId || item.tenantId || "";
+        const tenantQuery = effectiveTenantId ? `?tenantId=${effectiveTenantId}` : "";
+
+        // Step 1: Preview split via AI
+        const previewRes = await fetch(`/api/v1/knowledge/${item.id}/split-preview${tenantQuery}`, {
+          method: "POST",
+        });
+        const previewText = await previewRes.text();
+        let previewJson: any = null;
+        try {
+          previewJson = JSON.parse(previewText);
+        } catch {
+          throw new Error(previewText || `Server error (${previewRes.status})`);
+        }
+        if (!previewRes.ok) {
+          throw new Error(previewJson.message || "Gagal menganalisis dokumen via AI");
+        }
+        const previewData = previewJson.data || previewJson;
+        const topics = previewData.topics;
+
+        if (!Array.isArray(topics) || topics.length === 0) {
+          throw new Error("AI tidak mendeteksi topik mandiri pada dokumen ini");
+        }
+
+        // Simpan state needs_action agar notifikasi di pojok kanan bawah selalu muncul meminta verifikasi user
+        get().updateTask(taskId, {
+          status: "needs_action",
+          statusText: `Terdeteksi ${topics.length} topik modular. Menunggu verifikasi Anda...`,
+          actionLabel: "Verifikasi Sekarang",
+          actionData: {
+            item,
+            topics,
+            keepOriginal,
+            tenantId: effectiveTenantId,
+          },
+        });
+
+        // Buka panel widget agar terlihat jelas oleh user
+        get().setIsOpen(true);
+
+        toast.info(
+          `AI selesai menganalisis "${item.title}" (${topics.length} topik). Klik notifikasi di kanan bawah untuk verifikasi!`,
+          {
+            duration: 8000,
+            action: {
+              label: "Verifikasi",
+              onClick: () => {
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(
+                    new CustomEvent("open-knowledge-split-verify", {
+                      detail: {
+                        taskId,
+                        item,
+                        topics,
+                        keepOriginal,
+                      },
+                    }),
+                  );
+                }
+              },
+            },
+          },
+        );
+
+        onSuccess?.(topics.length);
+      } catch (err: any) {
+        const errorMsg = err.message || "Gagal memproses pemecahan dokumen";
+        get().updateTask(taskId, {
+          status: "error",
+          statusText: "Gagal: " + errorMsg,
+          error: errorMsg,
+          completedAt: Date.now(),
+        });
+        toast.error(`Gagal memecah "${item.title}": ${errorMsg}`);
         onError?.(err);
       }
     },

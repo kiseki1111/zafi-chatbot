@@ -108,6 +108,7 @@ export class AvailabilityService {
     data: {
       code: string;
       name?: string;
+      propertyType?: string;
       houseType?: string;
       status?: string;
       price?: number;
@@ -129,6 +130,7 @@ export class AvailabilityService {
         groupId,
         code: data.code,
         name: data.name,
+        propertyType: data.propertyType || 'BANGUNAN',
         houseType: data.houseType,
         status: data.status || 'AVAILABLE',
         price: data.price,
@@ -148,6 +150,7 @@ export class AvailabilityService {
     houseType?: string,
     price?: number,
     tenantId?: string,
+    propertyType: string = 'BANGUNAN',
   ) {
     if (tenantId) {
       const group = await this.prisma.resourceGroup.findFirst({
@@ -161,6 +164,7 @@ export class AvailabilityService {
       itemsData.push({
         groupId,
         code,
+        propertyType: propertyType || 'BANGUNAN',
         houseType: houseType || null,
         status: 'AVAILABLE',
         price: price || null,
@@ -179,6 +183,7 @@ export class AvailabilityService {
     data: {
       code?: string;
       name?: string;
+      propertyType?: string;
       houseType?: string;
       status?: string;
       price?: number;

@@ -320,5 +320,128 @@ describe('CsService', () => {
         }),
       );
     });
+
+    it('harus memindahkan tautan media sosial (Instagram Reel) dari videos ke teks balasan jika terdaftar di database', async () => {
+      mockAgentShared.getRecentContext.mockResolvedValue([]);
+      mockPrisma.whatsappInstance.findUnique.mockResolvedValue({
+        instanceName: 'wa-property',
+        tenantId: 'tenant-property',
+      });
+      mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-property' });
+      mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue(
+        'Tersedia video lokasi: https://www.instagram.com/reel/DVkx0HGjnEi/?utm_source=ig_web_copy_link',
+      );
+      mockAgentShared.getAvailabilityContext.mockResolvedValue(null);
+
+      mockAgentShared.callLLM.mockResolvedValue(
+        JSON.stringify({
+          text: 'Berikut video yang Kakak minta:',
+          images: [],
+          videos: [
+            {
+              url: 'https://www.instagram.com/reel/DVkx0HGjnEi/?utm_source=ig_web_copy_link',
+              caption: 'Video Arah Menuju Zafi Residence',
+            },
+          ],
+        }),
+      );
+
+      const response = await service.handleMessage({
+        senderId: '628123456789@c.us',
+        sessionName: 'wa-property',
+        text: 'ada video menuju lokasi zafi residence?',
+      });
+
+      // Array videos harus kosong karena ini adalah link IG Reel, bukan file video biner .mp4
+      expect(response.videos).toEqual([]);
+      // Tautan harus disertakan di dalam teks balasan agar WhatsApp memunculkan rich link preview
+      expect(response.text).toContain('https://www.instagram.com/reel/DVkx0HGjnEi/');
+      expect(response.text).toContain('Video Arah Menuju Zafi Residence');
+    });
+
+    it('harus mempertahankan file video langsung (.mp4 atau /uploads/) di array videos saat diminta user', async () => {
+      mockAgentShared.getRecentContext.mockResolvedValue([]);
+      mockPrisma.whatsappInstance.findUnique.mockResolvedValue({
+        instanceName: 'wa-property',
+        tenantId: 'tenant-property',
+      });
+      mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-property' });
+      mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue(
+        'Video tour unit: /uploads/video-zafi-residence.mp4',
+      );
+      mockAgentShared.getAvailabilityContext.mockResolvedValue(null);
+
+      mockAgentShared.callLLM.mockResolvedValue(
+        JSON.stringify({
+          text: 'Ini video unitnya kak.',
+          images: [],
+          videos: [
+            {
+              url: '/uploads/video-zafi-residence.mp4',
+              caption: 'Video Unit',
+            },
+          ],
+        }),
+      );
+
+      const response = await service.handleMessage({
+        senderId: '628123456789@c.us',
+        sessionName: 'wa-property',
+        text: 'minta video unitnya dong kak',
+      });
+
+      expect(response.videos).toHaveLength(1);
+      expect(response.videos[0].url).toBe('/uploads/video-zafi-residence.mp4');
+    });
+
+    it('harus menolak dan membersihkan link video lama yang ada di riwayat chat jika dokumen sudah dihapus dari knowledge base', async () => {
+      // Riwayat percakapan lama masih memuat link video dari sesi sebelum dihapus
+      mockAgentShared.getRecentContext.mockResolvedValue([
+        {
+          senderType: 'bot',
+          content: 'Ini videonya kak https://www.instagram.com/reel/DVkx0HGjnEi/',
+        },
+      ]);
+      mockPrisma.whatsappInstance.findUnique.mockResolvedValue({
+        instanceName: 'wa-property',
+        tenantId: 'tenant-property',
+      });
+      mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-property' });
+      // Database pengetahuan KOSONG karena sudah dihapus oleh tester
+      mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue('');
+      mockAgentShared.getAvailabilityContext.mockResolvedValue(null);
+
+      // LLM mencoba mengulang link yang ia lihat dari riwayat chat
+      mockAgentShared.callLLM.mockResolvedValue(
+        JSON.stringify({
+          text: 'Ini videonya ya kak: https://www.instagram.com/reel/DVkx0HGjnEi/',
+          images: [],
+          videos: [
+            {
+              url: 'https://www.instagram.com/reel/DVkx0HGjnEi/',
+              caption: 'Video Zafi',
+            },
+          ],
+        }),
+      );
+
+      const response = await service.handleMessage({
+        senderId: '628123456789@c.us',
+        sessionName: 'wa-property',
+        text: 'ada videonya kak?',
+      });
+
+      // Video tidak boleh dikirimkan karena tidak ada di database pengetahuan aktif
+      expect(response.videos).toEqual([]);
+      // Tautan usang di teks balasan juga harus dibersihkan
+      expect(response.text).not.toContain('https://www.instagram.com/reel/DVkx0HGjnEi/');
+
+      // Prompt ke LLM harus menetralkan link lama dari chat history
+      expect(mockAgentShared.callLLM).toHaveBeenCalledWith(
+        expect.stringContaining('[tautan media sebelumnya telah dihapus dari database]'),
+        expect.any(String),
+        true,
+      );
+    });
   });
 });

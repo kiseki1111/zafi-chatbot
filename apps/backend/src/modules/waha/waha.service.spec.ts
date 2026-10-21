@@ -28,6 +28,7 @@ describe('WahaService - Unit Tests (Features 1, 2, 6)', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockPrismaService.whatsappInstance.update.mockResolvedValue({});
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -123,6 +124,101 @@ describe('WahaService - Unit Tests (Features 1, 2, 6)', () => {
         }),
       );
       expect(about).toBe('Available for property consultation');
+    });
+  });
+
+  describe('Feature 7: Media & Video Guard (Mencegah pengiriman file HTML rusak)', () => {
+    it('harus mengalihkan sendVideo ke sendText jika URL adalah tautan media sosial (Instagram)', async () => {
+      mockedAxios.post.mockResolvedValue({ data: { success: true, id: 'msg-text-1' } });
+
+      await service.sendVideo(
+        'test-session',
+        '628123456789',
+        'https://www.instagram.com/reel/DVkx0HGjnEi/?utm_source=ig_web_copy_link',
+        'Video Arah Lokasi',
+      );
+
+      // Tidak boleh memanggil /api/sendVideo atau /api/sendFile
+      expect(mockedAxios.post).not.toHaveBeenCalledWith(
+        expect.stringContaining('/api/sendVideo'),
+        expect.anything(),
+        expect.anything(),
+      );
+      expect(mockedAxios.post).not.toHaveBeenCalledWith(
+        expect.stringContaining('/api/sendFile'),
+        expect.anything(),
+        expect.anything(),
+      );
+      // Harus memanggil /api/sendText dengan teks berisi tautan
+      expect(mockedAxios.post).toHaveBeenCalledWith(
+        expect.stringContaining('/api/sendText'),
+        expect.objectContaining({
+          session: 'test-session',
+          chatId: '628123456789',
+          text: expect.stringContaining('https://www.instagram.com/reel/DVkx0HGjnEi/'),
+        }),
+        expect.any(Object),
+      );
+    });
+
+    it('harus mengalihkan sendVideo ke sendText jika hasil unduhan URL adalah text/html', async () => {
+      mockedAxios.post.mockResolvedValue({ data: { success: true, id: 'msg-text-2' } });
+      mockedAxios.get.mockResolvedValueOnce({
+        data: Buffer.from('<!DOCTYPE html><html><body>Halaman Login</body></html>'),
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+      }); // axios.get videoUrl
+
+      await service.sendVideo(
+        'test-session',
+        '628123456789',
+        'https://example-property.com/video-page',
+        'Video Lokasi',
+      );
+
+      // Tidak boleh mengirim ke /api/sendVideo
+      expect(mockedAxios.post).not.toHaveBeenCalledWith(
+        expect.stringContaining('/api/sendVideo'),
+        expect.anything(),
+        expect.anything(),
+      );
+      // Harus dialihkan ke sendText
+      expect(mockedAxios.post).toHaveBeenCalledWith(
+        expect.stringContaining('/api/sendText'),
+        expect.objectContaining({
+          session: 'test-session',
+          chatId: '628123456789',
+          text: expect.stringContaining('https://example-property.com/video-page'),
+        }),
+        expect.any(Object),
+      );
+    });
+
+    it('harus mengirim ke /api/sendVideo jika URL mengembalikan video/mp4 biner', async () => {
+      mockedAxios.post.mockResolvedValue({ data: { success: true, id: 'msg-video-1' } });
+      mockedAxios.get.mockResolvedValueOnce({
+        data: Buffer.from('fake-mp4-binary-content'),
+        headers: { 'content-type': 'video/mp4' },
+      }); // axios.get videoUrl
+
+      await service.sendVideo(
+        'test-session',
+        '628123456789',
+        'https://storage.example.com/tour.mp4',
+        'Video Unit',
+      );
+
+      expect(mockedAxios.post).toHaveBeenCalledWith(
+        expect.stringContaining('/api/sendVideo'),
+        expect.objectContaining({
+          session: 'test-session',
+          chatId: '628123456789',
+          file: expect.objectContaining({
+            mimetype: 'video/mp4',
+            data: Buffer.from('fake-mp4-binary-content').toString('base64'),
+          }),
+        }),
+        expect.any(Object),
+      );
     });
   });
 });

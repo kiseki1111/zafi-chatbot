@@ -308,7 +308,8 @@ export class AgentSharedService {
 
         const itemList = g.items
           .map((i) => {
-            const typeStr = i.houseType ? ` (Tipe ${i.houseType})` : '';
+            const jenisStr = i.propertyType === 'TANAH' ? ' [Tanah Kosong]' : ' [Bangunan Rumah]';
+            const typeStr = i.houseType ? ` (${i.propertyType === 'TANAH' ? 'Luas ' : 'Tipe '}${i.houseType})` : '';
             const priceStr = i.price
               ? ` - Rp ${Number(i.price).toLocaleString('id-ID')}`
               : '';
@@ -319,7 +320,7 @@ export class AgentSharedService {
             if (i.status === 'MAINTENANCE')
               statusLabel = 'RUMAH CONTOH (Abu Hitam)';
 
-            return `  * ${i.code}${typeStr}: ${statusLabel}${priceStr}`;
+            return `  * ${i.code}${jenisStr}${typeStr}: ${statusLabel}${priceStr}`;
           })
           .join('\n');
 

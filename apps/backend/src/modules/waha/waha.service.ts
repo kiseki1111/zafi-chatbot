@@ -63,6 +63,9 @@ export class WahaService implements OnApplicationBootstrap {
     text: string,
     wpm: number = 70,
   ): Promise<void> {
+    if (process.env.NODE_ENV === 'test') {
+      return;
+    }
     // User requested a strict 3-4 seconds delay
     const finalDelay = Math.floor(Math.random() * (4000 - 3000 + 1)) + 3000;
 
@@ -479,6 +482,14 @@ export class WahaService implements OnApplicationBootstrap {
     }
   }
 
+  async sendText(
+    sessionName: string,
+    chatId: string,
+    text: string,
+  ): Promise<any> {
+    return this.sendMessage(sessionName, chatId, text);
+  }
+
   private getMediaBaseUrl(): string {
     return (
       this.configService.get<string>('PUBLIC_URL') ||
@@ -494,6 +505,20 @@ export class WahaService implements OnApplicationBootstrap {
       return `${this.getMediaBaseUrl()}${url}`;
     }
     return url;
+  }
+
+  private isWebOrSocialUrl(url: string): boolean {
+    if (!url) return false;
+    const lower = url.toLowerCase();
+    return (
+      lower.includes('instagram.com') ||
+      lower.includes('instagr.am') ||
+      lower.includes('tiktok.com') ||
+      lower.includes('youtube.com') ||
+      lower.includes('youtu.be') ||
+      lower.includes('facebook.com') ||
+      lower.includes('fb.watch')
+    );
   }
 
   /**
@@ -568,6 +593,15 @@ export class WahaService implements OnApplicationBootstrap {
       // Simulate human typing presence
       await this.sendTypingPresence(sessionName, chatId);
 
+      // Guard: Jika URL adalah tautan web/sosial media, kirim sebagai teks dengan link preview
+      if (this.isWebOrSocialUrl(imageUrl)) {
+        this.logger.warn(
+          `[WAHA-SEND-IMAGE] URL ${imageUrl} adalah tautan web/sosial media. Mengirim sebagai pesan teks tautan.`,
+        );
+        const textMsg = caption ? `${caption}\n${imageUrl}` : imageUrl;
+        return this.sendText(sessionName, chatId, textMsg);
+      }
+
       // Prioritaskan baca dari disk lokal (hindari loop HTTP ke Cloudflare)
       let base64Data: string;
       let mimeType: string;
@@ -584,26 +618,38 @@ export class WahaService implements OnApplicationBootstrap {
           const imageResponse = await axios.get(imageUrl, {
             responseType: 'arraybuffer',
           });
+          const contentType = String(imageResponse.headers['content-type'] || '').toLowerCase();
+          if (contentType.includes('text/html') || contentType.startsWith('text/')) {
+            this.logger.warn(
+              `[WAHA-SEND-IMAGE] URL ${imageUrl} mengembalikan '${contentType}' (bukan data gambar). Mengirim sebagai teks tautan.`,
+            );
+            const textMsg = caption ? `${caption}\n${imageUrl}` : imageUrl;
+            return this.sendText(sessionName, chatId, textMsg);
+          }
           base64Data = Buffer.from(imageResponse.data).toString('base64');
-          mimeType = String(
-            imageResponse.headers['content-type'] || 'image/jpeg',
-          );
+          mimeType = contentType || 'image/jpeg';
         }
       } else {
         const imageResponse = await axios.get(imageUrl, {
           responseType: 'arraybuffer',
         });
+        const contentType = String(imageResponse.headers['content-type'] || '').toLowerCase();
+        if (contentType.includes('text/html') || contentType.startsWith('text/')) {
+          this.logger.warn(
+            `[WAHA-SEND-IMAGE] URL ${imageUrl} mengembalikan '${contentType}' (bukan data gambar). Mengirim sebagai teks tautan.`,
+          );
+          const textMsg = caption ? `${caption}\n${imageUrl}` : imageUrl;
+          return this.sendText(sessionName, chatId, textMsg);
+        }
         base64Data = Buffer.from(imageResponse.data).toString('base64');
-        mimeType = String(
-          imageResponse.headers['content-type'] || 'image/jpeg',
-        );
+        mimeType = contentType || 'image/jpeg';
       }
 
       const payload: any = {
         session: sessionName,
         chatId: chatId,
         file: {
-          mimetype: mimeType.includes('text/html') ? 'image/jpeg' : mimeType,
+          mimetype: mimeType,
           filename: 'property-image.jpg',
           data: base64Data,
         },
@@ -664,6 +710,13 @@ export class WahaService implements OnApplicationBootstrap {
     this.logger.log(
       `[WAHA-SEND-MEDIA] Sesi=${sessionName} | Chat=${chatId} | URL yang diakses: ${mediaUrl}`,
     );
+    if (this.isWebOrSocialUrl(mediaUrl)) {
+      this.logger.warn(
+        `[WAHA-SEND-MEDIA] URL ${mediaUrl} adalah tautan web/sosial media. Mengirim sebagai teks dengan link preview.`,
+      );
+      const textMsg = caption ? `${caption}\n${mediaUrl}` : mediaUrl;
+      return this.sendText(sessionName, chatId, textMsg);
+    }
     const isVideo = /\.(mp4|mov|webm|mkv|ogg)($|\?)/i.test(mediaUrl);
     if (isVideo) {
       return this.sendVideo(sessionName, chatId, mediaUrl, caption);
@@ -767,6 +820,15 @@ export class WahaService implements OnApplicationBootstrap {
       );
       await this.sendTypingPresence(sessionName, chatId);
 
+      // Guard: Jika URL adalah tautan web/sosial media (IG, YouTube, TikTok, dsb.), kirim sebagai teks dengan link preview
+      if (this.isWebOrSocialUrl(videoUrl)) {
+        this.logger.warn(
+          `[WAHA-SEND-VIDEO] URL ${videoUrl} adalah tautan web/sosial media. Mengirim sebagai teks dengan link preview.`,
+        );
+        const textMsg = caption ? `${caption}\n${videoUrl}` : videoUrl;
+        return this.sendText(sessionName, chatId, textMsg);
+      }
+
       let filePayload: any = {
         mimetype: 'video/mp4',
         filename: 'video-properti.mp4',
@@ -792,9 +854,29 @@ export class WahaService implements OnApplicationBootstrap {
             headers: { 'User-Agent': 'Mozilla/5.0' },
             timeout: 40000,
           });
+
+          const contentType = String(downloadRes.headers['content-type'] || '').toLowerCase();
+          if (contentType.includes('text/html') || contentType.startsWith('text/')) {
+            this.logger.warn(
+              `[WAHA-SEND-VIDEO] URL ${videoUrl} mengembalikan '${contentType}' (bukan data video biner). Mengalihkan ke teks tautan.`,
+            );
+            const textMsg = caption ? `${caption}\n${videoUrl}` : videoUrl;
+            return this.sendText(sessionName, chatId, textMsg);
+          }
+
           const base64Data = Buffer.from(downloadRes.data).toString('base64');
           filePayload.data = base64Data;
-        } catch (dlErr) {
+          if (contentType && contentType.startsWith('video/')) {
+            filePayload.mimetype = contentType.split(';')[0].trim();
+          }
+        } catch (dlErr: any) {
+          if (!/\.(mp4|mov|avi|mkv|webm|m4v)($|\?)/i.test(videoUrl)) {
+            this.logger.warn(
+              `[WAHA-SEND-VIDEO] Gagal mengunduh URL ${videoUrl} dan bukan ekstensi video. Mengirim sebagai teks tautan.`,
+            );
+            const textMsg = caption ? `${caption}\n${videoUrl}` : videoUrl;
+            return this.sendText(sessionName, chatId, textMsg);
+          }
           // Fallback: kirim URL langsung jika unduhan lokal gagal
           filePayload.url = videoUrl;
         }
@@ -847,6 +929,15 @@ export class WahaService implements OnApplicationBootstrap {
       videoUrl = this.resolveMediaUrl(videoUrl);
       await this.sendTypingPresence(sessionName, chatId);
 
+      // Guard: Jika URL adalah tautan web/sosial media (IG, YouTube, TikTok, dsb.), kirim sebagai teks dengan link preview
+      if (this.isWebOrSocialUrl(videoUrl)) {
+        this.logger.warn(
+          `[WAHA-SEND-VIDEO] URL ${videoUrl} adalah tautan web/sosial media. Mengirim sebagai teks dengan link preview.`,
+        );
+        const textMsg = caption ? `${caption}\n${videoUrl}` : videoUrl;
+        return this.sendText(sessionName, chatId, textMsg);
+      }
+
       let filePayload: any = {
         mimetype: 'video/mp4',
         filename: 'video.mp4',
@@ -883,9 +974,29 @@ export class WahaService implements OnApplicationBootstrap {
             headers: { 'User-Agent': 'Mozilla/5.0' },
             timeout: 35000,
           });
+
+          const contentType = String(downloadRes.headers['content-type'] || '').toLowerCase();
+          if (contentType.includes('text/html') || contentType.startsWith('text/')) {
+            this.logger.warn(
+              `[WAHA-SEND-VIDEO] URL ${videoUrl} mengembalikan '${contentType}' (bukan video biner). Mengalihkan ke teks tautan.`,
+            );
+            const textMsg = caption ? `${caption}\n${videoUrl}` : videoUrl;
+            return this.sendText(sessionName, chatId, textMsg);
+          }
+
           const base64Data = Buffer.from(downloadRes.data).toString('base64');
           filePayload.data = base64Data;
-        } catch (dlErr) {
+          if (contentType && contentType.startsWith('video/')) {
+            filePayload.mimetype = contentType.split(';')[0].trim();
+          }
+        } catch (dlErr: any) {
+          if (!/\.(mp4|mov|avi|mkv|webm|m4v)($|\?)/i.test(videoUrl)) {
+            this.logger.warn(
+              `[WAHA-SEND-VIDEO] Gagal mengunduh URL ${videoUrl} dan bukan ekstensi video. Mengirim sebagai teks tautan.`,
+            );
+            const textMsg = caption ? `${caption}\n${videoUrl}` : videoUrl;
+            return this.sendText(sessionName, chatId, textMsg);
+          }
           filePayload.url = videoUrl;
         }
       }
@@ -920,6 +1031,12 @@ export class WahaService implements OnApplicationBootstrap {
         ? JSON.stringify(error.response.data)
         : error.message;
       this.logger.error(`Failed to send native video: ${errorDetail}`);
+
+      if (this.isWebOrSocialUrl(videoUrl)) {
+        const textMsg = caption ? `${caption}\n${videoUrl}` : videoUrl;
+        return this.sendText(sessionName, chatId, textMsg);
+      }
+
       this.logger.warn(`[WAHA] Mencoba fallback kirim video via sendFile...`);
       return this.sendVideoFile(sessionName, chatId, videoUrl, caption);
     }

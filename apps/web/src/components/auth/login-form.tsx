@@ -58,7 +58,16 @@ export function LoginForm() {
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <Label htmlFor="password">Password</Label>
-            <button type="button" onClick={() => setAuthView("forgot")} className="text-xs text-emerald-600 hover:underline">
+            <button
+              type="button"
+              onClick={() =>
+                toast({
+                  title: "Lupa Password",
+                  description: "Silakan hubungi administrator sistem untuk reset password akun Anda.",
+                })
+              }
+              className="text-xs text-emerald-600 hover:underline"
+            >
               Lupa password?
             </button>
           </div>

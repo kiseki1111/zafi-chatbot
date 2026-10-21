@@ -14,13 +14,15 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Plus, Search, Edit3, Trash2, CheckCircle2, Clock, XCircle, Wrench, Layers, RefreshCw, Upload, Image, FileVideo, ExternalLink, Play, Copy, Check, Film, BookOpen, Sparkles, FileText, User,
+  Plus, Search, Edit3, Trash2, CheckCircle2, Clock, XCircle, Wrench, Layers, RefreshCw, Upload, Image, FileVideo, ExternalLink, Play, Copy, Check, Film, BookOpen, Sparkles, FileText, User, AlertTriangle, Home, LandPlot
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { useBackgroundTasksStore } from "@/lib/background-tasks-store";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import type { ResourceGroup, ResourceItem, ResourceStatus } from "@/lib/types";
+import { checkWahaMediaLink } from "@/lib/waha-link-validator";
+import { cn } from "@/lib/utils";
+import type { ResourceGroup, ResourceItem, ResourceStatus, PropertyType } from "@/lib/types";
 
 /**
  * Membersihkan format harga (menerima "3500000", "3.500.000", maupun "Rp 3.500.000") menjadi angka murni
@@ -144,6 +146,7 @@ export function AvailabilityView() {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
+  const [filterPropertyType, setFilterPropertyType] = useState<string>("ALL");
   const [deleteConfirmState, setDeleteConfirmState] = useState<{
     open: boolean;
     title: string;
@@ -165,6 +168,7 @@ export function AvailabilityView() {
   const [itemForm, setItemForm] = useState({
     code: "",
     name: "",
+    propertyType: "BANGUNAN" as PropertyType | string,
     houseType: "",
     status: "AVAILABLE" as ResourceStatus,
     price: "",
@@ -174,7 +178,14 @@ export function AvailabilityView() {
   });
 
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
-  const [batchForm, setBatchForm] = useState({ prefix: "A-", startNumber: "1", endNumber: "10", houseType: "", price: "" });
+  const [batchForm, setBatchForm] = useState({
+    prefix: "A-",
+    startNumber: "1",
+    endNumber: "10",
+    propertyType: "BANGUNAN" as PropertyType | string,
+    houseType: "",
+    price: "",
+  });
 
   // Validation & loading states — Sprint 0 UX fixes
   const [groupError, setGroupError] = useState("");
@@ -229,11 +240,15 @@ export function AvailabilityView() {
         item.code.toLowerCase().includes(q) ||
         (item.houseType && item.houseType.toLowerCase().includes(q)) ||
         (item.customerName && item.customerName.toLowerCase().includes(q)) ||
+        ((item as any).propertyType && (item as any).propertyType.toLowerCase().includes(q)) ||
         (item.name && item.name.toLowerCase().includes(q));
       const matchStatus = filterStatus === "ALL" || item.status === filterStatus;
-      return matchSearch && matchStatus;
+      const matchPropertyType =
+        filterPropertyType === "ALL" ||
+        ((item as any).propertyType || "BANGUNAN") === filterPropertyType;
+      return matchSearch && matchStatus && matchPropertyType;
     });
-  }, [activeGroup, searchQuery, filterStatus]);
+  }, [activeGroup, searchQuery, filterStatus, filterPropertyType]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -241,7 +256,9 @@ export function AvailabilityView() {
     const available = items.filter((i) => i.status === "AVAILABLE").length;
     const booked = items.filter((i) => i.status === "BOOKED").length;
     const occupied = items.filter((i) => i.status === "OCCUPIED").length;
-    return { total: items.length, available, booked, occupied };
+    const buildingCount = items.filter((i) => ((i as any).propertyType || "BANGUNAN") === "BANGUNAN").length;
+    const landCount = items.filter((i) => (i as any).propertyType === "TANAH").length;
+    return { total: items.length, available, booked, occupied, buildingCount, landCount };
   }, [activeGroup]);
 
   // Handlers — with inline validation (F1) + anti-double-submit (F2)
@@ -287,6 +304,7 @@ export function AvailabilityView() {
       const payload = {
         code,
         name: itemForm.name.trim() || undefined,
+        propertyType: itemForm.propertyType || "BANGUNAN",
         houseType: itemForm.houseType.trim() || undefined,
         status: itemForm.status,
         price: parsedPrice,
@@ -351,6 +369,7 @@ export function AvailabilityView() {
           prefix,
           startNumber: startNum,
           endNumber: endNum,
+          propertyType: batchForm.propertyType || "BANGUNAN",
           houseType: batchForm.houseType.trim() || undefined,
           price: parsedBatchPrice,
         }),
@@ -649,6 +668,7 @@ export function AvailabilityView() {
     setItemForm({
       code: item.code,
       name: item.name || "",
+      propertyType: (item as any).propertyType || "BANGUNAN",
       houseType: item.houseType || "",
       status: item.status,
       price: item.price ? formatIdr(item.price) : "",
@@ -664,6 +684,7 @@ export function AvailabilityView() {
     setItemForm({
       code: "",
       name: "",
+      propertyType: "BANGUNAN",
       houseType: "",
       status: "AVAILABLE",
       price: "",
@@ -948,6 +969,26 @@ export function AvailabilityView() {
               </SelectItem>
             </SelectContent>
           </Select>
+          <Select value={filterPropertyType} onValueChange={setFilterPropertyType}>
+            <SelectTrigger className="w-[140px] h-9">
+              <SelectValue placeholder="Jenis" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Semua Jenis</SelectItem>
+              <SelectItem value="BANGUNAN">
+                <span className="flex items-center gap-2">
+                  <Home className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                  <span>Bangunan Rumah</span>
+                </span>
+              </SelectItem>
+              <SelectItem value="TANAH">
+                <span className="flex items-center gap-2">
+                  <LandPlot className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                  <span>Tanah Kosong</span>
+                </span>
+              </SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {activeGroup && (
@@ -973,12 +1014,18 @@ export function AvailabilityView() {
         </Card>
       ) : (
         <>
-          {/* Status Legend */}
-          <div className="flex flex-wrap gap-2 text-xs mb-3">
-            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-emerald-500" /> Tersedia</span>
-            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-amber-500" /> Booking</span>
-            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-rose-500" /> Terjual</span>
-            <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-zinc-800 dark:bg-zinc-200" /> Show Unit</span>
+          {/* Status Legend & Info Jenis */}
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs mb-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-emerald-500" /> Tersedia</span>
+              <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-amber-500" /> Booking</span>
+              <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-rose-500" /> Terjual</span>
+              <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-zinc-800 dark:bg-zinc-200" /> Show Unit</span>
+            </div>
+            <div className="flex items-center gap-3 text-muted-foreground">
+              <span className="flex items-center gap-1 font-medium"><Home className="h-3.5 w-3.5 text-blue-500" /> Rumah: {stats.buildingCount}</span>
+              <span className="flex items-center gap-1 font-medium"><LandPlot className="h-3.5 w-3.5 text-amber-500" /> Tanah: {stats.landCount}</span>
+            </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
           {filteredItems.map((item) => {
@@ -997,9 +1044,18 @@ export function AvailabilityView() {
               >
                 <div className="flex items-start justify-between">
                   <div>
-                    <span className="font-extrabold text-base tracking-tight">{item.code}</span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-extrabold text-base tracking-tight">{item.code}</span>
+                      {item.propertyType === "TANAH" ? (
+                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                          Tanah
+                        </span>
+                      ) : null}
+                    </div>
                     {item.houseType ? (
-                      <p className="text-xs font-semibold text-muted-foreground">Tipe {item.houseType}</p>
+                      <p className="text-xs font-semibold text-muted-foreground">
+                        {item.propertyType === "TANAH" ? "Luas " : "Tipe "}{item.houseType}
+                      </p>
                     ) : item.name ? (
                       <p className="text-xs text-muted-foreground truncate max-w-[100px]">{item.name}</p>
                     ) : null}
@@ -1115,7 +1171,7 @@ export function AvailabilityView() {
                     )}
 
                     {/* Badge Tipe */}
-                    <div className="absolute top-1.5 right-1.5">
+                    <div className="absolute top-1.5 left-1.5 right-1.5 flex items-center justify-between gap-1 pointer-events-none">
                       <Badge
                         variant="secondary"
                         className={`text-[9px] font-bold px-1.5 py-0 shadow-2xs backdrop-blur-sm ${
@@ -1126,6 +1182,28 @@ export function AvailabilityView() {
                       >
                         {m.type === "video" ? "VIDEO" : "FOTO"}
                       </Badge>
+
+                      {(() => {
+                        const status = checkWahaMediaLink(m.url);
+                        return (
+                          <span
+                            className={cn(
+                              "text-[8px] font-bold px-1.5 py-0.5 rounded-full shadow-2xs backdrop-blur-sm inline-flex items-center gap-1",
+                              status.isValid
+                                ? "bg-emerald-600/95 text-white"
+                                : "bg-amber-600/95 text-white",
+                            )}
+                            title={status.description}
+                          >
+                            {status.isValid ? (
+                              <CheckCircle2 className="h-2.5 w-2.5" />
+                            ) : (
+                              <AlertTriangle className="h-2.5 w-2.5" />
+                            )}
+                            WAHA
+                          </span>
+                        );
+                      })()}
                     </div>
                   </div>
 
@@ -1168,8 +1246,8 @@ export function AvailabilityView() {
                 className="mt-1 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 file:border-0 file:rounded-md file:mr-2"
               />
               {uploadFile && (
-                <p className="text-[11px] text-emerald-600 font-medium mt-1">
-                  ✓ File terpilih: {uploadFile.name} ({(uploadFile.size / 1024 / 1024).toFixed(2)} MB)
+                <p className="text-[11px] text-emerald-600 font-medium mt-1 flex items-center gap-1">
+                  <Check className="h-3.5 w-3.5" /> File terpilih: {uploadFile.name} ({(uploadFile.size / 1024 / 1024).toFixed(2)} MB)
                 </p>
               )}
             </div>
@@ -1299,6 +1377,29 @@ export function AvailabilityView() {
                       Buka <ExternalLink className="h-3 w-3" />
                     </a>
                   </div>
+
+                  {/* WAHA Link Validity Status */}
+                  {(() => {
+                    const status = checkWahaMediaLink(selectedMedia.url);
+                    return (
+                      <div
+                        className={cn(
+                          "flex items-center gap-2 p-2 rounded-lg border text-[11px] mt-1.5",
+                          status.isValid
+                            ? "bg-emerald-50/70 border-emerald-300 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"
+                            : "bg-amber-50/70 border-amber-300 text-amber-800 dark:bg-amber-950/30 dark:text-amber-300",
+                        )}
+                      >
+                        {status.isValid ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                        ) : (
+                          <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                        )}
+                        <span className="font-semibold">{status.statusText}: </span>
+                        <span className="opacity-90">{status.description}</span>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
@@ -1454,14 +1555,45 @@ export function AvailabilityView() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="houseType">Tipe Rumah</Label>
+                <Label htmlFor="propertyType">Jenis</Label>
+                <Select
+                  value={itemForm.propertyType}
+                  onValueChange={(val: string) => setItemForm({ ...itemForm, propertyType: val })}
+                >
+                  <SelectTrigger id="propertyType">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="BANGUNAN">
+                      <span className="flex items-center gap-2">
+                        <Home className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                        <span>Bangunan Rumah</span>
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="TANAH">
+                      <span className="flex items-center gap-2">
+                        <LandPlot className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                        <span>Tanah Kosong</span>
+                      </span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="houseType">
+                  {itemForm.propertyType === "TANAH" ? "Luas / Tipe Kavling" : "Tipe Rumah"}
+                </Label>
                 <Input
                   id="houseType"
-                  placeholder="misal: 36/72, 45/90"
+                  placeholder={itemForm.propertyType === "TANAH" ? "misal: 10x15, 150m2" : "misal: 36/72, 45/90"}
                   value={itemForm.houseType}
                   onChange={(e) => setItemForm({ ...itemForm, houseType: e.target.value })}
                 />
               </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="unitPrice">Harga (Opsional)</Label>
                 <div className="relative">
@@ -1476,16 +1608,16 @@ export function AvailabilityView() {
                   />
                 </div>
               </div>
-            </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="unitName">Nama Perumahan (Opsional)</Label>
-              <Input
-                id="unitName"
-                placeholder="misal: Grand Harmoni, Griya Amanah"
-                value={itemForm.name}
-                onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })}
-              />
+              <div className="space-y-1.5">
+                <Label htmlFor="unitName">Nama Perumahan (Opsional)</Label>
+                <Input
+                  id="unitName"
+                  placeholder="misal: Grand Harmoni, Griya Amanah"
+                  value={itemForm.name}
+                  onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })}
+                />
+              </div>
             </div>
 
             {/* Jika Status Booking / Occupied */}
@@ -1592,27 +1724,56 @@ export function AvailabilityView() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="batchHouseType">Tipe Rumah Default</Label>
+                <Label htmlFor="batchPropertyType">Jenis Default</Label>
+                <Select
+                  value={batchForm.propertyType}
+                  onValueChange={(val: string) => setBatchForm({ ...batchForm, propertyType: val })}
+                >
+                  <SelectTrigger id="batchPropertyType">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="BANGUNAN">
+                      <span className="flex items-center gap-2">
+                        <Home className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                        <span>Bangunan Rumah</span>
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="TANAH">
+                      <span className="flex items-center gap-2">
+                        <LandPlot className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                        <span>Tanah Kosong</span>
+                      </span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="batchHouseType">
+                  {batchForm.propertyType === "TANAH" ? "Luas / Tipe Default" : "Tipe Rumah Default"}
+                </Label>
                 <Input
                   id="batchHouseType"
-                  placeholder="misal: 36/72"
+                  placeholder={batchForm.propertyType === "TANAH" ? "misal: 10x15" : "misal: 36/72"}
                   value={batchForm.houseType}
                   onChange={(e) => setBatchForm({ ...batchForm, houseType: e.target.value })}
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="batchPrice">Harga Default (Opsional)</Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">Rp</span>
-                  <Input
-                    id="batchPrice"
-                    type="text"
-                    placeholder="misal: 350.000.000"
-                    value={batchForm.price}
-                    onChange={(e) => handleBatchPriceChange(e.target.value)}
-                    className="pl-9 font-mono"
-                  />
-                </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="batchPrice">Harga Default (Opsional)</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">Rp</span>
+                <Input
+                  id="batchPrice"
+                  type="text"
+                  placeholder="misal: 350.000.000"
+                  value={batchForm.price}
+                  onChange={(e) => handleBatchPriceChange(e.target.value)}
+                  className="pl-9 font-mono"
+                />
               </div>
             </div>
             {batchError && <p role="alert" className="text-xs text-destructive font-medium">{batchError}</p>}

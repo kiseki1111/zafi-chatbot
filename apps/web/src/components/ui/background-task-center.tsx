@@ -14,7 +14,7 @@ import {
   X,
   FileText,
   MapPin,
-  Sparkles,
+  ClipboardCheck,
   Layers,
 } from "lucide-react";
 
@@ -24,6 +24,7 @@ export function BackgroundTaskCenter() {
 
   if (tasks.length === 0) return null;
 
+  const actionTasks = tasks.filter((t) => t.status === "needs_action");
   const runningTasks = tasks.filter(
     (t) => t.status === "running" || t.status === "pending",
   );
@@ -40,9 +41,21 @@ export function BackgroundTaskCenter() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="flex items-center gap-2.5 px-3.5 py-2 rounded-full bg-card/95 text-foreground border border-border shadow-xl backdrop-blur-md hover:bg-accent/80 transition-all duration-200 group animate-in slide-in-from-bottom-2"
+          className={`flex items-center gap-2.5 px-3.5 py-2 rounded-full text-foreground border shadow-xl backdrop-blur-md transition-all duration-200 group animate-in slide-in-from-bottom-2 ${
+            actionTasks.length > 0
+              ? "bg-amber-500/10 dark:bg-amber-950/40 border-amber-500/50 hover:bg-amber-500/20 text-amber-900 dark:text-amber-200"
+              : "bg-card/95 border-border hover:bg-accent/80"
+          }`}
         >
-          {runningTasks.length > 0 ? (
+          {actionTasks.length > 0 ? (
+            <div className="relative flex items-center justify-center">
+              <ClipboardCheck className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+              </span>
+            </div>
+          ) : runningTasks.length > 0 ? (
             <div className="relative flex items-center justify-center">
               <Loader2 className="h-4 w-4 text-emerald-600 animate-spin" />
               <span className="absolute -top-1 -right-1 flex h-2 w-2">
@@ -55,7 +68,9 @@ export function BackgroundTaskCenter() {
           )}
 
           <span className="text-xs font-semibold">
-            {runningTasks.length > 0
+            {actionTasks.length > 0
+              ? `${actionTasks.length} Menunggu Verifikasi Anda`
+              : runningTasks.length > 0
               ? typeof runningTasks[0].progress === "number" &&
                 runningTasks[0].progress < 100
                 ? `Upload ${runningTasks[0].progress}% (${runningTasks.length})`
@@ -131,14 +146,34 @@ function TaskItem({
   task: BackgroundTask;
   onDismiss: () => void;
 }) {
+  const isNeedsAction = task.status === "needs_action";
   const isRunning = task.status === "running" || task.status === "pending";
   const isSuccess = task.status === "success";
   const isError = task.status === "error";
 
+  const handleAction = () => {
+    if (task.actionData) {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("open-knowledge-split-verify", {
+            detail: {
+              taskId: task.id,
+              item: task.actionData.item,
+              topics: task.actionData.topics,
+              keepOriginal: task.actionData.keepOriginal,
+            },
+          }),
+        );
+      }
+    }
+  };
+
   return (
     <div
       className={`rounded-xl p-3 transition-all ${
-        isRunning
+        isNeedsAction
+          ? "bg-amber-500/10 border-2 border-amber-500/60 shadow-xs"
+          : isRunning
           ? "bg-accent/40 border border-emerald-500/20"
           : isSuccess
           ? "bg-emerald-500/5 border border-emerald-500/10"
@@ -149,6 +184,9 @@ function TaskItem({
         <div className="flex items-start gap-2.5 min-w-0">
           {/* Status Icon */}
           <div className="mt-0.5 shrink-0">
+            {isNeedsAction && (
+              <ClipboardCheck className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            )}
             {isRunning && (
               <div className="relative grid place-items-center">
                 <Loader2 className="h-4 w-4 text-emerald-600 animate-spin" />
@@ -170,14 +208,18 @@ function TaskItem({
               </span>
               <span
                 className={`text-[9px] px-1.5 py-0.2 rounded-full font-medium shrink-0 ${
-                  task.category === "knowledge"
+                  isNeedsAction
+                    ? "bg-amber-200 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200"
+                    : task.category === "knowledge"
                     ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300"
                     : task.category === "siteplan"
                     ? "bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300"
                     : "bg-muted text-muted-foreground"
                 }`}
               >
-                {task.category === "knowledge"
+                {isNeedsAction
+                  ? "Verifikasi"
+                  : task.category === "knowledge"
                   ? "Knowledge"
                   : task.category === "siteplan"
                   ? "Siteplan"
@@ -189,7 +231,9 @@ function TaskItem({
             <div className="flex items-center justify-between gap-1 mt-1">
               <p
                 className={`text-[11px] leading-snug truncate ${
-                  isError
+                  isNeedsAction
+                    ? "text-amber-800 dark:text-amber-300 font-semibold"
+                    : isError
                     ? "text-destructive font-medium"
                     : isSuccess
                     ? "text-emerald-700 dark:text-emerald-300 font-medium"
@@ -205,6 +249,23 @@ function TaskItem({
                 </span>
               )}
             </div>
+
+            {/* Tombol Aksi Verifikasi jika status = needs_action */}
+            {isNeedsAction && (
+              <div className="mt-2.5 pt-2 border-t border-amber-500/20 flex items-center justify-between gap-2">
+                <span className="text-[10px] text-muted-foreground">
+                  Perlu konfirmasi alokasi materi
+                </span>
+                <button
+                  type="button"
+                  onClick={handleAction}
+                  className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] shadow-xs flex items-center gap-1.5 transition"
+                >
+                  <ClipboardCheck className="h-3 w-3" />
+                  {task.actionLabel || "Verifikasi Sekarang"}
+                </button>
+              </div>
+            )}
 
             {/* Running Animation Bar or Determinate Progress Bar */}
             {isRunning && (

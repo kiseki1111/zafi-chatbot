@@ -199,6 +199,7 @@ export class SearchService {
       OR: [
         { code: { contains: q, mode: 'insensitive' } },
         { name: { contains: q, mode: 'insensitive' } },
+        { propertyType: { contains: q, mode: 'insensitive' } },
         { houseType: { contains: q, mode: 'insensitive' } },
         { customerName: { contains: q, mode: 'insensitive' } },
         { notes: { contains: q, mode: 'insensitive' } },
@@ -216,6 +217,7 @@ export class SearchService {
         id: true,
         code: true,
         name: true,
+        propertyType: true,
         houseType: true,
         status: true,
         price: true,

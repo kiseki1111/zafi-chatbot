@@ -780,8 +780,8 @@ export function ClientsPage() {
                             <td className="p-3.5">
                               <div className="flex flex-wrap gap-1 max-w-xs">
                                 {hasFullAccess ? (
-                                  <Badge variant="secondary" className="text-[10px] bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                                    ✓ Semua Menu Klien ({userAllowed.length})
+                                  <Badge variant="secondary" className="text-[10px] bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 inline-flex items-center gap-1">
+                                    <Check className="h-3 w-3 text-emerald-600" /> Semua Menu Klien ({userAllowed.length})
                                   </Badge>
                                 ) : (
                                   userAllowed.map((mKey: string) => {

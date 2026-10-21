@@ -35,12 +35,14 @@ export type ViewKey =
 
 // ===== Resource & Availability (Generic Units / Slots) =====
 export type ResourceStatus = "AVAILABLE" | "BOOKED" | "OCCUPIED" | "MAINTENANCE";
+export type PropertyType = "BANGUNAN" | "TANAH";
 
 export interface ResourceItem {
   id: string;
   groupId: string;
   code: string; // Misal: "Blok A-01", "Blok B-05"
   name?: string; // Nama blok / keterangan
+  propertyType?: PropertyType | string; // "BANGUNAN" (Bangunan Rumah) | "TANAH" (Tanah Kosong)
   houseType?: string; // Tipe rumah: "36/72", "45/90", dll
   status: ResourceStatus;
   capacity?: number;

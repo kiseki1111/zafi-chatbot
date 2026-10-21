@@ -41,9 +41,12 @@ ATURAN MENJAWAB KETERSEDIAAN UNIT / PLANSITE:
    Anda WAJIB mengarahkan mereka untuk langsung menghubungi tim Sales / Marketing resmi kami {fallbackContact} agar jadwal survey atau pemesanan unit dapat segera diproses.
 
 ATURAN PENGIRIMAN GAMBAR & VIDEO (STRICT):
-1. Pengiriman VIDEO HANYA BOLEH jika pelanggan SECARA EKSPLISIT DAN JELAS MEMINTA video (misal: "minta video", "ada videonya?", "kirim video unit", "mau lihat video"). JIKA TIDAK DIMINTA VIDEO OLEH PELANGGAN, ARRAY "videos" WAJIB KOSONG []. DILARANG KERAS mengirim video secara inisiatif sendiri!
-2. Jika pelanggan meminta foto/gambar atau brosur perusahaan (termasuk dari daftar [MEDIA_PERUSAHAAN] atau siteplan), masukkan ke array "images" dengan format { "url": "URL_DARI_DATABASE", "caption": "Nama Media" }.
-3. Jangan pernah memasukkan link gambar atau video ke dalam text balasan. Pisahkan ke array "images" atau "videos". Jangan pernah gunakan example.com.
+1. Array "videos" dan "images" HANYA untuk FILE MEDIA LANGSUNG yang tersimpan di sistem/database (format path /uploads/... atau file langsung berakhiran .mp4, .jpg, .png).
+2. TAUTAN MEDIA SOSIAL / WEB (seperti Instagram Reel, YouTube, TikTok, Facebook): DILARANG dimasukkan ke array "videos" atau "images"! Tautan sosial media/web WAJIB disertakan langsung di dalam teks balasan ("text") agar WhatsApp otomatis menampilkan rich preview tautan yang bisa diklik.
+3. Pengiriman FILE VIDEO di array "videos" HANYA BOLEH jika pelanggan SECARA EKSPLISIT DAN JELAS MEMINTA video dan file videonya memang tersedia di database. Jika tidak diminta atau tidak ada file video, array "videos" WAJIB KOSONG [].
+4. Jika pelanggan meminta foto/gambar atau brosur perusahaan (termasuk dari daftar [MEDIA_PERUSAHAAN] atau siteplan), masukkan file ke array "images" dengan format { "url": "URL_DARI_DATABASE", "caption": "Nama Media" }.
+5. Jangan pernah mengarang URL (dilarang menggunakan example.com atau link fiktif).
+6. DILARANG MENGAMBIL LINK DARI RIWAYAT CHAT LAMA: Semua media (gambar/video/brosur) yang Anda kirimkan WAJIB bersumber dari DATABASE TOKO atau DATA PLANSITE yang aktif saat ini. DILARANG KERAS mengulangi atau mengambil kembali tautan media dari riwayat percakapan lama jika media tersebut sudah tidak tercantum di DATABASE TOKO saat ini (karena sudah dihapus oleh pemilik toko). Jika tidak ada di DATABASE TOKO saat ini, berarti media tersebut SUDAH TIDAK TERSEDIA.
 
 ATURAN FALLBACK (PERTANYAAN DI LUAR DATABASE):
 JANGAN NGARANG. Jika informasi yang ditanyakan TIDAK ADA di DATABASE TOKO, balas dengan menolak secara halus menggunakan kalimat ini:
@@ -204,29 +207,6 @@ WAJIB MERESPON DALAM FORMAT JSON BERIKUT:
       }
     }
 
-    // 1. Ambil History percakapan (8 pesan agar hemat token & respons AI jauh lebih cepat)
-    const recentMessages = await this.agentSharedService.getRecentContext(
-      senderId,
-      effectiveSessionName,
-      8,
-    );
-
-    // SANITASI: Hapus pesan halusinasi example.com
-    const cleanHistory = recentMessages.filter((msg) => {
-      if (
-        msg.senderType === 'bot' &&
-        msg.content &&
-        msg.content.includes('example.com')
-      ) {
-        return false;
-      }
-      return true;
-    });
-
-    const chatHistoryText = cleanHistory
-      .map((m) => `${m.senderType === 'bot' ? 'CS' : 'Customer'}: ${m.content}`)
-      .join('\n');
-
     const instance = await this.prisma.whatsappInstance.findUnique({
       where: { instanceName: effectiveSessionName },
       include: { tenant: true },
@@ -273,6 +253,50 @@ WAJIB MERESPON DALAM FORMAT JSON BERIKUT:
       context += `\n\n=== INFO PRODUK & STOK REAL-TIME SAAT INI (PENTING) ===\n${stockInfo}`;
     }
 
+    const activeKnowledgeSource = `${context || ''}\n${availabilityContext || ''}`;
+
+    // 1. Ambil History percakapan (8 pesan agar hemat token & respons AI jauh lebih cepat)
+    const recentMessages = await this.agentSharedService.getRecentContext(
+      senderId,
+      effectiveSessionName,
+      8,
+    );
+
+    // SANITASI: Hapus pesan halusinasi example.com
+    const cleanHistory = recentMessages.filter((msg) => {
+      if (
+        msg.senderType === 'bot' &&
+        msg.content &&
+        msg.content.includes('example.com')
+      ) {
+        return false;
+      }
+      return true;
+    });
+
+    const sanitizeHistoryContent = (content: string): string => {
+      if (!content) return '';
+      // Netralkan tautan media sosial / video lama yang sudah tidak ada di database toko aktif saat ini
+      // agar AI tidak mengulangi atau memunculkan link yang sudah dihapus pemilik toko
+      return content.replace(
+        /https?:\/\/(www\.)?(instagram\.com|instagr\.am|tiktok\.com|youtube\.com|youtu\.be|facebook\.com|fb\.watch)\/[^\s]+/gi,
+        (url) => {
+          const cleanUrl = url.split('?')[0];
+          if (!activeKnowledgeSource.includes(url) && !activeKnowledgeSource.includes(cleanUrl)) {
+            return '[tautan media sebelumnya telah dihapus dari database]';
+          }
+          return url;
+        },
+      );
+    };
+
+    const chatHistoryText = cleanHistory
+      .map(
+        (m) =>
+          `${m.senderType === 'bot' ? 'CS' : 'Customer'}: ${sanitizeHistoryContent(m.content)}`,
+      )
+      .join('\n');
+
     let systemPrompt = await this.buildSystemPrompt(tenantId);
 
     if (context) {
@@ -281,7 +305,7 @@ WAJIB MERESPON DALAM FORMAT JSON BERIKUT:
       systemPrompt += `\n\n=== DATABASE TOKO KOSONG ===\nSaat ini belum ada informasi produk di database. Silakan gunakan Aturan Fallback (arahkan ke tim marketing).`;
     }
 
-    const fullPrompt = `Riwayat Chat Terakhir (PENTING: INI HANYA UNTUK KONTEKS PERCAKAPAN, JANGAN JADIKAN REFERENSI FAKTA / HARGA):
+    const fullPrompt = `Riwayat Chat Terakhir (PENTING: HANYA UNTUK MEMAHAMI ALUR PERCAKAPAN. DILARANG MENGAMBIL FAKTA/HARGA/LINK DARI SINI):
 ${chatHistoryText ? chatHistoryText : '(Belum ada riwayat)'}
 
 Pesan Masuk Saat Ini dari Customer:
@@ -311,18 +335,122 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
       let aiText = parsed.text || '';
       aiText = aiText.replace(/[*~`]/g, '');
 
-      const aiImages = Array.isArray(parsed.images)
-        ? parsed.images.filter(
-            (img: any) => img && img.url && !img.url.includes('example.com'),
-          )
-        : [];
+      const isSocialOrWebLink = (url: string): boolean => {
+        if (!url) return false;
+        const lower = url.toLowerCase();
+        if (
+          lower.includes('instagram.com') ||
+          lower.includes('instagr.am') ||
+          lower.includes('tiktok.com') ||
+          lower.includes('youtube.com') ||
+          lower.includes('youtu.be') ||
+          lower.includes('facebook.com') ||
+          lower.includes('fb.watch')
+        ) {
+          return true;
+        }
+        const hasVideoExt = /\.(mp4|mov|avi|mkv|webm|m4v)($|\?)/i.test(lower);
+        const isLocalUpload = lower.startsWith('/uploads/') || lower.includes('/uploads/');
+        return !hasVideoExt && !isLocalUpload;
+      };
+
+      const isDirectImageUrl = (url: string): boolean => {
+        if (!url) return false;
+        const lower = url.toLowerCase();
+        if (
+          lower.includes('instagram.com') ||
+          lower.includes('instagr.am') ||
+          lower.includes('tiktok.com') ||
+          lower.includes('youtube.com') ||
+          lower.includes('youtu.be') ||
+          lower.includes('facebook.com')
+        ) {
+          return false;
+        }
+        return (
+          lower.startsWith('/uploads/') ||
+          lower.includes('/uploads/') ||
+          /\.(jpg|jpeg|png|webp|gif|bmp)($|\?)/i.test(lower)
+        );
+      };
+
+      // Verifikasi apakah URL yang di-output AI benar-benar ada di database pengetahuan aktif
+      // (mencegah AI mengambil link usang/dihapus dari ingatan percakapan)
+      const isKnownInActiveDatabase = (url: string): boolean => {
+        if (!url) return false;
+        const cleanUrl = url.split('?')[0];
+        return (
+          activeKnowledgeSource.includes(url) ||
+          activeKnowledgeSource.includes(cleanUrl) ||
+          (url.includes('/uploads/') && activeKnowledgeSource.includes(url.split('/uploads/')[1]))
+        );
+      };
+
+      const aiImages: { url: string; caption: string }[] = [];
+      if (Array.isArray(parsed.images)) {
+        for (const img of parsed.images) {
+          if (!img || !img.url || img.url.includes('example.com')) continue;
+          if (!isKnownInActiveDatabase(img.url)) {
+            this.logger.warn(
+              `[CS-BOT] Menolak image URL '${img.url}' karena tidak ditemukan di database pengetahuan aktif.`,
+            );
+            continue;
+          }
+          if (isDirectImageUrl(img.url)) {
+            aiImages.push(img);
+          } else if (!aiText.includes(img.url)) {
+            aiText += `\n\n${img.caption ? `${img.caption}: ` : ''}${img.url}`;
+          }
+        }
+      }
+
       // Strict guard: hanya sertakan video jika pesan user secara eksplisit meminta video
       const userAskedVideo = /\b(video|vidio|rekaman|virtual tour|vt)\b/i.test(text);
-      const aiVideos = userAskedVideo && Array.isArray(parsed.videos)
-        ? parsed.videos.filter(
-            (vid: any) => vid && vid.url && !vid.url.includes('example.com'),
-          )
-        : [];
+      const aiVideos: { url: string; caption: string }[] = [];
+      const extractedWebVideos: { url: string; caption: string }[] = [];
+
+      if (userAskedVideo && Array.isArray(parsed.videos)) {
+        for (const vid of parsed.videos) {
+          if (!vid || !vid.url || vid.url.includes('example.com')) continue;
+          if (!isKnownInActiveDatabase(vid.url)) {
+            this.logger.warn(
+              `[CS-BOT] Menolak video URL '${vid.url}' karena tidak ditemukan di database pengetahuan aktif (link sudah dihapus dari sistem).`,
+            );
+            continue;
+          }
+          if (isSocialOrWebLink(vid.url)) {
+            extractedWebVideos.push(vid);
+          } else {
+            aiVideos.push(vid);
+          }
+        }
+      }
+
+      // Jika ada video yang berupa tautan web/sosial media (seperti IG Reel atau YouTube),
+      // sertakan ke dalam teks balasan agar WhatsApp memunculkan rich link preview,
+      // bukan diunduh sebagai file biner MP4 yang rusak/kosong.
+      if (extractedWebVideos.length > 0) {
+        for (const linkItem of extractedWebVideos) {
+          if (!aiText.includes(linkItem.url)) {
+            const label = linkItem.caption ? `${linkItem.caption}:\n` : '';
+            aiText += `\n\n${label}${linkItem.url}`;
+          }
+        }
+      }
+
+      // Jika AI mencoba menuliskan tautan media sosial usang di dalam teks balasan, bersihkan
+      aiText = aiText.replace(
+        /https?:\/\/(www\.)?(instagram\.com|instagr\.am|tiktok\.com|youtube\.com|youtu\.be)\/[^\s]+/gi,
+        (matchedUrl) => {
+          if (!isKnownInActiveDatabase(matchedUrl)) {
+            this.logger.warn(
+              `[CS-BOT] Membersihkan tautan media usang '${matchedUrl}' dari teks balasan karena tidak ada di database aktif.`,
+            );
+            return '';
+          }
+          return matchedUrl;
+        },
+      ).trim();
       const order = parsed.order || null;
       const lead = parsed.lead || null;
 

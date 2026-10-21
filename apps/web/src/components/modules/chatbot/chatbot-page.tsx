@@ -1652,7 +1652,17 @@ export function ChatbotPage() {
                   : "bg-rose-50 border-rose-200 text-rose-900 dark:bg-rose-950/30 dark:border-rose-800 dark:text-rose-200"
               )}>
                 <div className="flex items-center gap-1.5 font-bold">
-                  <span>{wahaTestResult.sendSuccess ? "✓ Berhasil Dikirim ke WAHA" : "✗ Gagal Dikirim ke WAHA"}</span>
+                  {wahaTestResult.sendSuccess ? (
+                    <>
+                      <Check className="h-4 w-4 text-emerald-600" />
+                      <span>Berhasil Dikirim ke WAHA</span>
+                    </>
+                  ) : (
+                    <>
+                      <X className="h-4 w-4 text-rose-600" />
+                      <span>Gagal Dikirim ke WAHA</span>
+                    </>
+                  )}
                 </div>
                 <div className="text-[10px] space-y-0.5">
                   <p>Status Sesi: {wahaTestResult.wahaSessionStatus}</p>

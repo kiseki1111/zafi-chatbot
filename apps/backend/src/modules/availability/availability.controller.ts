@@ -211,6 +211,7 @@ export class AvailabilityController {
     body: {
       code: string;
       name?: string;
+      propertyType?: string;
       houseType?: string;
       status?: string;
       price?: number;
@@ -233,6 +234,7 @@ export class AvailabilityController {
       prefix: string;
       startNumber: number;
       endNumber: number;
+      propertyType?: string;
       houseType?: string;
       price?: number;
     },
@@ -246,6 +248,7 @@ export class AvailabilityController {
       body.houseType,
       body.price,
       tenantId,
+      body.propertyType,
     );
   }
 
@@ -257,6 +260,7 @@ export class AvailabilityController {
     body: {
       code?: string;
       name?: string;
+      propertyType?: string;
       houseType?: string;
       status?: string;
       price?: number;

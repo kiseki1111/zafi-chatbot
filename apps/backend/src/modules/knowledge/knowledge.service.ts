@@ -567,6 +567,11 @@ ${cleanDesc ? `Keterangan: ${cleanDesc}` : ''}`.trim();
       where: { id, tenantId },
     });
 
+    // Sinkronisasi ulang vector knowledge agar data lama terhapus dari vector_knowledge
+    this.dataAgentService
+      .syncKnowledgeBase(tenantId)
+      .catch((e) => this.logger.warn(`Knowledge sync warning: ${e.message}`));
+
     return { success: true };
   }
 
@@ -574,8 +579,21 @@ ${cleanDesc ? `Keterangan: ${cleanDesc}` : ''}`.trim();
    * AI-powered Knowledge Segmentation (Split Preview)
    * Membaca isi dokumen pengetahuan dan membaginya menjadi potongan-potongan topik mandiri.
    */
-  async previewSplitKnowledge(id: string, tenantId: string) {
-    const item = await this.findOne(id, tenantId);
+  async previewSplitKnowledge(id: string, tenantId?: string) {
+    let item: any = null;
+    if (tenantId) {
+      item = await this.prisma.knowledgeBase.findFirst({
+        where: { id, tenantId },
+      });
+    }
+    if (!item) {
+      item = await this.prisma.knowledgeBase.findUnique({
+        where: { id },
+      });
+    }
+    if (!item) {
+      throw new NotFoundException('Knowledge not found');
+    }
     return this.splitContentWithAi(item.content, item.title, id);
   }
 
@@ -601,28 +619,40 @@ ${cleanDesc ? `Keterangan: ${cleanDesc}` : ''}`.trim();
     }
 
     const systemPrompt = `Anda adalah AI Knowledge Architect ahli manajemen basis pengetahuan.
-Tugas Anda adalah membedah satu dokumen pengetahuan bisnis/toko yang panjang atau berisi banyak topik menjadi beberapa segmen pengetahuan mandiri (modular) yang rapi dan terpisah.
+Tugas Anda adalah membedah satu dokumen pengetahuan bisnis/toko/perumahan yang panjang atau berisi banyak topik menjadi beberapa segmen pengetahuan mandiri (modular) yang rapi, bersih, dan terpisah.
 
-ATURAN SEGMENTASI:
-1. Pisahkan menjadi 2 sampai 6 topik mandiri yang logis (misal: "Profil Perusahaan & Kontak", "Pricelist & Skema Pembayaran", "Spesifikasi Teknis Bangunan", "Persyaratan Berkas KPR", "Tata Tertib & Kebijakan", dll).
+ATURAN WAJIB STRUKTUR & FORMAT:
+1. Pisahkan menjadi 2 sampai 6 topik mandiri yang logis (misal: "Profil & Kontak", "Lokasi & Jam Buka", "Pricelist & Skema Pembayaran", "Spesifikasi Unit/Bangunan", "Legalitas & Proyek", "Fasilitas Kawasan", "Persyaratan Berkas KPR", dll).
 2. Setiap topik WAJIB memiliki "title" yang singkat, padat, dan jelas (maksimal 60 karakter).
-3. "content" harus memuat informasi lengkap topik tersebut tanpa menghilangkan detail angka, nomor kontak, spesifikasi teknis, atau poin penting dari teks aslinya.
-4. Format respon WAJIB berupa JSON valid:
+3. "content" WAJIB DISUSUN PER POIN (menggunakan tanda strip '- ' per baris) agar rapi, terstruktur, mudah diedit, dan nyaman dibaca pelanggan di WhatsApp. DILARANG KERAS menumpuk teks menjadi satu paragraf blok panjang!
+   Contoh format content yang benar:
+   - Nama pengembang: PT Rindang Alam Semesta
+   - Kontak marketing: +62 878-4762-8400
+   - Jam operasional: Senin - Sabtu 08.00 - 16.00 WIB
+4. "isSiteplan": Nilai TRUE jika topik ini secara spesifik membahas spesifikasi teknis bangunan, siteplan/denah, tipe unit rumah, luas tanah/bangunan, atau fasilitas cluster perumahan; nilai FALSE jika topik berupa profil umum perusahaan, kontak umum, atau tata tertib toko.
+5. "suggestedCategory": Pilih salah satu: "Spesifikasi Bangunan", "Pricelist & Skema", "Legalitas & Lokasi", atau "Fasilitas Kawasan".
+6. "detectedCluster": Tulis nama perumahan/cluster yang dibahas jika disebutkan di teks (misal: "Zafi Residence", "MAS 3", "Skyland", "Griya Amanah"), atau null jika umum.
+
+Format respon WAJIB berupa JSON valid:
 {
   "topics": [
     {
       "title": "Nama Topik Spesifik",
-      "content": "Isi lengkap materi topik ini..."
+      "content": "- Poin 1: keterangan\\n- Poin 2: keterangan",
+      "isSiteplan": true,
+      "suggestedCategory": "Spesifikasi Bangunan",
+      "detectedCluster": "Zafi Residence"
     }
   ]
 }`;
 
-    const userPrompt = `Judul Dokumen Asal: "${defaultTitle}"\n\nIsi Dokumen yang akan dipecah:\n"""\n${content}\n"""\n\nBedah dokumen di atas menjadi topik-topik mandiri dalam format JSON yang diminta.`;
+    const userPrompt = `Judul Dokumen Asal: "${defaultTitle}"\n\nIsi Dokumen yang akan dipecah:\n"""\n${content}\n"""\n\nBedah dokumen di atas menjadi topik-topik mandiri dengan format per poin dalam JSON yang diminta.`;
 
+    // Prioritaskan model cepat (gpt-4o-mini) agar tidak melewati timeout proxy 30 detik
     const candidateModels = [
+      'openai/gpt-4o-mini',
       process.env.OPENAI_MODEL || 'deepseek/deepseek-v4-flash-0731',
       'deepseek/deepseek-v4-flash-0731',
-      'openai/gpt-4o-mini',
       'z-ai/glm-5.3-flash',
     ].filter((m, idx, arr) => Boolean(m) && arr.indexOf(m) === idx);
 
@@ -630,15 +660,18 @@ ATURAN SEGMENTASI:
 
     for (const model of candidateModels) {
       try {
-        const response = await this.openai.chat.completions.create({
-          model,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt },
-          ],
-          response_format: { type: 'json_object' },
-          temperature: 0.3,
-        });
+        const response = await this.openai.chat.completions.create(
+          {
+            model,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt },
+            ],
+            response_format: { type: 'json_object' },
+            temperature: 0.3,
+          },
+          { timeout: 20000 },
+        );
 
         const raw = response.choices?.[0]?.message?.content || '{}';
         const parsed = JSON.parse(raw);
@@ -651,6 +684,13 @@ ATURAN SEGMENTASI:
             topics: topics.map((t: any) => ({
               title: String(t.title || 'Topik Tanpa Judul').trim(),
               content: String(t.content || '').trim(),
+              isSiteplan: Boolean(t.isSiteplan),
+              suggestedCategory: String(
+                t.suggestedCategory || 'Spesifikasi Bangunan',
+              ).trim(),
+              detectedCluster: t.detectedCluster
+                ? String(t.detectedCluster).trim()
+                : null,
             })),
           };
         }
@@ -671,7 +711,13 @@ ATURAN SEGMENTASI:
   async applySplitKnowledge(
     id: string,
     tenantId: string,
-    topics: { title: string; content: string }[],
+    topics: {
+      title: string;
+      content: string;
+      target?: 'knowledge' | 'siteplan';
+      targetGroupId?: string;
+      targetCategory?: string;
+    }[],
     keepOriginal: boolean = false,
   ) {
     if (!topics || !Array.isArray(topics) || topics.length === 0) {
@@ -682,9 +728,16 @@ ATURAN SEGMENTASI:
 
     const item = await this.findOne(id, tenantId); // Validasi kepemilikan
 
-    // Buat item-item baru secara paralel
-    const createdItems = await Promise.all(
-      topics.map((t) =>
+    const knowledgeTopics = topics.filter(
+      (t) => t.target !== 'siteplan' || !t.targetGroupId,
+    );
+    const siteplanTopics = topics.filter(
+      (t) => t.target === 'siteplan' && t.targetGroupId,
+    );
+
+    // 1. Simpan topik-topik yang ditujukan ke Knowledge Base
+    const createdKnowledgeItems = await Promise.all(
+      knowledgeTopics.map((t) =>
         this.prisma.knowledgeBase.create({
           data: {
             tenantId,
@@ -700,14 +753,62 @@ ATURAN SEGMENTASI:
       ),
     );
 
-    // Hapus dokumen lama jika keepOriginal false
+    // 2. Simpan topik-topik yang ditujukan langsung ke Siteplan Cluster
+    for (const st of siteplanTopics) {
+      const group = await this.prisma.resourceGroup.findFirst({
+        where: { id: st.targetGroupId, tenantId },
+      });
+      if (group) {
+        let existingList: any[] = [];
+        if (group.description) {
+          try {
+            const raw = group.description.trim();
+            if (raw.startsWith('[')) {
+              const parsed = JSON.parse(raw);
+              if (Array.isArray(parsed)) existingList = parsed;
+            } else {
+              existingList = [
+                {
+                  id: 'k-init',
+                  title: 'Informasi Cluster',
+                  category: 'Umum',
+                  content: raw,
+                },
+              ];
+            }
+          } catch {
+            existingList = [
+              {
+                id: 'k-init',
+                title: 'Informasi Cluster',
+                category: 'Umum',
+                content: group.description,
+              },
+            ];
+          }
+        }
+        existingList.push({
+          id: 'k-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+          title: st.title.trim(),
+          category: st.targetCategory || 'Spesifikasi Bangunan',
+          content: st.content.trim(),
+          updatedAt: new Date().toISOString().slice(0, 10),
+        });
+        await this.prisma.resourceGroup.update({
+          where: { id: group.id },
+          data: { description: JSON.stringify(existingList) },
+        });
+      }
+    }
+
+    // 3. Hapus dokumen lama jika keepOriginal false
     if (!keepOriginal) {
       await this.prisma.knowledgeBase.deleteMany({
         where: { id, tenantId },
       });
     }
 
-    // Sync vector knowledge di background
+    // 4. Sync vector knowledge di background
     this.dataAgentService
       .syncKnowledgeBase(tenantId)
       .catch((e) => this.logger.warn(`Knowledge sync warning: ${e.message}`));
@@ -716,14 +817,105 @@ ATURAN SEGMENTASI:
       success: true,
       originalId: id,
       deletedOriginal: !keepOriginal,
-      count: createdItems.length,
-      items: createdItems.map((ci) => ({
+      count: createdKnowledgeItems.length + siteplanTopics.length,
+      knowledgeCount: createdKnowledgeItems.length,
+      siteplanCount: siteplanTopics.length,
+      items: createdKnowledgeItems.map((ci) => ({
         id: ci.id,
         title: (ci.metadata as any)?.title || 'Untitled',
         content: ci.content,
         metadata: ci.metadata,
         createdAt: ci.createdAt,
       })),
+    };
+  }
+
+  /**
+   * Memindahkan satu segmen materi ke dalam Knowledge Cluster / Siteplan (ResourceGroup.description)
+   */
+  async moveToSiteplan(
+    tenantId: string,
+    data: {
+      groupId: string;
+      title: string;
+      category?: string;
+      content: string;
+      sourceKnowledgeId?: string;
+    },
+  ) {
+    if (!data.groupId || !data.title || !data.content) {
+      throw new BadRequestException('groupId, title, dan content wajib diisi');
+    }
+
+    const group = await this.prisma.resourceGroup.findFirst({
+      where: { id: data.groupId, tenantId },
+    });
+    if (!group) {
+      throw new NotFoundException('Cluster / Perumahan tidak ditemukan');
+    }
+
+    let existingList: any[] = [];
+    if (group.description) {
+      try {
+        const raw = group.description.trim();
+        if (raw.startsWith('[')) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) existingList = parsed;
+        } else {
+          existingList = [
+            {
+              id: 'k-init',
+              title: 'Informasi Cluster',
+              category: 'Umum',
+              content: raw,
+            },
+          ];
+        }
+      } catch {
+        existingList = [
+          {
+            id: 'k-init',
+            title: 'Informasi Cluster',
+            category: 'Umum',
+            content: group.description,
+          },
+        ];
+      }
+    }
+
+    const newKnowledgeItem = {
+      id: 'k-' + Date.now(),
+      title: data.title.trim(),
+      category: data.category || 'Spesifikasi Bangunan',
+      content: data.content.trim(),
+      updatedAt: new Date().toISOString().slice(0, 10),
+    };
+
+    const updatedList = [...existingList, newKnowledgeItem];
+
+    await this.prisma.resourceGroup.update({
+      where: { id: group.id },
+      data: { description: JSON.stringify(updatedList) },
+    });
+
+    if (data.sourceKnowledgeId) {
+      await this.prisma.knowledgeBase
+        .deleteMany({
+          where: { id: data.sourceKnowledgeId, tenantId },
+        })
+        .catch(() => null);
+    }
+
+    this.dataAgentService
+      .syncKnowledgeBase(tenantId)
+      .catch((e) => this.logger.warn(`Knowledge sync warning: ${e.message}`));
+
+    return {
+      success: true,
+      groupId: group.id,
+      groupName: group.name,
+      addedItem: newKnowledgeItem,
+      totalClusterKnowledge: updatedList.length,
     };
   }
 }

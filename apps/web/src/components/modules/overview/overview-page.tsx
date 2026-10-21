@@ -103,14 +103,23 @@ export function OverviewPage() {
       (process.env.NODE_ENV !== "production" && !user?.tenantId);
 
     const defaultEmptyMetrics: Metrics = {
-      activeSessions: 0,
-      totalSessions: 0,
       knowledgeCount: 0,
       totalChats: 0,
       botSuccessRate: 100,
     };
 
-    setTenant(loadedTenant || (isDemo ? MOCK_TENANT : { id: user?.tenantId || "", name: user?.name || "Toko Saya" }));
+    setTenant(
+      loadedTenant ||
+        (isDemo
+          ? MOCK_TENANT
+          : {
+              name: user?.name || "Toko Saya",
+              agentName: "AI Assistant",
+              agentTone: "Ramah",
+              phone: "-",
+              category: "General",
+            }),
+    );
     setMetrics(loadedMetrics || (isDemo ? MOCK_METRICS : defaultEmptyMetrics));
     setSessions(loadedSessions.length > 0 ? loadedSessions : (isDemo ? MOCK_SESSIONS : []));
     setKnowledgeCount(loadedKbCount || (isDemo ? MOCK_METRICS.knowledgeCount : 0));
@@ -269,9 +278,13 @@ export function OverviewPage() {
           <CardContent className="pt-0">
             <p className="text-xs text-muted-foreground">
               {activeSessions.length > 0 ? (
-                <span className="text-emerald-600 font-medium">● Online</span>
+                <span className="text-emerald-600 font-medium inline-flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" /> Online
+                </span>
               ) : (
-                <span className="text-rose-500 font-medium">● Tidak ada sesi aktif</span>
+                <span className="text-rose-500 font-medium inline-flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-rose-500" /> Tidak ada sesi aktif
+                </span>
               )}
             </p>
             <p className="text-[11px] text-muted-foreground/70 mt-0.5">bulan ini</p>

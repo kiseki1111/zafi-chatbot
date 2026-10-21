@@ -303,5 +303,39 @@ describe('Potongan 3: Knowledge Base RAG Ingestion (Boundary & Multi-Tenant Isol
         where: { id: 'kb-doc-1', tenantId: 'tenant-A' },
       });
     });
+
+    it('Berhasil memindahkan materi spesifik ke siteplan cluster (/api/v1/knowledge/move-to-siteplan) (201)', async () => {
+      currentUser = {
+        sub: 'user-tenant-a',
+        email: 'admin@tenant-a.com',
+        roles: ['manager'],
+        tenantId: 'tenant-A',
+      };
+
+      context.mockPrisma.resourceGroup.findFirst.mockResolvedValueOnce({
+        id: 'group-a',
+        name: 'Griya Indah A',
+        tenantId: 'tenant-A',
+        description: JSON.stringify([]),
+      });
+
+      context.mockPrisma.resourceGroup.update.mockResolvedValueOnce({
+        id: 'group-a',
+      });
+
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/knowledge/move-to-siteplan')
+        .send({
+          groupId: 'group-a',
+          title: 'Spesifikasi Unit Indah',
+          category: 'Spesifikasi Bangunan',
+          content: '- Luas tanah 72 m2\n- 2 kamar tidur',
+        })
+        .expect(201);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.groupName).toBe('Griya Indah A');
+      expect(res.body.addedItem.title).toBe('Spesifikasi Unit Indah');
+    });
   });
 });

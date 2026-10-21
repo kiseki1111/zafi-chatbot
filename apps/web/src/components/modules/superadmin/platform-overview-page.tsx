@@ -146,8 +146,9 @@ export function PlatformOverviewPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0 flex items-center justify-between text-xs text-muted-foreground">
-            <span className={s.activeInstances > 0 ? "text-emerald-600 font-medium" : "text-rose-500"}>
-              ● {s.activeInstances} Sesi Online
+            <span className={`inline-flex items-center gap-1.5 font-medium ${s.activeInstances > 0 ? "text-emerald-600" : "text-rose-500"}`}>
+              <span className={`h-2 w-2 rounded-full ${s.activeInstances > 0 ? "bg-emerald-500" : "bg-rose-500"}`} />
+              {s.activeInstances} Sesi Online
             </span>
             <ArrowRight className="h-3.5 w-3.5 text-indigo-600" />
           </CardContent>

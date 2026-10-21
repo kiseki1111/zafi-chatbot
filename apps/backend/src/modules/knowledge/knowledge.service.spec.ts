@@ -18,6 +18,10 @@ describe('KnowledgeService', () => {
       delete: jest.fn(),
       deleteMany: jest.fn(),
     },
+    resourceGroup: {
+      findFirst: jest.fn(),
+      update: jest.fn(),
+    },
   };
 
   const mockOpenAIClient = {
@@ -309,6 +313,101 @@ describe('KnowledgeService', () => {
         where: { id: 'kb-big-doc', tenantId: 'tenant-123' },
       });
       expect(mockDataAgentService.syncKnowledgeBase).toHaveBeenCalledWith('tenant-123');
+    });
+
+    it('berhasil memindahkan materi topik ke Knowledge Siteplan Cluster (moveToSiteplan)', async () => {
+      mockPrismaService.resourceGroup.findFirst.mockResolvedValueOnce({
+        id: 'group-zafi-1',
+        name: 'Zafi Residence',
+        tenantId: 'tenant-123',
+        description: JSON.stringify([
+          { id: 'k-old', title: 'Info Lama', category: 'Umum', content: 'Konten lama' },
+        ]),
+      });
+
+      mockPrismaService.resourceGroup.update.mockResolvedValueOnce({
+        id: 'group-zafi-1',
+      });
+
+      mockPrismaService.knowledgeBase.deleteMany.mockResolvedValueOnce({ count: 1 });
+
+      const res = await service.moveToSiteplan('tenant-123', {
+        groupId: 'group-zafi-1',
+        title: 'Spesifikasi Bangunan Tipe 36',
+        category: 'Spesifikasi Bangunan',
+        content: '- Pondasi 50 cm\n- Listrik 1300W',
+        sourceKnowledgeId: 'kb-source-1',
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.groupName).toBe('Zafi Residence');
+      expect(res.totalClusterKnowledge).toBe(2);
+      expect(res.addedItem.title).toBe('Spesifikasi Bangunan Tipe 36');
+      expect(mockPrismaService.resourceGroup.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'group-zafi-1' },
+          data: expect.objectContaining({
+            description: expect.stringContaining('Spesifikasi Bangunan Tipe 36'),
+          }),
+        }),
+      );
+      expect(mockPrismaService.knowledgeBase.deleteMany).toHaveBeenCalledWith({
+        where: { id: 'kb-source-1', tenantId: 'tenant-123' },
+      });
+      expect(mockDataAgentService.syncKnowledgeBase).toHaveBeenCalledWith('tenant-123');
+    });
+
+    it('berhasil memproses pemecahan data nyata data_rindang.docx dengan alokasi modular', async () => {
+      mockPrismaService.knowledgeBase.findFirst.mockResolvedValueOnce({
+        id: 'kb-rindang',
+        tenantId: 'tenant-rindang',
+        title: 'data_rindang.docx',
+        content: 'PT Rindang Alam Semesta. Unit: MAS 3= 90, SKYLAND= 70, RAS= 101. Harga: 182jt. Listrik: 1300VA. KPR: BSN & BSI.',
+      });
+
+      mockPrismaService.resourceGroup.findFirst.mockResolvedValueOnce({
+        id: 'group-rindang-1',
+        name: 'MAS 3',
+        tenantId: 'tenant-rindang',
+        description: '[]',
+      });
+
+      mockPrismaService.knowledgeBase.create.mockResolvedValue({ id: 'kb-new-1' });
+      mockPrismaService.resourceGroup.update.mockResolvedValue({ id: 'group-rindang-1' });
+      mockPrismaService.knowledgeBase.deleteMany.mockResolvedValue({ count: 1 });
+
+      // Topics hasil ekstraksi data_rindang.docx
+      const topicsFromDocx = [
+        {
+          title: 'Profil Developer & Legalitas',
+          content: 'Nama developer: PT Rindang Alam Semesta. NIB: 8120014262925. Marketing: +62 878-4762-8400.',
+          target: 'knowledge' as const,
+        },
+        {
+          title: 'Spesifikasi & Fasilitas Kawasan MAS 3',
+          content: 'Total unit: 90. Terjual: 15. Jalan lingkungan: Lebar 5m, aspal. Listrik: 1300VA. Air: Gorong2.',
+          target: 'siteplan' as const,
+          targetGroupId: 'group-rindang-1',
+          targetCategory: 'Spesifikasi Bangunan',
+        },
+      ];
+
+      const res = await service.applySplitKnowledge(
+        'kb-rindang',
+        'tenant-rindang',
+        topicsFromDocx,
+        false,
+      );
+
+      expect(res.success).toBe(true);
+      expect(res.knowledgeCount).toBe(1);
+      expect(res.siteplanCount).toBe(1);
+      expect(res.count).toBe(2);
+      expect(mockPrismaService.knowledgeBase.create).toHaveBeenCalledTimes(1);
+      expect(mockPrismaService.resourceGroup.update).toHaveBeenCalledTimes(1);
+      expect(mockPrismaService.knowledgeBase.deleteMany).toHaveBeenCalledWith({
+        where: { id: 'kb-rindang', tenantId: 'tenant-rindang' },
+      });
     });
   });
 });

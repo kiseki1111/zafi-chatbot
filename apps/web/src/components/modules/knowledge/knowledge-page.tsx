@@ -7,11 +7,14 @@ import { toast } from "sonner";
 import {
   Loader2, Plus, Trash2, Pencil, FileText, AlignLeft,
   BookOpen, Upload, X, Check, Brain, AlertTriangle, ImageIcon,
-  Video, Paperclip, ExternalLink, Copy, Eye, Download, Search, Sparkles
+  Video, Paperclip, ExternalLink, Copy, Eye, Download, Search, Sparkles,
+  Building2, CheckCircle2, Split, Info, Layers
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+import { checkWahaMediaLink } from "@/lib/waha-link-validator";
 
 const API_BASE = "/api/v1";
 
@@ -63,6 +66,8 @@ export function KnowledgePage() {
     runKnowledgeFileUpload,
     runKnowledgeTextCreate,
     runKnowledgeMediaUpload,
+    runKnowledgeSplitAi,
+    updateTask,
   } = useBackgroundTasksStore();
 
   const [items, setItems] = useState<KnowledgeItem[]>([]);
@@ -77,6 +82,13 @@ export function KnowledgePage() {
   interface SplitTopic {
     title: string;
     content: string;
+    enabled?: boolean;
+    target?: "knowledge" | "siteplan";
+    targetGroupId?: string;
+    targetCategory?: string;
+    isSiteplan?: boolean;
+    suggestedCategory?: string;
+    detectedCluster?: string | null;
   }
   const [splitModalOpen, setSplitModalOpen] = useState(false);
   const [splittingItem, setSplittingItem] = useState<KnowledgeItem | null>(null);
@@ -84,6 +96,20 @@ export function KnowledgePage() {
   const [splitTopics, setSplitTopics] = useState<SplitTopic[]>([]);
   const [keepOriginalDoc, setKeepOriginalDoc] = useState(false);
   const [applyingSplit, setApplyingSplit] = useState(false);
+  const [confirmApplyModalOpen, setConfirmApplyModalOpen] = useState(false);
+  const [activeSplitTaskId, setActiveSplitTaskId] = useState<string | null>(null);
+
+  // Modal Verifikasi Pemindahan ke Siteplan Cluster state
+  const [verifySiteplanModalOpen, setVerifySiteplanModalOpen] = useState(false);
+  const [topicToMove, setTopicToMove] = useState<SplitTopic | null>(null);
+  const [topicIndexToMove, setTopicIndexToMove] = useState<number | null>(null);
+  const [sourceKnowledgeIdToMove, setSourceKnowledgeIdToMove] = useState<string | null>(null);
+  const [availableClusters, setAvailableClusters] = useState<{ id: string; name: string }[]>([]);
+  const [selectedTargetClusterId, setSelectedTargetClusterId] = useState("");
+  const [selectedClusterCategory, setSelectedClusterCategory] = useState("Spesifikasi Bangunan");
+  const [clusterTopicTitle, setClusterTopicTitle] = useState("");
+  const [clusterTopicContent, setClusterTopicContent] = useState("");
+  const [isMovingToSiteplan, setIsMovingToSiteplan] = useState(false);
 
   // Form state untuk teks & dokumen OCR
   const [title, setTitle] = useState("");
@@ -128,9 +154,75 @@ export function KnowledgePage() {
     const handleUpdate = () => {
       fetchKnowledge();
     };
+    const handleOpenVerify = (e: any) => {
+      const detail = e.detail;
+      if (!detail) return;
+      const { taskId, item, topics, keepOriginal } = detail;
+      if (item) {
+        setSplittingItem(item);
+        setKeepOriginalDoc(Boolean(keepOriginal));
+        setActiveSplitTaskId(taskId || null);
+        setSplitModalOpen(true);
+        setSplittingLoading(false);
+
+        // Fetch clusters if not loaded yet
+        if (tenantId) {
+          fetch(`/api/v1/availability/groups?tenantId=${tenantId}`)
+            .then((r) => (r.ok ? r.json() : []))
+            .then((d) => (Array.isArray(d) ? d : d?.data || []))
+            .then((list) => {
+              const mapped = list.map((g: any) => ({ id: g.id, name: g.name }));
+              setAvailableClusters(mapped);
+              if (Array.isArray(topics)) {
+                const enriched: SplitTopic[] = topics.map((t: any) => {
+                  const isSiteplan = Boolean(t.isSiteplan);
+                  let targetGroupId = "";
+                  if (t.detectedCluster && mapped.length > 0) {
+                    const match = mapped.find((c: any) =>
+                      c.name.toLowerCase().includes(t.detectedCluster.toLowerCase()),
+                    );
+                    if (match) targetGroupId = match.id;
+                  }
+                  if (!targetGroupId && mapped.length > 0 && isSiteplan) {
+                    targetGroupId = mapped[0].id;
+                  }
+                  return {
+                    title: t.title,
+                    content: t.content,
+                    enabled: t.enabled !== false,
+                    target: isSiteplan && targetGroupId ? "siteplan" : "knowledge",
+                    targetGroupId,
+                    targetCategory: t.suggestedCategory || "Spesifikasi Bangunan",
+                    isSiteplan,
+                    suggestedCategory: t.suggestedCategory,
+                    detectedCluster: t.detectedCluster,
+                  };
+                });
+                setSplitTopics(enriched);
+              }
+            })
+            .catch(() => {});
+        } else if (Array.isArray(topics)) {
+          setSplitTopics(
+            topics.map((t: any) => ({
+              title: t.title,
+              content: t.content,
+              enabled: true,
+              target: "knowledge",
+              isSiteplan: Boolean(t.isSiteplan),
+              suggestedCategory: t.suggestedCategory,
+              detectedCluster: t.detectedCluster,
+            })),
+          );
+        }
+      }
+    };
+
     window.addEventListener("knowledge-updated", handleUpdate);
+    window.addEventListener("open-knowledge-split-verify", handleOpenVerify);
     return () => {
       window.removeEventListener("knowledge-updated", handleUpdate);
+      window.removeEventListener("open-knowledge-split-verify", handleOpenVerify);
     };
   }, [tenantId]);
 
@@ -142,15 +234,62 @@ export function KnowledgePage() {
     setKeepOriginalDoc(false);
 
     try {
-      const res = await fetch(`${API_BASE}/knowledge/${item.id}/split-preview`, {
-        method: "POST",
-      });
-      const json = await res.json();
-      const data = json?.data || json;
-      if (res.ok && data?.topics && Array.isArray(data.topics)) {
-        setSplitTopics(data.topics);
+      const tenantQuery = tenantId ? `?tenantId=${tenantId}` : "";
+
+      // Load clusters list in parallel so destinations are ready
+      const clustersPromise = tenantId
+        ? fetch(`/api/v1/availability/groups?tenantId=${tenantId}`)
+            .then((r) => (r.ok ? r.json() : []))
+            .then((d) => (Array.isArray(d) ? d : d?.data || []))
+            .catch(() => [])
+        : Promise.resolve([]);
+
+      const splitPromise = fetch(
+        `${API_BASE}/knowledge/${item.id}/split-preview${tenantQuery}`,
+        { method: "POST" },
+      );
+
+      const [clustersData, res] = await Promise.all([clustersPromise, splitPromise]);
+      const mappedClusters = clustersData.map((g: any) => ({ id: g.id, name: g.name }));
+      setAvailableClusters(mappedClusters);
+
+      const text = await res.text();
+      let data: any = null;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(text || `Server error (${res.status})`);
+      }
+      const payload = data?.data || data;
+      if (res.ok && payload?.topics && Array.isArray(payload.topics)) {
+        const enriched: SplitTopic[] = payload.topics.map((t: any) => {
+          const isSiteplan = Boolean(t.isSiteplan);
+          let targetGroupId = "";
+          if (t.detectedCluster && mappedClusters.length > 0) {
+            const match = mappedClusters.find((c: any) =>
+              c.name.toLowerCase().includes(t.detectedCluster.toLowerCase()),
+            );
+            if (match) targetGroupId = match.id;
+          }
+          if (!targetGroupId && mappedClusters.length > 0 && isSiteplan) {
+            targetGroupId = mappedClusters[0].id;
+          }
+
+          return {
+            title: t.title,
+            content: t.content,
+            enabled: true,
+            target: isSiteplan && targetGroupId ? "siteplan" : "knowledge",
+            targetGroupId,
+            targetCategory: t.suggestedCategory || "Spesifikasi Bangunan",
+            isSiteplan,
+            suggestedCategory: t.suggestedCategory,
+            detectedCluster: t.detectedCluster,
+          };
+        });
+        setSplitTopics(enriched);
       } else {
-        toast.error(data?.message || "Gagal membedah materi dengan AI");
+        toast.error(payload?.message || "Gagal membedah materi dengan AI");
         setSplitModalOpen(false);
       }
     } catch (e: any) {
@@ -161,36 +300,194 @@ export function KnowledgePage() {
     }
   };
 
+  const openMoveToSiteplanModal = async (topic: SplitTopic, index: number, sourceKnowledgeId?: string) => {
+    setTopicToMove(topic);
+    setTopicIndexToMove(index);
+    setSourceKnowledgeIdToMove(sourceKnowledgeId || null);
+    setClusterTopicTitle(topic.title);
+    setClusterTopicContent(topic.content);
+    setSelectedClusterCategory(topic.suggestedCategory || "Spesifikasi Bangunan");
+    setVerifySiteplanModalOpen(true);
+
+    if (tenantId) {
+      try {
+        const res = await fetch(`/api/v1/availability/groups?tenantId=${tenantId}`);
+        if (res.ok) {
+          const data = await res.json();
+          const list = Array.isArray(data) ? data : data?.data || [];
+          const mapped = list.map((g: any) => ({ id: g.id, name: g.name }));
+          setAvailableClusters(mapped);
+
+          if (topic.detectedCluster) {
+            const match = mapped.find((c: any) =>
+              c.name.toLowerCase().includes(topic.detectedCluster!.toLowerCase()),
+            );
+            if (match) {
+              setSelectedTargetClusterId(match.id);
+              return;
+            }
+          }
+          if (mapped.length > 0) {
+            setSelectedTargetClusterId(mapped[0].id);
+          }
+        }
+      } catch {}
+    }
+  };
+
+  const handleConfirmMoveToSiteplan = async () => {
+    if (!selectedTargetClusterId) {
+      return toast.error("Silakan pilih cluster / perumahan tujuan");
+    }
+    if (!clusterTopicTitle.trim() || !clusterTopicContent.trim()) {
+      return toast.error("Judul dan rincian poin materi wajib diisi");
+    }
+
+    setIsMovingToSiteplan(true);
+    try {
+      const res = await fetch(`${API_BASE}/knowledge/move-to-siteplan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          groupId: selectedTargetClusterId,
+          title: clusterTopicTitle.trim(),
+          category: selectedClusterCategory,
+          content: clusterTopicContent.trim(),
+          sourceKnowledgeId: sourceKnowledgeIdToMove || undefined,
+        }),
+      });
+
+      const json = await res.json();
+      const data = json?.data || json;
+
+      if (res.ok && data?.success) {
+        const clusterName = data.groupName || "cluster";
+        toast.success(
+          `Materi "${clusterTopicTitle}" berhasil dipindahkan ke Siteplan ${clusterName}!`,
+        );
+
+        if (topicIndexToMove !== null && topicIndexToMove >= 0) {
+          setSplitTopics((prev) =>
+            prev.filter((_, idx) => idx !== topicIndexToMove),
+          );
+        }
+
+        if (sourceKnowledgeIdToMove) {
+          fetchKnowledge();
+        }
+
+        setVerifySiteplanModalOpen(false);
+        setTopicToMove(null);
+        setTopicIndexToMove(null);
+        setSourceKnowledgeIdToMove(null);
+      } else {
+        toast.error(data?.message || "Gagal memindahkan materi ke siteplan");
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Terjadi kesalahan saat memindahkan ke siteplan");
+    } finally {
+      setIsMovingToSiteplan(false);
+    }
+  };
+
+  const handleSendToBackground = () => {
+    if (!splittingItem) return;
+    const itemToSplit = splittingItem;
+    const keepOrig = keepOriginalDoc;
+    setSplitModalOpen(false);
+    setSplittingLoading(false);
+    setPreviewItem(null);
+    toast.info(`Pemecahan "${itemToSplit.title}" dilanjutkan di latar belakang...`);
+
+    runKnowledgeSplitAi({
+      item: itemToSplit,
+      keepOriginal: keepOrig,
+      tenantId: (tenantId as string) || undefined,
+      onSuccess: () => {
+        fetchKnowledge();
+      },
+    });
+  };
+
+  const handlePreApplySplit = () => {
+    if (!splittingItem) return;
+    const selectedTopics = splitTopics.filter((t) => t.enabled !== false);
+    if (selectedTopics.length === 0) {
+      return toast.error("Minimal harus ada 1 topik yang dicentang untuk disimpan");
+    }
+    for (const t of selectedTopics) {
+      if (!t.title.trim() || !t.content.trim()) {
+        return toast.error("Semua judul dan konten topik terpilih wajib diisi");
+      }
+      if (t.target === "siteplan" && !t.targetGroupId) {
+        return toast.error(`Silakan pilih cluster perumahan tujuan untuk "${t.title}"`);
+      }
+    }
+    setConfirmApplyModalOpen(true);
+  };
+
   const handleApplySplit = async () => {
     if (!splittingItem) return;
-    if (splitTopics.length === 0) {
-      return toast.error("Minimal harus ada 1 topik hasil pemecahan");
+    const selectedTopics = splitTopics.filter((t) => t.enabled !== false);
+    if (selectedTopics.length === 0) {
+      return toast.error("Minimal harus ada 1 topik yang dicentang untuk disimpan");
     }
-    for (const t of splitTopics) {
+    for (const t of selectedTopics) {
       if (!t.title.trim() || !t.content.trim()) {
-        return toast.error("Semua judul dan konten topik wajib diisi");
+        return toast.error("Semua judul dan konten topik terpilih wajib diisi");
+      }
+      if (t.target === "siteplan" && !t.targetGroupId) {
+        return toast.error(`Silakan pilih cluster perumahan tujuan untuk "${t.title}"`);
       }
     }
 
     setApplyingSplit(true);
     try {
-      const res = await fetch(`${API_BASE}/knowledge/${splittingItem.id}/split-apply`, {
+      const tenantQuery = tenantId ? `?tenantId=${tenantId}` : "";
+      const res = await fetch(`${API_BASE}/knowledge/${splittingItem.id}/split-apply${tenantQuery}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          topics: splitTopics,
+          topics: selectedTopics.map((t) => ({
+            title: t.title.trim(),
+            content: t.content.trim(),
+            target: t.target || "knowledge",
+            targetGroupId: t.targetGroupId || undefined,
+            targetCategory: t.targetCategory || undefined,
+          })),
           keepOriginal: keepOriginalDoc,
         }),
       });
-      const json = await res.json();
-      const data = json?.data || json;
-      if (res.ok && data?.success) {
-        toast.success(`Berhasil memecah dokumen menjadi ${splitTopics.length} materi terpisah!`);
+      const text = await res.text();
+      let data: any = null;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(text || `Server error (${res.status})`);
+      }
+      const payload = data?.data || data;
+      if (res.ok && payload?.success) {
+        const kCount = payload.knowledgeCount ?? selectedTopics.filter((t) => t.target !== "siteplan").length;
+        const sCount = payload.siteplanCount ?? selectedTopics.filter((t) => t.target === "siteplan").length;
+        let msg = `Berhasil menyimpan ${selectedTopics.length} materi terpisah!`;
+        if (sCount > 0) {
+          msg = `Berhasil menyimpan ${selectedTopics.length} materi (${kCount} ke Knowledge Base, ${sCount} ke Siteplan)!`;
+        }
+        toast.success(msg);
+        if (activeSplitTaskId) {
+          updateTask(activeSplitTaskId, {
+            status: "success",
+            statusText: `Berhasil dipecah menjadi ${selectedTopics.length} materi terpisah!`,
+            completedAt: Date.now(),
+          });
+          setActiveSplitTaskId(null);
+        }
+        setConfirmApplyModalOpen(false);
         setSplitModalOpen(false);
         setPreviewItem(null);
         fetchKnowledge();
       } else {
-        toast.error(data?.message || "Gagal menerapkan pemecahan dokumen");
+        toast.error(payload?.message || "Gagal menerapkan pemecahan dokumen");
       }
     } catch (e: any) {
       toast.error(e?.message || "Terjadi kesalahan saat menyimpan materi baru");
@@ -575,20 +872,35 @@ export function KnowledgePage() {
                   {item.metadata?.description || item.content}
                 </p>
 
-                {/* File Link / View */}
+                {/* File Link / View (Berwarna Hijau untuk menandakan link valid bagi WAHA) */}
                 {fileUrl && (
                   <div className="mb-3">
-                    <span
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setPreviewItem(item);
-                      }}
-                      className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-300 bg-white/60 dark:bg-black/20 hover:bg-white dark:hover:bg-black/40 px-2.5 py-1 rounded-lg border border-border/60 transition"
-                      title="Klik untuk melihat pratinjau file"
-                    >
-                      <Eye className="h-3 w-3" />
-                      <span className="truncate max-w-[200px]">{item.metadata?.filename || item.metadata?.name || 'Lihat Pratinjau File'}</span>
-                    </span>
+                    {(() => {
+                      const linkStatus = checkWahaMediaLink(fileUrl);
+                      const isWahaValid = linkStatus.isValid;
+                      return (
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewItem(item);
+                          }}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg border transition truncate max-w-[260px]",
+                            isWahaValid
+                              ? "text-emerald-700 dark:text-emerald-300 bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 hover:bg-emerald-100 hover:border-emerald-400"
+                              : "text-muted-foreground bg-muted/40 border-border/60 hover:bg-muted hover:text-foreground",
+                          )}
+                          title={
+                            isWahaValid
+                              ? "Link valid & siap dikirim via WhatsApp (Klik untuk pratinjau)"
+                              : "Klik untuk melihat pratinjau file"
+                          }
+                        >
+                          <Eye className={cn("h-3 w-3 shrink-0", isWahaValid ? "text-emerald-600" : "text-muted-foreground")} />
+                          <span className="truncate">{item.metadata?.filename || item.metadata?.name || 'Lihat Pratinjau File'}</span>
+                        </span>
+                      );
+                    })()}
                   </div>
                 )}
 
@@ -619,7 +931,7 @@ export function KnowledgePage() {
                         className="rounded-lg bg-white/80 dark:bg-black/30 p-2 text-foreground hover:bg-indigo-50 dark:hover:bg-indigo-950/40 hover:text-indigo-600 transition backdrop-blur-sm"
                         title="Pecah Materi ini dengan AI"
                       >
-                        <Sparkles className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                        <Split className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
                       </button>
                     )}
                     <button
@@ -858,8 +1170,9 @@ export function KnowledgePage() {
                     <p className="text-xs text-muted-foreground">Keterangan ini digunakan AI bot WhatsApp untuk mereferensikan file saat pelanggan bertanya.</p>
                   </div>
 
-                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-950/20 p-3 text-xs text-emerald-800 dark:text-emerald-300 leading-relaxed">
-                    💡 <strong>Tips:</strong> File ini terikat dengan perusahaan (di luar produk). Bot WhatsApp dapat mengirimkannya langsung sebagai gambar/video/dokumen saat pelanggan meminta brosur atau profil perusahaan.
+                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-950/20 p-3 text-xs text-emerald-800 dark:text-emerald-300 leading-relaxed flex items-start gap-2">
+                    <Info className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span><strong>Tips:</strong> File ini terikat dengan perusahaan (di luar produk). Bot WhatsApp dapat mengirimkannya langsung sebagai gambar/video/dokumen saat pelanggan meminta brosur atau profil perusahaan.</span>
                   </div>
 
                   <button
@@ -898,7 +1211,7 @@ export function KnowledgePage() {
 
       {/* Modal Preview File & Detail Knowledge */}
       <Dialog open={!!previewItem} onOpenChange={(open) => { if (!open) setPreviewItem(null); }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-2.5">
@@ -1041,12 +1354,12 @@ export function KnowledgePage() {
             </div>
           )}
 
-          <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t border-border/40">
+          <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t border-border/40 flex-wrap">
             <Button variant="outline" size="sm" onClick={() => setPreviewItem(null)}>
               Tutup
             </Button>
             {previewItem && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 {previewItem.content && previewItem.content.length > 50 && (
                   <Button
                     variant="outline"
@@ -1058,7 +1371,7 @@ export function KnowledgePage() {
                     }}
                     className="gap-1.5 text-xs text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-800 bg-indigo-50/60 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-950/80 font-medium"
                   >
-                    <Sparkles className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" /> Pecah Topik (AI)
+                    <Split className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" /> Pecah Topik (AI)
                   </Button>
                 )}
                 <Button
@@ -1098,19 +1411,19 @@ export function KnowledgePage() {
       >
         <DialogContent
           showCloseButton={!applyingSplit}
-          className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0 rounded-2xl"
+          className="max-w-3xl max-h-[92vh] overflow-hidden flex flex-col p-0 gap-0 rounded-2xl border border-emerald-500/20 shadow-2xl"
         >
-          {/* Header */}
-          <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 p-5 text-white">
+          {/* Header - Emerald / Teal Theme */}
+          <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 p-5 text-white">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-white/20 backdrop-blur-sm">
-                <Sparkles className="h-5 w-5 text-amber-300" />
+                <Split className="h-5 w-5 text-white" />
               </div>
               <div className="min-w-0">
                 <DialogTitle className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                   <span>Pecah Dokumen Menjadi Topik Mandiri (AI)</span>
                 </DialogTitle>
-                <DialogDescription className="text-xs text-indigo-100 truncate mt-0.5">
+                <DialogDescription className="text-xs text-emerald-100 truncate mt-0.5">
                   Dokumen asal: <strong>"{splittingItem?.title}"</strong> ({splittingItem?.content.length || 0} karakter)
                 </DialogDescription>
               </div>
@@ -1118,15 +1431,65 @@ export function KnowledgePage() {
           </div>
 
           {/* Body */}
-          <div className="p-5 overflow-y-auto flex-1 space-y-4 max-h-[58vh]">
+          <div className="p-5 overflow-y-auto flex-1 space-y-4 max-h-[60vh]">
+            {/* Always show the source document preview first so user knows what is being processed */}
+            {splittingItem && (
+              <div className="rounded-xl border border-border/80 bg-muted/30 p-3.5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                    <FileText className="h-3.5 w-3.5 text-emerald-600" /> Dokumen Sumber
+                  </span>
+                  <span className="text-[10px] text-muted-foreground font-mono bg-muted px-2 py-0.5 rounded-full border">
+                    {splittingItem.content.length.toLocaleString()} karakter
+                  </span>
+                </div>
+                <p className="text-xs font-semibold text-foreground truncate">
+                  {splittingItem.title}
+                </p>
+                <div className="max-h-28 overflow-y-auto text-[11px] font-mono text-muted-foreground bg-background/80 p-2.5 rounded-lg border whitespace-pre-wrap leading-relaxed select-text">
+                  {splittingItem.content}
+                </div>
+              </div>
+            )}
+
+            {/* When splitting is loading: show live progress status + background option */}
             {splittingLoading ? (
-              <div className="py-16 flex flex-col items-center justify-center gap-3 text-center">
-                <Loader2 className="h-8 w-8 text-indigo-600 animate-spin" />
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold text-foreground">Sedang Menganalisis & Membedah Dokumen...</p>
-                  <p className="text-xs text-muted-foreground max-w-sm">
-                    AI sedang mengidentifikasi bagian-bagian topik mandiri agar materi dapat diedit atau dihapus secara terpisah.
-                  </p>
+              <div className="p-4.5 rounded-xl border border-emerald-500/30 bg-emerald-50/60 dark:bg-emerald-950/20 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <Loader2 className="h-4.5 w-4.5 text-emerald-600 animate-spin shrink-0" />
+                    <div>
+                      <p className="text-xs sm:text-sm font-bold text-foreground">
+                        AI Sedang Menganalisis & Membedah Topik...
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSendToBackground}
+                    className="h-8 text-xs gap-1.5 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 font-semibold shrink-0"
+                    title="Lanjutkan pekerjaan lain sambil proses berjalan di latar belakang"
+                  >
+                    <Layers className="h-3.5 w-3.5 text-emerald-600" /> Jalankan di Latar Belakang
+                  </Button>
+                </div>
+
+                {/* Progress Steps Indicators */}
+                <div className="space-y-2 pt-1 border-t border-emerald-500/20 text-xs">
+                  <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300 font-medium">
+                    <Check className="h-3.5 w-3.5 shrink-0" />
+                    <span>Teks dokumen berhasil dibaca ({splittingItem?.content.length || 0} karakter)</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-foreground font-semibold animate-pulse">
+                    <Split className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                    <span>AI sedang mendeteksi struktur topik (Pricelist, Spesifikasi, Syarat KPR, dll)...</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground/60">
+                    <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 ml-1 mr-1 shrink-0" />
+                    <span>Menyusun segmen modular siap pakai...</span>
+                  </div>
                 </div>
               </div>
             ) : splitTopics.length === 0 ? (
@@ -1136,7 +1499,8 @@ export function KnowledgePage() {
             ) : (
               <div className="space-y-4">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-foreground">
+                  <span className="font-semibold text-foreground flex items-center gap-1.5">
+                    <Check className="h-4 w-4 text-emerald-600" />
                     Terdeteksi {splitTopics.length} Topik Mandiri:
                   </span>
                   <button
@@ -1147,7 +1511,7 @@ export function KnowledgePage() {
                         { title: `Topik ${splitTopics.length + 1}`, content: "" },
                       ])
                     }
-                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+                    className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
                   >
                     <Plus className="h-3.5 w-3.5" /> Tambah Topik Manual
                   </button>
@@ -1157,11 +1521,26 @@ export function KnowledgePage() {
                   {splitTopics.map((topic, idx) => (
                     <div
                       key={idx}
-                      className="p-3.5 rounded-xl border bg-muted/20 space-y-2.5 relative group transition-all hover:border-indigo-300 dark:hover:border-indigo-800"
+                      className={`p-3.5 rounded-xl border bg-card space-y-2.5 relative group transition-all shadow-2xs ${
+                        topic.enabled !== false
+                          ? "hover:border-emerald-300 dark:hover:border-emerald-800"
+                          : "opacity-60 bg-muted/40 border-dashed"
+                      }`}
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 flex-1">
-                          <span className="h-5 w-5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 text-[11px] font-bold grid place-items-center shrink-0">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                          <input
+                            type="checkbox"
+                            checked={topic.enabled !== false}
+                            onChange={(e) => {
+                              const next = [...splitTopics];
+                              next[idx].enabled = e.target.checked;
+                              setSplitTopics(next);
+                            }}
+                            className="h-4 w-4 rounded accent-emerald-600 cursor-pointer shrink-0"
+                            title="Centang untuk simpan materi ini"
+                          />
+                          <span className="h-5 w-5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[11px] font-bold grid place-items-center shrink-0">
                             {idx + 1}
                           </span>
                           <input
@@ -1173,20 +1552,132 @@ export function KnowledgePage() {
                               setSplitTopics(next);
                             }}
                             placeholder="Judul Topik..."
-                            className="font-semibold text-xs sm:text-sm bg-transparent border-b border-transparent hover:border-border focus:border-indigo-500 focus:outline-hidden flex-1 py-0.5"
+                            className="font-semibold text-xs sm:text-sm bg-transparent border-b border-transparent hover:border-border focus:border-emerald-500 focus:outline-hidden flex-1 py-0.5"
                           />
                         </div>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setSplitTopics(splitTopics.filter((_, i) => i !== idx))
-                          }
-                          className="text-muted-foreground hover:text-destructive p-1 rounded-md transition"
-                          title="Hapus topik ini"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+
+                        <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                          {topic.isSiteplan && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300">
+                              <Building2 className="h-2.5 w-2.5 text-emerald-600" />
+                              Siteplan {topic.detectedCluster ? `(${topic.detectedCluster})` : ""}
+                            </span>
+                          )}
+
+                          {/* Switch Tujuan: Knowledge Base vs Siteplan Cluster */}
+                          <div className="inline-flex items-center p-0.5 rounded-lg border bg-muted/50 text-[11px]">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = [...splitTopics];
+                                next[idx].target = "knowledge";
+                                setSplitTopics(next);
+                              }}
+                              className={`px-2 py-0.5 rounded-md font-medium transition ${
+                                topic.target !== "siteplan"
+                                  ? "bg-white dark:bg-card text-foreground shadow-2xs font-semibold"
+                                  : "text-muted-foreground hover:text-foreground"
+                              }`}
+                            >
+                              Knowledge Base
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = [...splitTopics];
+                                next[idx].target = "siteplan";
+                                if (!next[idx].targetGroupId && availableClusters.length > 0) {
+                                  next[idx].targetGroupId = availableClusters[0].id;
+                                }
+                                if (!next[idx].targetCategory) {
+                                  next[idx].targetCategory = topic.suggestedCategory || "Spesifikasi Bangunan";
+                                }
+                                setSplitTopics(next);
+                              }}
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-medium transition ${
+                                topic.target === "siteplan"
+                                  ? "bg-emerald-600 text-white shadow-2xs font-semibold"
+                                  : "text-muted-foreground hover:text-foreground"
+                              }`}
+                            >
+                              <Building2 className="h-3 w-3" />
+                              Siteplan Cluster
+                            </button>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => openMoveToSiteplanModal(topic, idx)}
+                            className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md border border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition"
+                            title="Pindahkan topik ini langsung ke Knowledge Cluster Siteplan"
+                          >
+                            <Building2 className="h-3 w-3 text-emerald-600" /> Pindahkan ke Siteplan
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSplitTopics(splitTopics.filter((_, i) => i !== idx))
+                            }
+                            className="text-muted-foreground hover:text-destructive p-1 rounded-md transition"
+                            title="Hapus topik ini"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </div>
+
+                      {/* Dropdown Cluster & Kategori jika target === 'siteplan' */}
+                      {topic.target === "siteplan" && (
+                        <div className="p-2.5 rounded-lg border border-emerald-500/30 bg-emerald-50/40 dark:bg-emerald-950/30 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <label className="text-[10px] font-semibold text-emerald-900 dark:text-emerald-300 block mb-1">
+                              Pilih Cluster / Perumahan:
+                            </label>
+                            {availableClusters.length === 0 ? (
+                              <span className="text-[11px] text-amber-700 dark:text-amber-400">
+                                Belum ada cluster perumahan terdaftar di Siteplan
+                              </span>
+                            ) : (
+                              <select
+                                value={topic.targetGroupId || availableClusters[0]?.id || ""}
+                                onChange={(e) => {
+                                  const next = [...splitTopics];
+                                  next[idx].targetGroupId = e.target.value;
+                                  setSplitTopics(next);
+                                }}
+                                className="w-full h-7 rounded border bg-background px-2 text-[11px] focus:ring-1 focus:ring-emerald-500 focus:outline-hidden"
+                              >
+                                {availableClusters.map((c) => (
+                                  <option key={c.id} value={c.id}>
+                                    {c.name}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-semibold text-emerald-900 dark:text-emerald-300 block mb-1">
+                              Kategori Informasi:
+                            </label>
+                            <select
+                              value={topic.targetCategory || "Spesifikasi Bangunan"}
+                              onChange={(e) => {
+                                const next = [...splitTopics];
+                                next[idx].targetCategory = e.target.value;
+                                setSplitTopics(next);
+                              }}
+                              className="w-full h-7 rounded border bg-background px-2 text-[11px] focus:ring-1 focus:ring-emerald-500 focus:outline-hidden"
+                            >
+                              <option value="Spesifikasi Bangunan">Spesifikasi Bangunan</option>
+                              <option value="Pricelist & Skema">Pricelist & Skema</option>
+                              <option value="Legalitas & Lokasi">Legalitas & Lokasi</option>
+                              <option value="Fasilitas Kawasan">Fasilitas Kawasan</option>
+                              <option value="Umum">Umum</option>
+                            </select>
+                          </div>
+                        </div>
+                      )}
 
                       <textarea
                         value={topic.content}
@@ -1195,9 +1686,9 @@ export function KnowledgePage() {
                           next[idx].content = e.target.value;
                           setSplitTopics(next);
                         }}
-                        rows={3}
-                        placeholder="Rincian konten topik ini..."
-                        className="w-full text-xs font-mono rounded-lg border bg-background p-2.5 resize-y focus:outline-hidden focus:ring-1 focus:ring-indigo-500 leading-relaxed"
+                        rows={4}
+                        placeholder="- Poin 1...&#10;- Poin 2..."
+                        className="w-full text-xs font-mono rounded-lg border bg-background p-2.5 resize-y focus:outline-hidden focus:ring-1 focus:ring-emerald-500 leading-relaxed"
                       />
                     </div>
                   ))}
@@ -1210,7 +1701,7 @@ export function KnowledgePage() {
                     id="keepOriginalDoc"
                     checked={keepOriginalDoc}
                     onChange={(e) => setKeepOriginalDoc(e.target.checked)}
-                    className="h-4 w-4 rounded accent-indigo-600 cursor-pointer"
+                    className="h-4 w-4 rounded accent-emerald-600 cursor-pointer"
                   />
                   <label
                     htmlFor="keepOriginalDoc"
@@ -1233,19 +1724,244 @@ export function KnowledgePage() {
             >
               Batal
             </Button>
+            {splittingLoading ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleSendToBackground}
+                className="gap-1.5 text-xs border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 font-semibold"
+              >
+                <Layers className="h-3.5 w-3.5 text-emerald-600" /> Jalankan di Latar Belakang
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                disabled={applyingSplit || splitTopics.length === 0}
+                onClick={handlePreApplySplit}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 text-xs font-semibold shadow-xs"
+              >
+                {applyingSplit ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Menerapkan...
+                  </>
+                ) : (
+                  <>
+                    <Split className="h-3.5 w-3.5" /> Terapkan & Simpan ({splitTopics.filter((t) => t.enabled !== false).length} Materi)
+                  </>
+                )}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Verifikasi Pemindahan ke Siteplan Cluster */}
+      <Dialog
+        open={verifySiteplanModalOpen}
+        onOpenChange={(v) => !v && !isMovingToSiteplan && setVerifySiteplanModalOpen(false)}
+      >
+        <DialogContent className="max-w-lg rounded-2xl border p-5 space-y-4">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-foreground">
+              <Building2 className="h-5 w-5 text-emerald-600" />
+              Verifikasi Pemindahan ke Siteplan Cluster
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground leading-relaxed">
+              Materi ini akan disimpan langsung ke dalam database cluster perumahan agar bot AI dapat membacanya saat pelanggan menanyakan denah, spesifikasi, atau fasilitas cluster ini.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3.5 text-xs">
+            {/* Pilih Cluster Tujuan */}
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground">Pilih Cluster / Perumahan Tujuan (Wajib)</label>
+              {availableClusters.length === 0 ? (
+                <div className="p-2.5 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 text-xs">
+                  Belum ada cluster perumahan terdaftar. Tambahkan proyek perumahan terlebih dahulu di menu <strong>Siteplan</strong>.
+                </div>
+              ) : (
+                <select
+                  value={selectedTargetClusterId}
+                  onChange={(e) => setSelectedTargetClusterId(e.target.value)}
+                  className="w-full h-9 rounded-lg border bg-background px-3 text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-hidden"
+                >
+                  {availableClusters.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {/* Kategori Informasi Cluster */}
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground">Kategori Informasi Cluster</label>
+              <select
+                value={selectedClusterCategory}
+                onChange={(e) => setSelectedClusterCategory(e.target.value)}
+                className="w-full h-9 rounded-lg border bg-background px-3 text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-hidden"
+              >
+                <option value="Spesifikasi Bangunan">Spesifikasi Bangunan</option>
+                <option value="Pricelist & Skema">Pricelist & Skema</option>
+                <option value="Legalitas & Lokasi">Legalitas & Lokasi</option>
+                <option value="Fasilitas Kawasan">Fasilitas Kawasan</option>
+                <option value="Umum">Umum</option>
+              </select>
+            </div>
+
+            {/* Judul Materi */}
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground">Judul Materi</label>
+              <input
+                type="text"
+                value={clusterTopicTitle}
+                onChange={(e) => setClusterTopicTitle(e.target.value)}
+                placeholder="Judul info..."
+                className="w-full h-9 rounded-lg border bg-background px-3 text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-hidden font-medium"
+              />
+            </div>
+
+            {/* Isi Poin-Poin */}
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground">Rincian Poin-Poin Materi</label>
+              <textarea
+                value={clusterTopicContent}
+                onChange={(e) => setClusterTopicContent(e.target.value)}
+                rows={5}
+                placeholder="- Poin 1...&#10;- Poin 2..."
+                className="w-full rounded-lg border bg-background p-2.5 text-xs font-mono focus:ring-1 focus:ring-emerald-500 focus:outline-hidden leading-relaxed resize-y"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isMovingToSiteplan}
+              onClick={() => setVerifySiteplanModalOpen(false)}
+            >
+              Batal
+            </Button>
             <Button
               size="sm"
-              disabled={splittingLoading || applyingSplit || splitTopics.length === 0}
-              onClick={handleApplySplit}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 text-xs font-semibold"
+              disabled={isMovingToSiteplan || availableClusters.length === 0}
+              onClick={handleConfirmMoveToSiteplan}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 text-xs font-semibold"
             >
-              {applyingSplit ? (
+              {isMovingToSiteplan ? (
                 <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Menerapkan...
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Memindahkan...
                 </>
               ) : (
                 <>
-                  <Sparkles className="h-3.5 w-3.5" /> Terapkan & Simpan ({splitTopics.length} Materi)
+                  <Building2 className="h-3.5 w-3.5" /> Konfirmasi & Pindahkan ke Siteplan
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Dialog Konfirmasi Verifikasi Akhir Sebelum Eksekusi Split-Apply */}
+      <Dialog
+        open={confirmApplyModalOpen}
+        onOpenChange={(v) => !v && !applyingSplit && setConfirmApplyModalOpen(false)}
+      >
+        <DialogContent className="max-w-md rounded-2xl border p-5 space-y-4">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-foreground">
+              <Check className="h-5 w-5 text-emerald-600" />
+              Verifikasi Pemecahan Materi
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground leading-relaxed">
+              Periksa kembali alokasi pembagian segmen materi sebelum disimpan ke sistem.
+            </DialogDescription>
+          </DialogHeader>
+
+          {(() => {
+            const selectedTopics = splitTopics.filter((t) => t.enabled !== false);
+            const kbTopics = selectedTopics.filter((t) => t.target !== "siteplan");
+            const spTopics = selectedTopics.filter((t) => t.target === "siteplan");
+            const spClusterNames = Array.from(
+              new Set(
+                spTopics.map(
+                  (t) =>
+                    availableClusters.find((c) => c.id === t.targetGroupId)?.name ||
+                    t.detectedCluster ||
+                    "Cluster Perumahan",
+                ),
+              ),
+            );
+
+            return (
+              <div className="space-y-3 text-xs">
+                <div className="rounded-xl border bg-muted/40 p-3 space-y-2">
+                  <div className="flex justify-between items-center py-1 border-b border-border/50">
+                    <span className="text-muted-foreground">Total materi disimpan:</span>
+                    <span className="font-bold text-foreground">{selectedTopics.length} topik</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-border/50">
+                    <span className="text-muted-foreground">Ke Knowledge Base umum:</span>
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                      {kbTopics.length} topik
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-border/50">
+                    <span className="text-muted-foreground">Ke Siteplan Cluster:</span>
+                    <span className="font-semibold text-teal-600 dark:text-teal-400">
+                      {spTopics.length} topik
+                    </span>
+                  </div>
+                  {spTopics.length > 0 && (
+                    <div className="flex justify-between items-start py-1 border-b border-border/50">
+                      <span className="text-muted-foreground">Cluster tujuan:</span>
+                      <span className="font-medium text-foreground text-right max-w-[200px]">
+                        {spClusterNames.join(", ")}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-muted-foreground">Status dokumen lama:</span>
+                    <span className={`font-semibold ${keepOriginalDoc ? "text-blue-600" : "text-amber-600"}`}>
+                      {keepOriginalDoc ? "Tetap Disimpan" : "Akan Dihapus & Digantikan"}
+                    </span>
+                  </div>
+                </div>
+
+                {!keepOriginalDoc && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                    <span>1 dokumen asli bertumpuk akan dihapus dan digantikan oleh topik modular yang Anda pilih.</span>
+                  </p>
+                )}
+              </div>
+            );
+          })()}
+
+          <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={applyingSplit}
+              onClick={() => setConfirmApplyModalOpen(false)}
+            >
+              Batal
+            </Button>
+            <Button
+              size="sm"
+              disabled={applyingSplit}
+              onClick={handleApplySplit}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 text-xs font-semibold"
+            >
+              {applyingSplit ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Menyimpan...
+                </>
+              ) : (
+                <>
+                  <Check className="h-3.5 w-3.5" /> Konfirmasi & Eksekusi
                 </>
               )}
             </Button>
