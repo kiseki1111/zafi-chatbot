@@ -63,25 +63,64 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Coolify Deployment (Force Without Cache)
+      - name: Trigger Coolify Deployment
         env:
           COOLIFY_URL: ${{ secrets.COOLIFY_WEBHOOK_URL || 'https://coolify.zafii.tech/api/v1/deploy?uuid=hqcqrwm4b5gxzbvrwrw3g73m' }}
           COOLIFY_BACKEND_URL: ${{ secrets.COOLIFY_BACKEND_WEBHOOK_URL }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN || secrets.COOLIFY_API_TOKEN }}
         run: |
-          for URL in "$COOLIFY_URL" "$COOLIFY_BACKEND_URL"; do
-            if [ -n "$URL" ]; then
-              TARGET_URL=$(echo "$URL" | sed 's/force=false/force=true/g')
-              if [[ "$TARGET_URL" != *"force=true"* ]]; then
-                if [[ "$TARGET_URL" == *"?"* ]]; then
-                  TARGET_URL="${TARGET_URL}&force=true"
-                else
-                  TARGET_URL="${TARGET_URL}?force=true"
-                fi
+          echo "=========================================================="
+          echo " [DEPLOY TRIGGER] Menghubungi Webhook Coolify..."
+          echo "=========================================================="
+
+          AUTH_HEADER=()
+          if [ -n "$COOLIFY_TOKEN" ]; then
+            AUTH_HEADER=(-H "Authorization: Bearer $COOLIFY_TOKEN")
+            echo "✓ Menggunakan Bearer Token dari GitHub Secrets."
+          else
+            echo "ℹ Info: COOLIFY_TOKEN belum diset di GitHub Secrets."
+          fi
+
+          URL_LIST=()
+          if [ -n "$COOLIFY_URL" ]; then URL_LIST+=("$COOLIFY_URL"); fi
+          if [ -n "$COOLIFY_BACKEND_URL" ]; then URL_LIST+=("$COOLIFY_BACKEND_URL"); fi
+
+          SUCCESS_COUNT=0
+          for RAW_URL in "${URL_LIST[@]}"; do
+            TARGET_URL=$(echo "$RAW_URL" | sed 's/force=false/force=true/g')
+            if [[ "$TARGET_URL" != *"force=true"* ]]; then
+              if [[ "$TARGET_URL" == *"?"* ]]; then
+                TARGET_URL="${TARGET_URL}&force=true"
+              else
+                TARGET_URL="${TARGET_URL}?force=true"
               fi
-              echo "Memanggil Webhook Coolify: $TARGET_URL"
-              curl -f -sSL "$TARGET_URL" || echo "Panggilan webhook selesai."
+            fi
+
+            echo ""
+            echo "--> Memanggil Target Webhook: $TARGET_URL"
+            HTTP_RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" "${AUTH_HEADER[@]}" -X POST "$TARGET_URL" || true)
+            HTTP_BODY=$(echo "$HTTP_RESPONSE" | sed -e '$d')
+            HTTP_STATUS=$(echo "$HTTP_RESPONSE" | tail -n1 | sed -e 's/HTTP_STATUS://')
+
+            echo "    [HTTP Status] : $HTTP_STATUS"
+            echo "    [Response]    : $HTTP_BODY"
+
+            if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+              echo "    ✓ SUKSES: Coolify telah menerima sinyal deploy!"
+              SUCCESS_COUNT=$((SUCCESS_COUNT+1))
+            elif [ "$HTTP_STATUS" -eq 401 ]; then
+              echo "    ❌ ERROR 401 (Unauthenticated): Coolify membutuhkan API Token."
+              echo "       Cara mengatasi: Buka Coolify -> Keys & Tokens -> API Tokens, buat token baru,"
+              echo "       lalu masukkan ke GitHub Repository Secrets dengan nama 'COOLIFY_TOKEN'."
+            else
+              echo "    ⚠ PERINGATAN: Coolify merespons dengan HTTP $HTTP_STATUS"
             fi
           done
-          if [ -z "$COOLIFY_BACKEND_URL" ]; then
-            echo "::warning title=COOLIFY_BACKEND_WEBHOOK_URL Not Found::Secret COOLIFY_BACKEND_WEBHOOK_URL belum diset di GitHub Secrets. Jika backend dan web terpisah di Coolify, pastikan menambahkan secret webhook backend di GitHub agar backend ter-deploy otomatis."
+
+          if [ "$SUCCESS_COUNT" -eq 0 ]; then
+            echo ""
+            echo "=========================================================="
+            echo "❌ Peringatan: Tidak ada webhook Coolify yang berhasil dipicu!"
+            echo "   Pastikan Webhook URL benar dan COOLIFY_TOKEN sudah ditambahkan."
+            echo "=========================================================="
           fi

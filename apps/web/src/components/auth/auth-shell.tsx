@@ -24,7 +24,7 @@ export function AuthShell({
             <Building2 className="h-6 w-6" />
           </div>
           <div>
-            <p className="text-lg font-bold leading-tight">Chatbot Manager</p>
+            <p className="text-lg font-bold leading-tight">ZAF Sales</p>
             <p className="text-xs text-emerald-100/80">AI Assistant · WhatsApp Waha</p>
           </div>
         </div>
@@ -45,7 +45,7 @@ export function AuthShell({
         </div>
 
         <p className="relative z-10 text-xs text-emerald-100/70">
-          © {new Date().getFullYear()} Chatbot Manager. Ditenagai oleh Waha WhatsApp API.
+          © {new Date().getFullYear()} ZAF Sales. Ditenagai oleh Waha WhatsApp API.
         </p>
       </div>
 
@@ -56,7 +56,7 @@ export function AuthShell({
             <Building2 className="h-5 w-5" />
           </div>
           <div>
-            <p className="font-bold">Chatbot Manager</p>
+            <p className="font-bold">ZAF Sales</p>
             <p className="text-xs text-muted-foreground">AI Assistant untuk WhatsApp</p>
           </div>
         </div>

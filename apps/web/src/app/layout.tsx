@@ -15,15 +15,15 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Chatbot Manager — Kelola AI Asisten WhatsApp",
+  title: "ZAF Sales — Kelola AI Asisten WhatsApp",
   description: "Dasbor pusat untuk mengelola chatbot AI dan operasional WhatsApp Anda.",
   keywords: ["properti", "AI agent", "WhatsApp", "Waha", "chatbot", "CRM", "real estate", "Indonesia"],
-  authors: [{ name: "Chatbot Manager" }],
+  authors: [{ name: "ZAF Sales" }],
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Chatbot Manager",
+    title: "ZAF Sales",
   },
   formatDetection: {
     telephone: false,

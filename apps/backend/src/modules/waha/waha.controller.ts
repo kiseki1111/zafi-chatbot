@@ -591,18 +591,38 @@ export class WahaController {
           });
           let contactId;
           const defaultAnonName = 'Anonim';
+          const isValidPushName = Boolean(
+            contactName &&
+            contactName.trim() !== '' &&
+            contactName.trim().toLowerCase() !== 'anonim' &&
+            !contactName.startsWith('+') &&
+            contactName !== contactNumber,
+          );
+
           if (contact) {
+            const existingMeta = (contact.metadata as Record<string, any>) || {};
+            const hasSelfDeclared = Boolean(existingMeta.selfDeclaredName);
             const hasRealName =
               contact.name &&
               contact.name !== 'Anonim' &&
               !contact.name.startsWith('+') &&
               contact.name !== contact.phone &&
               contact.name !== 'Pelanggan Baru';
+
+            const updatedMeta = {
+              ...existingMeta,
+              ...(contactName ? { profileName: contactName } : {}),
+            };
+
+            // Nama dari nomor (pushname) hanya mengisi jika belum ada nama yang dinyatakan sendiri
+            const shouldApplyProfileName = !hasSelfDeclared && (!hasRealName || contact.name === defaultAnonName);
+
             await this.prisma.contact.update({
               where: { id: contact.id },
               data: {
                 phone: contactNumber,
-                ...(!hasRealName && { name: contactName || contact.name || defaultAnonName }),
+                ...(shouldApplyProfileName && isValidPushName ? { name: contactName } : {}),
+                metadata: updatedMeta,
               },
             });
             contactId = contact.id;
@@ -610,7 +630,10 @@ export class WahaController {
             const newContact = await this.prisma.contact.create({
               data: {
                 phone: contactNumber,
-                name: contactName || defaultAnonName,
+                name: isValidPushName ? contactName : defaultAnonName,
+                metadata: {
+                  ...(contactName ? { profileName: contactName, nameSource: isValidPushName ? 'profile' : 'none' } : {}),
+                },
               },
             });
             contactId = newContact.id;

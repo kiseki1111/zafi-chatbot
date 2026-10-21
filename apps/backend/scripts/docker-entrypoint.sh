@@ -1,8 +1,17 @@
 #!/bin/sh
 set -e
 
+BUILD_DATE="Unknown"
+if [ -f "build_info.txt" ]; then
+  BUILD_DATE=$(cat build_info.txt)
+fi
+
 echo "=========================================================="
-echo " [Zafi Backend Startup] Memulai inisialisasi container..."
+echo " [ZAFI BACKEND] CONTAINER INITIALIZATION"
+echo " Image Build Time : $BUILD_DATE"
+echo " Node Version     : $(node -v)"
+echo " Environment      : ${NODE_ENV:-development}"
+echo " Database Host    : ${DATABASE_URL%%@*}@..."
 echo "=========================================================="
 
 SCHEMA_PATH="src/core/prisma/schema.prisma"

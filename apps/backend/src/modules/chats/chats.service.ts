@@ -66,8 +66,64 @@ export class ChatsService {
         .replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, '')
         .replace(/^\+/, '');
 
-      // Tampilkan nomor telepon sebagai nama kontak (mirip WhatsApp web resmi saat kontak belum disimpan di buku telepon)
-      const displayName = cleanPhone ? `+${cleanPhone}` : c.contact?.name || 'Pelanggan';
+      const contactMeta = (c.contact?.metadata as Record<string, any>) || {};
+
+      // Settingan nama di nomornya (WhatsApp profile pushname / notifyName)
+      let profileName = contactMeta.profileName || contactMeta.pushName || null;
+      if (!profileName) {
+        for (const msg of c.messages || []) {
+          const meta = msg.metadata as any;
+          const notify = meta?._data?.notifyName || meta?.sender?.pushname;
+          if (
+            notify &&
+            typeof notify === 'string' &&
+            notify.trim() &&
+            notify.trim().toLowerCase() !== 'anonim' &&
+            !notify.startsWith('+') &&
+            notify !== cleanPhone
+          ) {
+            profileName = notify.trim();
+            break;
+          }
+        }
+      }
+
+      const selfDeclared = contactMeta.selfDeclaredName;
+      const contactName = c.contact?.name;
+
+      const isUnidentified = (name?: string | null): boolean => {
+        if (!name) return true;
+        const trimmed = name.trim();
+        return (
+          trimmed === '' ||
+          trimmed.toLowerCase() === 'anonim' ||
+          trimmed.toLowerCase() === 'pelanggan baru' ||
+          trimmed.toLowerCase() === 'pelanggan simulator' ||
+          trimmed === cleanPhone ||
+          trimmed === `+${cleanPhone}` ||
+          trimmed === c.contact?.phone ||
+          /^\+?\d{8,16}$/.test(trimmed)
+        );
+      };
+
+      let displayName: string;
+
+      // 1. Prioritas Tertinggi: Nama yang dinyatakan sendiri oleh pelanggan (Self-declared)
+      if (selfDeclared && !isUnidentified(selfDeclared)) {
+        displayName = selfDeclared;
+      }
+      // 2. Prioritas Kedua: Nama kontak teridentifikasi yang tersimpan di database CRM
+      else if (contactName && !isUnidentified(contactName)) {
+        displayName = contactName;
+      }
+      // 3. Prioritas Ketiga: Settingan nama di nomornya (WhatsApp profile pushname / notifyName)
+      else if (profileName && !isUnidentified(profileName)) {
+        displayName = profileName;
+      }
+      // 4. Paling bawah: Jika tidak teridentifikasi atau Anonim -> tetap tampilkan nomor telepon
+      else {
+        displayName = cleanPhone ? `+${cleanPhone}` : (c.contact?.phone ? `+${c.contact.phone.replace(/^\+/, '')}` : 'Pelanggan');
+      }
 
       return {
         ...c,

@@ -22,7 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { checkWahaMediaLink } from "@/lib/waha-link-validator";
 import { cn } from "@/lib/utils";
-import type { ResourceGroup, ResourceItem, ResourceStatus, PropertyType, PricingTemplate } from "@/lib/types";
+import type { ResourceGroup, ResourceItem, ResourceStatus, PropertyType, PricingTemplate, SiteplanPricingConfig } from "@/lib/types";
 
 /**
  * Membersihkan format harga (menerima "3500000", "3.500.000", maupun "Rp 3.500.000") menjadi angka murni

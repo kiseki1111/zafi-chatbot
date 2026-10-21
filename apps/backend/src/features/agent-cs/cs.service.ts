@@ -498,7 +498,7 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
       });
 
       const existingMeta = (contact?.metadata as Record<string, any>) || {};
-      const updatedMeta = {
+      const updatedMeta: Record<string, any> = {
         ...existingMeta,
         ...(lead.perumahan ? { perumahan: lead.perumahan } : {}),
         ...(lead.tipeUnit ? { tipeUnit: lead.tipeUnit } : {}),
@@ -507,9 +507,19 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
 
       if (!contact) {
         if (!cleanPhone) return;
-        const initialName = (lead.customerName && lead.customerName !== 'Anonim')
-          ? lead.customerName
-          : 'Anonim';
+        const hasDeclared = Boolean(
+          lead.customerName &&
+          typeof lead.customerName === 'string' &&
+          lead.customerName.trim() !== '' &&
+          lead.customerName.toLowerCase() !== 'anonim' &&
+          !lead.customerName.startsWith('+') &&
+          lead.customerName !== cleanPhone,
+        );
+        if (hasDeclared) {
+          updatedMeta.selfDeclaredName = lead.customerName.trim();
+          updatedMeta.nameSource = 'self_declared';
+        }
+        const initialName = hasDeclared ? lead.customerName.trim() : 'Anonim';
         contact = await this.prisma.contact.create({
           data: {
             phone: cleanPhone,
@@ -519,6 +529,26 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
             metadata: updatedMeta,
           },
         });
+
+        if (sessionName && sessionName !== 'unknown' && sessionName !== 'unknown-session') {
+          await this.prisma.conversation
+            .upsert({
+              where: {
+                instanceName_contactId: {
+                  instanceName: sessionName,
+                  contactId: contact.id,
+                },
+              },
+              update: {},
+              create: {
+                instanceName: sessionName,
+                contactId: contact.id,
+                status: 'OPEN',
+              },
+            })
+            .catch(() => null);
+        }
+
         this.logger.log(
           `[CS-LEAD] Kontak prospek baru otomatis terdata: ${contact.name} (${contact.phone})`,
         );
@@ -536,23 +566,25 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
         }
       }
 
-      const isCurrentlyAnon =
-        !contact.name ||
-        contact.name === 'Anonim' ||
-        contact.name === contact.phone ||
-        contact.name.startsWith('+') ||
-        contact.name === 'Pelanggan Baru' ||
-        contact.name === 'Pelanggan Simulator';
-
-      const shouldUpdateName =
+      // Customer menyatakan sendiri namanya di percakapan (prioritas tertinggi dalam hierarki)
+      const hasSelfDeclaredName = Boolean(
         lead.customerName &&
-        lead.customerName !== 'Anonim' &&
-        isCurrentlyAnon;
+        typeof lead.customerName === 'string' &&
+        lead.customerName.trim() !== '' &&
+        lead.customerName.toLowerCase() !== 'anonim' &&
+        !lead.customerName.startsWith('+') &&
+        lead.customerName !== cleanPhone,
+      );
+
+      if (hasSelfDeclaredName) {
+        updatedMeta.selfDeclaredName = lead.customerName.trim();
+        updatedMeta.nameSource = 'self_declared';
+      }
 
       await this.prisma.contact.update({
         where: { id: contact.id },
         data: {
-          ...(shouldUpdateName && { name: lead.customerName }),
+          ...(hasSelfDeclaredName && { name: lead.customerName.trim() }),
           ...(lead.status && { status: lead.status }),
           ...(combinedNotes && { notes: combinedNotes }),
           metadata: updatedMeta,

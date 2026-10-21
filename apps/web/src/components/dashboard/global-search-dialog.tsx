@@ -291,6 +291,43 @@ export function GlobalSearchDialog({ open, onClose }: GlobalSearchDialogProps) {
     return [...nav, ...results];
   }, [navMatches, categories]);
 
+  // ─── Actions ─────────────────────────────────────────────────────────────
+  const handleNavSelect = React.useCallback(
+    (cmd: (typeof NAV_COMMANDS)[0]) => {
+      setView(cmd.view as any);
+      pushHistory(q || cmd.label);
+      onClose();
+    },
+    [setView, pushHistory, q, onClose],
+  );
+
+  const handleResultSelect = React.useCallback(
+    (item: SearchResultItem) => {
+      pushHistory(q);
+      switch (item.category) {
+        case "contact":
+          setView("crm");
+          break;
+        case "message":
+          if (item.meta?.contactId) setActiveContactId(item.meta.contactId);
+          if (item.meta?.instanceName) setActiveSessionId(item.meta.instanceName);
+          setView("chatbot");
+          break;
+        case "unit":
+          setView("availability");
+          break;
+        case "knowledge":
+          setView("knowledge");
+          break;
+        case "product":
+          setView("overview");
+          break;
+      }
+      onClose();
+    },
+    [pushHistory, q, setView, setActiveContactId, setActiveSessionId, onClose],
+  );
+
   // Keyboard navigation
   React.useEffect(() => {
     if (!open) return;
@@ -319,38 +356,7 @@ export function GlobalSearchDialog({ open, onClose }: GlobalSearchDialogProps) {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [open, flatItems, selectedIdx]);
-
-  // ─── Actions ─────────────────────────────────────────────────────────────
-  const handleNavSelect = (cmd: (typeof NAV_COMMANDS)[0]) => {
-    setView(cmd.view as any);
-    pushHistory(q || cmd.label);
-    onClose();
-  };
-
-  const handleResultSelect = (item: SearchResultItem) => {
-    pushHistory(q);
-    switch (item.category) {
-      case "contact":
-        setView("crm");
-        break;
-      case "message":
-        if (item.meta?.contactId) setActiveContactId(item.meta.contactId);
-        if (item.meta?.instanceName) setActiveSessionId(item.meta.instanceName);
-        setView("chatbot");
-        break;
-      case "unit":
-        setView("availability");
-        break;
-      case "knowledge":
-        setView("knowledge");
-        break;
-      case "product":
-        setView("overview");
-        break;
-    }
-    onClose();
-  };
+  }, [open, flatItems, selectedIdx, q, handleNavSelect, handleResultSelect, pushHistory]);
 
   const handleHistoryClick = (entry: HistoryEntry) => {
     setQ(entry.q);

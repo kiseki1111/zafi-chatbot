@@ -60,7 +60,7 @@ export function Sidebar() {
           <Building2 className="h-5 w-5" />
         </div>
         <div className="min-w-0">
-          <p className="font-bold text-sm leading-tight truncate">Chatbot Manager</p>
+          <p className="font-bold text-sm leading-tight truncate">ZAF Sales</p>
           <p className="text-[10px] text-muted-foreground truncate">Asisten AI WhatsApp</p>
         </div>
         <Button

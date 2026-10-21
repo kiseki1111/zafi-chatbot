@@ -115,8 +115,10 @@ function tagClass(tag: string): string {
 }
 
 function initials(name: string): string {
+  if (!name || name.startsWith("+") || /^\d+$/.test(name.replace(/\D/g, "") && name)) return "+";
   return name
     .split(" ")
+    .filter(Boolean)
     .map((s) => s[0])
     .slice(0, 2)
     .join("")
@@ -336,11 +338,6 @@ function ContactListItem({
               <span className="text-[10px] text-muted-foreground">
                 {contact.lastMessageAt}
               </span>
-              {(contact.unread ?? 0) > 0 && (
-                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">
-                  {contact.unread}
-                </span>
-              )}
             </div>
           </div>
           <p className="text-xs text-muted-foreground truncate mt-0.5">
@@ -706,10 +703,24 @@ export function ChatbotPage() {
         return;
       }
       const mappedContacts: Contact[] = chatsData.map((c: any) => {
-        const cleanPhone = (c.contactNumber || "")
+        const cleanPhone = (c.contactNumber || c.contact?.phone || "")
           .replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, "")
           .replace(/^\+/, "");
-        const cleanName = cleanPhone ? `+${cleanPhone}` : (c.contactName || "Pelanggan");
+
+        const rawName = c.contactName || c.contact?.name || "";
+        const trimmed = typeof rawName === "string" ? rawName.trim() : "";
+        const isIdentified =
+          trimmed !== "" &&
+          trimmed.toLowerCase() !== "anonim" &&
+          trimmed.toLowerCase() !== "pelanggan baru" &&
+          trimmed.toLowerCase() !== "pelanggan simulator" &&
+          trimmed !== cleanPhone &&
+          trimmed !== `+${cleanPhone}` &&
+          !/^\+?\d{8,16}$/.test(trimmed);
+
+        const cleanName = isIdentified
+          ? trimmed
+          : (cleanPhone ? `+${cleanPhone}` : "Pelanggan");
         return {
           id: c.id,
           name: cleanName,

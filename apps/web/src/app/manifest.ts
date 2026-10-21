@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Chatbot Manager",
-    short_name: "Chatbot AI",
+    name: "ZAF Sales",
+    short_name: "ZAF Sales",
     description: "Dasbor pusat untuk mengelola chatbot AI dan operasional WhatsApp Anda.",
     start_url: "/",
     display: "standalone",

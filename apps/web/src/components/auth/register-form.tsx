@@ -31,7 +31,7 @@ export function RegisterForm() {
     if (!res.ok) {
       toast({ title: "Pendaftaran gagal", description: res.message, variant: "destructive" });
     } else {
-      toast({ title: "Akun dibuat!", description: "Selamat datang di Chatbot Manager." });
+      toast({ title: "Akun dibuat!", description: "Selamat datang di ZAF Sales." });
       useAppStore.getState().setView("overview");
     }
   };
@@ -92,7 +92,7 @@ export function RegisterForm() {
           <input id="terms" type="checkbox" className="h-4 w-4 mt-0.5 rounded border-input accent-emerald-600" required />
           <Label htmlFor="terms" className="text-xs font-normal cursor-pointer leading-relaxed text-muted-foreground">
             Saya menyetujui <span className="text-emerald-600 hover:underline cursor-pointer">Syarat & Ketentuan</span> dan{" "}
-            <span className="text-emerald-600 hover:underline cursor-pointer">Kebijakan Privasi</span> Chatbot Manager.
+            <span className="text-emerald-600 hover:underline cursor-pointer">Kebijakan Privasi</span> ZAF Sales.
           </Label>
         </div>
 
