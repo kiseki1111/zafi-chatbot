@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Menu, Bell, Sun, Moon, LogOut, User as UserIcon,
-  Settings as SettingsIcon, ChevronDown, AlertTriangle, QrCode, X, Download, Building2, Search,
+  Settings as SettingsIcon, ChevronDown, AlertTriangle, QrCode, X, Download, Search,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { useAppStore } from "@/lib/app-store";
@@ -112,12 +112,16 @@ export function Topbar() {
       <div className="flex items-center justify-between lg:justify-start gap-3 h-full px-4 lg:px-6">
         {/* Compact Mobile Brand (No hamburger clutter) */}
         <div className="flex items-center gap-2">
-          <div className="grid place-items-center h-8 w-8 rounded-lg bg-emerald-600 text-white shadow-xs shrink-0">
-            <Building2 className="h-4.5 w-4.5" />
+          <div className="relative h-8 w-8 rounded-lg overflow-hidden bg-white/95 dark:bg-card p-0.5 border border-border/40 shadow-xs shrink-0">
+            <img
+              src="/logo.png"
+              alt="ZAF Sales"
+              className="h-full w-full object-contain"
+            />
           </div>
           <div className="min-w-0">
             <span className="font-bold text-sm tracking-tight text-foreground truncate block leading-tight">
-              {user.tenantId ? "Zafi AI" : "Chatbot AI"}
+              ZAF Sales
             </span>
             <span className="text-[10px] text-muted-foreground block lg:hidden leading-none">
               PWA Mobile

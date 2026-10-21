@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Building2, LogOut, ChevronLeft } from "lucide-react";
+import { LogOut, ChevronLeft } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { useAppStore } from "@/lib/app-store";
 import { menuForRole, ROLE_LABELS, ROLE_THEME } from "@/lib/rbac";
@@ -56,8 +56,12 @@ export function Sidebar() {
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       {/* Brand */}
       <div className="flex items-center gap-2.5 px-5 h-16 border-b border-sidebar-border shrink-0">
-        <div className="grid place-items-center h-9 w-9 rounded-lg bg-emerald-600 text-white shadow-sm shrink-0">
-          <Building2 className="h-5 w-5" />
+        <div className="relative h-9 w-9 rounded-lg overflow-hidden bg-white/95 dark:bg-card p-0.5 border border-border/40 shadow-xs shrink-0">
+          <img
+            src="/logo.png"
+            alt="ZAF Sales"
+            className="h-full w-full object-contain"
+          />
         </div>
         <div className="min-w-0">
           <p className="font-bold text-sm leading-tight truncate">ZAF Sales</p>

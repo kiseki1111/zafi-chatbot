@@ -345,7 +345,12 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
           lower.includes('youtube.com') ||
           lower.includes('youtu.be') ||
           lower.includes('facebook.com') ||
-          lower.includes('fb.watch')
+          lower.includes('fb.watch') ||
+          lower.includes('drive.google.com') ||
+          lower.includes('dropbox.com') ||
+          lower.includes('threads.net') ||
+          lower.includes('twitter.com') ||
+          lower.includes('x.com')
         ) {
           return true;
         }
@@ -404,12 +409,15 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
         }
       }
 
-      // Strict guard: hanya sertakan video jika pesan user secara eksplisit meminta video
-      const userAskedVideo = /\b(video|vidio|rekaman|virtual tour|vt)\b/i.test(text);
+      // Chaos Resilience Guard:
+      // Tautan sosial media / web (Reels, TikTok, YouTube, Drive, dll.) SELALU dipindahkan ke teks link preview
+      // agar WhatsApp menampilkan kartu link yang dapat diklik, dan WAHA tidak crash saat mencoba unduh file biner.
+      // File biner (.mp4 lokal/eksternal) HANYA dikirimkan di array aiVideos jika pengguna menanyakan video.
+      const userAskedVideo = /\b(video|vidio|rekaman|virtual tour|vt|reels?|ig|instagram|tiktok|youtube|yt|short|shorts|film|tonton|lihat|link)\b/i.test(text);
       const aiVideos: { url: string; caption: string }[] = [];
       const extractedWebVideos: { url: string; caption: string }[] = [];
 
-      if (userAskedVideo && Array.isArray(parsed.videos)) {
+      if (Array.isArray(parsed.videos)) {
         for (const vid of parsed.videos) {
           if (!vid || !vid.url || vid.url.includes('example.com')) continue;
           if (!isKnownInActiveDatabase(vid.url)) {
@@ -420,7 +428,7 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
           }
           if (isSocialOrWebLink(vid.url)) {
             extractedWebVideos.push(vid);
-          } else {
+          } else if (userAskedVideo) {
             aiVideos.push(vid);
           }
         }

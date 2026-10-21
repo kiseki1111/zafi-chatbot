@@ -6,7 +6,7 @@
 export interface WahaLinkStatus {
   isValid: boolean;
   statusText: string;
-  badgeVariant: "success" | "warning" | "destructive";
+  badgeVariant: "success" | "warning" | "destructive" | "secondary";
   description: string;
 }
 
@@ -84,6 +84,28 @@ export function checkWahaMediaLink(url?: string | null): WahaLinkStatus {
         badgeVariant: "destructive",
         description:
           "Hanya protokol HTTP/HTTPS yang didukung oleh WhatsApp gateway.",
+      };
+    }
+
+    const isSocialOrWeb =
+      host.includes("instagram.com") ||
+      host.includes("instagr.am") ||
+      host.includes("tiktok.com") ||
+      host.includes("youtube.com") ||
+      host.includes("youtu.be") ||
+      host.includes("facebook.com") ||
+      host.includes("fb.watch") ||
+      host.includes("drive.google.com") ||
+      host.includes("dropbox.com") ||
+      !/\.(jpg|jpeg|png|webp|gif|bmp|mp4|mov|webm|pdf|doc|docx|xls|xlsx|txt)($|\?)/i.test(clean);
+
+    if (isSocialOrWeb) {
+      return {
+        isValid: true,
+        statusText: "Tautan Sosial Media (Preview Teks)",
+        badgeVariant: "secondary",
+        description:
+          "Tautan sosial media/web akan otomatis dikirim sebagai pesan teks dengan rich preview oleh WhatsApp (bukan file biner download).",
       };
     }
 

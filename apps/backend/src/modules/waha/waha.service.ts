@@ -517,7 +517,10 @@ export class WahaService implements OnApplicationBootstrap {
       lower.includes('youtube.com') ||
       lower.includes('youtu.be') ||
       lower.includes('facebook.com') ||
-      lower.includes('fb.watch')
+      lower.includes('fb.watch') ||
+      lower.includes('threads.net') ||
+      lower.includes('twitter.com') ||
+      lower.includes('x.com')
     );
   }
 
