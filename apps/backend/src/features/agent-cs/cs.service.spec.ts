@@ -443,5 +443,65 @@ describe('CsService', () => {
         true,
       );
     });
+
+    it('harus menggunakan dynamic safety net jika LLM mengembalikan text kosong saat request foto', async () => {
+      mockAgentShared.getRecentContext.mockResolvedValue([]);
+      mockPrisma.whatsappInstance.findUnique.mockResolvedValue({
+        instanceName: 'wa-rindang',
+        tenantId: 'tenant-rindang',
+        tenant: {
+          id: 'tenant-rindang',
+          name: 'Rindang Property',
+          phone: '08123456789',
+        },
+      });
+      mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue('');
+      mockAgentShared.getAvailabilityContext.mockResolvedValue(null);
+
+      // LLM mengembalikan text kosong dan images kosong
+      mockAgentShared.callLLM.mockResolvedValue(
+        JSON.stringify({
+          text: '',
+          images: [],
+          videos: [],
+        }),
+      );
+
+      const response = await service.handleMessage({
+        senderId: '6285820404344@c.us',
+        sessionName: 'wa-rindang',
+        text: 'foto lokasi lapangan',
+      });
+
+      expect(response.text.length).toBeGreaterThan(0);
+      expect(response.text).toContain('Rindang Property');
+      expect(response.text).toContain('foto');
+      expect(response.text).toContain('08123456789');
+    });
+
+    it('harus menangkap teks jika LLM menamai key balasan dengan message atau response', async () => {
+      mockAgentShared.getRecentContext.mockResolvedValue([]);
+      mockPrisma.whatsappInstance.findUnique.mockResolvedValue({
+        instanceName: 'wa-rindang',
+        tenantId: 'tenant-rindang',
+      });
+      mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue('');
+      mockAgentShared.getAvailabilityContext.mockResolvedValue(null);
+
+      mockAgentShared.callLLM.mockResolvedValue(
+        JSON.stringify({
+          message: 'Halo Kak, ada yang bisa kami bantu seputar unit kami?',
+          images: [],
+        }),
+      );
+
+      const response = await service.handleMessage({
+        senderId: '6285820404344@c.us',
+        sessionName: 'wa-rindang',
+        text: 'halo',
+      });
+
+      expect(response.text).toBe('Halo Kak, ada yang bisa kami bantu seputar unit kami?');
+    });
   });
 });

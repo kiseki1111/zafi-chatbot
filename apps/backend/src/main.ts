@@ -87,6 +87,9 @@ async function bootstrap() {
   app.useGlobalInterceptors(new TransformInterceptor());
   app.useGlobalFilters(new HttpExceptionFilter());
 
+  // ponytail: enable shutdown hooks so SIGTERM/SIGINT lets in-flight AI and queue tasks drain gracefully
+  app.enableShutdownHooks();
+
   const port = process.env.PORT || 3030;
   const server = await app.listen(port, '0.0.0.0');
   if (server) {

@@ -24,31 +24,37 @@ fi
 echo "==> Menggunakan Prisma Schema di: $SCHEMA_PATH"
 
 # 1. Retry loop untuk menghubungkan ke database dan push schema (tabel & kolom baru otomatis dibuat)
-MAX_RETRIES=10
-RETRY_COUNT=0
-DB_SUCCESS=false
+if [ "$SKIP_DB_PUSH" = "true" ]; then
+  echo "==> [Info] SKIP_DB_PUSH=true, melewati prisma db push untuk mempercepat boot time."
+else
+  MAX_RETRIES=3
+  RETRY_COUNT=0
+  DB_SUCCESS=false
 
-echo "==> Menyinkronkan struktur database (prisma db push)..."
-until [ $RETRY_COUNT -ge $MAX_RETRIES ]
-do
-  if npx prisma db push --accept-data-loss --schema="$SCHEMA_PATH"; then
-    echo "==> [Sukses] Database berhasil disinkronkan dengan schema terbaru!"
-    DB_SUCCESS=true
-    break
-  else
-    RETRY_COUNT=$((RETRY_COUNT+1))
-    echo "==> [Peringatan] Gagal sinkronisasi DB (Percobaan $RETRY_COUNT/$MAX_RETRIES). Menunggu 3 detik..."
-    sleep 3
+  echo "==> Menyinkronkan struktur database (prisma db push)..."
+  until [ $RETRY_COUNT -ge $MAX_RETRIES ]
+  do
+    if npx prisma db push --accept-data-loss --schema="$SCHEMA_PATH"; then
+      echo "==> [Sukses] Database berhasil disinkronkan dengan schema terbaru!"
+      DB_SUCCESS=true
+      break
+    else
+      RETRY_COUNT=$((RETRY_COUNT+1))
+      echo "==> [Peringatan] Gagal sinkronisasi DB (Percobaan $RETRY_COUNT/$MAX_RETRIES). Menunggu 1 detik..."
+      sleep 1
+    fi
+  done
+
+  if [ "$DB_SUCCESS" = false ]; then
+    echo "==> [Warning] prisma db push belum berhasil setelah $MAX_RETRIES percobaan. Aplikasi tetap melanjutkan boot..."
   fi
-done
-
-if [ "$DB_SUCCESS" = false ]; then
-  echo "==> [Warning] prisma db push belum berhasil setelah $MAX_RETRIES percobaan. Aplikasi tetap melanjutkan boot..."
 fi
 
-# 2. Pastikan Prisma Client selalu di-generate ulang dengan schema termutakhir
-echo "==> Memverifikasi dan meng-generate Prisma Client mutakhir..."
-npx prisma generate --schema="$SCHEMA_PATH" || echo "[Warning] prisma generate selesai dengan catatan."
+# 2. Generate Prisma Client hanya jika belum ada di image (menghemat 5-8 detik saat reboot)
+if [ ! -d "node_modules/.prisma/client" ] && [ ! -d "apps/backend/node_modules/.prisma/client" ]; then
+  echo "==> Prisma Client belum terdeteksi, meng-generate..."
+  npx prisma generate --schema="$SCHEMA_PATH" || echo "[Warning] prisma generate selesai dengan catatan."
+fi
 
 # 3. Sinkronisasikan folder .prisma client ke node_modules root
 if [ -d "apps/backend/node_modules/.prisma" ]; then

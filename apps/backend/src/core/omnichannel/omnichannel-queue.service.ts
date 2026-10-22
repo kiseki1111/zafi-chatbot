@@ -1,10 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BeforeApplicationShutdown,
+} from '@nestjs/common';
 import { IncomingMessage } from './interfaces/incoming-message.interface';
 import { CsService } from '../../features/agent-cs/cs.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
-export class OmnichannelQueueService {
+export class OmnichannelQueueService implements BeforeApplicationShutdown {
   private readonly logger = new Logger(OmnichannelQueueService.name);
 
   // Buffer debounce per nomor pelanggan per chatbot (10 detik untuk menggabungkan chat beruntun & hindari deteksi bot)
@@ -27,6 +31,19 @@ export class OmnichannelQueueService {
     private readonly csService: CsService,
     private readonly prisma: PrismaService,
   ) {}
+
+  // ponytail: flush all pending debounce buffers on graceful shutdown to prevent message drop in RAM
+  async beforeApplicationShutdown(signal?: string) {
+    this.logger.log(
+      `[Omnichannel] Menerima sinyal shutdown (${signal}), melakukan flush ${this.messageBuffer.size} buffer pesan...`,
+    );
+    for (const [customerKey, item] of Array.from(this.messageBuffer.entries())) {
+      clearTimeout(item.timer);
+      const botKey =
+        item.message.sessionName || item.message.provider || 'default_bot';
+      this.flushCustomerBuffer(customerKey, botKey);
+    }
+  }
 
   enqueue(message: IncomingMessage) {
     const { senderId, text, sessionName, provider } = message;

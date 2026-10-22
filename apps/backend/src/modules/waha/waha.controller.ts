@@ -14,6 +14,7 @@ import {
   Headers,
   Optional,
   UseGuards,
+  OnApplicationBootstrap,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SkipThrottle } from '@nestjs/throttler';
@@ -29,7 +30,7 @@ import { Public } from '../../common/decorators/public.decorator';
 
 @UseGuards(JwtAuthGuard)
 @Controller('api/v1/waha')
-export class WahaController {
+export class WahaController implements OnApplicationBootstrap {
   private readonly logger = new Logger(WahaController.name);
 
   // Queue for CLI Mock output
@@ -41,6 +42,88 @@ export class WahaController {
     private readonly omnichannelQueue: OmnichannelQueueService,
     @Optional() private readonly configService?: ConfigService,
   ) {}
+
+  async onApplicationBootstrap() {
+    if (process.env.NODE_ENV === 'test') return;
+    // ponytail: recover customer messages from the last 5 minutes that had no bot reply (due to container restart)
+    setTimeout(() => {
+      this.recoverUnrepliedMessages().catch((e) =>
+        this.logger.warn(
+          `[Waha Startup Recovery] Gagal recover pesan tertinggal: ${e.message}`,
+        ),
+      );
+    }, 3000);
+  }
+
+  private async recoverUnrepliedMessages() {
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const unrepliedConversations = await this.prisma.conversation.findMany({
+      where: {
+        mode: 'bot',
+        instanceName: { not: 'CLI_TEST_SESSION' },
+        lastMessageAt: { gte: fiveMinutesAgo },
+      },
+      include: {
+        contact: true,
+        messages: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    for (const conv of unrepliedConversations) {
+      const lastMsg = conv.messages[0];
+      if (lastMsg && lastMsg.senderType === 'customer' && conv.contact?.phone) {
+        this.logger.log(
+          `[Waha Startup Recovery] Memulihkan chat customer belum terbalas di sesi ${conv.instanceName} (${conv.contact.phone}): "${lastMsg.content}"`,
+        );
+
+        const targetSender = conv.contact.phone.includes('@')
+          ? conv.contact.phone
+          : `${conv.contact.phone}@c.us`;
+
+        const incomingMessage: IncomingMessage = {
+          senderId: targetSender,
+          text: lastMsg.content,
+          provider: 'WAHA',
+          sessionName: conv.instanceName,
+          replyCallback: async (reply) => {
+            if (reply.text && reply.text.length > 0) {
+              await this.wahaService.sendMessage(
+                conv.instanceName,
+                targetSender,
+                reply.text,
+              );
+              const botMsg = await this.prisma.message.create({
+                data: {
+                  conversationId: conv.id,
+                  senderType: 'bot',
+                  messageType: 'text',
+                  content: reply.text,
+                  status: 'SENT',
+                },
+              });
+              await this.prisma.conversation.update({
+                where: { id: conv.id },
+                data: { lastMessageAt: new Date() },
+              });
+              ChatStreamService.getInstance()?.emit({
+                type: 'message',
+                data: {
+                  conversationId: conv.id,
+                  instanceName: conv.instanceName,
+                  message: botMsg,
+                },
+              });
+            }
+          },
+        };
+
+        this.omnichannelQueue.enqueue(incomingMessage);
+      }
+    }
+  }
 
   @Post('instances')
   async createInstance(

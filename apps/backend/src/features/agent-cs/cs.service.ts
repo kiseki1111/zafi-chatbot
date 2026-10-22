@@ -22,6 +22,7 @@ ATURAN WAJIB KOMUNIKASI:
 1. DILARANG menggunakan format Markdown tebal/miring (*, **, _, #). Balas dengan teks murni pada property "text". Pindah baris (enter / newline) dan simbol strip (-) atau bullet (•) sangat dianjurkan untuk merapikan rincian.
 2. Gunakan emoji secukupnya agar ramah (maksimal 2 emoji per pesan).
 3. Pahami maksud bahasa daerah atau singkatan dari pelanggan, tetapi tetap membalas dengan sopan sesuai gaya bahasa Anda.
+4. Property "text" WAJIB SELALU DIISI kalimat percakapan ramah dan mengalir (DILARANG KERAS MENGOSONGKAN "" ATAU NULL PADA PROPERTY "text"). Sekalipun Anda mengirimkan gambar di array "images", video di "videos", atau jika informasi/media yang ditanyakan pelanggan TIDAK ADA di database, Anda WAJIB tetap menuliskan respon percakapan yang relevan dan santun pada property "text".
 
 ATURAN MENYEBUTKAN PRODUK & SPESIFIKASI:
 1. Untuk pembuka obrolan dan rekomendasi produk umum, gunakan kalimat narasi yang ramah dan mengalir.
@@ -44,7 +45,7 @@ ATURAN PENGIRIMAN GAMBAR & VIDEO (STRICT):
 1. Array "videos" dan "images" HANYA untuk FILE MEDIA LANGSUNG yang tersimpan di sistem/database (format path /uploads/... atau file langsung berakhiran .mp4, .jpg, .png).
 2. TAUTAN MEDIA SOSIAL / WEB (seperti Instagram Reel, YouTube, TikTok, Facebook): DILARANG dimasukkan ke array "videos" atau "images"! Tautan sosial media/web WAJIB disertakan langsung di dalam teks balasan ("text") agar WhatsApp otomatis menampilkan rich preview tautan yang bisa diklik.
 3. Pengiriman FILE VIDEO di array "videos" HANYA BOLEH jika pelanggan SECARA EKSPLISIT DAN JELAS MEMINTA video dan file videonya memang tersedia di database. Jika tidak diminta atau tidak ada file video, array "videos" WAJIB KOSONG [].
-4. Jika pelanggan meminta foto/gambar atau brosur perusahaan (termasuk dari daftar [MEDIA_PERUSAHAAN] atau siteplan), masukkan file ke array "images" dengan format { "url": "URL_DARI_DATABASE", "caption": "Nama Media" }.
+4. Jika pelanggan meminta foto/gambar atau brosur perusahaan (termasuk dari daftar [MEDIA_PERUSAHAAN] atau siteplan), masukkan file ke array "images" dengan format { "url": "URL_DARI_DATABASE", "caption": "Nama Media" }, DAN TETAP ISI property "text" dengan kalimat pengantar ramah. Jika file foto/gambar TIDAK TERSEDIA di database, JANGAN kosongkan property "text"; sampaikan secara luwes bahwa file belum tersedia dan arahkan ke {fallbackContact}.
 5. Jangan pernah mengarang URL (dilarang menggunakan example.com atau link fiktif).
 6. DILARANG MENGAMBIL LINK DARI RIWAYAT CHAT LAMA: Semua media (gambar/video/brosur) yang Anda kirimkan WAJIB bersumber dari DATABASE TOKO atau DATA PLANSITE yang aktif saat ini. DILARANG KERAS mengulangi atau mengambil kembali tautan media dari riwayat percakapan lama jika media tersebut sudah tidak tercantum di DATABASE TOKO saat ini (karena sudah dihapus oleh pemilik toko). Jika tidak ada di DATABASE TOKO saat ini, berarti media tersebut SUDAH TIDAK TERSEDIA.
 
@@ -221,6 +222,17 @@ WAJIB MERESPON DALAM FORMAT JSON BERIKUT:
       };
     }
 
+    let tenant = instance?.tenant;
+    if (!tenant && tenantId) {
+      tenant = await this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+      });
+    }
+    const tenantName = tenant?.name || 'kami';
+    const fallbackContact = tenant?.phone
+      ? `di nomor WA: ${tenant.phone}`
+      : 'langsung ke tim marketing kami';
+
     // 2. Rewrite Query & Detect Catalog Intent (Optional, for now just use standard RAG)
     let context = await this.agentSharedService.retrieveRelevantKnowledge(
       text,
@@ -332,8 +344,30 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
 
       const parsed = JSON.parse(rawResponse);
 
-      let aiText = parsed.text || '';
-      aiText = aiText.replace(/[*~`]/g, '');
+      // ponytail: robust text extraction covering all LLM key variations & object shapes
+      let rawAiText = '';
+      const textCandidate =
+        parsed.text ??
+        parsed.message ??
+        parsed.response ??
+        parsed.reply ??
+        parsed.content ??
+        parsed.jawaban ??
+        parsed.balasan;
+
+      if (typeof textCandidate === 'string') {
+        rawAiText = textCandidate;
+      } else if (Array.isArray(textCandidate)) {
+        rawAiText = textCandidate
+          .filter((t) => typeof t === 'string')
+          .join('\n');
+      } else if (textCandidate && typeof textCandidate === 'object') {
+        rawAiText = Object.values(textCandidate)
+          .filter((v) => typeof v === 'string')
+          .join('\n');
+      }
+
+      let aiText = (rawAiText || '').replace(/[*~`]/g, '');
 
       const isSocialOrWebLink = (url: string): boolean => {
         if (!url) return false;
@@ -459,6 +493,34 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
           return matchedUrl;
         },
       ).trim();
+
+      // ponytail: multi-layer dynamic safety net to guarantee bot never responds with 0 characters
+      if (!aiText && aiImages.length > 0) {
+        const captions = aiImages
+          .map((img) => img.caption)
+          .filter(Boolean)
+          .join(', ');
+        aiText = captions
+          ? `Halo Kak, berikut ${captions} yang Kakak minta ya 🙏`
+          : `Halo Kak, berikut file gambar yang Kakak minta ya 🙏`;
+      } else if (!aiText && aiVideos.length > 0) {
+        aiText = `Halo Kak, berikut video yang Kakak minta ya 🙏`;
+      } else if (!aiText) {
+        const lowerInput = (text || '').toLowerCase();
+        const isMedia = /\b(foto|gambar|video|brosur|denah|siteplan|spesifikasi|pricelist|file|dokumen|pdf)\b/i.test(lowerInput);
+        const isLocationOrSurvey = /\b(lokasi|alamat|lapangan|survey|cek|lihat|kunjungan|jadwal)\b/i.test(lowerInput);
+        const isCommercial = /\b(harga|biaya|kpr|cicilan|angsuran|booking|pesan|beli|ambil|stok|unit)\b/i.test(lowerInput);
+
+        if (isMedia && isLocationOrSurvey) {
+          aiText = `Halo Kak, untuk foto atau dokumentasi fisik lokasi lapangan saat ini belum tersimpan di sistem kami. Kakak bisa langsung konfirmasi ke tim ${tenantName} ${fallbackContact} agar bisa dikirimkan dokumentasi terbaru langsung dari tim lapangan ya 🙏`;
+        } else if (isMedia) {
+          aiText = `Halo Kak, untuk file atau dokumentasi tersebut saat ini belum tersedia di sistem kami. Kakak bisa langsung menghubungi tim ${tenantName} ${fallbackContact} agar dibantu kirimkan secara langsung ya 🙏`;
+        } else if (isCommercial || isLocationOrSurvey) {
+          aiText = `Halo Kak, untuk informasi detail dan paling akurat terkait hal tersebut, Kakak bisa langsung berkonsultasi dengan tim ${tenantName} ${fallbackContact} ya 🙏`;
+        } else {
+          aiText = `Halo Kak, terima kasih sudah menghubungi ${tenantName}. Terkait pertanyaan Kakak, boleh diinfokan lebih spesifik atau Kakak bisa langsung chat tim kami ${fallbackContact} ya 🙏`;
+        }
+      }
       const order = parsed.order || null;
       const lead = parsed.lead || null;
 
