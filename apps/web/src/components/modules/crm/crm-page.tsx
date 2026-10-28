@@ -12,6 +12,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cn } from "@/lib/utils";
 import {
@@ -25,6 +32,8 @@ import {
   ChevronDown,
   Home,
   FileSpreadsheet,
+  History,
+  Clock,
 } from "lucide-react";
 import { useAppStore } from "@/lib/app-store";
 import { useAuthStore } from "@/lib/auth-store";
@@ -85,6 +94,67 @@ function parseRupiahNumber(val: string): number {
   return digits ? Number(digits) : 0;
 }
 
+function getLatestNote(notes?: string | null): string {
+  if (!notes) return "";
+  const lines = notes.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  return lines.length > 0 ? lines[lines.length - 1] : "";
+}
+
+interface StatusLogItem {
+  status: string;
+  notes: string;
+  timestamp: string;
+}
+
+function getContactStatusLogs(c: ContactData): StatusLogItem[] {
+  if (Array.isArray(c.metadata?.statusLogs) && c.metadata.statusLogs.length > 0) {
+    return (c.metadata.statusLogs as any[])
+      .map((l: any) => ({
+        status: l.status || c.status || "Follow-Up",
+        notes: l.notes || "",
+        timestamp: l.timestamp || c.updatedAt || c.createdAt,
+      }))
+      .reverse();
+  }
+
+  // Fallback untuk data lama yang riwayatnya tersimpan berbaris-baris (\n) di catatan
+  if (c.notes && c.notes.includes("\n")) {
+    const lines = c.notes.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    return lines
+      .map((line, idx) => ({
+        status: idx === lines.length - 1 ? (c.status || "Follow-Up") : "Follow-Up",
+        notes: line,
+        timestamp: idx === lines.length - 1 ? c.updatedAt : c.createdAt,
+      }))
+      .reverse();
+  }
+
+  return [
+    {
+      status: c.status || "Follow-Up",
+      notes: c.notes || "Belum ada catatan",
+      timestamp: c.updatedAt || c.createdAt,
+    },
+  ];
+}
+
+function formatLogTimestamp(ts: string): string {
+  try {
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return ts;
+    return d.toLocaleString("id-ID", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return ts;
+  }
+}
+
 export function CrmPage() {
   const { setView, setActiveContactId } = useAppStore();
   const { user } = useAuthStore();
@@ -95,6 +165,7 @@ export function CrmPage() {
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [propertyGroups, setPropertyGroups] = useState<PropertyGroup[]>([]);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [selectedLogContact, setSelectedLogContact] = useState<ContactData | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Debounce search — hanya filter setelah user berhenti mengetik 400ms
@@ -122,7 +193,8 @@ export function CrmPage() {
     setLoading(true);
     let list: ContactData[] = [];
     try {
-      const res = await fetch("/api/v1/contacts");
+      const tenantQuery = user?.tenantId ? `?tenantId=${encodeURIComponent(user.tenantId)}` : "";
+      const res = await fetch(`/api/v1/contacts${tenantQuery}`);
       if (res.ok) {
         const data = await res.json();
         list = Array.isArray(data) ? data : (data.data ?? []);
@@ -250,7 +322,6 @@ export function CrmPage() {
   };
 
   const handleAddRow = async () => {
-    const def = perumahanCatalog[0];
     const tempId = `crm-${Date.now()}`;
     const newContact: ContactData = {
       id: tempId,
@@ -259,7 +330,7 @@ export function CrmPage() {
       email: null,
       status: "Follow-Up",
       notes: "",
-      metadata: { perumahan: def?.name ?? "", tipeUnit: def?.types?.[0]?.name ?? "", hargaUnit: def?.types?.[0]?.price ?? 0 },
+      metadata: {},
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -293,10 +364,10 @@ export function CrmPage() {
     const headers = ["No.", "Nama Pelanggan", "No. WhatsApp", "Perumahan", "Tipe Unit", "Harga Unit (Rp)", "Status", "Catatan"];
     const rows = filteredContacts.map((c, idx) => {
       const cleanPhone = (c.phone || "").replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, "").replace(/^\+/, "");
-      const selectedPerumahan = c.metadata?.perumahan || perumahanCatalog[0]?.name || "";
+      const selectedPerumahan = c.metadata?.perumahan || "-";
       const cluster = perumahanCatalog.find((p) => p.name === selectedPerumahan);
-      const selectedTipe = c.metadata?.tipeUnit || cluster?.types?.[0]?.name || "";
-      const displayPrice = c.metadata?.hargaUnit ? formatRupiah(c.metadata.hargaUnit) : (cluster?.types?.[0]?.price ? formatRupiah(cluster.types[0].price) : "");
+      const selectedTipe = c.metadata?.tipeUnit || "-";
+      const displayPrice = c.metadata?.hargaUnit ? formatRupiah(c.metadata.hargaUnit) : "-";
 
       return [
         idx + 1,
@@ -516,10 +587,10 @@ export function CrmPage() {
                   </thead>
                   <tbody className="divide-y divide-border">
                     {filteredContacts.map((c, index) => {
-                      const selectedPerumahan = c.metadata?.perumahan ?? perumahanCatalog[0]?.name ?? "";
+                      const selectedPerumahan = c.metadata?.perumahan ?? "";
                       const cluster = perumahanCatalog.find((p) => p.name === selectedPerumahan);
                       const unitTypes = cluster?.types ?? [];
-                      const selectedTipe = c.metadata?.tipeUnit ?? unitTypes[0]?.name ?? "";
+                      const selectedTipe = c.metadata?.tipeUnit ?? "";
                       const cleanPhone = (c.phone ?? "")
                         .replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, "")
                         .replace(/^\+/, "");
@@ -582,13 +653,26 @@ export function CrmPage() {
                             />
                           </td>
 
-                          <td className="py-1 px-2 overflow-hidden align-middle">
-                            <textarea
-                              value={c.notes ?? ""}
-                              onChange={(e) => handleFieldChange(c.id, "notes", e.target.value)}
-                              placeholder="Catatan kebutuhan..."
-                              className="w-full h-[3.25rem] bg-transparent px-2 py-1 rounded text-xs leading-relaxed border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background outline-none resize-none transition-colors"
-                            />
+                          <td className="py-1 px-2 align-middle">
+                            <div className="flex items-center gap-1.5">
+                              <textarea
+                                value={getLatestNote(c.notes)}
+                                onChange={(e) => handleFieldChange(c.id, "notes", e.target.value)}
+                                placeholder="Catatan kebutuhan..."
+                                rows={2}
+                                className="w-full min-h-[2.5rem] bg-transparent px-2 py-1 rounded text-xs leading-relaxed border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background outline-none resize-none transition-colors"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-7 w-7 shrink-0 text-muted-foreground hover:text-emerald-600 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-md transition-colors"
+                                title="Lihat riwayat status & log catatan lengkap"
+                                onClick={() => setSelectedLogContact(c)}
+                              >
+                                <History className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                              </Button>
+                            </div>
                           </td>
 
                           <td style={{ width: "64px", maxWidth: "64px" }} className="py-1 px-2 text-center align-middle overflow-hidden">
@@ -621,9 +705,10 @@ export function CrmPage() {
               {/* ── MOBILE CARDS ── */}
               <div className="md:hidden divide-y divide-border">
                 {filteredContacts.map((c, idx) => {
-                  const selectedPerumahan = c.metadata?.perumahan ?? perumahanCatalog[0]?.name ?? "";
+                  const selectedPerumahan = c.metadata?.perumahan ?? "";
                   const cluster = perumahanCatalog.find((p) => p.name === selectedPerumahan);
                   const unitTypes = cluster?.types ?? [];
+                  const selectedTipe = c.metadata?.tipeUnit ?? "";
                   const cleanPhone = (c.phone ?? "")
                     .replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, "")
                     .replace(/^\+/, "");
@@ -711,10 +796,20 @@ export function CrmPage() {
                       />
 
                       <div className="space-y-1">
-                        <span className="text-[10px] text-muted-foreground font-medium">Catatan:</span>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-muted-foreground font-medium">Catatan:</span>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedLogContact(c)}
+                            className="text-[11px] text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-1 font-medium"
+                          >
+                            <History className="h-3 w-3" />
+                            Riwayat Status
+                          </button>
+                        </div>
                         <textarea
                           rows={2}
-                          value={c.notes ?? ""}
+                          value={getLatestNote(c.notes)}
                           onChange={(e) => handleFieldChange(c.id, "notes", e.target.value)}
                           placeholder="Catatan kebutuhan pelanggan..."
                           className="w-full text-xs bg-muted/20 px-2.5 py-1.5 rounded-lg border border-border leading-relaxed resize-none outline-none"
@@ -737,6 +832,43 @@ export function CrmPage() {
         confirmLabel="Ya, Hapus"
         onConfirm={executeDeleteRow}
       />
+
+      {/* Modal Dialog Riwayat Log Status & Catatan */}
+      <Dialog open={Boolean(selectedLogContact)} onOpenChange={(open) => !open && setSelectedLogContact(null)}>
+        <DialogContent className="max-w-md sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-semibold">
+              <History className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              Riwayat Status & Catatan Prospek
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              {selectedLogContact?.name || "Pelanggan"} • {(selectedLogContact?.phone || "").replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, "").replace(/^\+/, "")}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="mt-2 space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+            {selectedLogContact && getContactStatusLogs(selectedLogContact).map((log, idx) => (
+              <div key={idx} className="relative pl-6 pb-3 border-l-2 border-emerald-500/30 last:border-transparent last:pb-0">
+                <div className="absolute -left-[7px] top-0.5 h-3 w-3 rounded-full bg-emerald-500 ring-4 ring-background" />
+                <div className="space-y-1.5 bg-muted/40 p-3 rounded-lg border border-border/60">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300">
+                      {log.status}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground flex items-center gap-1 font-mono">
+                      <Clock className="h-3 w-3" />
+                      {formatLogTimestamp(log.timestamp)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-foreground leading-relaxed pt-0.5 whitespace-pre-wrap">
+                    {log.notes || "Tidak ada catatan pada fase ini."}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

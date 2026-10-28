@@ -146,8 +146,9 @@ model WebhookLog {
 
 model Contact {
   id        String   @id @default(uuid())
+  tenantId  String?  @map("tenant_id")
   name      String   @db.VarChar(100)
-  phone     String   @unique @db.VarChar(50)
+  phone     String   @db.VarChar(50)
   email     String?  @db.VarChar(150)
   status    String   @default("NEW") @db.VarChar(50)
   company   String?  @db.VarChar(100)
@@ -158,10 +159,13 @@ model Contact {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  tenant        Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   tags          ContactTag[]
   conversations Conversation[]
   followUps     FollowUp[]
 
+  @@index([tenantId])
+  @@index([phone])
   @@map("contacts")
 }
 
@@ -447,6 +451,7 @@ model Tenant {
   whatsappInstances WhatsappInstance[]
   resourceGroups    ResourceGroup[]
   followUpConfig    FollowUpConfig?
+  contacts          Contact[]
 
   @@map("tenants")
 }

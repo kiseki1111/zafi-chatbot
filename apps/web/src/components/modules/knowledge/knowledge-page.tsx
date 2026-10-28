@@ -637,23 +637,23 @@ export function KnowledgePage() {
     <div className="space-y-4 p-1">
       {/* Header - Minimalist & Compact (Zero Overlapping) */}
       <div className="rounded-xl border bg-card p-3 sm:p-4 shadow-xs space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 grid place-items-center shrink-0">
               <Brain className="h-4.5 w-4.5" />
             </div>
-            <h1 className="text-sm sm:text-base font-bold tracking-tight text-foreground whitespace-nowrap">
+            <h1 className="text-sm sm:text-base font-bold tracking-tight text-foreground">
               Knowledge Base
             </h1>
           </div>
 
           {/* Action buttons */}
-          <div className="flex items-center gap-1.5 shrink-0 flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <Button
               variant="outline"
               size="sm"
               onClick={() => openCreate("create-media")}
-              className="h-7.5 text-xs gap-1 px-2 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 bg-emerald-50/50 dark:bg-emerald-950/20 hover:bg-emerald-100"
+              className="h-7.5 text-xs gap-1 px-2 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 bg-emerald-50/50 dark:bg-emerald-950/20 hover:bg-emerald-100 shrink-0"
               title="Unggah File / Media Perusahaan (Foto, Video, Brosur PDF tanpa OCR)"
             >
               <Paperclip className="h-3 w-3" />
@@ -663,7 +663,7 @@ export function KnowledgePage() {
               variant="outline"
               size="sm"
               onClick={() => openCreate("create-file")}
-              className="h-7.5 text-xs gap-1 px-2 border-border"
+              className="h-7.5 text-xs gap-1 px-2 border-border shrink-0"
               title="Unggah Dokumen PDF, Word, Excel, atau Foto/Gambar untuk diekstrak teksnya via AI OCR ke RAG"
             >
               <Upload className="h-3 w-3" />
@@ -672,7 +672,7 @@ export function KnowledgePage() {
             <Button
               size="sm"
               onClick={() => openCreate("create-text")}
-              className="h-7.5 text-xs gap-1 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs font-semibold"
+              className="h-7.5 text-xs gap-1 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs font-semibold shrink-0"
               title="Tambah Teks Manual"
             >
               <Plus className="h-3.5 w-3.5" />

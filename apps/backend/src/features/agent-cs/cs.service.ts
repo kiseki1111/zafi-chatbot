@@ -557,8 +557,17 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
         .replace(/^\+/, '')
         .replace('-customer', '');
 
+      let tenantId: string | null = null;
+      if (sessionName && sessionName !== 'unknown' && sessionName !== 'unknown-session') {
+        const inst = await this.prisma.whatsappInstance.findUnique({
+          where: { instanceName: sessionName },
+        });
+        tenantId = inst?.tenantId || null;
+      }
+
       let contact = await this.prisma.contact.findFirst({
         where: {
+          ...(tenantId ? { tenantId } : {}),
           OR: [
             { phone: senderId },
             { phone: cleanPhone },
@@ -590,12 +599,24 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
           updatedMeta.nameSource = 'self_declared';
         }
         const initialName = hasDeclared ? lead.customerName.trim() : 'Anonim';
+        const initialStatus = lead.status || 'Follow-Up';
+        const initialNotes = lead.notes ? String(lead.notes).trim() : null;
+        if (initialStatus || initialNotes) {
+          updatedMeta.statusLogs = [
+            {
+              status: initialStatus,
+              notes: initialNotes || 'Kontak prospek baru terdaftar',
+              timestamp: new Date().toISOString(),
+            },
+          ];
+        }
         contact = await this.prisma.contact.create({
           data: {
+            tenantId,
             phone: cleanPhone,
             name: initialName,
-            status: lead.status || 'Follow-Up',
-            notes: lead.notes || null,
+            status: initialStatus,
+            notes: initialNotes,
             metadata: updatedMeta,
           },
         });
@@ -625,16 +646,24 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
         return;
       }
 
-      const existingNotes = contact.notes || '';
-      let combinedNotes = existingNotes;
-      if (lead.notes && typeof lead.notes === 'string') {
-        const cleanNewNotes = lead.notes.trim();
-        if (cleanNewNotes && !existingNotes.includes(cleanNewNotes)) {
-          combinedNotes = existingNotes
-            ? `${existingNotes}\n${cleanNewNotes}`
-            : cleanNewNotes;
-        }
+      const existingLogs: Array<{ status?: string; notes?: string; timestamp: string }> =
+        Array.isArray(existingMeta.statusLogs) ? [...existingMeta.statusLogs] : [];
+
+      const cleanNewNotes = lead.notes && typeof lead.notes === 'string' ? lead.notes.trim() : '';
+      const newStatus = lead.status || contact.status;
+      const lastLog = existingLogs[existingLogs.length - 1];
+      const isChanged = !lastLog || lastLog.status !== newStatus || (cleanNewNotes && lastLog.notes !== cleanNewNotes);
+
+      if (isChanged && (newStatus || cleanNewNotes)) {
+        existingLogs.push({
+          status: newStatus,
+          notes: cleanNewNotes || contact.notes || '',
+          timestamp: new Date().toISOString(),
+        });
+        updatedMeta.statusLogs = existingLogs;
       }
+
+      const latestNotes = cleanNewNotes || contact.notes;
 
       // Customer menyatakan sendiri namanya di percakapan (prioritas tertinggi dalam hierarki)
       const hasSelfDeclaredName = Boolean(
@@ -656,7 +685,7 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
         data: {
           ...(hasSelfDeclaredName && { name: lead.customerName.trim() }),
           ...(lead.status && { status: lead.status }),
-          ...(combinedNotes && { notes: combinedNotes }),
+          ...(latestNotes !== undefined && { notes: latestNotes }),
           metadata: updatedMeta,
         },
       });

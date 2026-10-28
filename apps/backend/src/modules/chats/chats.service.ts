@@ -485,11 +485,17 @@ export class ChatsService {
     });
 
     // 2. Upsert Contact
-    const contact = await this.prisma.contact.upsert({
-      where: { phone },
-      update: { name },
-      create: { phone, name, status: 'NEW', source: 'WHATSAPP' },
-    });
+    let contact = await this.prisma.contact.findFirst({ where: { phone } });
+    if (!contact) {
+      contact = await this.prisma.contact.create({
+        data: { phone, name, status: 'NEW', source: 'WHATSAPP' },
+      });
+    } else {
+      contact = await this.prisma.contact.update({
+        where: { id: contact.id },
+        data: { name },
+      });
+    }
 
     // 3. Upsert Conversation
     const conversation = await this.prisma.conversation.upsert({

@@ -20,11 +20,13 @@ export class ContactsController {
   constructor(private readonly contactsService: ContactsService) {}
 
   private resolveTenantId(req: any): string | undefined {
-    const isSuper = req?.user?.roles?.includes('superadmin');
+    const isSuper =
+      req?.user?.roles?.includes('superadmin') ||
+      req?.user?.role === 'superadmin';
     if (isSuper) {
       return req?.query?.tenantId;
     }
-    return req?.user?.tenantId;
+    return req?.user?.tenantId || req?.query?.tenantId;
   }
 
   @Get()
@@ -33,8 +35,11 @@ export class ContactsController {
     @Query('status') status?: string,
     @Req() req?: any,
   ) {
+    const isSuper =
+      req?.user?.roles?.includes('superadmin') ||
+      req?.user?.role === 'superadmin';
     const tenantId = this.resolveTenantId(req);
-    return this.contactsService.listContacts(search, status, tenantId);
+    return this.contactsService.listContacts(search, status, tenantId, isSuper);
   }
 
   @Get(':id')

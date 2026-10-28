@@ -14,19 +14,35 @@ export class ContactsService {
     search?: string,
     status?: string,
     tenantId?: string,
+    isSuper?: boolean,
   ) {
+    // ponytail: fail-closed if tenantId is missing for non-superadmin
+    if (!tenantId && !isSuper) {
+      return [];
+    }
+
     const where: any = {
       phone: { not: { contains: 'broadcast' } },
     };
 
     if (tenantId) {
-      where.conversations = {
-        some: {
-          whatsappInstance: {
-            tenantId,
-          },
+      where.AND = [
+        {
+          OR: [
+            { tenantId },
+            {
+              tenantId: null,
+              conversations: {
+                some: {
+                  whatsappInstance: {
+                    tenantId,
+                  },
+                },
+              },
+            },
+          ],
         },
-      };
+      ];
     }
 
     if (status && status !== 'ALL') {
@@ -114,13 +130,23 @@ export class ContactsService {
   async getContact(id: string, tenantId?: string) {
     const where: any = { id };
     if (tenantId) {
-      where.conversations = {
-        some: {
-          whatsappInstance: {
-            tenantId,
-          },
+      where.AND = [
+        {
+          OR: [
+            { tenantId },
+            {
+              tenantId: null,
+              conversations: {
+                some: {
+                  whatsappInstance: {
+                    tenantId,
+                  },
+                },
+              },
+            },
+          ],
         },
-      };
+      ];
     }
 
     const contact = await this.prisma.contact.findFirst({
@@ -145,14 +171,18 @@ export class ContactsService {
 
   async createContact(dto: CreateContactDto, tenantId?: string) {
     if (!dto.phone) throw new BadRequestException('Phone is required');
-    const existing = await this.prisma.contact.findUnique({
-      where: { phone: dto.phone },
+    const existing = await this.prisma.contact.findFirst({
+      where: {
+        phone: dto.phone,
+        ...(tenantId ? { tenantId } : {}),
+      },
     });
     if (existing)
       throw new BadRequestException('Nomor telepon sudah terdaftar');
 
     const contact = await this.prisma.contact.create({
       data: {
+        tenantId: tenantId || null,
         name: dto.name || dto.phone,
         phone: dto.phone,
         email: dto.email,
@@ -192,16 +222,43 @@ export class ContactsService {
   ) {
     const where: any = { id };
     if (tenantId) {
-      where.conversations = {
-        some: {
-          whatsappInstance: {
-            tenantId,
-          },
+      where.AND = [
+        {
+          OR: [
+            { tenantId },
+            {
+              tenantId: null,
+              conversations: {
+                some: {
+                  whatsappInstance: {
+                    tenantId,
+                  },
+                },
+              },
+            },
+          ],
         },
-      };
+      ];
     }
     const contact = await this.prisma.contact.findFirst({ where });
     if (!contact) throw new NotFoundException('Contact not found');
+
+    const currentMeta = (contact.metadata as Record<string, any>) || {};
+    const updatedMeta = dto.metadata !== undefined ? { ...currentMeta, ...dto.metadata } : { ...currentMeta };
+    if (
+      (dto.status !== undefined && dto.status !== contact.status) ||
+      (dto.notes !== undefined && dto.notes.trim() !== (contact.notes || '').trim())
+    ) {
+      const logs = Array.isArray(updatedMeta.statusLogs) ? [...updatedMeta.statusLogs] : [];
+      const newStatus = dto.status !== undefined ? dto.status : contact.status;
+      const newNotes = dto.notes !== undefined ? dto.notes : (contact.notes || '');
+      logs.push({
+        status: newStatus,
+        notes: newNotes,
+        timestamp: new Date().toISOString(),
+      });
+      updatedMeta.statusLogs = logs;
+    }
 
     return this.prisma.contact.update({
       where: { id },
@@ -213,7 +270,7 @@ export class ContactsService {
         ...(dto.address !== undefined && { address: dto.address }),
         ...(dto.notes !== undefined && { notes: dto.notes }),
         ...(dto.status !== undefined && { status: dto.status }),
-        ...(dto.metadata !== undefined && { metadata: dto.metadata }),
+        metadata: updatedMeta,
       },
     });
   }
@@ -221,13 +278,23 @@ export class ContactsService {
   async deleteContact(id: string, tenantId?: string) {
     const where: any = { id };
     if (tenantId) {
-      where.conversations = {
-        some: {
-          whatsappInstance: {
-            tenantId,
-          },
+      where.AND = [
+        {
+          OR: [
+            { tenantId },
+            {
+              tenantId: null,
+              conversations: {
+                some: {
+                  whatsappInstance: {
+                    tenantId,
+                  },
+                },
+              },
+            },
+          ],
         },
-      };
+      ];
     }
     const contact = await this.prisma.contact.findFirst({ where });
     if (!contact) throw new NotFoundException('Contact not found');

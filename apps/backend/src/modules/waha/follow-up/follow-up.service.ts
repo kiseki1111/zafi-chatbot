@@ -171,7 +171,7 @@ Bahasa: Indonesia. Maksimal 2 emoji. Tanpa markdown.`;
   async sendFollowUp(contactPhone: string, instanceName: string, text: string) {
     try {
       await this.wahaService.sendMessage(instanceName, contactPhone, text);
-      const contact = await this.prisma.contact.findUnique({
+      const contact = await this.prisma.contact.findFirst({
         where: { phone: contactPhone },
       });
       if (!contact) {
@@ -349,11 +349,19 @@ Bahasa: Indonesia. Maksimal 2 emoji. Tanpa markdown.`;
       create: { instanceName, status: 'WORKING' },
     });
 
-    const contact = await this.prisma.contact.upsert({
+    let contact = await this.prisma.contact.findFirst({
       where: { phone: cleanPhone },
-      update: { name },
-      create: { phone: cleanPhone, name },
     });
+    if (!contact) {
+      contact = await this.prisma.contact.create({
+        data: { phone: cleanPhone, name },
+      });
+    } else {
+      contact = await this.prisma.contact.update({
+        where: { id: contact.id },
+        data: { name },
+      });
+    }
 
     // Set lastMessageAt ke waktu lampau agar langsung masuk daftar inaktif
     const config = await this.getConfig();
@@ -489,11 +497,19 @@ Bahasa: Indonesia. Maksimal 2 emoji. Tanpa markdown.`;
     });
 
     // 3. Pastikan contact ada
-    const contact = await this.prisma.contact.upsert({
+    let contact = await this.prisma.contact.findFirst({
       where: { phone: cleanPhone },
-      update: { name },
-      create: { phone: cleanPhone, name },
     });
+    if (!contact) {
+      contact = await this.prisma.contact.create({
+        data: { phone: cleanPhone, name },
+      });
+    } else {
+      contact = await this.prisma.contact.update({
+        where: { id: contact.id },
+        data: { name },
+      });
+    }
 
     // 4. Hitung waktu mundur: disetel lebih lama dari delayMinutes agar terdeteksi inaktif
     const pastTime = new Date(Date.now() - (delayMinutes + 1) * 60 * 1000);

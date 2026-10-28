@@ -337,11 +337,22 @@ export class WahaController implements OnApplicationBootstrap {
     @Param('id') id: string,
     @Body() body: { chatId: string; text: string },
   ) {
-    const contact = await this.prisma.contact.upsert({
-      where: { phone: body.chatId },
-      update: {},
-      create: { name: body.chatId, phone: body.chatId },
+    const inst = await this.prisma.whatsappInstance.findUnique({
+      where: { instanceName: id },
     });
+    const tenantId = inst?.tenantId || null;
+
+    let contact = await this.prisma.contact.findFirst({
+      where: {
+        phone: body.chatId,
+        ...(tenantId ? { tenantId } : {}),
+      },
+    });
+    if (!contact) {
+      contact = await this.prisma.contact.create({
+        data: { name: body.chatId, phone: body.chatId, tenantId },
+      });
+    }
 
     // 1. Create Conversation if not exists
     const conversation = await this.prisma.conversation.upsert({
@@ -529,8 +540,14 @@ export class WahaController implements OnApplicationBootstrap {
       if (caller && sessionName) {
         const cleanCaller = caller.replace(/@(c\.us|s\.whatsapp\.net)$/i, '').replace(/^\+/, '');
         try {
+          const inst = await this.prisma.whatsappInstance.findUnique({
+            where: { instanceName: sessionName },
+          });
+          const tenantId = inst?.tenantId || null;
+
           let contact = await this.prisma.contact.findFirst({
             where: {
+              ...(tenantId ? { tenantId } : {}),
               OR: [
                 { phone: cleanCaller },
                 { phone: `+${cleanCaller}` },
@@ -541,6 +558,7 @@ export class WahaController implements OnApplicationBootstrap {
           if (!contact) {
             contact = await this.prisma.contact.create({
               data: {
+                tenantId,
                 phone: cleanCaller,
                 name: `+${cleanCaller}`,
               },
@@ -623,6 +641,7 @@ export class WahaController implements OnApplicationBootstrap {
       const contactNumber = cleanNumber || rawNumber;
 
       let currentConversationId: string | null = null;
+      let activeContactId: string | null = null;
       let storedMediaUrl: string | null = null;
       const msgId = message.id?._serialized || message.id || 'unknown';
 
@@ -658,13 +677,20 @@ export class WahaController implements OnApplicationBootstrap {
         extractedMediaUrl = `/api/v1/waha/media/${sessionName}/${encodeURIComponent(msgId)}`;
       }
 
+      let sessionTenantId: string | null = null;
       if (sessionName && isDirectPhone(rawNumber)) {
         const contactName =
           message._data?.notifyName || message.sender?.pushname || null;
 
         try {
+          const inst = await this.prisma.whatsappInstance.findUnique({
+            where: { instanceName: sessionName },
+          });
+          sessionTenantId = inst?.tenantId || null;
+
           const contact = await this.prisma.contact.findFirst({
             where: {
+              ...(sessionTenantId ? { tenantId: sessionTenantId } : {}),
               OR: [
                 { phone: contactNumber },
                 { phone: rawNumber },
@@ -712,6 +738,7 @@ export class WahaController implements OnApplicationBootstrap {
           } else {
             const newContact = await this.prisma.contact.create({
               data: {
+                tenantId: sessionTenantId,
                 phone: contactNumber,
                 name: isValidPushName ? contactName : defaultAnonName,
                 metadata: {
@@ -721,6 +748,7 @@ export class WahaController implements OnApplicationBootstrap {
             });
             contactId = newContact.id;
           }
+          activeContactId = contactId;
 
           const conversation = await this.prisma.conversation.upsert({
             where: {
@@ -1013,31 +1041,49 @@ export class WahaController implements OnApplicationBootstrap {
                     /@c\.us|@s\.whatsapp\.net|@lid/g,
                     '',
                   );
-                  const contact = await this.prisma.contact.findFirst({
-                    where: {
-                      OR: [
-                        { phone: contactNumber },
-                        { phone: rawNumber },
-                        { phone: replyContactNumber },
-                        { phone: { contains: replyContactNumber } },
-                        ...(message?.from ? [{ phone: message.from }] : []),
-                      ],
-                    },
-                  });
+                  const contact = activeContactId
+                    ? await this.prisma.contact.findUnique({
+                        where: { id: activeContactId },
+                      })
+                    : await this.prisma.contact.findFirst({
+                        where: {
+                          ...(sessionTenantId ? { tenantId: sessionTenantId } : {}),
+                          OR: [
+                            { phone: contactNumber },
+                            { phone: rawNumber },
+                            { phone: replyContactNumber },
+                            { phone: { contains: replyContactNumber } },
+                            ...(message?.from ? [{ phone: message.from }] : []),
+                          ],
+                        },
+                      });
                   if (contact) {
                     const existingMeta = (contact.metadata as Record<string, any>) || {};
+                    const existingLogs: Array<{ status?: string; notes?: string; timestamp: string }> =
+                      Array.isArray(existingMeta.statusLogs) ? [...existingMeta.statusLogs] : [];
+
+                    const cleanLeadNotes = reply.lead.notes && typeof reply.lead.notes === 'string' ? reply.lead.notes.trim() : '';
+                    const newStatus = reply.lead.status || contact.status;
+                    const lastLog = existingLogs[existingLogs.length - 1];
+                    const isChanged = !lastLog || lastLog.status !== newStatus || (cleanLeadNotes && lastLog.notes !== cleanLeadNotes);
+
+                    if (isChanged && (newStatus || cleanLeadNotes)) {
+                      existingLogs.push({
+                        status: newStatus,
+                        notes: cleanLeadNotes || contact.notes || '',
+                        timestamp: new Date().toISOString(),
+                      });
+                    }
+
                     const updatedMeta = {
                       ...existingMeta,
                       ...(reply.lead.perumahan && { perumahan: reply.lead.perumahan }),
                       ...(reply.lead.tipeUnit && { tipeUnit: reply.lead.tipeUnit }),
                       ...(reply.lead.hargaUnit && { hargaUnit: reply.lead.hargaUnit }),
+                      statusLogs: existingLogs,
                     };
-                    const leadNotes = reply.lead.notes;
-                    const combinedNotes = leadNotes
-                      ? contact.notes
-                        ? `${contact.notes}\n${leadNotes}`
-                        : leadNotes
-                      : contact.notes;
+
+                    const latestNotes = cleanLeadNotes || contact.notes;
 
                     await this.prisma.contact.update({
                       where: { id: contact.id },
@@ -1047,7 +1093,7 @@ export class WahaController implements OnApplicationBootstrap {
                             name: reply.lead.customerName,
                           }),
                         ...(reply.lead.status && { status: reply.lead.status }),
-                        ...(combinedNotes && { notes: combinedNotes }),
+                        ...(latestNotes !== undefined && { notes: latestNotes }),
                         metadata: updatedMeta,
                       },
                     });

@@ -8,13 +8,13 @@ export class AvailabilityService {
   async getGroups(tenantId: string) {
     try {
       let filterWhere: any = {};
-      if (tenantId) {
-        const tenant = await this.prisma.tenant.findUnique({
-          where: { id: tenantId },
-        });
-        if (tenant) {
-          filterWhere = { tenantId: tenant.id };
-        }
+      // ponytail: strict isolation - prevent leaking perumahan across accounts
+      if (tenantId === 'all') {
+        filterWhere = {};
+      } else if (tenantId) {
+        filterWhere = { tenantId };
+      } else {
+        return [];
       }
 
       return await this.prisma.resourceGroup.findMany({
