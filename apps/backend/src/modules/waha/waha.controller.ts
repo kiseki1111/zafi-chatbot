@@ -1231,6 +1231,22 @@ export class WahaController implements OnApplicationBootstrap {
                           },
                         }));
                       if (matchedGroup) {
+                        let isIllustrationActive = true;
+                        let templates = matchedGroup.pricingTemplates as any;
+                        if (typeof templates === 'string') {
+                          try { templates = JSON.parse(templates); } catch {}
+                        }
+                        if (templates && typeof templates === 'object') {
+                          if (templates.isIllustrationActive === false || templates.isSiteplanActive === false) {
+                            isIllustrationActive = false;
+                          }
+                        }
+
+                        if (!isIllustrationActive) {
+                          // ponytail: jika ilustrasi dinonaktifkan, jangan kirim gambar ke WhatsApp (bot arahkan ke marketing)
+                          continue;
+                        }
+
                         const freshSiteplan = await this.availabilityService.generateSiteplanImage(matchedGroup.id);
                         img = {
                           ...img,

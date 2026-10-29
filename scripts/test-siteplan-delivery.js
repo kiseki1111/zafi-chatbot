@@ -122,16 +122,44 @@ async function run() {
   }
   console.log(`   ✓ Terdaftar di RAG Knowledge: "${siteplanMedia.name}" -> ${siteplanMedia.url}\n`);
 
-  // Step 4: Simulasi Permintaan Customer ke Chatbot AI (CS Luna)
+  // Step 4: Simulasi Permintaan Customer ke Chatbot AI (CS Luna) & Verifikasi Toggle Nonaktif
   console.log('4️⃣ Menguji respon AI Chatbot saat customer meminta denah siteplan...');
   const { AgentSharedService } = require(path.resolve(process.cwd(), 'apps/backend/dist/src/core/agent-shared/agent-shared.service'));
   const agentShared = new AgentSharedService(prisma);
-  const context = await agentShared.getAvailabilityContext('Zafi Residence');
 
-  console.log('   --- RAG PLANSITE KNOWLEDGE YANG DIBACA AI ---');
-  const previewLines = context.split('\n').filter((l) => l.includes('SITEPLAN') || l.includes('Daftar') || l.includes('Perumahan')).slice(0, 5);
-  previewLines.forEach((l) => console.log(`   ${l}`));
-  console.log('   ---------------------------------------------\n');
+  // A. Saat Status Aktif
+  const activeContext = await agentShared.getAvailabilityContext('Zafi Residence');
+  if (!activeContext.includes('[FOTO SITEPLAN UTAMA PERUMAHAN')) {
+    throw new Error('Gagal: Konteks aktif tidak memuat tag [FOTO SITEPLAN UTAMA PERUMAHAN]!');
+  }
+  console.log('   ✓ Status Aktif terkonfirmasi: AI menerima URL foto siteplan.');
+
+  // B. Uji Toggle Nonaktif (simulasi admin mematikan ilustrasi siteplan)
+  console.log('   🔄 Menguji simulasi toggle nonaktif...');
+  const groupBefore = await prisma.resourceGroup.findUnique({ where: { id: group.id } });
+  let templates = groupBefore.pricingTemplates || {};
+  if (typeof templates === 'string') {
+    try { templates = JSON.parse(templates); } catch { templates = {}; }
+  }
+  templates.isIllustrationActive = false;
+  await prisma.resourceGroup.update({
+    where: { id: group.id },
+    data: { pricingTemplates: templates },
+  });
+
+  const inactiveContext = await agentShared.getAvailabilityContext('Zafi Residence');
+  if (!inactiveContext.includes('[STATUS SITEPLAN PERUMAHAN ZAFI RESIDENCE: NONAKTIF / BELUM TERSEDIA]')) {
+    throw new Error('Gagal: Konteks nonaktif tidak memuat larangan kirim foto siteplan!');
+  }
+  console.log('   ✓ Status Nonaktif terkonfirmasi: AI dilarang kirim gambar & diarahkan ke kontak marketing.');
+
+  // Kembalikan ke aktif
+  templates.isIllustrationActive = true;
+  await prisma.resourceGroup.update({
+    where: { id: group.id },
+    data: { pricingTemplates: templates },
+  });
+  console.log('   ✓ Status dikembalikan ke Aktif normal.\n');
 
   // Step 5: Kirim Gambar Siteplan Asli ke WhatsApp Customer via WAHA
   console.log('5️⃣ Mengirimkan gambar siteplan langsung ke WhatsApp nomor pengujian via WAHA...');

@@ -292,7 +292,14 @@ export class AgentSharedService {
   async getAvailabilityContext(tenantId: string): Promise<string> {
     try {
       const groups = await this.prisma.resourceGroup.findMany({
-        where: tenantId ? { tenantId } : {},
+        where: tenantId
+          ? {
+              OR: [
+                { tenantId },
+                { name: { contains: tenantId, mode: 'insensitive' } },
+              ],
+            }
+          : {},
         include: {
           items: {
             orderBy: { code: 'asc' },
@@ -376,37 +383,59 @@ export class AgentSharedService {
           })
           .join('\n');
 
+        let isIllustrationActive = true;
+        let templates = g.pricingTemplates as any;
+        if (typeof templates === 'string') {
+          try { templates = JSON.parse(templates); } catch {}
+        }
+        if (templates && typeof templates === 'object') {
+          if (templates.isIllustrationActive === false || templates.isSiteplanActive === false) {
+            isIllustrationActive = false;
+          }
+        }
+
         let mediaStr = '';
-        if (g.siteplanImage) {
-          try {
-            const raw = g.siteplanImage.trim();
-            if (raw.startsWith('[')) {
-              const medias = JSON.parse(raw);
-              if (Array.isArray(medias) && medias.length > 0) {
-                const siteplan = medias.find(
-                  (m: any) =>
-                    m.name?.toLowerCase().includes('siteplan') ||
-                    m.name?.toLowerCase().includes('denah') ||
-                    m.url?.includes('siteplan'),
-                );
-                let highlight = '';
-                if (siteplan) {
-                  highlight = `\n[FOTO SITEPLAN UTAMA PERUMAHAN ${g.name.toUpperCase()}] "${siteplan.name}": ${siteplan.url}\n(WAJIB: Jika pelanggan bertanya/meminta siteplan, denah, atau gambar letak kavling ${g.name}, Anda WAJIB menyertakan URL foto ini ke array "images"!).\n`;
+        if (!isIllustrationActive) {
+          mediaStr = `\n[STATUS SITEPLAN PERUMAHAN ${g.name.toUpperCase()}: NONAKTIF / BELUM TERSEDIA]\n(PERINGATAN KERAS: Fitur gambar denah siteplan untuk ${g.name} DINONAKTIFKAN oleh manajemen. DILARANG mengirimkan gambar siteplan di array "images" (array "images" WAJIB KOSONG []). Jika pelanggan meminta denah/siteplan/tata letak perumahan ${g.name}, Anda WAJIB menginfokan dengan ramah bahwa denah siteplan sedang diperbarui/belum tersedia di sistem, dan ARAHKAN pelanggan untuk langsung menghubungi tim Marketing kami {fallbackContact} agar dibantu dikirimkan denah lengkapnya secara manual!).\n`;
+        } else {
+          const fallbackSiteplanUrl = `/uploads/incoming/siteplan-${g.id}.jpg`;
+          let siteplanHighlight = `\n[FOTO SITEPLAN UTAMA PERUMAHAN ${g.name.toUpperCase()}] "Denah Siteplan ${g.name}": ${fallbackSiteplanUrl}\n(WAJIB: Jika pelanggan bertanya/meminta siteplan, denah, atau gambar letak kavling ${g.name}, Anda WAJIB menyertakan URL foto ini ke array "images"!).\n`;
+
+          if (g.siteplanImage) {
+            try {
+              const raw = g.siteplanImage.trim();
+              if (raw.startsWith('[')) {
+                const medias = JSON.parse(raw);
+                if (Array.isArray(medias) && medias.length > 0) {
+                  const siteplan = medias.find(
+                    (m: any) =>
+                      m.name?.toLowerCase().includes('siteplan') ||
+                      m.name?.toLowerCase().includes('denah') ||
+                      m.url?.includes('siteplan'),
+                  );
+                  if (siteplan) {
+                    siteplanHighlight = `\n[FOTO SITEPLAN UTAMA PERUMAHAN ${g.name.toUpperCase()}] "${siteplan.name}": ${siteplan.url}\n(WAJIB: Jika pelanggan bertanya/meminta siteplan, denah, atau gambar letak kavling ${g.name}, Anda WAJIB menyertakan URL foto ini ke array "images"!).\n`;
+                  }
+                  mediaStr =
+                    siteplanHighlight +
+                    '\nDaftar Foto & Video yang tersedia untuk dikirimkan ke pelanggan:\n' +
+                    medias
+                      .map(
+                        (m: any) =>
+                          `  - [${m.type === 'video' ? 'VIDEO' : 'FOTO'}] "${m.name}": ${m.url}${m.description ? ` (${m.description})` : ''}`,
+                      )
+                      .join('\n');
                 }
-                mediaStr =
-                  highlight +
-                  '\nDaftar Foto & Video yang tersedia untuk dikirimkan ke pelanggan:\n' +
-                  medias
-                    .map(
-                      (m: any) =>
-                        `  - [${m.type === 'video' ? 'VIDEO' : 'FOTO'}] "${m.name}": ${m.url}${m.description ? ` (${m.description})` : ''}`,
-                    )
-                    .join('\n');
+              } else if (raw) {
+                siteplanHighlight = `\n[FOTO SITEPLAN UTAMA PERUMAHAN ${g.name.toUpperCase()}] "Denah Siteplan ${g.name}": ${raw}\n(WAJIB: Jika pelanggan bertanya/meminta siteplan, denah, atau gambar letak kavling ${g.name}, Anda WAJIB menyertakan URL foto ini ke array "images"!).\n`;
+                mediaStr = `${siteplanHighlight}Foto/Video Siteplan: ${raw}`;
               }
-            } else {
-              mediaStr = `\n[FOTO SITEPLAN UTAMA PERUMAHAN ${g.name.toUpperCase()}] "Denah Siteplan ${g.name}": ${raw}\n(WAJIB: Jika pelanggan bertanya/meminta siteplan, denah, atau gambar letak kavling ${g.name}, Anda WAJIB menyertakan URL foto ini ke array "images"!).\nFoto/Video Siteplan: ${raw}`;
-            }
-          } catch (e) {}
+            } catch (e) {}
+          }
+
+          if (!mediaStr) {
+            mediaStr = siteplanHighlight;
+          }
         }
 
         let descStr = '';

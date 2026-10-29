@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -342,6 +343,61 @@ export function AvailabilityView() {
     }
   }, [activeGroup?.pricingTemplates]);
 
+  const isIllustrationActive = useMemo(() => {
+    if (!activeGroup?.pricingTemplates) return true;
+    try {
+      const raw = activeGroup.pricingTemplates;
+      const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+      if (parsed && typeof parsed === "object") {
+        if (parsed.isIllustrationActive === false || parsed.isSiteplanActive === false) {
+          return false;
+        }
+      }
+      return true;
+    } catch {
+      return true;
+    }
+  }, [activeGroup?.pricingTemplates]);
+
+  const handleToggleIllustration = async (checked: boolean) => {
+    if (!activeGroup) return;
+    let existingTemplates: any = {};
+    if (activeGroup.pricingTemplates) {
+      try {
+        existingTemplates =
+          typeof activeGroup.pricingTemplates === "string"
+            ? JSON.parse(activeGroup.pricingTemplates)
+            : activeGroup.pricingTemplates;
+      } catch {}
+    }
+    const updatedTemplates = {
+      ...(typeof existingTemplates === "object" ? existingTemplates : {}),
+      isIllustrationActive: checked,
+      isSiteplanActive: checked,
+    };
+
+    try {
+      const res = await fetch(`/api/v1/availability/groups/${activeGroup.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pricingTemplates: updatedTemplates }),
+      });
+      if (res.ok) {
+        setGroups((prev) =>
+          prev.map((g) => (g.id === activeGroup.id ? { ...g, pricingTemplates: updatedTemplates } : g))
+        );
+        toast({
+          title: checked ? "Ilustrasi Siteplan Diaktifkan" : "Ilustrasi Siteplan Dinonaktifkan",
+          description: checked
+            ? "Bot AI WhatsApp kini dapat mengirimkan gambar siteplan kepada customer."
+            : "Bot AI WhatsApp akan otomatis mengarahkan customer ke nomor kontak tim Marketing jika ada yang meminta siteplan.",
+        });
+      }
+    } catch (e: any) {
+      toast({ title: "Gagal Mengubah Status", description: e.message, variant: "destructive" });
+    }
+  };
+
   const naturalSortItems = (list: ResourceItem[]) =>
     [...list].sort((a, b) =>
       a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: "base" })
@@ -362,6 +418,7 @@ export function AvailabilityView() {
       roads: currentRoads,
       fasos: currentFasos,
       groups: groups,
+      isIllustrationActive,
     };
     if (typeof window !== "undefined") {
       localStorage.setItem(`siteplan-layout-${activeGroup.id}`, JSON.stringify(fullLayout));
@@ -1939,32 +1996,58 @@ export function AvailabilityView() {
 
       {/* Switcher Tab View: Ilustrasi Siteplan vs Grid Matrix */}
       {activeGroup && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-2 bg-muted/40 rounded-xl border">
-          <div className="flex items-center gap-1.5 p-1 bg-background rounded-lg border shadow-2xs">
-            <Button
-              variant={viewMode === "canvas" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("canvas")}
-              className={cn(
-                "h-8 text-xs font-bold gap-1.5",
-                viewMode === "canvas" ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs" : "text-muted-foreground"
-              )}
-            >
-              <MapPin className="h-3.5 w-3.5" />
-              <span>Ilustrasi Siteplan (Interactive Canvas)</span>
-            </Button>
-            <Button
-              variant={viewMode === "matrix" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("matrix")}
-              className={cn(
-                "h-8 text-xs font-bold gap-1.5",
-                viewMode === "matrix" ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs" : "text-muted-foreground"
-              )}
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-              <span>Daftar Kartu Unit ({filteredItems.length})</span>
-            </Button>
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 p-2 bg-muted/40 rounded-xl border">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 p-1 bg-background rounded-lg border shadow-2xs">
+              <Button
+                variant={viewMode === "canvas" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("canvas")}
+                className={cn(
+                  "h-8 text-xs font-bold gap-1.5",
+                  viewMode === "canvas" ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs" : "text-muted-foreground"
+                )}
+              >
+                <MapPin className="h-3.5 w-3.5" />
+                <span>Ilustrasi Siteplan</span>
+              </Button>
+              <Button
+                variant={viewMode === "matrix" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("matrix")}
+                className={cn(
+                  "h-8 text-xs font-bold gap-1.5",
+                  viewMode === "matrix" ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs" : "text-muted-foreground"
+                )}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                <span>Daftar Kartu Unit ({filteredItems.length})</span>
+              </Button>
+            </div>
+
+            {/* Toggle Status Aktif/Nonaktif Ilustrasi Siteplan untuk Bot AI */}
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-background shadow-2xs">
+              <Switch
+                checked={isIllustrationActive}
+                onCheckedChange={handleToggleIllustration}
+                id="toggle-siteplan-active"
+              />
+              <Label
+                htmlFor="toggle-siteplan-active"
+                className="text-xs font-bold cursor-pointer select-none flex items-center gap-1.5"
+              >
+                <span className="text-muted-foreground">Siteplan AI:</span>
+                {isIllustrationActive ? (
+                  <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 py-0 px-1.5 font-bold">
+                    Aktif
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 py-0 px-1.5 font-bold">
+                    Nonaktif (Arahkan ke Marketing)
+                  </Badge>
+                )}
+              </Label>
+            </div>
           </div>
 
           {viewMode === "canvas" && (
@@ -2037,6 +2120,12 @@ export function AvailabilityView() {
                 <p className="text-xs text-muted-foreground mt-0.5">
                   <span className="font-semibold text-emerald-600 dark:text-emerald-400">Canva Mode:</span> Klik &amp; blok area untuk memilih banyak kavling. Seret mouse untuk geser, dan tarik sudut kotak (handle bulat) untuk ubah ukuran. Klik 2x pada kavling untuk ubah status unit.
                 </p>
+                {!isIllustrationActive && (
+                  <div className="mt-2.5 inline-flex items-center gap-1.5 py-1 px-3 rounded-full bg-amber-100 dark:bg-amber-950/70 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-[11px] font-semibold shadow-2xs">
+                    <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                    <span>Mode Nonaktif: Customer yang meminta denah di WhatsApp akan diarahkan ke nomor kontak tim Marketing.</span>
+                  </div>
+                )}
               </div>
 
               {/* Canva Rubberband / Marquee Selection Box */}
