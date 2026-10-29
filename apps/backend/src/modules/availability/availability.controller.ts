@@ -10,11 +10,13 @@ import {
   UseInterceptors,
   UploadedFile,
   Req,
+  Res,
   BadRequestException,
   ForbiddenException,
   UseGuards,
   Logger,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
@@ -197,6 +199,42 @@ export class AvailabilityController {
   ) {
     const tenantId = this.resolveTenantId(req);
     return this.availabilityService.updateGroup(id, body, tenantId);
+  }
+
+  @Public()
+  @Post('groups/:id/generate-siteplan')
+  async generateSiteplan(
+    @Param('id') id: string,
+    @Req() req: any,
+  ) {
+    const tenantId = this.resolveTenantId(req);
+    return this.availabilityService.generateSiteplanImage(id, tenantId);
+  }
+
+  @Public()
+  @SkipThrottle()
+  @Get('groups/:id/siteplan.jpg')
+  async getLiveSiteplanImage(@Param('id') id: string, @Res() res: any) {
+    try {
+      const buffer = await this.availabilityService.getLiveSiteplanJpeg(id);
+      res.setHeader('Content-Type', 'image/jpeg');
+      res.setHeader('Content-Disposition', 'inline; filename="siteplan.jpg"');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      return res.send(buffer);
+    } catch (e: any) {
+      return res.status(404).send({ error: e.message });
+    }
+  }
+
+  @Public()
+  @Post('groups/:id/save-layout')
+  async saveLayout(
+    @Param('id') id: string,
+    @Body() body: { layout?: any; imageBase64?: string },
+    @Req() req: any,
+  ) {
+    const tenantId = this.resolveTenantId(req);
+    return this.availabilityService.saveSiteplanLayout(id, body, tenantId);
   }
 
   @Delete('groups/:id')

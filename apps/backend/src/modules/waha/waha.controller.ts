@@ -21,6 +21,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 import * as fs from 'fs';
 import * as path from 'path';
 import { WahaService } from './waha.service';
+import { AvailabilityService } from '../availability/availability.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { OmnichannelQueueService } from '../../core/omnichannel/omnichannel-queue.service';
 import { IncomingMessage } from '../../core/omnichannel/interfaces/incoming-message.interface';
@@ -40,6 +41,7 @@ export class WahaController implements OnApplicationBootstrap {
     private readonly wahaService: WahaService,
     private readonly prisma: PrismaService,
     private readonly omnichannelQueue: OmnichannelQueueService,
+    @Optional() private readonly availabilityService?: AvailabilityService,
     @Optional() private readonly configService?: ConfigService,
   ) {}
 
@@ -1194,7 +1196,53 @@ export class WahaController implements OnApplicationBootstrap {
                 }
               }
               if (reply.images && reply.images.length > 0) {
-                for (const img of reply.images) {
+                for (let img of reply.images) {
+                  // ponytail: on-demand realtime siteplan generation saat diminta customer
+                  if (
+                    this.availabilityService &&
+                    (img.url?.includes('siteplan') ||
+                      /siteplan|denah/i.test(img.caption || '') ||
+                      /siteplan|denah/i.test(reply.text || ''))
+                  ) {
+                    try {
+                      const instance = await this.prisma.whatsappInstance.findUnique({
+                        where: { instanceName: sessionName },
+                        select: { tenantId: true },
+                      });
+                      const effectiveTenantId = instance?.tenantId || sessionTenantId;
+
+                      const matchedGroup =
+                        (effectiveTenantId && reply.lead?.perumahan
+                          ? await this.prisma.resourceGroup.findFirst({
+                              where: {
+                                tenantId: effectiveTenantId,
+                                name: { contains: reply.lead.perumahan, mode: 'insensitive' as const },
+                              },
+                            })
+                          : null) ||
+                        (effectiveTenantId
+                          ? await this.prisma.resourceGroup.findFirst({
+                              where: { tenantId: effectiveTenantId },
+                            })
+                          : null) ||
+                        (await this.prisma.resourceGroup.findFirst({
+                          where: {
+                            tenant: { whatsappInstances: { some: { instanceName: sessionName } } },
+                          },
+                        }));
+                      if (matchedGroup) {
+                        const freshSiteplan = await this.availabilityService.generateSiteplanImage(matchedGroup.id);
+                        img = {
+                          ...img,
+                          url: freshSiteplan.url,
+                          caption: img.caption || `Denah Siteplan ${matchedGroup.name}`,
+                        };
+                      }
+                    } catch (e: any) {
+                      this.logger.warn(`Failed to generate on-demand siteplan: ${e.message}`);
+                    }
+                  }
+
                   if (sessionName === 'CLI_TEST_SESSION') {
                     this.cliOutputQueue.push({
                       type: 'image',

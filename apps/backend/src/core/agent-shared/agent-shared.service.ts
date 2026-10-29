@@ -383,7 +383,18 @@ export class AgentSharedService {
             if (raw.startsWith('[')) {
               const medias = JSON.parse(raw);
               if (Array.isArray(medias) && medias.length > 0) {
+                const siteplan = medias.find(
+                  (m: any) =>
+                    m.name?.toLowerCase().includes('siteplan') ||
+                    m.name?.toLowerCase().includes('denah') ||
+                    m.url?.includes('siteplan'),
+                );
+                let highlight = '';
+                if (siteplan) {
+                  highlight = `\n[FOTO SITEPLAN UTAMA PERUMAHAN ${g.name.toUpperCase()}] "${siteplan.name}": ${siteplan.url}\n(WAJIB: Jika pelanggan bertanya/meminta siteplan, denah, atau gambar letak kavling ${g.name}, Anda WAJIB menyertakan URL foto ini ke array "images"!).\n`;
+                }
                 mediaStr =
+                  highlight +
                   '\nDaftar Foto & Video yang tersedia untuk dikirimkan ke pelanggan:\n' +
                   medias
                     .map(
@@ -393,7 +404,7 @@ export class AgentSharedService {
                     .join('\n');
               }
             } else {
-              mediaStr = `\nFoto/Video Siteplan: ${raw}`;
+              mediaStr = `\n[FOTO SITEPLAN UTAMA PERUMAHAN ${g.name.toUpperCase()}] "Denah Siteplan ${g.name}": ${raw}\n(WAJIB: Jika pelanggan bertanya/meminta siteplan, denah, atau gambar letak kavling ${g.name}, Anda WAJIB menyertakan URL foto ini ke array "images"!).\nFoto/Video Siteplan: ${raw}`;
             }
           } catch (e) {}
         }

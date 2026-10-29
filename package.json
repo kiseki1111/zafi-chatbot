@@ -19,6 +19,7 @@
     "test:stress": "node tests/load/stress-runner.js",
     "test:persona": "node scripts/persona-user-tester.js",
     "test:waha:real": "node apps/backend/scripts/test-waha-real.js",
-    "test:waha:voice": "node scripts/test-send-voice-note.js"
+    "test:waha:voice": "node scripts/test-send-voice-note.js",
+    "test:waha:siteplan": "node scripts/test-siteplan-delivery.js"
   }
 }
