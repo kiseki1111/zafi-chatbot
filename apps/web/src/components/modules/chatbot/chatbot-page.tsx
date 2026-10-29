@@ -62,6 +62,9 @@ import {
   UserCog,
   Image as ImageIcon,
   Users,
+  Play,
+  Pause,
+  Mic,
 } from "lucide-react";
 import type {
   Contact,
@@ -177,6 +180,237 @@ function StatusTicks({ status }: { status: MessageStatus }) {
   return <X className="h-3.5 w-3.5 text-rose-300" aria-label="Gagal" />;
 }
 
+function formatMediaUrl(url?: string | null): string | undefined {
+  if (!url) return undefined;
+  // ponytail: proxy WAHA internal files if not downloaded locally
+  if (url.includes('/api/files/')) {
+    const pathPart = url.substring(url.indexOf('/api/files/'));
+    return `/api/waha/files/${pathPart.replace('/api/files/', '')}`;
+  }
+  return url;
+}
+
+function formatAudioTime(seconds: number): string {
+  if (isNaN(seconds) || seconds <= 0) return "0:00";
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+}
+
+const WAVEFORM_BARS = [
+  30, 50, 75, 40, 65, 85, 35, 95, 60, 45, 80, 55, 35, 70, 90, 50, 40, 80, 65, 45, 85, 70, 40, 60, 80, 50, 35, 55
+];
+
+function WhatsAppVoicePlayer({
+  src,
+  isOut,
+  contactName,
+}: {
+  src: string;
+  isOut?: boolean;
+  contactName?: string;
+}) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+
+  // ponytail: muat audio ke memory Blob URL agar ekstensi download manager (seperti IDM) tidak mencegat pemutaran
+  useEffect(() => {
+    let isMounted = true;
+    let objectUrl: string | null = null;
+
+    if (!src) return;
+
+    fetch(src)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.blob();
+      })
+      .then((blob) => {
+        if (isMounted) {
+          objectUrl = URL.createObjectURL(blob);
+          setBlobUrl(objectUrl);
+        }
+      })
+      .catch(() => {
+        if (isMounted) setBlobUrl(src);
+      });
+
+    return () => {
+      isMounted = false;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [src]);
+
+  const togglePlay = async () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      try {
+        await audioRef.current.play();
+      } catch {
+        if (audioRef.current) {
+          audioRef.current.load();
+          audioRef.current.play().catch(() => {});
+        }
+      }
+    }
+  };
+
+  const toggleSpeed = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!audioRef.current) return;
+    const nextSpeed = playbackSpeed === 1 ? 1.5 : playbackSpeed === 1.5 ? 2 : 1;
+    audioRef.current.playbackRate = nextSpeed;
+    setPlaybackSpeed(nextSpeed);
+  };
+
+  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!audioRef.current || !duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    audioRef.current.currentTime = pos * duration;
+    setCurrentTime(pos * duration);
+  };
+
+  const progress = duration > 0 ? currentTime / duration : 0;
+
+  return (
+    <div className="flex items-center gap-2.5 py-1 min-w-[240px] max-w-[290px] select-none">
+      {/* Play/Pause Button */}
+      <button
+        type="button"
+        onClick={togglePlay}
+        className={cn(
+          "h-9 w-9 shrink-0 rounded-full flex items-center justify-center transition-transform active:scale-95 shadow-sm",
+          isOut
+            ? "bg-white text-emerald-700 hover:bg-zinc-100"
+            : "bg-emerald-600 text-white hover:bg-emerald-700"
+        )}
+        aria-label={isPlaying ? "Jeda" : "Putar"}
+      >
+        {isPlaying ? (
+          <Pause className="h-4 w-4 fill-current" />
+        ) : (
+          <Play className="h-4 w-4 fill-current ml-0.5" />
+        )}
+      </button>
+
+      {/* Waveform & Scrubber */}
+      <div className="flex-1 flex flex-col justify-center gap-0.5">
+        <div
+          onClick={handleSeek}
+          className="relative flex items-center gap-[2.5px] h-6 cursor-pointer py-1"
+        >
+          {/* Waveform bars */}
+          {WAVEFORM_BARS.map((heightPercent, idx) => {
+            const barPos = idx / WAVEFORM_BARS.length;
+            const isPlayed = progress >= barPos;
+            return (
+              <div
+                key={idx}
+                className="flex-1 flex items-center justify-center h-full"
+              >
+                <div
+                  style={{ height: `${heightPercent}%` }}
+                  className={cn(
+                    "w-[2px] sm:w-[2.5px] rounded-full transition-colors",
+                    isPlayed
+                      ? isOut
+                        ? "bg-white"
+                        : "bg-emerald-600 dark:bg-emerald-400"
+                      : isOut
+                      ? "bg-white/40"
+                      : "bg-zinc-300 dark:bg-zinc-600"
+                  )}
+                />
+              </div>
+            );
+          })}
+
+          {/* Scrubber Green Dot */}
+          <div
+            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-3.5 w-3.5 rounded-full bg-emerald-500 border-2 border-white shadow-sm pointer-events-none transition-all"
+            style={{
+              left: `${Math.min(98, Math.max(2, progress * 100))}%`,
+            }}
+          />
+        </div>
+
+        {/* Time & Speed indicator */}
+        <div className="flex items-center justify-between text-[11px] leading-none font-medium opacity-80">
+          <span>{formatAudioTime(currentTime || duration)}</span>
+          <button
+            type="button"
+            onClick={toggleSpeed}
+            className={cn(
+              "px-1.5 py-0.5 rounded-full text-[10px] font-bold transition-colors leading-none",
+              isOut
+                ? "bg-white/20 hover:bg-white/30 text-white"
+                : "bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 text-zinc-700 dark:text-zinc-200"
+            )}
+          >
+            {playbackSpeed}x
+          </button>
+        </div>
+      </div>
+
+      {/* Avatar on the right with Mic Badge (like WhatsApp VN) */}
+      <div className="relative shrink-0 ml-1">
+        <Avatar className="h-10 w-10 border border-zinc-200/50 dark:border-zinc-700/50 shadow-xs">
+          <AvatarFallback
+            className={cn(
+              "text-xs font-bold",
+              isOut
+                ? "bg-emerald-800 text-white"
+                : "bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200"
+            )}
+          >
+            {initials(contactName || "User")}
+          </AvatarFallback>
+        </Avatar>
+        <div className="absolute -bottom-0.5 -left-0.5 bg-white dark:bg-zinc-950 rounded-full p-0.5 shadow-xs border border-zinc-200 dark:border-zinc-800">
+          <Mic className="h-3 w-3 text-emerald-500 fill-emerald-500" />
+        </div>
+      </div>
+
+      <audio
+        ref={audioRef}
+        src={blobUrl || undefined}
+        preload="auto"
+        onTimeUpdate={() => {
+          if (audioRef.current) {
+            setCurrentTime(audioRef.current.currentTime);
+            if (!duration && audioRef.current.duration) {
+              setDuration(audioRef.current.duration);
+            }
+          }
+        }}
+        onLoadedMetadata={() => {
+          if (audioRef.current) {
+            setDuration(audioRef.current.duration);
+          }
+        }}
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+        onEnded={() => {
+          setIsPlaying(false);
+          setCurrentTime(0);
+        }}
+        onError={() => {
+          setIsPlaying(false);
+        }}
+      />
+    </div>
+  );
+}
+
 function MessageBubble({
   msg,
   contactName,
@@ -188,7 +422,12 @@ function MessageBubble({
   const isCall = msg.messageType === "call";
   const isImage = msg.messageType === "image" && msg.mediaUrl;
   const isVideo = msg.messageType === "video" && msg.mediaUrl;
-  const isAudio = (msg.messageType === "audio" || msg.messageType === "ptt" || msg.messageType === "voice") && msg.mediaUrl;
+  const isAudio =
+    (msg.messageType === "audio" ||
+      msg.messageType === "ptt" ||
+      msg.messageType === "voice" ||
+      /\.(ogg|oga|opus|mp3|wav|m4a)($|\?)/i.test(msg.mediaUrl || "")) &&
+    Boolean(msg.mediaUrl);
 
   if (isCall) {
     return (
@@ -268,11 +507,10 @@ function MessageBubble({
           />
         ) : null}
         {isAudio ? (
-          <audio
-            src={msg.mediaUrl}
-            controls
-            preload="metadata"
-            className="w-full max-w-xs my-1"
+          <WhatsAppVoicePlayer
+            src={msg.mediaUrl!}
+            isOut={isOut}
+            contactName={isOut ? (msg.isAI ? "AI" : msg.senderName || "Admin") : contactName}
           />
         ) : null}
         {/* Untuk pesan image/video/audio: sembunyikan placeholder caption default */}
@@ -804,7 +1042,7 @@ export function ChatbotPage() {
           isFollowUp,
           senderName: m.senderType === 'agent' ? (m.sender?.name || 'Admin') : undefined,
           messageType: m.messageType?.toLowerCase(),
-          mediaUrl: meta?.localMediaUrl || meta?.mediaUrl || meta?.url,
+          mediaUrl: formatMediaUrl(meta?.localMediaUrl || meta?.mediaUrl || meta?.url),
         };
       });
       
@@ -894,7 +1132,7 @@ export function ChatbotPage() {
                 isFollowUp,
                 senderName: m.senderType === 'agent' ? (m.sender?.name || 'Admin') : undefined,
                 messageType: m.messageType?.toLowerCase(),
-                mediaUrl: meta?.localMediaUrl || meta?.mediaUrl || meta?.url,
+                mediaUrl: formatMediaUrl(meta?.localMediaUrl || meta?.mediaUrl || meta?.url),
               };
             });
             setMessages(prev => {
@@ -931,7 +1169,7 @@ export function ChatbotPage() {
                 isFollowUp,
                 senderName: raw.senderType === 'agent' ? (raw.sender?.name || 'Admin') : undefined,
                 messageType: raw.messageType?.toLowerCase(),
-                mediaUrl: rawMeta?.localMediaUrl || rawMeta?.mediaUrl || rawMeta?.url,
+                mediaUrl: formatMediaUrl(rawMeta?.localMediaUrl || rawMeta?.mediaUrl || rawMeta?.url),
               };
               setMessages((prev) => {
                 if (prev.some((p) => p.id === liveMsg.id)) return prev;

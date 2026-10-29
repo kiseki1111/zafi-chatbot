@@ -1108,16 +1108,47 @@ export class WahaService implements OnApplicationBootstrap {
     }
   }
 
+  getBaseUrl(): string {
+    return this.baseUrl;
+  }
+
+  getApiKey(): string {
+    return this.apiKey;
+  }
+
+  async getMediaStreamOrBuffer(pathPart: string): Promise<{ data: Buffer; mimetype: string } | null> {
+    try {
+      const cleanPath = pathPart.replace(/^\/+/, '');
+      const targetUrl = `${this.baseUrl}/api/files/${cleanPath}`;
+      const res = await axios.get(targetUrl, {
+        headers: {
+          'X-Api-Key': this.apiKey,
+          Accept: '*/*',
+        },
+        responseType: 'arraybuffer',
+        timeout: 30000,
+      });
+      return {
+        data: Buffer.from(res.data),
+        mimetype: String(res.headers['content-type'] || 'application/octet-stream'),
+      };
+    } catch (e: any) {
+      this.logger.warn(`Could not proxy media file ${pathPart}: ${e.message}`);
+      return null;
+    }
+  }
+
   private getCleanExt(mimetype: string, fallback = 'jpg'): string {
     const raw = (mimetype.split('/')[1] || fallback).split(';')[0].trim().toLowerCase();
     if (raw === 'jpeg') return 'jpg';
     if (raw === 'mpeg') return 'mp3';
+    if (raw === 'oga' || raw === 'opus') return 'ogg';
     return raw;
   }
 
   /**
    * Unduh media yang diterima dan simpan ke folder uploads lokal (VPS disk),
-   * agar gambar/video dapat langsung ditampilkan di dashboard monitoring.
+   * agar gambar/video/audio dapat langsung ditampilkan dan diputar di dashboard monitoring.
    * Mengembalikan URL lokal (/uploads/...) atau null jika gagal.
    */
   async downloadAndStoreMedia(
@@ -1152,34 +1183,45 @@ export class WahaService implements OnApplicationBootstrap {
         }
       }
 
-      // 2. Coba unduh langsung dari URL eksternal (WhatsApp CDN / hosted)
-      if (mediaUrl && mediaUrl.startsWith('http')) {
-        // Perbaiki URL media dari WAHA yang salah host/port (mis. localhost:3000)
-        // -> arahkan ke baseUrl WAHA yang benar
+      // 2. Normalisasi URL sumber: redirect internal WAHA host ke baseUrl WAHA yang benar
+      if (mediaUrl) {
         let targetUrl = mediaUrl;
-        if (
-          /localhost|127\.0\.0\.1|\.\.:3000/i.test(mediaUrl) &&
-          mediaUrl.includes('/api/files/')
-        ) {
+        if (mediaUrl.includes('/api/files/')) {
           const pathPart = mediaUrl.substring(mediaUrl.indexOf('/api/files/'));
           targetUrl = `${this.baseUrl}${pathPart}`;
           this.logger.log(
             `[MEDIA-DOWNLOAD] Memperbaiki URL WAHA: ${mediaUrl} -> ${targetUrl}`,
           );
+        } else if (mediaUrl.startsWith('/')) {
+          targetUrl = `${this.baseUrl}${mediaUrl}`;
         }
 
-        const res = await axios.get(targetUrl, {
-          responseType: 'arraybuffer',
-          headers: this.getHeaders(),
-          timeout: 30000,
-        });
-        const mime = String(res.headers['content-type'] || 'image/jpeg');
-        const ext = this.getCleanExt(mime, 'jpg');
-        return this.writeMediaBuffer(Buffer.from(res.data), mime, ext);
+        if (targetUrl.startsWith('http')) {
+          const isWahaInternal = targetUrl.startsWith(this.baseUrl) || targetUrl.includes('/api/files/');
+          const res = await axios.get(targetUrl, {
+            responseType: 'arraybuffer',
+            headers: {
+              Accept: '*/*',
+              ...(isWahaInternal && this.apiKey ? { 'X-Api-Key': this.apiKey } : {}),
+            },
+            timeout: 30000,
+          });
+          const mime = String(res.headers['content-type'] || 'application/octet-stream');
+          let ext = this.getCleanExt(mime, 'jpg');
+          // ponytail: ambil ekstensi audio/media dari URL jika MIME type bersifat generik
+          if (ext === 'octet-stream' || ext === 'jpg' || ext === 'plain') {
+            const urlMatch = targetUrl.match(/\.(ogg|oga|opus|mp3|wav|m4a|aac|mp4|webm|jpg|jpeg|png|webp|pdf)($|\?)/i);
+            if (urlMatch) {
+              const matchedExt = urlMatch[1].toLowerCase();
+              ext = matchedExt === 'oga' || matchedExt === 'opus' ? 'ogg' : matchedExt;
+            }
+          }
+          return this.writeMediaBuffer(Buffer.from(res.data), mime, ext);
+        }
       }
 
       return null;
-    } catch (e) {
+    } catch (e: any) {
       this.logger.warn(
         `Could not download & store media ${messageId}: ${e.message}`,
       );
@@ -1193,15 +1235,17 @@ export class WahaService implements OnApplicationBootstrap {
     ext: string,
   ): string | null {
     try {
+      // ponytail: normalisasi oga & opus ke ogg agar kompatibel penuh pemutar HTML5 web browser
+      const cleanExt = ext === 'oga' || ext === 'opus' ? 'ogg' : ext;
       const uploadsPath = path.join(process.cwd(), 'uploads', 'incoming');
       if (!fs.existsSync(uploadsPath)) {
         fs.mkdirSync(uploadsPath, { recursive: true });
       }
-      const filename = `${Date.now()}-${Math.round(Math.random() * 1e6)}.${ext}`;
+      const filename = `${Date.now()}-${Math.round(Math.random() * 1e6)}.${cleanExt}`;
       const filePath = path.join(uploadsPath, filename);
       fs.writeFileSync(filePath, buffer);
       return `/uploads/incoming/${filename}`;
-    } catch (e) {
+    } catch (e: any) {
       this.logger.warn(`Could not write media to disk: ${e.message}`);
       return null;
     }

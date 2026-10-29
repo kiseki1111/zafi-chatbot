@@ -18,6 +18,7 @@
     "test:security": "node tests/security/penetration-test.js",
     "test:stress": "node tests/load/stress-runner.js",
     "test:persona": "node scripts/persona-user-tester.js",
-    "test:waha:real": "node apps/backend/scripts/test-waha-real.js"
+    "test:waha:real": "node apps/backend/scripts/test-waha-real.js",
+    "test:waha:voice": "node scripts/test-send-voice-note.js"
   }
 }

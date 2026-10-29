@@ -17,6 +17,10 @@ const nextConfig: NextConfig = {
         source: "/api/waha/:path*",
         destination: `${backendUrl}/api/v1/waha/:path*`,
       },
+      {
+        source: "/uploads/:path*",
+        destination: `${backendUrl}/uploads/:path*`,
+      },
     ];
   },
 };

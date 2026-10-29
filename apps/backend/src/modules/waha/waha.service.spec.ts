@@ -221,4 +221,38 @@ describe('WahaService - Unit Tests (Features 1, 2, 6)', () => {
       );
     });
   });
+
+  describe('Feature 8: Voice Note / Audio Media Download (downloadAndStoreMedia)', () => {
+    it('harus mengunduh voice note dari WAHA dan menyimpan sebagai file lokal .ogg', async () => {
+      mockedAxios.get.mockResolvedValueOnce({
+        data: Buffer.from('fake-audio-binary'),
+        headers: { 'content-type': 'audio/ogg; codecs=opus' },
+      });
+
+      const res = await service.downloadAndStoreMedia(
+        'zafi-property',
+        'msg-ptt-123',
+        'http://localhost:3000/api/files/zafi-property/voice.oga',
+      );
+
+      expect(mockedAxios.get).toHaveBeenCalledWith(
+        expect.stringContaining('/api/files/zafi-property/voice.oga'),
+        expect.objectContaining({
+          responseType: 'arraybuffer',
+        }),
+      );
+      expect(res).toMatch(/^\/uploads\/incoming\/\d+-\d+\.ogg$/);
+    });
+
+    it('harus mengembalikan URL yang sama jika mediaUrl sudah merupakan path lokal (/uploads/)', async () => {
+      const res = await service.downloadAndStoreMedia(
+        'zafi-property',
+        'msg-local-123',
+        '/uploads/incoming/existing-voice.ogg',
+      );
+
+      expect(res).toBe('/uploads/incoming/existing-voice.ogg');
+      expect(mockedAxios.get).not.toHaveBeenCalled();
+    });
+  });
 });

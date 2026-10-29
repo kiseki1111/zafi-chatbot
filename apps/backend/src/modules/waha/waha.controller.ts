@@ -357,6 +357,7 @@ export class WahaController implements OnApplicationBootstrap {
     }
   }
 
+  @Public()
   @SkipThrottle()
   @Get('media/:session/:messageId')
   async getMedia(
@@ -370,12 +371,33 @@ export class WahaController implements OnApplicationBootstrap {
         return res.status(404).send({ error: 'Media not found' });
       }
       res.setHeader('Content-Type', media.mimetype || 'image/jpeg');
+      res.setHeader('Content-Disposition', 'inline');
       return res.send(media.data);
     } catch (error) {
       this.logger.warn(`Failed to proxy media ${messageId}: ${error.message}`);
       return res.status(error.response?.status || 500).send({
         error: error.message,
       });
+    }
+  }
+
+  @Public()
+  @SkipThrottle()
+  @Get('files/*')
+  async proxyWahaFile(@Req() req: any, @Res() res: any) {
+    try {
+      const idx = req.url.indexOf('/files/');
+      const pathPart = idx !== -1 ? req.url.substring(idx + '/files/'.length) : '';
+      const file = await this.wahaService.getMediaStreamOrBuffer(pathPart);
+      if (!file || !file.data) {
+        return res.status(404).send({ error: 'File not found' });
+      }
+      res.setHeader('Content-Type', file.mimetype || 'application/octet-stream');
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Content-Disposition', 'inline');
+      return res.send(file.data);
+    } catch (e: any) {
+      return res.status(e.response?.status || 404).send({ error: 'File not found' });
     }
   }
 
@@ -862,10 +884,20 @@ export class WahaController implements OnApplicationBootstrap {
             );
           }
 
+          const msgMetadata = {
+            ...message,
+            ...(extractedMediaUrl
+              ? { mediaUrl: storedMediaUrl || extractedMediaUrl }
+              : {}),
+            ...(storedMediaUrl ? { localMediaUrl: storedMediaUrl } : {}),
+          };
+
           const createdMsg = await this.prisma.message.upsert({
             where: { wahaMessageId: msgId },
             update: {
               status: message.fromMe ? 'SENT' : 'RECEIVED',
+              messageType: finalMessageType,
+              metadata: msgMetadata,
             },
             create: {
               wahaMessageId: msgId,
@@ -874,13 +906,7 @@ export class WahaController implements OnApplicationBootstrap {
               messageType: finalMessageType,
               content: message.body || defaultContent,
               status: message.fromMe ? 'SENT' : 'RECEIVED',
-              metadata: {
-                ...message,
-                ...(extractedMediaUrl
-                  ? { mediaUrl: storedMediaUrl || extractedMediaUrl }
-                  : {}),
-                ...(storedMediaUrl ? { localMediaUrl: storedMediaUrl } : {}),
-              },
+              metadata: msgMetadata,
             },
           });
 

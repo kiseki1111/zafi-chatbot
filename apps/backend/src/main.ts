@@ -43,9 +43,17 @@ async function bootstrap() {
     prefix: '/uploads/',
     setHeaders: (res, path) => {
       res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Content-Disposition', 'inline');
       if (path && path.toLowerCase().endsWith('.pdf')) {
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'inline');
+      } else if (path && /\.(ogg|oga|opus)$/i.test(path)) {
+        res.setHeader('Content-Type', 'audio/ogg');
+      } else if (path && /\.mp3$/i.test(path)) {
+        res.setHeader('Content-Type', 'audio/mpeg');
+      } else if (path && /\.wav$/i.test(path)) {
+        res.setHeader('Content-Type', 'audio/wav');
+      } else if (path && /\.m4a$/i.test(path)) {
+        res.setHeader('Content-Type', 'audio/mp4');
       }
     },
   });
