@@ -76,7 +76,7 @@ export class ContactsService {
       },
     });
 
-    return contacts.map((c) => {
+    const mapped = contacts.map((c) => {
       let realPhone = c.phone;
       const msgs = c.conversations?.[0]?.messages || [];
       for (const msg of msgs) {
@@ -125,6 +125,28 @@ export class ContactsService {
         lastChatAt: c.conversations?.[0]?.lastMessageAt || c.updatedAt,
       };
     });
+
+    // ponytail: deduplicate contacts by phone; keep richer CRM record over empty duplicate
+    const seen = new Map<string, (typeof mapped)[0]>();
+    for (const item of mapped) {
+      const existing = seen.get(item.phone);
+      if (!existing) {
+        seen.set(item.phone, item);
+      } else {
+        const itemScore =
+          (item.status !== 'NEW' ? 2 : 0) +
+          (item.notes ? 2 : 0) +
+          (item.conversations?.length ? 1 : 0);
+        const existingScore =
+          (existing.status !== 'NEW' ? 2 : 0) +
+          (existing.notes ? 2 : 0) +
+          (existing.conversations?.length ? 1 : 0);
+        if (itemScore > existingScore) {
+          seen.set(item.phone, item);
+        }
+      }
+    }
+    return Array.from(seen.values());
   }
 
   async getContact(id: string, tenantId?: string) {

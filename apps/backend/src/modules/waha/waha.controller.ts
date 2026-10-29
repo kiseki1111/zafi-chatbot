@@ -52,7 +52,54 @@ export class WahaController implements OnApplicationBootstrap {
           `[Waha Startup Recovery] Gagal recover pesan tertinggal: ${e.message}`,
         ),
       );
+      this.cleanDuplicateContacts().catch((e) =>
+        this.logger.warn(`[Self-Healing] Gagal membersihkan kontak duplikat: ${e.message}`),
+      );
     }, 3000);
+  }
+
+  // ponytail: self-healing cleanup for duplicate blank contacts (0 messages/notes) caused by outbound webhooks
+  private async cleanDuplicateContacts() {
+    try {
+      const duplicates = await this.prisma.contact.groupBy({
+        by: ['phone'],
+        _count: { phone: true },
+        having: { phone: { _count: { gt: 1 } } },
+      });
+
+      for (const dup of duplicates) {
+        const contacts = await this.prisma.contact.findMany({
+          where: { phone: dup.phone },
+          include: {
+            conversations: {
+              include: {
+                messages: { select: { id: true } },
+              },
+            },
+          },
+        });
+
+        // Urutkan: kontak dengan pesan terbanyak / data CRM terkaya diprioritaskan
+        const sorted = contacts.sort((a, b) => {
+          const aMsgs = a.conversations.reduce((sum, c) => sum + c.messages.length, 0);
+          const bMsgs = b.conversations.reduce((sum, c) => sum + c.messages.length, 0);
+          const aScore = (aMsgs > 0 ? 10 : 0) + (a.notes ? 5 : 0) + (a.status !== 'NEW' ? 3 : 0);
+          const bScore = (bMsgs > 0 ? 10 : 0) + (b.notes ? 5 : 0) + (b.status !== 'NEW' ? 3 : 0);
+          return bScore - aScore;
+        });
+
+        const toRemove = sorted.slice(1);
+        for (const extra of toRemove) {
+          const extraMsgs = extra.conversations.reduce((sum, c) => sum + c.messages.length, 0);
+          if (extraMsgs === 0) {
+            await this.prisma.contact.delete({ where: { id: extra.id } }).catch(() => null);
+            this.logger.log(`[Self-Healing] Hapus kontak duplikat kosong: ${dup.phone} (ID: ${extra.id})`);
+          }
+        }
+      }
+    } catch (e) {
+      this.logger.debug(`cleanDuplicateContacts error: ${e.message}`);
+    }
   }
 
   private async recoverUnrepliedMessages() {
@@ -606,7 +653,7 @@ export class WahaController implements OnApplicationBootstrap {
       }
     }
 
-    // Process message events: Gunakan HANYA event 'message' agar tidak dobel dengan 'message.any'
+    // ponytail: handle only 'message' event to prevent duplicate contacts/messages from outbound message.any webhooks
     if (payload?.event === 'message') {
       const message = payload.payload;
       const sessionName = payload.session;
@@ -688,16 +735,33 @@ export class WahaController implements OnApplicationBootstrap {
           });
           sessionTenantId = inst?.tenantId || null;
 
-          const contact = await this.prisma.contact.findFirst({
+          const phoneConditions = [
+            { phone: contactNumber },
+            { phone: `+${contactNumber}` },
+            { phone: rawNumber },
+            ...(message?.from ? [{ phone: message.from }] : []),
+          ];
+
+          let contact = await this.prisma.contact.findFirst({
             where: {
-              ...(sessionTenantId ? { tenantId: sessionTenantId } : {}),
-              OR: [
-                { phone: contactNumber },
-                { phone: rawNumber },
-                ...(message?.from ? [{ phone: message.from }] : []),
-              ],
+              OR: phoneConditions,
+              ...(sessionTenantId
+                ? {
+                    OR: [
+                      { tenantId: sessionTenantId },
+                      { tenantId: null },
+                    ],
+                  }
+                : {}),
             },
           });
+
+          // ponytail: fallback to phone match if tenantId was null on initial creation
+          if (!contact) {
+            contact = await this.prisma.contact.findFirst({
+              where: { OR: phoneConditions },
+            });
+          }
           let contactId;
           const defaultAnonName = 'Anonim';
           const isValidPushName = Boolean(
@@ -730,6 +794,7 @@ export class WahaController implements OnApplicationBootstrap {
               where: { id: contact.id },
               data: {
                 phone: contactNumber,
+                ...(sessionTenantId && !contact.tenantId ? { tenantId: sessionTenantId } : {}),
                 ...(shouldApplyProfileName && isValidPushName ? { name: contactName } : {}),
                 metadata: updatedMeta,
               },

@@ -415,11 +415,30 @@ export class WahaService implements OnApplicationBootstrap {
     }
   }
 
+  // ponytail: dev safety guard: if WAHA_DEV_TEST_PHONE is set, allow sending real messages ONLY to this specified number.
+  private isAllowedDevTarget(chatId: string): boolean {
+    if (process.env.NODE_ENV === 'test') return true;
+    const devAllowedPhone =
+      process.env.WAHA_DEV_TEST_PHONE ||
+      this.configService?.get<string>('WAHA_DEV_TEST_PHONE');
+    if (!devAllowedPhone) return true;
+
+    const cleanTarget = (chatId || '').replace(/[^0-9]/g, '');
+    const cleanAllowed = devAllowedPhone.replace(/[^0-9]/g, '');
+    return cleanTarget === cleanAllowed;
+  }
+
   async sendMessage(
     sessionName: string,
     chatId: string,
     text: string,
   ): Promise<any> {
+    if (!this.isAllowedDevTarget(chatId)) {
+      this.logger.warn(
+        `[WAHA DEV GUARD] Pengiriman ke ${chatId} dialihkan ke simulasi karena dibatasi hanya ke nomor uji: ${process.env.WAHA_DEV_TEST_PHONE}`,
+      );
+      return { id: `mock-dev-${Date.now()}`, body: text, devGuarded: true };
+    }
     try {
       this.logger.log(
         `[WahaService] Menyiapkan pengiriman balasan ke ${chatId} (Sesi: ${sessionName})...`,
@@ -588,6 +607,12 @@ export class WahaService implements OnApplicationBootstrap {
     imageUrl: string,
     caption?: string,
   ): Promise<any> {
+    if (!this.isAllowedDevTarget(chatId)) {
+      this.logger.warn(
+        `[WAHA DEV GUARD] Pengiriman gambar ke ${chatId} dialihkan ke simulasi karena dibatasi hanya ke nomor uji: ${process.env.WAHA_DEV_TEST_PHONE}`,
+      );
+      return { id: `mock-dev-img-${Date.now()}`, devGuarded: true };
+    }
     try {
       imageUrl = this.resolveMediaUrl(imageUrl);
       this.logger.log(
@@ -709,6 +734,12 @@ export class WahaService implements OnApplicationBootstrap {
     mediaUrl: string,
     caption?: string,
   ): Promise<any> {
+    if (!this.isAllowedDevTarget(chatId)) {
+      this.logger.warn(
+        `[WAHA DEV GUARD] Pengiriman media ke ${chatId} dialihkan ke simulasi karena dibatasi hanya ke nomor uji: ${process.env.WAHA_DEV_TEST_PHONE}`,
+      );
+      return { id: `mock-dev-media-${Date.now()}`, devGuarded: true };
+    }
     mediaUrl = this.resolveMediaUrl(mediaUrl);
     this.logger.log(
       `[WAHA-SEND-MEDIA] Sesi=${sessionName} | Chat=${chatId} | URL yang diakses: ${mediaUrl}`,

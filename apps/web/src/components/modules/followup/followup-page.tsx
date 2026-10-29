@@ -230,7 +230,11 @@ export function FollowupPage() {
       if (!res.ok) throw new Error("Gagal trigger");
       const r = await res.json();
       const d = r.data ?? r;
-      toast.success(`Follow-up selesai: ${d.sent ?? 0} terkirim, ${d.errors ?? 0} gagal`);
+      if (d.busy) {
+        toast.info("Follow-up saat ini sedang berlangsung di latar belakang.");
+      } else {
+        toast.success(`Follow-up selesai: ${d.sent ?? 0} terkirim, ${d.errors ?? 0} gagal`);
+      }
       loadAll();
     } catch {
       toast.error("Gagal menjalankan follow-up");

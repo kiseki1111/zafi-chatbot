@@ -155,10 +155,17 @@ export class AgentSharedService {
     limit: number = 6,
   ) {
     try {
+      const cleanPhone = (chatId || '').replace(/[^0-9]/g, '');
       const messages = await this.prisma.message.findMany({
         where: {
           conversation: {
-            contact: { phone: chatId },
+            contact: {
+              OR: [
+                { phone: chatId },
+                { phone: cleanPhone },
+                { phone: `+${cleanPhone}` },
+              ],
+            },
             instanceName: instanceName,
           },
         },

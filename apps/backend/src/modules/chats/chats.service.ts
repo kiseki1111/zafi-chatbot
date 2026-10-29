@@ -47,7 +47,7 @@ export class ChatsService {
       },
     });
 
-    return conversations.map((c) => {
+    const mapped = conversations.map((c) => {
       let realPhone = c.contact?.phone || '';
       for (const msg of c.messages || []) {
         const meta = msg.metadata as any;
@@ -131,6 +131,19 @@ export class ChatsService {
         contactNumber: cleanPhone,
       };
     });
+
+    // ponytail: deduplicate conversation list by instance:contactNumber, keep one with more messages
+    const seen = new Map<string, (typeof mapped)[0]>();
+    for (const conv of mapped) {
+      const key = `${conv.instanceName}:${conv.contactNumber}`;
+      const existing = seen.get(key);
+      if (!existing) {
+        seen.set(key, conv);
+      } else if ((conv.messages?.length || 0) > (existing.messages?.length || 0)) {
+        seen.set(key, conv);
+      }
+    }
+    return Array.from(seen.values());
   }
 
   async getMessages(

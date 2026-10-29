@@ -67,8 +67,10 @@ export class FollowUpController {
       name?: string;
       instanceName?: string;
     },
+    @Req() req?: any,
   ) {
-    return this.followUpService.addToQueue(body);
+    const tenantId = this.resolveTenantId(req);
+    return this.followUpService.addToQueue(body, tenantId);
   }
 
   @Delete('queue/:contactId/:instanceName')

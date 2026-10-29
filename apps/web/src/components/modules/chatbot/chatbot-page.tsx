@@ -223,7 +223,18 @@ function MessageBubble({
             : "bg-background border rounded-bl-sm",
         )}
       >
-        {msg.isAI && (
+        {msg.isFollowUp ? (
+          <div
+            className={cn(
+              "mb-1 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+              isOut
+                ? "bg-amber-400/20 text-amber-100 border border-amber-300/30"
+                : "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+            )}
+          >
+            <Sparkles className="h-3 w-3" /> Follow-Up AI
+          </div>
+        ) : msg.isAI ? (
           <div
             className={cn(
               "mb-1 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
@@ -234,8 +245,8 @@ function MessageBubble({
           >
             <Bot className="h-3 w-3" /> AI
           </div>
-        )}
-        {msg.senderName && !msg.isAI && isOut && (
+        ) : null}
+        {msg.senderName && !msg.isAI && !msg.isFollowUp && isOut && (
           <div className="mb-1 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold bg-white/20 text-white">
             <UserCog className="h-3 w-3" /> {msg.senderName}
           </div>
@@ -779,18 +790,23 @@ export function ChatbotPage() {
         setHasMore(false);
         return;
       }
-      const mappedMsgs: ChatMessage[] = msgsData.map((m: any) => ({
-        id: m.id,
-        contactId: m.conversationId,
-        direction: m.senderType === 'customer' ? 'in' : 'out',
-        text: m.content,
-        status: m.status?.toLowerCase() || 'sent',
-        timestamp: new Date(m.createdAt).toLocaleTimeString(),
-        isAI: m.senderType === 'bot' || m.senderType === 'ai',
-        senderName: m.senderType === 'agent' ? (m.sender?.name || 'Admin') : undefined,
-        messageType: m.messageType?.toLowerCase(),
-        mediaUrl: (m.metadata as any)?.localMediaUrl || (m.metadata as any)?.mediaUrl || (m.metadata as any)?.url,
-      }));
+      const mappedMsgs: ChatMessage[] = msgsData.map((m: any) => {
+        const meta = (m.metadata as any) || {};
+        const isFollowUp = Boolean(meta.isFollowUp || meta.source === 'automated_follow_up');
+        return {
+          id: m.id,
+          contactId: m.conversationId,
+          direction: m.senderType === 'customer' ? 'in' : 'out',
+          text: m.content,
+          status: m.status?.toLowerCase() || 'sent',
+          timestamp: new Date(m.createdAt).toLocaleTimeString(),
+          isAI: m.senderType === 'bot' || m.senderType === 'ai',
+          isFollowUp,
+          senderName: m.senderType === 'agent' ? (m.sender?.name || 'Admin') : undefined,
+          messageType: m.messageType?.toLowerCase(),
+          mediaUrl: meta?.localMediaUrl || meta?.mediaUrl || meta?.url,
+        };
+      });
       
       if (reset) {
          setMessages(mappedMsgs);
@@ -864,18 +880,23 @@ export function ChatbotPage() {
               msgsData = data.data;
             }
             if (!Array.isArray(msgsData)) return;
-            const mappedMsgs: ChatMessage[] = msgsData.map((m: any) => ({
-              id: m.id,
-              contactId: m.conversationId,
-              direction: m.senderType === 'customer' ? 'in' : 'out',
-              text: m.content,
-              status: m.status?.toLowerCase() || 'sent',
-              timestamp: new Date(m.createdAt).toLocaleTimeString(),
-              isAI: m.senderType === 'bot' || m.senderType === 'ai',
-              senderName: m.senderType === 'agent' ? (m.sender?.name || 'Admin') : undefined,
-              messageType: m.messageType?.toLowerCase(),
-              mediaUrl: (m.metadata as any)?.localMediaUrl || (m.metadata as any)?.mediaUrl || (m.metadata as any)?.url,
-            }));
+            const mappedMsgs: ChatMessage[] = msgsData.map((m: any) => {
+              const meta = (m.metadata as any) || {};
+              const isFollowUp = Boolean(meta.isFollowUp || meta.source === 'automated_follow_up');
+              return {
+                id: m.id,
+                contactId: m.conversationId,
+                direction: m.senderType === 'customer' ? 'in' : 'out',
+                text: m.content,
+                status: m.status?.toLowerCase() || 'sent',
+                timestamp: new Date(m.createdAt).toLocaleTimeString(),
+                isAI: m.senderType === 'bot' || m.senderType === 'ai',
+                isFollowUp,
+                senderName: m.senderType === 'agent' ? (m.sender?.name || 'Admin') : undefined,
+                messageType: m.messageType?.toLowerCase(),
+                mediaUrl: meta?.localMediaUrl || meta?.mediaUrl || meta?.url,
+              };
+            });
             setMessages(prev => {
                if (skip <= 20) return mappedMsgs;
                const existingIds = new Set(prev.map(p => p.id));
@@ -897,6 +918,8 @@ export function ChatbotPage() {
             const raw = payload.data.message;
             if (raw.conversationId === activeId) {
               const isBot = raw.senderType === 'bot' || raw.senderType === 'ai';
+              const rawMeta = (raw.metadata as any) || {};
+              const isFollowUp = Boolean(rawMeta.isFollowUp || rawMeta.source === 'automated_follow_up');
               const liveMsg: ChatMessage = {
                 id: raw.id || `live-${Date.now()}`,
                 contactId: raw.conversationId,
@@ -905,9 +928,10 @@ export function ChatbotPage() {
                 timestamp: new Date(raw.createdAt || Date.now()).toLocaleTimeString(),
                 status: 'delivered',
                 isAI: isBot,
+                isFollowUp,
                 senderName: raw.senderType === 'agent' ? (raw.sender?.name || 'Admin') : undefined,
                 messageType: raw.messageType?.toLowerCase(),
-                mediaUrl: (raw.metadata as any)?.localMediaUrl || (raw.metadata as any)?.mediaUrl || (raw.metadata as any)?.url,
+                mediaUrl: rawMeta?.localMediaUrl || rawMeta?.mediaUrl || rawMeta?.url,
               };
               setMessages((prev) => {
                 if (prev.some((p) => p.id === liveMsg.id)) return prev;

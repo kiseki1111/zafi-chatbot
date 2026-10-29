@@ -31,10 +31,13 @@ describe('Follow-Up Automation Flow (e2e)', () => {
   };
 
   const mockWaha = {
+    sendMessage: jest.fn().mockResolvedValue({ success: true, messageId: 'msg-flw-1' }),
     sendTextMessage: jest.fn().mockResolvedValue({ success: true, messageId: 'msg-1' }),
   };
 
   const mockAgentShared = {
+    getRecentContext: jest.fn().mockResolvedValue([]),
+    callLLM: jest.fn().mockResolvedValue('Halo Kak, ada yang bisa dibantu kembali?'),
     generateFollowUpText: jest.fn().mockResolvedValue('Halo Kak, ada yang bisa dibantu kembali?'),
   };
 
@@ -128,6 +131,129 @@ describe('Follow-Up Automation Flow (e2e)', () => {
       expect(response.body).toHaveProperty('totalFollowedUp', 42);
       expect(response.body).toHaveProperty('pendingCount', 0);
       expect(response.body).toHaveProperty('isEnabled', false);
+    });
+  });
+
+  describe('GET /api/v1/followup/list', () => {
+    it('harus mengembalikan daftar kontak inaktif yang belum di-follow-up (200)', async () => {
+      context.mockPrisma.followUpConfig.findUnique.mockResolvedValue({
+        isEnabled: true,
+        inactivityHours: 24,
+      });
+
+      const pastDate = new Date(Date.now() - 36 * 3600 * 1000);
+      context.mockPrisma.conversation.findMany.mockResolvedValue([
+        {
+          contactId: 'c-inactive-1',
+          instanceName: 'zafi-property',
+          contact: { id: 'c-inactive-1', phone: '62812345678', name: 'Dewi' },
+          lastMessageAt: pastDate,
+        },
+      ]);
+      context.mockPrisma.followUp.findMany.mockResolvedValue([]);
+
+      const response = await request(app.getHttpServer())
+        .get('/api/v1/followup/list')
+        .expect(200);
+
+      expect(response.body).toHaveLength(1);
+      expect(response.body[0].contactId).toBe('c-inactive-1');
+      expect(response.body[0].contactPhone).toBe('62812345678');
+    });
+
+    it('harus mengabaikan kontak yang sudah pernah di-follow-up jika belum ada balasan (200)', async () => {
+      context.mockPrisma.followUpConfig.findUnique.mockResolvedValue({
+        isEnabled: true,
+        inactivityHours: 24,
+      });
+
+      const pastDate = new Date(Date.now() - 36 * 3600 * 1000);
+      context.mockPrisma.conversation.findMany.mockResolvedValue([
+        {
+          contactId: 'c-already-followed',
+          instanceName: 'zafi-property',
+          contact: { id: 'c-already-followed', phone: '62812345678', name: 'Dewi' },
+          lastMessageAt: pastDate,
+        },
+      ]);
+      context.mockPrisma.followUp.findMany.mockResolvedValue([
+        { contactId: 'c-already-followed', instanceName: 'zafi-property', followedUpAt: new Date(Date.now() - 12 * 3600 * 1000) },
+      ]);
+
+      const response = await request(app.getHttpServer())
+        .get('/api/v1/followup/list')
+        .expect(200);
+
+      expect(response.body).toHaveLength(0);
+    });
+  });
+
+  describe('POST /api/v1/followup/trigger', () => {
+    it('harus mengeksekusi pengiriman follow-up dan mencatat ke database (201)', async () => {
+      context.mockPrisma.followUpConfig.findUnique.mockResolvedValue({
+        isEnabled: true,
+        inactivityHours: 24,
+      });
+
+      context.mockPrisma.conversation.findMany.mockResolvedValue([
+        {
+          contactId: 'c-trigger-1',
+          instanceName: 'zafi-property',
+          contact: { id: 'c-trigger-1', phone: '628199988877', name: 'Bambang' },
+          lastMessageAt: new Date(Date.now() - 40 * 3600 * 1000),
+        },
+      ]);
+      context.mockPrisma.followUp.findMany.mockResolvedValue([]);
+      context.mockPrisma.contact.findUnique.mockResolvedValue({
+        id: 'c-trigger-1',
+        phone: '628199988877',
+        name: 'Bambang',
+      });
+      context.mockPrisma.conversation.findFirst.mockResolvedValue({
+        id: 'conv-trigger-1',
+        instanceName: 'zafi-property',
+        contactId: 'c-trigger-1',
+      });
+      context.mockPrisma.message.create.mockResolvedValue({ id: 'msg-created-1' });
+      context.mockPrisma.followUp.create.mockResolvedValue({ id: 'flw-created-1' });
+
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/followup/trigger')
+        .expect(201);
+
+      expect(response.body.sent).toBe(1);
+      expect(response.body.processed).toBe(1);
+      expect(mockWaha.sendMessage).toHaveBeenCalledWith(
+        'zafi-property',
+        '628199988877',
+        expect.stringContaining('Halo'),
+      );
+    });
+  });
+
+  describe('GET /api/v1/followup/history', () => {
+    it('harus mengembalikan riwayat pesan follow-up (200)', async () => {
+      context.mockPrisma.whatsappInstance.findMany.mockResolvedValue([
+        { instanceName: 'zafi-property' },
+      ]);
+      context.mockPrisma.followUp.findMany.mockResolvedValue([
+        {
+          id: 'hist-1',
+          instanceName: 'zafi-property',
+          contactId: 'c-1',
+          followedUpAt: new Date(),
+          contact: { phone: '62812345678', name: 'Budi' },
+        },
+      ]);
+      context.mockPrisma.followUp.count.mockResolvedValue(1);
+
+      const response = await request(app.getHttpServer())
+        .get('/api/v1/followup/history?take=10')
+        .expect(200);
+
+      expect(response.body).toHaveProperty('total', 1);
+      expect(response.body.data).toHaveLength(1);
+      expect(response.body.data[0].contactPhone).toBe('62812345678');
     });
   });
 });

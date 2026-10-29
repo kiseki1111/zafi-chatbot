@@ -91,6 +91,7 @@ export interface ChatMessage {
   status: MessageStatus;
   timestamp: string;
   isAI?: boolean;
+  isFollowUp?: boolean;
   mediaUrl?: string;
   messageType?: string;
   senderName?: string;
