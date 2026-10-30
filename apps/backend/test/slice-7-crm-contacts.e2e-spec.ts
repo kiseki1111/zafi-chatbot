@@ -16,23 +16,28 @@ describe('Slice-7: CRM Contacts (CRUD + Search Filter + Tenant Isolation)', () =
   };
 
   beforeAll(async () => {
-    context = await createTestApp(
-      { imports: [ContactsModule] },
-      (b) =>
-        b.overrideGuard(JwtAuthGuard).useValue({
-          canActivate: (ctx: any) => {
-            ctx.switchToHttp().getRequest().user = currentUser;
-            return true;
-          },
-        }),
+    context = await createTestApp({ imports: [ContactsModule] }, (b) =>
+      b.overrideGuard(JwtAuthGuard).useValue({
+        canActivate: (ctx: any) => {
+          ctx.switchToHttp().getRequest().user = currentUser;
+          return true;
+        },
+      }),
     );
     app = context.app;
   });
 
-  afterAll(async () => { if (app) await app.close(); });
+  afterAll(async () => {
+    if (app) await app.close();
+  });
   beforeEach(() => {
     jest.clearAllMocks();
-    currentUser = { sub: 'op-1', email: 'operator@toko.com', roles: ['operator'], tenantId: 'tenant-crm' };
+    currentUser = {
+      sub: 'op-1',
+      email: 'operator@toko.com',
+      roles: ['operator'],
+      tenantId: 'tenant-crm',
+    };
   });
 
   describe('1. Batas Validasi Buat Kontak', () => {
@@ -72,7 +77,14 @@ describe('Slice-7: CRM Contacts (CRUD + Search Filter + Tenant Isolation)', () =
   describe('2. Listing & Filter Pencarian', () => {
     it('Mengembalikan semua kontak tenant dengan filter status (200)', async () => {
       context.mockPrisma.contact.findMany.mockResolvedValue([
-        { id: 'c1', name: 'Andi', phone: '62811', status: 'QUALIFIED', tags: [], conversations: [] },
+        {
+          id: 'c1',
+          name: 'Andi',
+          phone: '62811',
+          status: 'QUALIFIED',
+          tags: [],
+          conversations: [],
+        },
       ]);
 
       const res = await request(app.getHttpServer())
@@ -85,7 +97,14 @@ describe('Slice-7: CRM Contacts (CRUD + Search Filter + Tenant Isolation)', () =
 
     it('Filter pencarian via query `search` menghasilkan kontak yang cocok (200)', async () => {
       context.mockPrisma.contact.findMany.mockResolvedValue([
-        { id: 'c2', name: 'Siti Rahayu', phone: '62822', status: 'NEW', tags: [], conversations: [] },
+        {
+          id: 'c2',
+          name: 'Siti Rahayu',
+          phone: '62822',
+          status: 'NEW',
+          tags: [],
+          conversations: [],
+        },
       ]);
 
       const res = await request(app.getHttpServer())
@@ -98,9 +117,15 @@ describe('Slice-7: CRM Contacts (CRUD + Search Filter + Tenant Isolation)', () =
 
   describe('3. Update & Batas Status Kontak', () => {
     it('Berhasil mengubah status prospek kontak (200)', async () => {
-      context.mockPrisma.contact.findFirst.mockResolvedValue({ id: 'c1', phone: '62811' });
+      context.mockPrisma.contact.findFirst.mockResolvedValue({
+        id: 'c1',
+        phone: '62811',
+      });
       context.mockPrisma.contact.update.mockResolvedValue({
-        id: 'c1', name: 'Andi', phone: '62811', status: 'WON',
+        id: 'c1',
+        name: 'Andi',
+        phone: '62811',
+        status: 'WON',
       });
 
       const res = await request(app.getHttpServer())
@@ -112,20 +137,31 @@ describe('Slice-7: CRM Contacts (CRUD + Search Filter + Tenant Isolation)', () =
     });
 
     it('Berhasil memperbarui metadata perumahan, tipeUnit, dan status prospek (200)', async () => {
-      context.mockPrisma.contact.findFirst.mockResolvedValue({ id: 'c1', phone: '62811' });
+      context.mockPrisma.contact.findFirst.mockResolvedValue({
+        id: 'c1',
+        phone: '62811',
+      });
       context.mockPrisma.contact.update.mockResolvedValue({
         id: 'c1',
         name: 'Andi',
         phone: '62811',
         status: 'Booking',
-        metadata: { perumahan: 'Griya Amanah 2', tipeUnit: 'Tipe 40', hargaUnit: 295000000 },
+        metadata: {
+          perumahan: 'Griya Amanah 2',
+          tipeUnit: 'Tipe 40',
+          hargaUnit: 295000000,
+        },
       });
 
       const res = await request(app.getHttpServer())
         .patch('/api/v1/contacts/c1')
         .send({
           status: 'Booking',
-          metadata: { perumahan: 'Griya Amanah 2', tipeUnit: 'Tipe 40', hargaUnit: 295000000 },
+          metadata: {
+            perumahan: 'Griya Amanah 2',
+            tipeUnit: 'Tipe 40',
+            hargaUnit: 295000000,
+          },
         })
         .expect(200);
 
@@ -159,7 +195,13 @@ describe('Slice-7: CRM Contacts (CRUD + Search Filter + Tenant Isolation)', () =
     it('Superadmin dapat melihat kontak semua tenant tanpa batas (200)', async () => {
       currentUser = { sub: 'super-1', roles: ['superadmin'], tenantId: null };
       context.mockPrisma.contact.findMany.mockResolvedValue([
-        { id: 'c-global', name: 'Global Contact', phone: '62899', tags: [], conversations: [] },
+        {
+          id: 'c-global',
+          name: 'Global Contact',
+          phone: '62899',
+          tags: [],
+          conversations: [],
+        },
       ]);
 
       const res = await request(app.getHttpServer())

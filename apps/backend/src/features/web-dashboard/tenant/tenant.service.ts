@@ -1,51 +1,448 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../../core/prisma/prisma.service';
 import { OnboardingDto } from './dto/onboarding.dto';
 import { DataAgentService } from '../../knowledge-ingest/data-agent.service';
 
-export const PLAN_TIERS = {
-  trial: {
-    key: 'trial',
-    name: 'Free Trial',
+export interface PlanTierConfig {
+  key: string;
+  name: string;
+  price: number;
+  priceLabel: string;
+  yearlyPrice: number;
+  yearlyPriceLabel: string;
+  yearlySavings: string;
+  maxAiResponses: number;
+  maxMau: number;
+  whatsappNumbers: number;
+  maxProjects: number;
+  maxUsers: number;
+  setupFee: number;
+  setupFeeLabel: string;
+  yearlySetupDiscount: string;
+  trialDays: string;
+  support: string;
+  onboarding: string;
+  avgAiResponsePerMau: string;
+  desc?: string;
+}
+
+export const PLAN_TIERS: Record<string, PlanTierConfig> = {
+  lite: {
+    key: 'lite',
+    name: 'Lite - UMKM',
+    price: 249000,
+    priceLabel: 'Rp 249.000/bln',
+    yearlyPrice: 209000,
+    yearlyPriceLabel: 'Rp 209.000/bln',
+    yearlySavings: '16.1%',
+    maxAiResponses: 1000,
+    maxMau: 300,
+    whatsappNumbers: 1,
+    maxProjects: 1,
+    maxUsers: 1,
+    setupFee: 0,
+    setupFeeLabel: 'Rp 0',
+    yearlySetupDiscount: 'Tidak ada setup',
+    trialDays: '14 hari',
+    support: 'Panduan & email',
+    onboarding: 'Self-service',
+    avgAiResponsePerMau: '3.3 respons/kontak',
+    desc: 'Untuk UMKM pemula dengan 1 WhatsApp & 1 proyek',
+  },
+  bronze: {
+    key: 'bronze',
+    name: 'Bronze - Starter',
+    price: 499000,
+    priceLabel: 'Rp 499.000/bln',
+    yearlyPrice: 429000,
+    yearlyPriceLabel: 'Rp 429.000/bln',
+    yearlySavings: '14.0%',
+    maxAiResponses: 4000,
+    maxMau: 1000,
+    whatsappNumbers: 1,
+    maxProjects: 1,
+    maxUsers: 3,
+    setupFee: 500000,
+    setupFeeLabel: 'Rp 500.000',
+    yearlySetupDiscount: 'Gratis',
+    trialDays: '14 hari',
+    support: 'WhatsApp, 2x24 jam',
+    onboarding: 'Self-service + video',
+    avgAiResponsePerMau: '4.0 respons/kontak',
+    desc: 'Starter pack tim berkembang dengan 3 pengguna & support WhatsApp',
+  },
+  silver: {
+    key: 'silver',
+    name: 'Silver - Pro',
+    price: 999000,
+    priceLabel: 'Rp 999.000/bln',
+    yearlyPrice: 849000,
+    yearlyPriceLabel: 'Rp 849.000/bln',
+    yearlySavings: '15.0%',
+    maxAiResponses: 10000,
+    maxMau: 2500,
+    whatsappNumbers: 2,
+    maxProjects: 3,
+    maxUsers: 6,
+    setupFee: 500000,
+    setupFeeLabel: 'Rp 500.000',
+    yearlySetupDiscount: 'Gratis',
+    trialDays: '14 hari',
+    support: 'WhatsApp, 1x24 jam',
+    onboarding: '1x sesi online',
+    avgAiResponsePerMau: '4.0 respons/kontak',
+    desc: 'Paket terpopuler untuk multi-proyek (3 siteplan), 2 nomor WA & 6 pengguna',
+  },
+  gold: {
+    key: 'gold',
+    name: 'Gold - Business',
+    price: 1999000,
+    priceLabel: 'Rp 1.999.000/bln',
+    yearlyPrice: 1699000,
+    yearlyPriceLabel: 'Rp 1.699.000/bln',
+    yearlySavings: '15%',
+    maxAiResponses: 24000,
+    maxMau: 6000,
+    whatsappNumbers: 4,
+    maxProjects: 8,
+    maxUsers: 12,
+    setupFee: 0,
+    setupFeeLabel: 'Rp 0',
+    yearlySetupDiscount: 'Gratis',
+    trialDays: '14 hari',
+    support: 'Dedicated PIC + SLA 4 jam',
+    onboarding: '3x sesi online',
+    avgAiResponsePerMau: '4 respons/kontak',
+    desc: 'Solusi bisnis skala besar dengan 4 nomor WA, 8 proyek & Dedicated PIC SLA 4 jam',
+  },
+  // ponytail: sentinel high value for unlimited developer mode, upgrade to isUnlimited boolean if needed
+  developer: {
+    key: 'developer',
+    name: 'Developer Mode (Internal)',
     price: 0,
-    priceLabel: 'Gratis',
-    maxMau: 10,
-    maxAiResponses: 50,
-  },
-  pro: {
-    key: 'pro',
-    name: 'Pro',
-    price: 1500000,
-    priceLabel: 'Rp 1.500k/bln',
-    maxMau: 2000,
-    maxAiResponses: 15000,
-  },
-  business: {
-    key: 'business',
-    name: 'Business',
-    price: 2500000,
-    priceLabel: 'Rp 2.500k/bln',
-    maxMau: 8000,
-    maxAiResponses: 50000,
-  },
-  enterprise: {
-    key: 'enterprise',
-    name: 'Enterprise',
-    price: 5799000,
-    priceLabel: 'Rp 5.799k/bln',
-    maxMau: 30000,
-    maxAiResponses: 150000,
+    priceLabel: 'Unlimited / Internal',
+    yearlyPrice: 0,
+    yearlyPriceLabel: 'Unlimited',
+    yearlySavings: '100%',
+    maxAiResponses: 999999999,
+    maxMau: 999999999,
+    whatsappNumbers: 999,
+    maxProjects: 999,
+    maxUsers: 999,
+    setupFee: 0,
+    setupFeeLabel: 'Rp 0',
+    yearlySetupDiscount: 'Gratis',
+    trialDays: 'Selamanya',
+    support: 'Internal Root Access',
+    onboarding: 'All Features Unlocked',
+    avgAiResponsePerMau: 'Unlimited',
+    desc: 'Mode khusus perusahaan pemilik SaaS: seluruh fitur & kuota tanpa batas',
   },
   custom: {
     key: 'custom',
-    name: 'Custom',
+    name: 'Kustom - Fleksibel',
     price: 0,
     priceLabel: 'Kustom',
-    maxMau: 1000,
+    yearlyPrice: 0,
+    yearlyPriceLabel: 'Kustom',
+    yearlySavings: '-',
     maxAiResponses: 10000,
+    maxMau: 1000,
+    whatsappNumbers: 2,
+    maxProjects: 3,
+    maxUsers: 5,
+    setupFee: 0,
+    setupFeeLabel: 'Kustom',
+    yearlySetupDiscount: 'Kustom',
+    trialDays: '14 hari',
+    support: 'Dedicated Support',
+    onboarding: 'Kustom',
+    avgAiResponsePerMau: 'Kustom',
+    desc: 'Kustomisasi batas MAU, AI respons, nomor WhatsApp & pengguna sesuai kebutuhan',
+  },
+  // Legacy aliases for backwards compatibility:
+  trial: {
+    key: 'trial',
+    name: 'Free Trial (Legacy)',
+    price: 0,
+    priceLabel: 'Gratis',
+    yearlyPrice: 0,
+    yearlyPriceLabel: 'Gratis',
+    yearlySavings: '0%',
+    maxAiResponses: 50,
+    maxMau: 10,
+    whatsappNumbers: 1,
+    maxProjects: 1,
+    maxUsers: 1,
+    setupFee: 0,
+    setupFeeLabel: 'Rp 0',
+    yearlySetupDiscount: 'Gratis',
+    trialDays: '14 hari',
+    support: 'Panduan & email',
+    onboarding: 'Self-service',
+    avgAiResponsePerMau: '5 respons/kontak',
+    desc: 'Evaluasi awal (Legacy)',
+  },
+  pro: {
+    key: 'pro',
+    name: 'Pro (Legacy)',
+    price: 1500000,
+    priceLabel: 'Rp 1.500k/bln',
+    yearlyPrice: 1500000,
+    yearlyPriceLabel: 'Rp 1.500k/bln',
+    yearlySavings: '0%',
+    maxAiResponses: 15000,
+    maxMau: 2000,
+    whatsappNumbers: 2,
+    maxProjects: 3,
+    maxUsers: 6,
+    setupFee: 500000,
+    setupFeeLabel: 'Rp 500.000',
+    yearlySetupDiscount: 'Gratis',
+    trialDays: '14 hari',
+    support: 'WhatsApp, 1x24 jam',
+    onboarding: '1x sesi online',
+    avgAiResponsePerMau: '7.5 respons/kontak',
+    desc: 'Pro Tier (Legacy)',
+  },
+  business: {
+    key: 'business',
+    name: 'Business (Legacy)',
+    price: 2500000,
+    priceLabel: 'Rp 2.500k/bln',
+    yearlyPrice: 2500000,
+    yearlyPriceLabel: 'Rp 2.500k/bln',
+    yearlySavings: '0%',
+    maxAiResponses: 50000,
+    maxMau: 8000,
+    whatsappNumbers: 4,
+    maxProjects: 8,
+    maxUsers: 12,
+    setupFee: 0,
+    setupFeeLabel: 'Rp 0',
+    yearlySetupDiscount: 'Gratis',
+    trialDays: '14 hari',
+    support: 'Dedicated PIC',
+    onboarding: '3x sesi online',
+    avgAiResponsePerMau: '6.2 respons/kontak',
+    desc: 'Business Tier (Legacy)',
+  },
+  enterprise: {
+    key: 'enterprise',
+    name: 'Enterprise - Corporate',
+    price: 0,
+    priceLabel: 'Kustom',
+    yearlyPrice: 0,
+    yearlyPriceLabel: 'Kustom',
+    yearlySavings: 'Sesuai Kontrak',
+    maxAiResponses: 100000,
+    maxMau: 25000,
+    whatsappNumbers: 10,
+    maxProjects: 25,
+    maxUsers: 50,
+    setupFee: 0,
+    setupFeeLabel: 'Custom',
+    yearlySetupDiscount: 'Custom',
+    trialDays: 'POC 30 hari',
+    support: 'Dedicated + SLA 2 jam',
+    onboarding: 'Full project',
+    avgAiResponsePerMau: '5.0 respons/kontak',
+    desc: 'Solusi korporat enterprise dengan POC 30 hari & Dedicated SLA 2 jam',
   },
 };
+
+// ponytail: Top-up & add-on catalog per TIER_FEATURE_GUIDE.md
+export const TOPUP_CATALOG: Record<
+  string,
+  {
+    key: string;
+    category: 'mau' | 'ai' | 'booster' | 'addon';
+    name: string;
+    mau?: number;
+    ai?: number;
+    whatsapp?: number;
+    users?: number;
+    projects?: number;
+    price: number;
+    desc: string;
+  }
+> = {
+  MAU_S: {
+    key: 'MAU_S',
+    category: 'mau',
+    name: 'Top-Up MAU S',
+    mau: 500,
+    price: 90000,
+    desc: '+500 MAU sampai akhir bulan',
+  },
+  MAU_M: {
+    key: 'MAU_M',
+    category: 'mau',
+    name: 'Top-Up MAU M',
+    mau: 1000,
+    price: 150000,
+    desc: '+1.000 MAU sampai akhir bulan',
+  },
+  MAU_L: {
+    key: 'MAU_L',
+    category: 'mau',
+    name: 'Top-Up MAU L',
+    mau: 2500,
+    price: 325000,
+    desc: '+2.500 MAU sampai akhir bulan',
+  },
+  AI_S: {
+    key: 'AI_S',
+    category: 'ai',
+    name: 'Top-Up AI S',
+    ai: 1000,
+    price: 60000,
+    desc: '+1.000 respons AI (tidak hangus)',
+  },
+  AI_M: {
+    key: 'AI_M',
+    category: 'ai',
+    name: 'Top-Up AI M',
+    ai: 5000,
+    price: 200000,
+    desc: '+5.000 respons AI (tidak hangus)',
+  },
+  AI_L: {
+    key: 'AI_L',
+    category: 'ai',
+    name: 'Top-Up AI L',
+    ai: 10000,
+    price: 400000,
+    desc: '+10.000 respons AI (tidak hangus)',
+  },
+  BOOSTER_S: {
+    key: 'BOOSTER_S',
+    category: 'booster',
+    name: 'Booster S',
+    mau: 500,
+    ai: 2000,
+    price: 160000,
+    desc: '+500 MAU & +2.000 respons AI',
+  },
+  BOOSTER_M: {
+    key: 'BOOSTER_M',
+    category: 'booster',
+    name: 'Booster M',
+    mau: 1000,
+    ai: 4000,
+    price: 290000,
+    desc: '+1.000 MAU & +4.000 respons AI',
+  },
+  BOOSTER_L: {
+    key: 'BOOSTER_L',
+    category: 'booster',
+    name: 'Booster L',
+    mau: 2500,
+    ai: 10000,
+    price: 650000,
+    desc: '+2.500 MAU & +10.000 respons AI',
+  },
+  ADDON_WA: {
+    key: 'ADDON_WA',
+    category: 'addon',
+    name: 'Tambah Nomor WhatsApp',
+    whatsapp: 1,
+    price: 150000,
+    desc: '+1 slot nomor WhatsApp',
+  },
+  ADDON_USER: {
+    key: 'ADDON_USER',
+    category: 'addon',
+    name: 'Tambah User Staf',
+    users: 1,
+    price: 50000,
+    desc: '+1 slot user staf',
+  },
+  ADDON_PROJECT: {
+    key: 'ADDON_PROJECT',
+    category: 'addon',
+    name: 'Setup Proyek Tambahan',
+    projects: 1,
+    price: 500000,
+    desc: '+1 slot proyek siteplan',
+  },
+};
+
+// ponytail: helper ringkas kapasitas limit tier tenant tanpa abstraksi berlebih
+export function resolveTenantCapacity(metadata: any) {
+  const raw = metadata?.plan ? String(metadata.plan).toLowerCase() : null;
+  const extraWa = Number(metadata?.extraWhatsapp) || 0;
+  const extraUsers = Number(metadata?.extraUsers) || 0;
+  const extraProj = Number(metadata?.extraProjects) || 0;
+  const extraMau = Number(metadata?.extraMau) || 0;
+  const extraAi = Number(metadata?.extraAiResponses) || 0;
+
+  if (!raw) {
+    return {
+      planKey: null,
+      planName: 'Tanpa Paket',
+      maxWhatsapp: extraWa,
+      maxProjects: extraProj,
+      maxUsers: 1 + extraUsers,
+      maxMau: extraMau,
+      maxAiResponses: extraAi,
+      extraMau,
+      extraAiResponses: extraAi,
+      extraWhatsapp: extraWa,
+      extraUsers: extraUsers,
+      extraProjects: extraProj,
+      isDeveloper: false,
+    };
+  }
+  const cfg = PLAN_TIERS[raw] || PLAN_TIERS.lite;
+  const isDeveloper = raw === 'developer';
+  return {
+    planKey: raw,
+    planName: cfg.name,
+    maxWhatsapp: isDeveloper ? 999 : cfg.whatsappNumbers + extraWa,
+    maxProjects: isDeveloper ? 999 : cfg.maxProjects + extraProj,
+    maxUsers: isDeveloper ? 999 : cfg.maxUsers + extraUsers,
+    maxMau: isDeveloper ? 999999999 : (cfg.maxMau || 0) + extraMau,
+    maxAiResponses: isDeveloper
+      ? 999999999
+      : (cfg.maxAiResponses || 0) + extraAi,
+    extraMau,
+    extraAiResponses: extraAi,
+    extraWhatsapp: extraWa,
+    extraUsers: extraUsers,
+    extraProjects: extraProj,
+    isDeveloper,
+  };
+}
+
+// ponytail: feature gating helper ringkas - cek hak akses fitur eksklusif per tier
+export function isFeatureAllowed(
+  metadata: any,
+  feature:
+    | 'mediaGallery'
+    | 'ocrExtract'
+    | 'customFollowUp'
+    | 'manualFollowUp'
+    | 'autoTopUp',
+): boolean {
+  const raw = metadata?.plan ? String(metadata.plan).toLowerCase() : null;
+  if (!raw) return false;
+  if (
+    raw === 'developer' ||
+    raw === 'gold' ||
+    raw === 'silver' ||
+    raw === 'enterprise'
+  ) {
+    return true;
+  }
+  // Lite & Bronze tidak memiliki fitur-fitur eksklusif ini (ditandai '-' di matriks)
+  return false;
+}
 
 @Injectable()
 export class TenantService {
@@ -90,19 +487,46 @@ export class TenantService {
 
     if (!tenant) throw new NotFoundException('Tenant not found');
 
-    const meta = (tenant.metadata as any) || {};
-    const planKey = (meta.plan || 'trial') as keyof typeof PLAN_TIERS;
-    const tierConfig = PLAN_TIERS[planKey] || PLAN_TIERS.trial;
+    const meta = tenant.metadata || {};
+    const rawPlan = meta.plan ? String(meta.plan).toLowerCase() : null;
+    const planKey =
+      rawPlan && rawPlan !== 'none' && rawPlan !== 'null' ? rawPlan : null;
+    const tierConfig =
+      planKey && PLAN_TIERS[planKey] ? PLAN_TIERS[planKey] : null;
 
-    const maxMau =
-      typeof meta.maxMau === 'number' ? meta.maxMau : tierConfig.maxMau;
-    const maxAiResponses =
+    const extraMau = Number(meta.extraMau) || 0;
+    const extraAi = Number(meta.extraAiResponses) || 0;
+
+    const baseMau =
+      typeof meta.maxMau === 'number'
+        ? meta.maxMau
+        : tierConfig
+          ? tierConfig.maxMau
+          : 0;
+    const maxMau = planKey === 'developer' ? 999999999 : baseMau + extraMau;
+
+    const baseAi =
       typeof meta.maxAiResponses === 'number'
         ? meta.maxAiResponses
-        : tierConfig.maxAiResponses;
+        : tierConfig
+          ? tierConfig.maxAiResponses
+          : 0;
+    const maxAiResponses =
+      planKey === 'developer' ? 999999999 : baseAi + extraAi;
+
     const planPrice =
-      typeof meta.planPrice === 'number' ? meta.planPrice : tierConfig.price;
-    const planName = meta.planName || tierConfig.name;
+      typeof meta.planPrice === 'number'
+        ? meta.planPrice
+        : tierConfig
+          ? tierConfig.price
+          : 0;
+    const planName =
+      meta.planName || (tierConfig ? tierConfig.name : 'Belum Ada Paket');
+    const priceLabel = tierConfig
+      ? tierConfig.priceLabel
+      : planPrice > 0
+        ? `Rp ${planPrice.toLocaleString('id-ID')}/bln`
+        : 'Belum Berlangganan';
 
     const instanceNames = tenant.whatsappInstances
       ? tenant.whatsappInstances.map((i: any) => i.instanceName)
@@ -137,30 +561,100 @@ export class TenantService {
       });
     }
 
+    // ponytail: soft-limit 110% MAU (grace period 10%)
+    const softLimitMau = Math.round(maxMau * 1.1);
+    const isGracePeriod =
+      planKey !== 'developer' &&
+      maxMau > 0 &&
+      mauUsed > maxMau &&
+      mauUsed <= softLimitMau;
+    const isMauExceeded =
+      planKey === 'developer'
+        ? false
+        : maxMau > 0
+          ? mauUsed > softLimitMau
+          : false;
+
+    // ponytail: kalkulasi penggunaan kapasitas entitas add-on (staf, proyek, wa)
+    const capacity = resolveTenantCapacity(meta);
+    const usersUsed =
+      tenant.users?.length ??
+      (this.prisma.user?.count
+        ? ((await Promise.resolve(
+            this.prisma.user.count({ where: { tenantId } }),
+          ).catch(() => 0)) ?? 0)
+        : 0);
+    const projectsUsed =
+      tenant._count?.resourceGroups ??
+      (this.prisma.resourceGroup?.count
+        ? ((await Promise.resolve(
+            this.prisma.resourceGroup.count({ where: { tenantId } }),
+          ).catch(() => 0)) ?? 0)
+        : 0);
+    const whatsappUsed = instanceNames.length;
+
     return {
       plan: planKey,
       planName,
       planPrice,
-      priceLabel: tierConfig.priceLabel,
+      priceLabel,
       mauUsed,
       maxMau,
+      baseMau,
+      extraMau,
+      softLimitMau,
+      isGracePeriod,
       mauPercent:
-        maxMau > 0 ? Math.min(100, Math.round((mauUsed / maxMau) * 100)) : 0,
-      isMauExceeded: mauUsed >= maxMau,
+        planKey === 'developer'
+          ? 0
+          : maxMau > 0
+            ? Math.min(100, Math.round((mauUsed / maxMau) * 100))
+            : 0,
+      isMauExceeded,
       aiResponsesUsed,
       maxAiResponses,
+      baseAiResponses: baseAi,
+      extraAiResponses: extraAi,
       aiResponsesPercent:
-        maxAiResponses > 0
-          ? Math.min(100, Math.round((aiResponsesUsed / maxAiResponses) * 100))
+        planKey === 'developer'
+          ? 0
+          : maxAiResponses > 0
+            ? Math.min(
+                100,
+                Math.round((aiResponsesUsed / maxAiResponses) * 100),
+              )
+            : 0,
+      isAiResponsesExceeded:
+        planKey === 'developer'
+          ? false
+          : maxAiResponses > 0
+            ? aiResponsesUsed >= maxAiResponses
+            : false,
+      usersUsed,
+      maxUsers: capacity.maxUsers,
+      extraUsers: capacity.extraUsers,
+      projectsUsed,
+      maxProjects: capacity.maxProjects,
+      extraProjects: capacity.extraProjects,
+      whatsappUsed,
+      maxWhatsapp: capacity.maxWhatsapp,
+      extraWhatsapp: capacity.extraWhatsapp,
+      autoTopUpEnabled: Boolean(meta.autoTopUpEnabled),
+      autoTopUpMonthlyLimit: Number(meta.autoTopUpMonthlyLimit || 3),
+      autoTopUpCount:
+        meta.autoTopUpMonth === new Date().toISOString().slice(0, 7)
+          ? Number(meta.autoTopUpCount) || 0
           : 0,
-      isAiResponsesExceeded: aiResponsesUsed >= maxAiResponses,
+      quotaAlerts: Array.isArray(meta.quotaAlerts) ? meta.quotaAlerts : [],
+      topups: Array.isArray(meta.topups) ? meta.topups : [],
     };
   }
 
   async updateTenantQuota(
     tenantId: string,
     data: {
-      plan?: string;
+      plan?: string | null;
+      planName?: string | null;
       maxMau?: number;
       maxAiResponses?: number;
       planPrice?: number;
@@ -172,17 +666,60 @@ export class TenantService {
     if (!tenant) throw new NotFoundException('Tenant not found');
 
     const meta = (tenant.metadata as any) || {};
-    const planKey = (data.plan || meta.plan || 'trial') as keyof typeof PLAN_TIERS;
-    const tierConfig = PLAN_TIERS[planKey] || PLAN_TIERS.trial;
+
+    // Allow setting / resetting plan to null
+    if (
+      data.plan === null ||
+      data.plan === '' ||
+      data.plan === 'none' ||
+      data.plan === 'null'
+    ) {
+      const updated = await this.prisma.tenant.update({
+        where: { id: tenantId },
+        data: {
+          metadata: {
+            ...meta,
+            plan: null,
+            planName: null,
+            planPrice: typeof data.planPrice === 'number' ? data.planPrice : 0,
+            maxMau: typeof data.maxMau === 'number' ? data.maxMau : 0,
+            maxAiResponses:
+              typeof data.maxAiResponses === 'number' ? data.maxAiResponses : 0,
+          },
+        },
+      });
+      return this.getTenantQuota(tenantId, updated);
+    }
+
+    const rawPlan = data.plan
+      ? String(data.plan).toLowerCase()
+      : meta.plan
+        ? String(meta.plan).toLowerCase()
+        : null;
+    const planKey = (rawPlan as keyof typeof PLAN_TIERS) || null;
+    const tierConfig = planKey ? PLAN_TIERS[planKey] : null;
 
     const maxMau =
-      typeof data.maxMau === 'number' ? data.maxMau : tierConfig.maxMau;
+      typeof data.maxMau === 'number'
+        ? data.maxMau
+        : tierConfig
+          ? tierConfig.maxMau
+          : (meta.maxMau ?? 0);
     const maxAiResponses =
       typeof data.maxAiResponses === 'number'
         ? data.maxAiResponses
-        : tierConfig.maxAiResponses;
+        : tierConfig
+          ? tierConfig.maxAiResponses
+          : (meta.maxAiResponses ?? 0);
     const planPrice =
-      typeof data.planPrice === 'number' ? data.planPrice : tierConfig.price;
+      typeof data.planPrice === 'number'
+        ? data.planPrice
+        : tierConfig
+          ? tierConfig.price
+          : (meta.planPrice ?? 0);
+    const planName =
+      data.planName ||
+      (tierConfig ? tierConfig.name : meta.planName || 'Belum Ada Paket');
 
     const updated = await this.prisma.tenant.update({
       where: { id: tenantId },
@@ -190,7 +727,7 @@ export class TenantService {
         metadata: {
           ...meta,
           plan: planKey,
-          planName: tierConfig.name,
+          planName,
           planPrice,
           maxMau,
           maxAiResponses,
@@ -199,6 +736,215 @@ export class TenantService {
     });
 
     return this.getTenantQuota(tenantId, updated);
+  }
+
+  // ponytail: katalog top-up & add-on
+  getTopUpCatalog() {
+    return Object.values(TOPUP_CATALOG);
+  }
+
+  // ponytail: injeksi / pembelian paket top-up atau add-on kapasitas
+  async applyTenantTopUp(
+    tenantId: string,
+    data: {
+      itemKey: string;
+      mau?: number;
+      ai?: number;
+      whatsapp?: number;
+      users?: number;
+      projects?: number;
+      notes?: string;
+    },
+  ) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+
+    const meta = (tenant.metadata as any) || {};
+    const catalogItem = TOPUP_CATALOG[data.itemKey];
+    if (!catalogItem && data.itemKey !== 'CUSTOM') {
+      throw new BadRequestException(
+        `Paket top-up "${data.itemKey}" tidak valid.`,
+      );
+    }
+
+    const addMau = Number(data.mau ?? catalogItem?.mau ?? 0);
+    const addAi = Number(data.ai ?? catalogItem?.ai ?? 0);
+    const addWa = Number(data.whatsapp ?? catalogItem?.whatsapp ?? 0);
+    const addUsers = Number(data.users ?? catalogItem?.users ?? 0);
+    const addProj = Number(data.projects ?? catalogItem?.projects ?? 0);
+
+    const newRecord = {
+      id: `topup-${Date.now()}`,
+      itemKey: data.itemKey,
+      name: catalogItem?.name || 'Top-Up Kustom',
+      price: catalogItem?.price || 0,
+      mau: addMau,
+      ai: addAi,
+      whatsapp: addWa,
+      users: addUsers,
+      projects: addProj,
+      notes: data.notes || '',
+      createdAt: new Date().toISOString(),
+    };
+
+    const existingTopups = Array.isArray(meta.topups) ? meta.topups : [];
+    const updatedMeta = {
+      ...meta,
+      extraMau: (Number(meta.extraMau) || 0) + addMau,
+      extraAiResponses: (Number(meta.extraAiResponses) || 0) + addAi,
+      extraWhatsapp: (Number(meta.extraWhatsapp) || 0) + addWa,
+      extraUsers: (Number(meta.extraUsers) || 0) + addUsers,
+      extraProjects: (Number(meta.extraProjects) || 0) + addProj,
+      topups: [newRecord, ...existingTopups],
+    };
+
+    const updated = await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: { metadata: updatedMeta },
+    });
+
+    return this.getTenantQuota(tenantId, updated);
+  }
+
+  // ponytail: pengaturan auto top-up booster s saat kuota 100% (eksklusif Silver ke atas)
+  async updateAutoTopUpSettings(
+    tenantId: string,
+    data: { autoTopUpEnabled: boolean; autoTopUpMonthlyLimit?: number },
+  ) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+
+    if (
+      data.autoTopUpEnabled &&
+      !isFeatureAllowed(tenant.metadata, 'autoTopUp')
+    ) {
+      throw new BadRequestException(
+        'Fitur Auto Top-Up Booster S eksklusif untuk paket Silver ke atas.',
+      );
+    }
+
+    const meta = (tenant.metadata as any) || {};
+    const updatedMeta = {
+      ...meta,
+      autoTopUpEnabled: Boolean(data.autoTopUpEnabled),
+      autoTopUpMonthlyLimit: Number(
+        data.autoTopUpMonthlyLimit ?? meta.autoTopUpMonthlyLimit ?? 3,
+      ),
+    };
+
+    const updated = await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: { metadata: updatedMeta },
+    });
+
+    return this.getTenantQuota(tenantId, updated);
+  }
+
+  // ponytail: evaluasi & pemicu notifikasi kuota 80% & 100% ke nomor owner via WAHA & alerts dashboard
+  async checkAndNotifyQuota(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      include: {
+        whatsappInstances: { select: { instanceName: true, status: true } },
+      },
+    });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+
+    const quota = await this.getTenantQuota(tenantId, tenant);
+    if (!quota.plan || quota.plan === 'developer') return quota;
+
+    const meta = (tenant.metadata as any) || {};
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const alerts = Array.isArray(meta.quotaAlerts) ? [...meta.quotaAlerts] : [];
+    let shouldUpdateMeta = false;
+
+    const mauRatio = quota.maxMau > 0 ? quota.mauUsed / quota.maxMau : 0;
+    const aiRatio =
+      quota.maxAiResponses > 0
+        ? quota.aiResponsesUsed / quota.maxAiResponses
+        : 0;
+    const maxRatio = Math.max(mauRatio, aiRatio);
+
+    const ownerPhone = tenant.ownerChatId || tenant.phone;
+    const activeInstance =
+      tenant.whatsappInstances.find(
+        (i) => i.status === 'WORKING' || i.status === 'CONNECTED',
+      )?.instanceName || tenant.whatsappInstances[0]?.instanceName;
+
+    // Peringatan 80%
+    if (maxRatio >= 0.8 && meta.notified80Month !== currentMonth) {
+      meta.notified80Month = currentMonth;
+      alerts.unshift({
+        type: '80%',
+        message: `Peringatan: Pemakaian kuota (${Math.round(maxRatio * 100)}%) mendekati batas. Segera lakukan top-up agar bot tidak berhenti.`,
+        createdAt: new Date().toISOString(),
+      });
+      shouldUpdateMeta = true;
+
+      if (ownerPhone && activeInstance) {
+        const text = `⚠️ *Peringatan Kuota Platform ZAF (80%)*\nHalo ${tenant.name}, pemakaian kuota chatbot Anda telah mencapai ${Math.round(maxRatio * 100)}%.\nSilakan lakukan top-up di dashboard agar auto-reply tetap berjalan lancar.`;
+        this.sendWahaDirect(activeInstance, ownerPhone, text).catch(() => null);
+      }
+    }
+
+    // Peringatan 100%
+    if (maxRatio >= 1.0 && meta.notified100Month !== currentMonth) {
+      meta.notified100Month = currentMonth;
+      alerts.unshift({
+        type: '100%',
+        message: `Perhatian: Kuota chatbot 100% habis. Percakapan baru otomatis dialihkan ke admin manusia.`,
+        createdAt: new Date().toISOString(),
+      });
+      shouldUpdateMeta = true;
+
+      if (ownerPhone && activeInstance) {
+        const text = `🚨 *Peringatan Kuota Platform ZAF (100% Habis)*\nHalo ${tenant.name}, kuota chatbot Anda telah habis. Sesuai aturan, percakapan pelanggan baru otomatis dialihkan ke admin manusia di dashboard. Beli booster kuota untuk mengaktifkan kembali bot AI.`;
+        this.sendWahaDirect(activeInstance, ownerPhone, text).catch(() => null);
+      }
+    }
+
+    if (shouldUpdateMeta) {
+      const updated = await this.prisma.tenant.update({
+        where: { id: tenantId },
+        data: {
+          metadata: {
+            ...meta,
+            quotaAlerts: alerts.slice(0, 10),
+          },
+        },
+      });
+      return this.getTenantQuota(tenantId, updated);
+    }
+
+    return quota;
+  }
+
+  // ponytail: kirim langsung notifikasi via WAHA API native fetch tanpa circular dependency
+  private async sendWahaDirect(
+    sessionName: string,
+    phone: string,
+    text: string,
+  ) {
+    try {
+      const cleanPhone = phone.replace(/[^0-9]/g, '');
+      const chatId = cleanPhone.includes('@')
+        ? cleanPhone
+        : `${cleanPhone}@c.us`;
+      const wahaUrl = process.env.WAHA_API_URL || 'http://127.0.0.1:3000';
+      const apiKey = process.env.WAHA_API_KEY || '';
+      await fetch(`${wahaUrl}/api/sendText`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(apiKey ? { 'X-Api-Key': apiKey } : {}),
+        },
+        body: JSON.stringify({ session: sessionName, chatId, text }),
+      });
+    } catch {}
   }
 
   async getDashboardOverview(userId: string) {
@@ -263,7 +1009,9 @@ export class TenantService {
             tenant = fallbackTenant;
             tenantId = fallbackTenant.id;
           } else {
-            throw new NotFoundException('User tidak terhubung dengan tenant manapun');
+            throw new NotFoundException(
+              'User tidak terhubung dengan tenant manapun',
+            );
           }
         }
       }
@@ -611,6 +1359,7 @@ Berikan jawaban yang natural seperti CS manusia sungguhan. Jangan menggunakan ba
         waktu: new Date(r.createdAt).toLocaleTimeString('id-ID', {
           hour: '2-digit',
           minute: '2-digit',
+          hour12: false,
         }),
         pelanggan: r.customerName || 'Unknown',
         produk: (r.attributes as any)?.items || 'Item',
@@ -973,9 +1722,10 @@ Berikan jawaban yang natural seperti CS manusia sungguhan. Jangan menggunakan ba
         agentName: 'Asisten AI',
         metadata: {
           enabledMenus: data.enabledMenus,
-          plan: 'trial',
-          maxMau: 10,
-          maxAiResponses: 50,
+          plan: null,
+          planName: null,
+          maxMau: 0,
+          maxAiResponses: 0,
           planPrice: 0,
         },
       },
@@ -1082,6 +1832,20 @@ Berikan jawaban yang natural seperti CS manusia sungguhan. Jangan menggunakan ba
       where: { id: tenantId },
     });
     if (!tenant) throw new NotFoundException('Tenant not found');
+
+    // ponytail: validasi batas kuota staf admin/sales per tier
+    const capacity = resolveTenantCapacity(tenant.metadata);
+    if (!capacity.isDeveloper && capacity.planKey !== null) {
+      const userCount =
+        (await this.prisma.user
+          .count({ where: { tenantId } })
+          .catch(() => 0)) ?? 0;
+      if (userCount >= capacity.maxUsers) {
+        throw new BadRequestException(
+          `Batas kuota pengguna (${capacity.maxUsers} user) untuk paket ${capacity.planName} telah tercapai. Silakan tingkatkan paket Anda.`,
+        );
+      }
+    }
 
     const defaultPassword = data.password || 'Staff@123';
     const hashedPassword = await bcrypt.hash(defaultPassword, 10);

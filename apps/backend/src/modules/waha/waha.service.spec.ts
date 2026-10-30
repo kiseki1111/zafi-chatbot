@@ -11,7 +11,10 @@ describe('WahaService - Unit Tests (Features 1, 2, 6)', () => {
   let service: WahaService;
 
   const mockConfigService = {
-    get: jest.fn((key: string, defaultValue?: string) => defaultValue ?? 'http://localhost:3000'),
+    get: jest.fn(
+      (key: string, defaultValue?: string) =>
+        defaultValue ?? 'http://localhost:3000',
+    ),
   };
 
   const mockPrismaService = {
@@ -99,7 +102,10 @@ describe('WahaService - Unit Tests (Features 1, 2, 6)', () => {
         data: { url: 'https://cdn.whatsapp.net/pfp/user1.jpg' },
       });
 
-      const pfpUrl = await service.getContactProfilePicture('test-session', '628123456789');
+      const pfpUrl = await service.getContactProfilePicture(
+        'test-session',
+        '628123456789',
+      );
 
       expect(mockedAxios.get).toHaveBeenCalledWith(
         expect.stringContaining('/api/contacts/profile-picture'),
@@ -115,7 +121,10 @@ describe('WahaService - Unit Tests (Features 1, 2, 6)', () => {
         data: { about: 'Available for property consultation' },
       });
 
-      const about = await service.getContactAbout('test-session', '628123456789');
+      const about = await service.getContactAbout(
+        'test-session',
+        '628123456789',
+      );
 
       expect(mockedAxios.get).toHaveBeenCalledWith(
         expect.stringContaining('/api/contacts/about'),
@@ -129,7 +138,9 @@ describe('WahaService - Unit Tests (Features 1, 2, 6)', () => {
 
   describe('Feature 7: Media & Video Guard (Mencegah pengiriman file HTML rusak)', () => {
     it('harus mengalihkan sendVideo ke sendText jika URL adalah tautan media sosial (Instagram)', async () => {
-      mockedAxios.post.mockResolvedValue({ data: { success: true, id: 'msg-text-1' } });
+      mockedAxios.post.mockResolvedValue({
+        data: { success: true, id: 'msg-text-1' },
+      });
 
       await service.sendVideo(
         'test-session',
@@ -155,16 +166,22 @@ describe('WahaService - Unit Tests (Features 1, 2, 6)', () => {
         expect.objectContaining({
           session: 'test-session',
           chatId: '628123456789',
-          text: expect.stringContaining('https://www.instagram.com/reel/DVkx0HGjnEi/'),
+          text: expect.stringContaining(
+            'https://www.instagram.com/reel/DVkx0HGjnEi/',
+          ),
         }),
         expect.any(Object),
       );
     });
 
     it('harus mengalihkan sendVideo ke sendText jika hasil unduhan URL adalah text/html', async () => {
-      mockedAxios.post.mockResolvedValue({ data: { success: true, id: 'msg-text-2' } });
+      mockedAxios.post.mockResolvedValue({
+        data: { success: true, id: 'msg-text-2' },
+      });
       mockedAxios.get.mockResolvedValueOnce({
-        data: Buffer.from('<!DOCTYPE html><html><body>Halaman Login</body></html>'),
+        data: Buffer.from(
+          '<!DOCTYPE html><html><body>Halaman Login</body></html>',
+        ),
         headers: { 'content-type': 'text/html; charset=utf-8' },
       }); // axios.get videoUrl
 
@@ -187,14 +204,18 @@ describe('WahaService - Unit Tests (Features 1, 2, 6)', () => {
         expect.objectContaining({
           session: 'test-session',
           chatId: '628123456789',
-          text: expect.stringContaining('https://example-property.com/video-page'),
+          text: expect.stringContaining(
+            'https://example-property.com/video-page',
+          ),
         }),
         expect.any(Object),
       );
     });
 
     it('harus mengirim ke /api/sendVideo jika URL mengembalikan video/mp4 biner', async () => {
-      mockedAxios.post.mockResolvedValue({ data: { success: true, id: 'msg-video-1' } });
+      mockedAxios.post.mockResolvedValue({
+        data: { success: true, id: 'msg-video-1' },
+      });
       mockedAxios.get.mockResolvedValueOnce({
         data: Buffer.from('fake-mp4-binary-content'),
         headers: { 'content-type': 'video/mp4' },

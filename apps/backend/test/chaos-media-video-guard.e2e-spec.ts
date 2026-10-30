@@ -68,7 +68,9 @@ describe('Chaos & E2E Suite: Media Video Guard & Stale Links Immunity', () => {
     jest.clearAllMocks();
     mockPrisma.whatsappInstance.update.mockResolvedValue({});
     mockPrisma.product.findMany.mockResolvedValue([]);
-    mockedAxios.post.mockResolvedValue({ data: { success: true, id: 'mock-waha-ok' } });
+    mockedAxios.post.mockResolvedValue({
+      data: { success: true, id: 'mock-waha-ok' },
+    });
   });
 
   // =========================================================================
@@ -81,7 +83,10 @@ describe('Chaos & E2E Suite: Media Video Guard & Stale Links Immunity', () => {
         instanceName: 'wa-property',
         tenantId: 'tenant-1',
       });
-      mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-1', name: 'Zafi Property' });
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        id: 'tenant-1',
+        name: 'Zafi Property',
+      });
       mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue(
         'Video Arah: /uploads/video-zafi-residence.mp4',
       );
@@ -112,14 +117,20 @@ describe('Chaos & E2E Suite: Media Video Guard & Stale Links Immunity', () => {
     });
 
     it('harus memindahkan tautan media sosial (Instagram Reel) dari videos ke teks balasan agar WhatsApp render link preview', async () => {
-      const reelUrl = 'https://www.instagram.com/reel/DVkx0HGjnEi/?utm_source=ig_web_copy_link';
+      const reelUrl =
+        'https://www.instagram.com/reel/DVkx0HGjnEi/?utm_source=ig_web_copy_link';
       mockAgentShared.getRecentContext.mockResolvedValue([]);
       mockPrisma.whatsappInstance.findUnique.mockResolvedValue({
         instanceName: 'wa-property',
         tenantId: 'tenant-1',
       });
-      mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-1', name: 'Zafi Property' });
-      mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue(`Video IG: ${reelUrl}`);
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        id: 'tenant-1',
+        name: 'Zafi Property',
+      });
+      mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue(
+        `Video IG: ${reelUrl}`,
+      );
       mockAgentShared.getAvailabilityContext.mockResolvedValue(null);
 
       mockAgentShared.callLLM.mockResolvedValue(
@@ -154,8 +165,13 @@ describe('Chaos & E2E Suite: Media Video Guard & Stale Links Immunity', () => {
         instanceName: 'wa-property',
         tenantId: 'tenant-1',
       });
-      mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-1', name: 'Zafi Property' });
-      mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue('Video: /uploads/promo.mp4');
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        id: 'tenant-1',
+        name: 'Zafi Property',
+      });
+      mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue(
+        'Video: /uploads/promo.mp4',
+      );
       mockAgentShared.getAvailabilityContext.mockResolvedValue(null);
 
       // AI berinisiatif kirim video padahal customer cuma tanya harga
@@ -187,7 +203,10 @@ describe('Chaos & E2E Suite: Media Video Guard & Stale Links Immunity', () => {
         instanceName: 'wa-property',
         tenantId: 'tenant-1',
       });
-      mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-1', name: 'Zafi Property' });
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        id: 'tenant-1',
+        name: 'Zafi Property',
+      });
       // Knowledge base saat ini KOSONG (karena dokumen sudah dihapus oleh tester)
       mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue('');
       mockAgentShared.getAvailabilityContext.mockResolvedValue(null);
@@ -214,7 +233,9 @@ describe('Chaos & E2E Suite: Media Video Guard & Stale Links Immunity', () => {
 
       // Prompt yang dikirim ke LLM harus menetralkan tautan usang
       expect(mockAgentShared.callLLM).toHaveBeenCalledWith(
-        expect.stringContaining('[tautan media sebelumnya telah dihapus dari database]'),
+        expect.stringContaining(
+          '[tautan media sebelumnya telah dihapus dari database]',
+        ),
         expect.any(String),
         true,
       );
@@ -227,7 +248,12 @@ describe('Chaos & E2E Suite: Media Video Guard & Stale Links Immunity', () => {
   describe('Suite 2: WahaService Video & Media Safeguards', () => {
     it('sendVideo: harus langsung mengalihkan URL Instagram ke sendMessage / sendText', async () => {
       const igUrl = 'https://www.instagram.com/reel/DVkx0HGjnEi/';
-      await wahaService.sendVideo('test-session', '628111222333', igUrl, 'Tonton Reel');
+      await wahaService.sendVideo(
+        'test-session',
+        '628111222333',
+        igUrl,
+        'Tonton Reel',
+      );
 
       // Tidak boleh memanggil endpoint video biner WAHA
       expect(mockedAxios.post).not.toHaveBeenCalledWith(
@@ -249,7 +275,12 @@ describe('Chaos & E2E Suite: Media Video Guard & Stale Links Immunity', () => {
 
     it('sendVideoFile: harus langsung mengalihkan URL YouTube ke sendMessage / sendText', async () => {
       const ytUrl = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
-      await wahaService.sendVideoFile('test-session', '628111222333', ytUrl, 'Video Tour');
+      await wahaService.sendVideoFile(
+        'test-session',
+        '628111222333',
+        ytUrl,
+        'Video Tour',
+      );
 
       expect(mockedAxios.post).not.toHaveBeenCalledWith(
         expect.stringContaining('/api/sendFile'),
@@ -267,7 +298,12 @@ describe('Chaos & E2E Suite: Media Video Guard & Stale Links Immunity', () => {
 
     it('sendMedia: harus mengenali tautan TikTok dan mengalihkannya ke sendMessage / sendText', async () => {
       const ttUrl = 'https://www.tiktok.com/@property/video/1234567890';
-      await wahaService.sendMedia('test-session', '628111222333', ttUrl, 'TikTok Tour');
+      await wahaService.sendMedia(
+        'test-session',
+        '628111222333',
+        ttUrl,
+        'TikTok Tour',
+      );
 
       expect(mockedAxios.post).not.toHaveBeenCalledWith(
         expect.stringContaining('/api/sendImage'),
@@ -306,7 +342,9 @@ describe('Chaos & E2E Suite: Media Video Guard & Stale Links Immunity', () => {
       expect(mockedAxios.post).toHaveBeenCalledWith(
         expect.stringContaining('/api/sendText'),
         expect.objectContaining({
-          text: expect.stringContaining('https://external-site.com/video-preview'),
+          text: expect.stringContaining(
+            'https://external-site.com/video-preview',
+          ),
         }),
         expect.any(Object),
       );
@@ -359,14 +397,18 @@ describe('Chaos & E2E Suite: Media Video Guard & Stale Links Immunity', () => {
       expect(mockedAxios.post).toHaveBeenCalledWith(
         expect.stringContaining('/api/sendVideo'),
         expect.objectContaining({
-          file: expect.objectContaining({ url: 'https://broken-cdn.com/virtual-tour.mp4' }),
+          file: expect.objectContaining({
+            url: 'https://broken-cdn.com/virtual-tour.mp4',
+          }),
         }),
         expect.any(Object),
       );
     });
 
     it('[Chaos 2: Network Timeout (ETIMEDOUT)]', async () => {
-      mockedAxios.get.mockRejectedValueOnce(new Error('connect ETIMEDOUT 104.21.5.12:443'));
+      mockedAxios.get.mockRejectedValueOnce(
+        new Error('connect ETIMEDOUT 104.21.5.12:443'),
+      );
 
       const result = await wahaService.sendVideo(
         'test-session',
@@ -379,7 +421,9 @@ describe('Chaos & E2E Suite: Media Video Guard & Stale Links Immunity', () => {
       expect(mockedAxios.post).toHaveBeenCalledWith(
         expect.stringContaining('/api/sendVideo'),
         expect.objectContaining({
-          file: expect.objectContaining({ url: 'https://timeout-host.com/walkthrough.mp4' }),
+          file: expect.objectContaining({
+            url: 'https://timeout-host.com/walkthrough.mp4',
+          }),
         }),
         expect.any(Object),
       );
@@ -388,7 +432,9 @@ describe('Chaos & E2E Suite: Media Video Guard & Stale Links Immunity', () => {
     it('[Chaos 3: Cloudflare Bot Block (403 Returning HTML Page)]', async () => {
       // Cloudflare menolak scraping dan mengembalikan halaman HTML dengan status 200/403
       mockedAxios.get.mockResolvedValueOnce({
-        data: Buffer.from('<!DOCTYPE html><html><title>Just a moment...</title>Cloudflare challenge</html>'),
+        data: Buffer.from(
+          '<!DOCTYPE html><html><title>Just a moment...</title>Cloudflare challenge</html>',
+        ),
         headers: { 'content-type': 'text/html; charset=UTF-8' },
       });
 
@@ -425,7 +471,12 @@ describe('Chaos & E2E Suite: Media Video Guard & Stale Links Immunity', () => {
       for (const url of maliciousUrls) {
         mockedAxios.get.mockRejectedValueOnce(new Error('Invalid URL'));
         await expect(
-          wahaService.sendVideo('test-session', '628111222333', url, 'Chaos Video'),
+          wahaService.sendVideo(
+            'test-session',
+            '628111222333',
+            url,
+            'Chaos Video',
+          ),
         ).resolves.not.toThrow();
       }
     });
@@ -442,9 +493,14 @@ describe('Chaos & E2E Suite: Media Video Guard & Stale Links Immunity', () => {
         instanceName: 'wa-property',
         tenantId: 'tenant-1',
       });
-      mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-1', name: 'Zafi Property' });
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        id: 'tenant-1',
+        name: 'Zafi Property',
+      });
       // Di database aktif saat ini, TIDAK ADA satu pun dari 50 link tersebut
-      mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue('Database bersih.');
+      mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue(
+        'Database bersih.',
+      );
       mockAgentShared.getAvailabilityContext.mockResolvedValue(null);
 
       // LLM mengutip salah satu link dari tumpukan banjir history
@@ -452,7 +508,12 @@ describe('Chaos & E2E Suite: Media Video Guard & Stale Links Immunity', () => {
         JSON.stringify({
           text: 'Ini videonya kak https://www.instagram.com/reel/staleReelId25/',
           images: [],
-          videos: [{ url: 'https://www.instagram.com/reel/staleReelId25/', caption: 'Old Video' }],
+          videos: [
+            {
+              url: 'https://www.instagram.com/reel/staleReelId25/',
+              caption: 'Old Video',
+            },
+          ],
         }),
       );
 
@@ -464,7 +525,9 @@ describe('Chaos & E2E Suite: Media Video Guard & Stale Links Immunity', () => {
 
       // Semua 50 link harus tertolak dan ternetralisir
       expect(response.videos).toEqual([]);
-      expect(response.text).not.toContain('https://www.instagram.com/reel/staleReelId25/');
+      expect(response.text).not.toContain(
+        'https://www.instagram.com/reel/staleReelId25/',
+      );
     });
 
     it('[Chaos 6: High-Concurrency Burst (30 Simultaneous Video Inquiries)]', async () => {
@@ -474,8 +537,13 @@ describe('Chaos & E2E Suite: Media Video Guard & Stale Links Immunity', () => {
         instanceName: 'wa-property',
         tenantId: 'tenant-1',
       });
-      mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-1', name: 'Zafi Property' });
-      mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue(`Video: ${igUrl}`);
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        id: 'tenant-1',
+        name: 'Zafi Property',
+      });
+      mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue(
+        `Video: ${igUrl}`,
+      );
       mockAgentShared.getAvailabilityContext.mockResolvedValue(null);
 
       mockAgentShared.callLLM.mockResolvedValue(

@@ -28,10 +28,7 @@ export class SearchService {
   private highlight(text: string, q: string): string {
     if (!text || !q) return text;
     const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return text.replace(
-      new RegExp(`(${escaped})`, 'gi'),
-      '**$1**',
-    );
+    return text.replace(new RegExp(`(${escaped})`, 'gi'), '**$1**');
   }
 
   async searchContacts(
@@ -158,9 +155,7 @@ export class SearchService {
   ): Promise<SearchCategoryResult> {
     const t0 = Date.now();
     const where: any = {
-      OR: [
-        { content: { contains: q, mode: 'insensitive' } },
-      ],
+      OR: [{ content: { contains: q, mode: 'insensitive' } }],
     };
     if (!isSuperadmin && tenantId) where.tenantId = tenantId;
 
@@ -229,7 +224,9 @@ export class SearchService {
       id: r.id,
       category: 'unit',
       title: `${r.code}${r.houseType ? ` (${r.houseType})` : ''}`,
-      subtitle: r.group.name + (r.price ? ` · Rp ${Number(r.price).toLocaleString('id-ID')}` : ''),
+      subtitle:
+        r.group.name +
+        (r.price ? ` · Rp ${Number(r.price).toLocaleString('id-ID')}` : ''),
       meta: {
         status: r.status,
         groupId: r.group.id,
@@ -305,7 +302,10 @@ export class SearchService {
       ]);
 
     return [contacts, units, knowledge, products, messages]
-      .filter((r): r is PromiseFulfilledResult<SearchCategoryResult> => r.status === 'fulfilled')
+      .filter(
+        (r): r is PromiseFulfilledResult<SearchCategoryResult> =>
+          r.status === 'fulfilled',
+      )
       .map((r) => r.value);
   }
 }

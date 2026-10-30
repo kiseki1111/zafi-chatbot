@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { useAppStore } from "@/lib/app-store";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import {
   Activity, RefreshCw, AlertTriangle, CheckCircle2,
   TrendingUp, Users, Zap, Building2, ArrowRight,
@@ -118,8 +119,16 @@ export function QuotaMonitorPage() {
                       {c.instances} Sesi WhatsApp tertaut
                     </p>
                   </div>
-                  <Badge variant="outline" className="uppercase text-[10px] font-bold bg-muted/40">
-                    Paket: {c.plan}
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "uppercase text-[10px] font-bold",
+                      c.plan
+                        ? "bg-muted/40"
+                        : "bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950 dark:text-amber-300"
+                    )}
+                  >
+                    Paket: {c.plan || "Tanpa Paket"}
                   </Badge>
                 </div>
 
@@ -130,7 +139,7 @@ export function QuotaMonitorPage() {
                       <Users className="h-3 w-3" /> Pengguna Aktif (MAU)
                     </span>
                     <span className="font-mono text-[11px] font-semibold">
-                      {c.mauUsed} / {c.maxMau > 0 ? c.maxMau : "Unlimited"} ({c.mauPercent}%)
+                      {c.mauUsed} / {c.maxMau > 0 ? c.maxMau.toLocaleString("id-ID") : "Belum diatur"} ({c.mauPercent}%)
                     </span>
                   </div>
                   <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
@@ -150,7 +159,7 @@ export function QuotaMonitorPage() {
                       <Zap className="h-3 w-3" /> Respons AI Bulanan
                     </span>
                     <span className="font-mono text-[11px] font-semibold">
-                      {c.aiUsed} / {c.maxAiResponses > 0 ? c.maxAiResponses : "Unlimited"} ({c.aiPercent}%)
+                      {c.aiUsed} / {c.maxAiResponses > 0 ? c.maxAiResponses.toLocaleString("id-ID") : "Belum diatur"} ({c.aiPercent}%)
                     </span>
                   </div>
                   <div className="h-2 w-full bg-muted rounded-full overflow-hidden">

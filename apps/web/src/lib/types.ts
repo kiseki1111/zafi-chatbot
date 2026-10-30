@@ -90,6 +90,7 @@ export interface ChatMessage {
   text: string;
   status: MessageStatus;
   timestamp: string;
+  createdAt?: string;
   isAI?: boolean;
   isFollowUp?: boolean;
   mediaUrl?: string;

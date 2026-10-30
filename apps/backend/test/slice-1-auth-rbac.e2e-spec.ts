@@ -34,7 +34,7 @@ describe('Potongan 1: Batas Limit Autentikasi & Keamanan RBAC (Boundary Test)', 
   describe('1. Batas Input & Validasi Payload Login', () => {
     it('Harus menolak format email sampah atau injection pattern (400)', async () => {
       const payloads = [
-        { email: 'admin\' OR \'1\'=\'1', passwordPlain: 'Pass123!' },
+        { email: "admin' OR '1'='1", passwordPlain: 'Pass123!' },
         { email: 'notanemail', passwordPlain: 'Pass123!' },
         { email: '', passwordPlain: 'Pass123!' },
       ];
@@ -123,7 +123,12 @@ describe('Potongan 1: Batas Limit Autentikasi & Keamanan RBAC (Boundary Test)', 
   describe('5. Batas Role-Based Access Control (Privilege Escalation Check)', () => {
     it('Operator atau Manajer DITOLAK saat mencoba mengakses fungsi Superadmin (403)', async () => {
       const operatorToken = jwtService.sign(
-        { sub: 'operator-1', email: 'op@toko.com', roles: ['operator'], tenantId: 'tenant-1' },
+        {
+          sub: 'operator-1',
+          email: 'op@toko.com',
+          roles: ['operator'],
+          tenantId: 'tenant-1',
+        },
         { secret: JWT_SECRET },
       );
 
@@ -137,7 +142,11 @@ describe('Potongan 1: Batas Limit Autentikasi & Keamanan RBAC (Boundary Test)', 
 
     it('Superadmin DIIZINKAN mengakses statistik platform (200)', async () => {
       const superadminToken = jwtService.sign(
-        { sub: 'superadmin-1', email: 'owner@platform.com', roles: ['superadmin'] },
+        {
+          sub: 'superadmin-1',
+          email: 'owner@platform.com',
+          roles: ['superadmin'],
+        },
         { secret: JWT_SECRET },
       );
 
@@ -172,7 +181,9 @@ describe('Potongan 1: Batas Limit Autentikasi & Keamanan RBAC (Boundary Test)', 
         { sub: 'u1', email: 'user@toko.com', roles: ['manager'] },
         { secret: JWT_SECRET },
       );
-      context.mockPrisma.refreshToken.deleteMany.mockResolvedValue({ count: 1 });
+      context.mockPrisma.refreshToken.deleteMany.mockResolvedValue({
+        count: 1,
+      });
 
       const res = await request(app.getHttpServer())
         .post('/api/v1/auth/logout')

@@ -121,7 +121,9 @@ describe('Availability & Resource Flow (e2e)', () => {
         id: 'group-1',
         tenantId: 'tenant-123',
       });
-      context.mockPrisma.resourceGroup.delete.mockResolvedValue({ id: 'group-1' });
+      context.mockPrisma.resourceGroup.delete.mockResolvedValue({
+        id: 'group-1',
+      });
 
       const response = await request(app.getHttpServer())
         .delete('/api/v1/availability/groups/group-1')

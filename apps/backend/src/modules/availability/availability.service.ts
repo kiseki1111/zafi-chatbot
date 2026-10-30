@@ -1,13 +1,18 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import { PrismaService } from '../../core/prisma/prisma.service';
+import { resolveTenantCapacity } from '../../features/web-dashboard/tenant/tenant.service';
 
 const sharp = require('sharp');
 
 @Injectable()
 export class AvailabilityService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(public readonly prisma: PrismaService) {}
 
   async getGroups(tenantId: string) {
     try {
@@ -54,6 +59,19 @@ export class AvailabilityService {
         });
         if (tenant) {
           validTenantId = tenant.id;
+          // ponytail: validasi batas kuota proyek per tier
+          const capacity = resolveTenantCapacity(tenant.metadata);
+          if (!capacity.isDeveloper && capacity.planKey !== null) {
+            const projectCount =
+              (await this.prisma.resourceGroup
+                .count({ where: { tenantId: validTenantId } })
+                .catch(() => 0)) ?? 0;
+            if (projectCount >= capacity.maxProjects) {
+              throw new BadRequestException(
+                `Batas kuota proyek (${capacity.maxProjects} proyek) untuk paket ${capacity.planName} telah tercapai. Silakan tingkatkan paket Anda.`,
+              );
+            }
+          }
         }
       }
 
@@ -64,7 +82,7 @@ export class AvailabilityService {
           category: data.category || 'properti',
           description: data.description || null,
           siteplanImage: data.siteplanImage || null,
-          pricingTemplates: (data.pricingTemplates || []) as any,
+          pricingTemplates: data.pricingTemplates || [],
         } as any,
         include: { items: true },
       });
@@ -89,7 +107,8 @@ export class AvailabilityService {
       const group = await this.prisma.resourceGroup.findFirst({
         where: { id, tenantId },
       });
-      if (!group) throw new NotFoundException('Group not found or access denied');
+      if (!group)
+        throw new NotFoundException('Group not found or access denied');
     }
     return this.prisma.resourceGroup.update({
       where: { id },
@@ -103,7 +122,8 @@ export class AvailabilityService {
       const group = await this.prisma.resourceGroup.findFirst({
         where: { id, tenantId },
       });
-      if (!group) throw new NotFoundException('Group not found or access denied');
+      if (!group)
+        throw new NotFoundException('Group not found or access denied');
     }
     return this.prisma.resourceGroup.delete({
       where: { id },
@@ -130,7 +150,8 @@ export class AvailabilityService {
       const group = await this.prisma.resourceGroup.findFirst({
         where: { id: groupId, tenantId },
       });
-      if (!group) throw new NotFoundException('Group not found or access denied');
+      if (!group)
+        throw new NotFoundException('Group not found or access denied');
     }
     return this.prisma.resourceItem.create({
       data: {
@@ -163,7 +184,8 @@ export class AvailabilityService {
       const group = await this.prisma.resourceGroup.findFirst({
         where: { id: groupId, tenantId },
       });
-      if (!group) throw new NotFoundException('Group not found or access denied');
+      if (!group)
+        throw new NotFoundException('Group not found or access denied');
     }
     const itemsData: any[] = [];
     for (let i = startNumber; i <= endNumber; i++) {
@@ -235,29 +257,56 @@ export class AvailabilityService {
       .replace(/'/g, '&apos;');
   }
 
-  buildSiteplanSvg(groupName: string, items: any[], customLayout?: any): string {
+  buildSiteplanSvg(
+    groupName: string,
+    items: any[],
+    customLayout?: any,
+  ): string {
     const width = 1600;
     const height = 900;
 
     // Natural alphanumeric sorting (A1, A2, A3... A10 instead of A1, A10, A11... A2)
     const sortedItems = [...items].sort((a, b) =>
-      a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }),
+      a.code.localeCompare(b.code, undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      }),
     );
 
     const getColor = (item: any) => {
       const s = String(item.status || '').toUpperCase();
       const n = String(item.notes || '').toUpperCase();
-      if (s === 'OCCUPIED' || s === 'TERJUAL' || n.includes('TERJUAL')) return '#EF4444';
-      if (s === 'BOOKED' || s === 'PROSES_BANK' || n.includes('PROSES BANK') || n.includes('PROSES')) return '#F97316';
-      if (s === 'AVAILABLE' || s === 'READY' || n.includes('READY')) return '#22C55E';
-      if (s === 'MAINTENANCE' || n.includes('CONTOH') || n.includes('BOOKING')) return '#3B82F6';
-      if (n.includes('CASH') || n.includes('TYPE 40') || String(item.houseType || '').includes('40')) return '#06B6D4';
+      if (s === 'OCCUPIED' || s === 'TERJUAL' || n.includes('TERJUAL'))
+        return '#EF4444';
+      if (
+        s === 'BOOKED' ||
+        s === 'PROSES_BANK' ||
+        n.includes('PROSES BANK') ||
+        n.includes('PROSES')
+      )
+        return '#F97316';
+      if (s === 'AVAILABLE' || s === 'READY' || n.includes('READY'))
+        return '#22C55E';
+      if (s === 'MAINTENANCE' || n.includes('CONTOH') || n.includes('BOOKING'))
+        return '#3B82F6';
+      if (
+        n.includes('CASH') ||
+        n.includes('TYPE 40') ||
+        String(item.houseType || '').includes('40')
+      )
+        return '#06B6D4';
       return '#22C55E';
     };
 
-    const readyCount = sortedItems.filter((i) => (i.status || '').toUpperCase() === 'AVAILABLE').length;
-    const bookedCount = sortedItems.filter((i) => (i.status || '').toUpperCase() === 'BOOKED').length;
-    const soldCount = sortedItems.filter((i) => (i.status || '').toUpperCase() === 'OCCUPIED').length;
+    const readyCount = sortedItems.filter(
+      (i) => (i.status || '').toUpperCase() === 'AVAILABLE',
+    ).length;
+    const bookedCount = sortedItems.filter(
+      (i) => (i.status || '').toUpperCase() === 'BOOKED',
+    ).length;
+    const soldCount = sortedItems.filter(
+      (i) => (i.status || '').toUpperCase() === 'OCCUPIED',
+    ).length;
 
     let roadsSvg = '';
     let fasosSvg = '';
@@ -290,7 +339,9 @@ export class AvailabilityService {
       // Default central road
       const roadY = 410;
       const roadH = 80;
-      const defaultRoadTitle = this.escapeXml(`JALAN KOMPLEK ${groupName.toUpperCase()}`);
+      const defaultRoadTitle = this.escapeXml(
+        `JALAN KOMPLEK ${groupName.toUpperCase()}`,
+      );
       roadsSvg = `
         <g id="road">
           <rect x="60" y="${roadY}" width="${width - 120}" height="${roadH}" fill="#334155" rx="6"/>
@@ -305,8 +356,11 @@ export class AvailabilityService {
     // 2. Render Fasos
     if (Array.isArray(customLayout?.fasos) && customLayout.fasos.length > 0) {
       customLayout.fasos.forEach((f: any) => {
-        const fx = ((f.x || 50) / 100) * width - (((f.width || 8) / 100) * width) / 2;
-        const fy = ((f.y || 24) / 100) * height - (((f.height || 10) / 100) * height) / 2;
+        const fx =
+          ((f.x || 50) / 100) * width - (((f.width || 8) / 100) * width) / 2;
+        const fy =
+          ((f.y || 24) / 100) * height -
+          (((f.height || 10) / 100) * height) / 2;
         const fw = ((f.width || 8) / 100) * width;
         const fh = ((f.height || 10) / 100) * height;
         const fasosTitle = this.escapeXml(f.name || 'FASOS');
@@ -328,7 +382,9 @@ export class AvailabilityService {
     }
 
     // 3. Render Units (using custom coordinates or auto-straight 2-row layout)
-    const hasCustomPositions = customLayout?.unitPositions && Object.keys(customLayout.unitPositions).length > 0;
+    const hasCustomPositions =
+      customLayout?.unitPositions &&
+      Object.keys(customLayout.unitPositions).length > 0;
 
     if (hasCustomPositions) {
       sortedItems.forEach((item) => {
@@ -337,7 +393,9 @@ export class AvailabilityService {
         const uy = (pos.y / 100) * height - unitH / 2;
         const color = getColor(item);
         const itemCodeEscaped = this.escapeXml(item.code);
-        const houseTypeEscaped = this.escapeXml(item.houseType ? 'T-' + item.houseType : '');
+        const houseTypeEscaped = this.escapeXml(
+          item.houseType ? 'T-' + item.houseType : '',
+        );
 
         unitsSvg += `
           <g id="unit-${itemCodeEscaped}">
@@ -349,10 +407,18 @@ export class AvailabilityService {
       });
     } else {
       // Natural straight 2-row layout
-      const blockA = sortedItems.filter((i) => i.code.startsWith('A') || i.code.startsWith('a'));
-      const blockB = sortedItems.filter((i) => i.code.startsWith('B') || i.code.startsWith('b'));
+      const blockA = sortedItems.filter(
+        (i) => i.code.startsWith('A') || i.code.startsWith('a'),
+      );
+      const blockB = sortedItems.filter(
+        (i) => i.code.startsWith('B') || i.code.startsWith('b'),
+      );
       const others = sortedItems.filter(
-        (i) => !i.code.startsWith('A') && !i.code.startsWith('a') && !i.code.startsWith('B') && !i.code.startsWith('b'),
+        (i) =>
+          !i.code.startsWith('A') &&
+          !i.code.startsWith('a') &&
+          !i.code.startsWith('B') &&
+          !i.code.startsWith('b'),
       );
 
       let row1 = blockA;
@@ -368,9 +434,16 @@ export class AvailabilityService {
       const marginX = 80;
       const usableW = width - marginX * 2;
       const maxCount = Math.max(row1.length, row2.length, 1);
-      const computedUnitW = Math.max(34, Math.min(50, Math.floor((usableW - 140) / maxCount)));
+      const computedUnitW = Math.max(
+        34,
+        Math.min(50, Math.floor((usableW - 140) / maxCount)),
+      );
 
-      const renderStraightRow = (rowItems: any[], startY: number, hasFasosCenter = false) => {
+      const renderStraightRow = (
+        rowItems: any[],
+        startY: number,
+        hasFasosCenter = false,
+      ) => {
         let elements = '';
         const fasosIndex = Math.floor(rowItems.length / 2);
         let curX = marginX;
@@ -382,7 +455,9 @@ export class AvailabilityService {
 
           const color = getColor(item);
           const itemCodeEscaped = this.escapeXml(item.code);
-          const houseTypeEscaped = this.escapeXml(item.houseType ? 'T-' + item.houseType : '');
+          const houseTypeEscaped = this.escapeXml(
+            item.houseType ? 'T-' + item.houseType : '',
+          );
 
           elements += `
             <g id="unit-${itemCodeEscaped}">
@@ -470,14 +545,22 @@ export class AvailabilityService {
     let customLayout: any = null;
     let templates = group.pricingTemplates as any;
     if (typeof templates === 'string') {
-      try { templates = JSON.parse(templates); } catch {}
+      try {
+        templates = JSON.parse(templates);
+      } catch {}
     }
     if (templates?.siteplanLayout) {
       customLayout = templates.siteplanLayout;
     }
 
-    const svg = this.buildSiteplanSvg(group.name, group.items || [], customLayout);
-    const jpegBuffer = await sharp(Buffer.from(svg)).jpeg({ quality: 95 }).toBuffer();
+    const svg = this.buildSiteplanSvg(
+      group.name,
+      group.items || [],
+      customLayout,
+    );
+    const jpegBuffer = await sharp(Buffer.from(svg))
+      .jpeg({ quality: 95 })
+      .toBuffer();
 
     const filename = `siteplan-${group.id}.jpg`;
     const targetDirs = [
@@ -495,7 +578,10 @@ export class AvailabilityService {
     return jpegBuffer;
   }
 
-  async generateSiteplanImage(groupId: string, tenantId?: string): Promise<{ url: string; fullUrl: string; filename: string }> {
+  async generateSiteplanImage(
+    groupId: string,
+    tenantId?: string,
+  ): Promise<{ url: string; fullUrl: string; filename: string }> {
     const group = await this.prisma.resourceGroup.findUnique({
       where: { id: groupId },
       include: {
@@ -515,14 +601,18 @@ export class AvailabilityService {
     let customLayout: any = null;
     let templates = group.pricingTemplates as any;
     if (typeof templates === 'string') {
-      try { templates = JSON.parse(templates); } catch {}
+      try {
+        templates = JSON.parse(templates);
+      } catch {}
     }
     if (templates?.siteplanLayout) {
       customLayout = templates.siteplanLayout;
     }
 
     const svg = this.buildSiteplanSvg(group.name, items, customLayout);
-    const jpegBuffer = await sharp(Buffer.from(svg)).jpeg({ quality: 95 }).toBuffer();
+    const jpegBuffer = await sharp(Buffer.from(svg))
+      .jpeg({ quality: 95 })
+      .toBuffer();
 
     const targetDirs = [
       path.join(process.cwd(), 'uploads', 'incoming'),
@@ -546,7 +636,9 @@ export class AvailabilityService {
         if (raw.startsWith('[')) {
           currentMedias = JSON.parse(raw);
         } else if (raw) {
-          currentMedias = [{ id: 'legacy', name: 'Siteplan Utama', url: raw, type: 'image' }];
+          currentMedias = [
+            { id: 'legacy', name: 'Siteplan Utama', url: raw, type: 'image' },
+          ];
         }
       } catch (e) {}
     }
@@ -561,7 +653,9 @@ export class AvailabilityService {
       createdAt: new Date().toISOString(),
     };
 
-    const existingIdx = currentMedias.findIndex((m: any) => m.id === mediaId || m.name?.includes('Siteplan'));
+    const existingIdx = currentMedias.findIndex(
+      (m: any) => m.id === mediaId || m.name?.includes('Siteplan'),
+    );
     if (existingIdx !== -1) {
       currentMedias[existingIdx] = mediaItem;
     } else {
@@ -597,7 +691,11 @@ export class AvailabilityService {
     // Persist layout to pricingTemplates
     let templates = group.pricingTemplates as any;
     if (typeof templates === 'string') {
-      try { templates = JSON.parse(templates); } catch { templates = {}; }
+      try {
+        templates = JSON.parse(templates);
+      } catch {
+        templates = {};
+      }
     }
     if (Array.isArray(templates)) {
       templates = { list: templates, siteplanLayout: body.layout };
@@ -610,7 +708,7 @@ export class AvailabilityService {
     await this.prisma.resourceGroup.update({
       where: { id: group.id },
       data: {
-        pricingTemplates: templates as any,
+        pricingTemplates: templates,
       },
     });
 
@@ -618,14 +716,24 @@ export class AvailabilityService {
     const relativeUrl = `/uploads/incoming/${filename}`;
 
     if (body.imageBase64) {
-      const cleanBase64 = body.imageBase64.replace(/^data:image\/[a-zA-Z]+;base64,/, '');
+      const cleanBase64 = body.imageBase64.replace(
+        /^data:image\/[a-zA-Z]+;base64,/,
+        '',
+      );
       const buffer = Buffer.from(cleanBase64, 'base64');
       const jpegBuffer = await sharp(buffer).jpeg({ quality: 95 }).toBuffer();
 
       const targetDirs = [
         path.join(process.cwd(), 'uploads', 'incoming'),
         path.join(process.cwd(), 'apps', 'backend', 'uploads', 'incoming'),
-        path.join(process.cwd(), 'apps', 'web', 'public', 'uploads', 'incoming'),
+        path.join(
+          process.cwd(),
+          'apps',
+          'web',
+          'public',
+          'uploads',
+          'incoming',
+        ),
       ];
 
       for (const dir of targetDirs) {
@@ -644,7 +752,9 @@ export class AvailabilityService {
           if (raw.startsWith('[')) {
             currentMedias = JSON.parse(raw);
           } else if (raw) {
-            currentMedias = [{ id: 'legacy', name: 'Siteplan Utama', url: raw, type: 'image' }];
+            currentMedias = [
+              { id: 'legacy', name: 'Siteplan Utama', url: raw, type: 'image' },
+            ];
           }
         } catch (e) {}
       }
@@ -659,7 +769,9 @@ export class AvailabilityService {
         createdAt: new Date().toISOString(),
       };
 
-      const existingIdx = currentMedias.findIndex((m: any) => m.id === mediaId || m.name?.includes('Siteplan'));
+      const existingIdx = currentMedias.findIndex(
+        (m: any) => m.id === mediaId || m.name?.includes('Siteplan'),
+      );
       if (existingIdx !== -1) {
         currentMedias[existingIdx] = mediaItem;
       } else {

@@ -24,14 +24,16 @@ export class WahaService implements OnApplicationBootstrap {
       url = url.replace('waha:3000', '127.0.0.1:3000');
     }
     this.baseUrl = url.replace(/\/$/, '');
-    let key =
+    const key =
       this.configService.get<string>('WAHA_API_KEY') ||
       this.configService.get<string>('WHATSAPP_API_KEY') ||
       process.env.WAHA_API_KEY ||
       process.env.WHATSAPP_API_KEY ||
       '';
     this.apiKey = key;
-    this.logger.log(`[WAHA SERVICE] Initialized with baseUrl: ${this.baseUrl} and apiKey: ${this.apiKey}`);
+    this.logger.log(
+      `[WAHA SERVICE] Initialized with baseUrl: ${this.baseUrl} and apiKey: ${this.apiKey}`,
+    );
   }
 
   private getHeaders() {
@@ -106,16 +108,19 @@ export class WahaService implements OnApplicationBootstrap {
   }
 
   // Sends blue ticks / read receipt (sendSeen)
-  async sendSeen(sessionName: string, chatId: string, messageId?: string): Promise<void> {
+  async sendSeen(
+    sessionName: string,
+    chatId: string,
+    messageId?: string,
+  ): Promise<void> {
     try {
       const targetChat = chatId.includes('@') ? chatId : `${chatId}@c.us`;
       const payload: any = { session: sessionName, chatId: targetChat };
       if (messageId) payload.messageId = messageId;
-      await axios.post(
-        `${this.baseUrl}/api/sendSeen`,
-        payload,
-        { headers: this.getHeaders(), timeout: 5000 },
-      );
+      await axios.post(`${this.baseUrl}/api/sendSeen`, payload, {
+        headers: this.getHeaders(),
+        timeout: 5000,
+      });
     } catch (error) {
       this.logger.debug(
         `Could not send seen receipt for ${sessionName}. Error: ${error.message}`,
@@ -138,17 +143,26 @@ export class WahaService implements OnApplicationBootstrap {
   }
 
   // Mengambil foto profil kontak dari WAHA
-  async getContactProfilePicture(sessionName: string, contactPhone: string): Promise<string | null> {
+  async getContactProfilePicture(
+    sessionName: string,
+    contactPhone: string,
+  ): Promise<string | null> {
     try {
-      const cleanPhone = (contactPhone || '').replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, '').replace(/^\+/, '');
-      if (!cleanPhone || cleanPhone.length < 5 || cleanPhone === '0') return null;
+      const cleanPhone = (contactPhone || '')
+        .replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, '')
+        .replace(/^\+/, '');
+      if (!cleanPhone || cleanPhone.length < 5 || cleanPhone === '0')
+        return null;
 
       const contactId = `${cleanPhone}@c.us`;
-      const response = await axios.get(`${this.baseUrl}/api/contacts/profile-picture`, {
-        params: { session: sessionName, contactId },
-        headers: this.getHeaders(),
-        timeout: 4000,
-      });
+      const response = await axios.get(
+        `${this.baseUrl}/api/contacts/profile-picture`,
+        {
+          params: { session: sessionName, contactId },
+          headers: this.getHeaders(),
+          timeout: 4000,
+        },
+      );
       return response.data?.url || response.data?.profilePicture || null;
     } catch {
       return null;
@@ -156,10 +170,16 @@ export class WahaService implements OnApplicationBootstrap {
   }
 
   // Mengambil status bio / about kontak dari WAHA
-  async getContactAbout(sessionName: string, contactPhone: string): Promise<string | null> {
+  async getContactAbout(
+    sessionName: string,
+    contactPhone: string,
+  ): Promise<string | null> {
     try {
-      const cleanPhone = (contactPhone || '').replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, '').replace(/^\+/, '');
-      if (!cleanPhone || cleanPhone.length < 5 || cleanPhone === '0') return null;
+      const cleanPhone = (contactPhone || '')
+        .replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, '')
+        .replace(/^\+/, '');
+      if (!cleanPhone || cleanPhone.length < 5 || cleanPhone === '0')
+        return null;
 
       const contactId = `${cleanPhone}@c.us`;
       const response = await axios.get(`${this.baseUrl}/api/contacts/about`, {
@@ -331,10 +351,12 @@ export class WahaService implements OnApplicationBootstrap {
       // If WAHA API unreachable or returned empty, sync DB statuses with WAHA reality
       if (wahaSessions.length === 0) {
         // Jika WAHA merespons list kosong (sesi tidak ada lagi di WAHA), tandai status di DB sebagai STOPPED
-        await this.prisma.whatsappInstance.updateMany({
-          where: { status: 'WORKING' },
-          data: { status: 'STOPPED' },
-        }).catch(() => null);
+        await this.prisma.whatsappInstance
+          .updateMany({
+            where: { status: 'WORKING' },
+            data: { status: 'STOPPED' },
+          })
+          .catch(() => null);
 
         const dbInstances = await this.prisma.whatsappInstance.findMany({
           where: tenantId ? { tenantId } : {},
@@ -350,13 +372,15 @@ export class WahaService implements OnApplicationBootstrap {
 
       const activeNames = new Set(wahaSessions.map((ws) => ws.name));
       // Tandai instance DB yang tidak ada di WAHA aktif sebagai STOPPED
-      await this.prisma.whatsappInstance.updateMany({
-        where: {
-          instanceName: { notIn: Array.from(activeNames) },
-          status: 'WORKING',
-        },
-        data: { status: 'STOPPED' },
-      }).catch(() => null);
+      await this.prisma.whatsappInstance
+        .updateMany({
+          where: {
+            instanceName: { notIn: Array.from(activeNames) },
+            status: 'WORKING',
+          },
+          data: { status: 'STOPPED' },
+        })
+        .catch(() => null);
 
       const mergedSessions = await Promise.all(
         wahaSessions.map(async (ws) => {
@@ -581,7 +605,10 @@ export class WahaService implements OnApplicationBootstrap {
     }
   }
 
-  private readLocalMediaFile(localFile: string, fallbackMime: string): { data: Buffer; mime: string } | null {
+  private readLocalMediaFile(
+    localFile: string,
+    fallbackMime: string,
+  ): { data: Buffer; mime: string } | null {
     try {
       const buffer = fs.readFileSync(localFile);
       const ext = path.extname(localFile).toLowerCase().replace('.', '');
@@ -646,8 +673,13 @@ export class WahaService implements OnApplicationBootstrap {
           const imageResponse = await axios.get(imageUrl, {
             responseType: 'arraybuffer',
           });
-          const contentType = String(imageResponse.headers['content-type'] || '').toLowerCase();
-          if (contentType.includes('text/html') || contentType.startsWith('text/')) {
+          const contentType = String(
+            imageResponse.headers['content-type'] || '',
+          ).toLowerCase();
+          if (
+            contentType.includes('text/html') ||
+            contentType.startsWith('text/')
+          ) {
             this.logger.warn(
               `[WAHA-SEND-IMAGE] URL ${imageUrl} mengembalikan '${contentType}' (bukan data gambar). Mengirim sebagai teks tautan.`,
             );
@@ -661,8 +693,13 @@ export class WahaService implements OnApplicationBootstrap {
         const imageResponse = await axios.get(imageUrl, {
           responseType: 'arraybuffer',
         });
-        const contentType = String(imageResponse.headers['content-type'] || '').toLowerCase();
-        if (contentType.includes('text/html') || contentType.startsWith('text/')) {
+        const contentType = String(
+          imageResponse.headers['content-type'] || '',
+        ).toLowerCase();
+        if (
+          contentType.includes('text/html') ||
+          contentType.startsWith('text/')
+        ) {
           this.logger.warn(
             `[WAHA-SEND-IMAGE] URL ${imageUrl} mengembalikan '${contentType}' (bukan data gambar). Mengirim sebagai teks tautan.`,
           );
@@ -755,7 +792,9 @@ export class WahaService implements OnApplicationBootstrap {
     if (isVideo) {
       return this.sendVideo(sessionName, chatId, mediaUrl, caption);
     }
-    const isPdfOrDoc = /\.(pdf|doc|docx|xls|xlsx|csv|txt)($|\?)/i.test(mediaUrl);
+    const isPdfOrDoc = /\.(pdf|doc|docx|xls|xlsx|csv|txt)($|\?)/i.test(
+      mediaUrl,
+    );
     if (isPdfOrDoc) {
       return this.sendDocument(sessionName, chatId, mediaUrl, caption);
     }
@@ -776,9 +815,12 @@ export class WahaService implements OnApplicationBootstrap {
       await this.sendTypingPresence(sessionName, chatId);
 
       const isPdf = /\.pdf($|\?)/i.test(documentUrl);
-      const defaultMime = isPdf ? 'application/pdf' : 'application/octet-stream';
+      const defaultMime = isPdf
+        ? 'application/pdf'
+        : 'application/octet-stream';
       const cleanFilename =
-        documentUrl.split('/').pop()?.split('?')[0] || (isPdf ? 'document.pdf' : 'document');
+        documentUrl.split('/').pop()?.split('?')[0] ||
+        (isPdf ? 'document.pdf' : 'document');
 
       const filePayload: any = {
         mimetype: defaultMime,
@@ -863,7 +905,7 @@ export class WahaService implements OnApplicationBootstrap {
         return this.sendText(sessionName, chatId, textMsg);
       }
 
-      let filePayload: any = {
+      const filePayload: any = {
         mimetype: 'video/mp4',
         filename: 'video-properti.mp4',
       };
@@ -889,8 +931,13 @@ export class WahaService implements OnApplicationBootstrap {
             timeout: 40000,
           });
 
-          const contentType = String(downloadRes.headers['content-type'] || '').toLowerCase();
-          if (contentType.includes('text/html') || contentType.startsWith('text/')) {
+          const contentType = String(
+            downloadRes.headers['content-type'] || '',
+          ).toLowerCase();
+          if (
+            contentType.includes('text/html') ||
+            contentType.startsWith('text/')
+          ) {
             this.logger.warn(
               `[WAHA-SEND-VIDEO] URL ${videoUrl} mengembalikan '${contentType}' (bukan data video biner). Mengalihkan ke teks tautan.`,
             );
@@ -972,7 +1019,7 @@ export class WahaService implements OnApplicationBootstrap {
         return this.sendText(sessionName, chatId, textMsg);
       }
 
-      let filePayload: any = {
+      const filePayload: any = {
         mimetype: 'video/mp4',
         filename: 'video.mp4',
       };
@@ -1009,8 +1056,13 @@ export class WahaService implements OnApplicationBootstrap {
             timeout: 35000,
           });
 
-          const contentType = String(downloadRes.headers['content-type'] || '').toLowerCase();
-          if (contentType.includes('text/html') || contentType.startsWith('text/')) {
+          const contentType = String(
+            downloadRes.headers['content-type'] || '',
+          ).toLowerCase();
+          if (
+            contentType.includes('text/html') ||
+            contentType.startsWith('text/')
+          ) {
             this.logger.warn(
               `[WAHA-SEND-VIDEO] URL ${videoUrl} mengembalikan '${contentType}' (bukan video biner). Mengalihkan ke teks tautan.`,
             );
@@ -1076,7 +1128,10 @@ export class WahaService implements OnApplicationBootstrap {
     }
   }
 
-  async getMediaFile(sessionName: string, messageId: string): Promise<{ data: Buffer; mimetype: string } | null> {
+  async getMediaFile(
+    sessionName: string,
+    messageId: string,
+  ): Promise<{ data: Buffer; mimetype: string } | null> {
     try {
       // WAHA provides endpoints to download media by message ID or file path
       const endpoints = [
@@ -1103,7 +1158,9 @@ export class WahaService implements OnApplicationBootstrap {
       }
       return null;
     } catch (e) {
-      this.logger.warn(`Could not retrieve media file for ${messageId}: ${e.message}`);
+      this.logger.warn(
+        `Could not retrieve media file for ${messageId}: ${e.message}`,
+      );
       return null;
     }
   }
@@ -1116,7 +1173,9 @@ export class WahaService implements OnApplicationBootstrap {
     return this.apiKey;
   }
 
-  async getMediaStreamOrBuffer(pathPart: string): Promise<{ data: Buffer; mimetype: string } | null> {
+  async getMediaStreamOrBuffer(
+    pathPart: string,
+  ): Promise<{ data: Buffer; mimetype: string } | null> {
     try {
       const cleanPath = pathPart.replace(/^\/+/, '');
       const targetUrl = `${this.baseUrl}/api/files/${cleanPath}`;
@@ -1130,7 +1189,9 @@ export class WahaService implements OnApplicationBootstrap {
       });
       return {
         data: Buffer.from(res.data),
-        mimetype: String(res.headers['content-type'] || 'application/octet-stream'),
+        mimetype: String(
+          res.headers['content-type'] || 'application/octet-stream',
+        ),
       };
     } catch (e: any) {
       this.logger.warn(`Could not proxy media file ${pathPart}: ${e.message}`);
@@ -1139,7 +1200,10 @@ export class WahaService implements OnApplicationBootstrap {
   }
 
   private getCleanExt(mimetype: string, fallback = 'jpg'): string {
-    const raw = (mimetype.split('/')[1] || fallback).split(';')[0].trim().toLowerCase();
+    const raw = (mimetype.split('/')[1] || fallback)
+      .split(';')[0]
+      .trim()
+      .toLowerCase();
     if (raw === 'jpeg') return 'jpg';
     if (raw === 'mpeg') return 'mp3';
     if (raw === 'oga' || raw === 'opus') return 'ogg';
@@ -1197,23 +1261,34 @@ export class WahaService implements OnApplicationBootstrap {
         }
 
         if (targetUrl.startsWith('http')) {
-          const isWahaInternal = targetUrl.startsWith(this.baseUrl) || targetUrl.includes('/api/files/');
+          const isWahaInternal =
+            targetUrl.startsWith(this.baseUrl) ||
+            targetUrl.includes('/api/files/');
           const res = await axios.get(targetUrl, {
             responseType: 'arraybuffer',
             headers: {
               Accept: '*/*',
-              ...(isWahaInternal && this.apiKey ? { 'X-Api-Key': this.apiKey } : {}),
+              ...(isWahaInternal && this.apiKey
+                ? { 'X-Api-Key': this.apiKey }
+                : {}),
             },
             timeout: 30000,
           });
-          const mime = String(res.headers['content-type'] || 'application/octet-stream');
+          const mime = String(
+            res.headers['content-type'] || 'application/octet-stream',
+          );
           let ext = this.getCleanExt(mime, 'jpg');
           // ponytail: ambil ekstensi audio/media dari URL jika MIME type bersifat generik
           if (ext === 'octet-stream' || ext === 'jpg' || ext === 'plain') {
-            const urlMatch = targetUrl.match(/\.(ogg|oga|opus|mp3|wav|m4a|aac|mp4|webm|jpg|jpeg|png|webp|pdf)($|\?)/i);
+            const urlMatch = targetUrl.match(
+              /\.(ogg|oga|opus|mp3|wav|m4a|aac|mp4|webm|jpg|jpeg|png|webp|pdf)($|\?)/i,
+            );
             if (urlMatch) {
               const matchedExt = urlMatch[1].toLowerCase();
-              ext = matchedExt === 'oga' || matchedExt === 'opus' ? 'ogg' : matchedExt;
+              ext =
+                matchedExt === 'oga' || matchedExt === 'opus'
+                  ? 'ogg'
+                  : matchedExt;
             }
           }
           return this.writeMediaBuffer(Buffer.from(res.data), mime, ext);
@@ -1253,28 +1328,26 @@ export class WahaService implements OnApplicationBootstrap {
 
   async getQrCode(sessionName: string): Promise<any> {
     const url = `${this.baseUrl}/api/${sessionName}/auth/qr`;
-    this.logger.debug(`[WAHA QR] Fetching QR: ${url} with apiKey: ${this.apiKey}`);
+    this.logger.debug(
+      `[WAHA QR] Fetching QR: ${url} with apiKey: ${this.apiKey}`,
+    );
     try {
-      const response = await axios.get(
-        url,
-        {
-          headers: { ...this.getHeaders(), Accept: 'image/png' },
-          responseType: 'arraybuffer',
-        },
-      );
+      const response = await axios.get(url, {
+        headers: { ...this.getHeaders(), Accept: 'image/png' },
+        responseType: 'arraybuffer',
+      });
       return response.data;
     } catch (error) {
-      this.logger.error(`[WAHA QR] First attempt failed: ${error.message} (status: ${error.response?.status})`);
+      this.logger.error(
+        `[WAHA QR] First attempt failed: ${error.message} (status: ${error.response?.status})`,
+      );
       try {
         const fallbackUrl = `${this.baseUrl}/api/sessions/${sessionName}/auth/qr`;
         this.logger.debug(`[WAHA QR] Trying fallback: ${fallbackUrl}`);
-        const fallbackResponse = await axios.get(
-          fallbackUrl,
-          {
-            headers: { ...this.getHeaders(), Accept: 'image/png' },
-            responseType: 'arraybuffer',
-          },
-        );
+        const fallbackResponse = await axios.get(fallbackUrl, {
+          headers: { ...this.getHeaders(), Accept: 'image/png' },
+          responseType: 'arraybuffer',
+        });
         return fallbackResponse.data;
       } catch (innerError) {
         this.logger.error(

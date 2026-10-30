@@ -54,7 +54,9 @@ describe('Potongan 4: Modul Vertikal Siteplan Properti & Denah Kursi Bus (Bounda
 
   describe('1. Pembuatan Grup Vertikal (Properti & Armada Bus)', () => {
     it('Berhasil membuat grup kavling perumahan (category: properti) (201)', async () => {
-      context.mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-proper-1' });
+      context.mockPrisma.tenant.findUnique.mockResolvedValue({
+        id: 'tenant-proper-1',
+      });
       context.mockPrisma.resourceGroup.create.mockResolvedValue({
         id: 'group-prop-1',
         name: 'Cluster Mawar Hills',
@@ -77,7 +79,9 @@ describe('Potongan 4: Modul Vertikal Siteplan Properti & Denah Kursi Bus (Bounda
     });
 
     it('Berhasil membuat grup armada bus transportasi (category: bus) (201)', async () => {
-      context.mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-proper-1' });
+      context.mockPrisma.tenant.findUnique.mockResolvedValue({
+        id: 'tenant-proper-1',
+      });
       context.mockPrisma.resourceGroup.create.mockResolvedValue({
         id: 'group-bus-1',
         name: 'Bus Scania SHD-01',
@@ -116,7 +120,9 @@ describe('Potongan 4: Modul Vertikal Siteplan Properti & Denah Kursi Bus (Bounda
         id: 'group-bus-1',
         tenantId: 'tenant-proper-1',
       });
-      context.mockPrisma.resourceItem.createMany.mockResolvedValue({ count: 10 });
+      context.mockPrisma.resourceItem.createMany.mockResolvedValue({
+        count: 10,
+      });
 
       const res = await request(app.getHttpServer())
         .post('/api/v1/availability/groups/group-bus-1/batch-items')
@@ -136,7 +142,9 @@ describe('Potongan 4: Modul Vertikal Siteplan Properti & Denah Kursi Bus (Bounda
         id: 'group-bus-1',
         tenantId: 'tenant-proper-1',
       });
-      context.mockPrisma.resourceItem.createMany.mockResolvedValue({ count: 0 });
+      context.mockPrisma.resourceItem.createMany.mockResolvedValue({
+        count: 0,
+      });
 
       const res = await request(app.getHttpServer())
         .post('/api/v1/availability/groups/group-bus-1/batch-items')
@@ -194,7 +202,9 @@ describe('Potongan 4: Modul Vertikal Siteplan Properti & Denah Kursi Bus (Bounda
       context.mockPrisma.resourceItem.findFirst.mockResolvedValue({
         id: 'item-1',
       });
-      context.mockPrisma.resourceItem.delete.mockResolvedValue({ id: 'item-1' });
+      context.mockPrisma.resourceItem.delete.mockResolvedValue({
+        id: 'item-1',
+      });
 
       const res = await request(app.getHttpServer())
         .delete('/api/v1/availability/items/item-1')

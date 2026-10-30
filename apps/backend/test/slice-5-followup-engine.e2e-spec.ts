@@ -31,13 +31,19 @@ describe('Potongan 5: Automated Follow-Up Engine (Boundary & Anti-Duplicate Test
   };
 
   const mockWaha = {
-    sendMessage: jest.fn().mockResolvedValue({ success: true, messageId: 'msg-flw-1' }),
+    sendMessage: jest
+      .fn()
+      .mockResolvedValue({ success: true, messageId: 'msg-flw-1' }),
     sendTextMessage: jest.fn().mockResolvedValue({ success: true }),
   };
 
   const mockAgentShared = {
     getRecentContext: jest.fn().mockResolvedValue([]),
-    callLLM: jest.fn().mockResolvedValue('Halo Kak, apakah ada yang bisa dibantu lagi hari ini? 😊'),
+    callLLM: jest
+      .fn()
+      .mockResolvedValue(
+        'Halo Kak, apakah ada yang bisa dibantu lagi hari ini? 😊',
+      ),
   };
 
   beforeAll(async () => {
@@ -126,13 +132,21 @@ describe('Potongan 5: Automated Follow-Up Engine (Boundary & Anti-Duplicate Test
         {
           contactId: 'contact-sudah-pernah',
           instanceName: 'session-wa',
-          contact: { id: 'contact-sudah-pernah', phone: '6281111111', name: 'Budi' },
+          contact: {
+            id: 'contact-sudah-pernah',
+            phone: '6281111111',
+            name: 'Budi',
+          },
           lastMessageAt: new Date(Date.now() - 48 * 3600 * 1000),
         },
         {
           contactId: 'contact-baru-inaktif',
           instanceName: 'session-wa',
-          contact: { id: 'contact-baru-inaktif', phone: '6282222222', name: 'Siti' },
+          contact: {
+            id: 'contact-baru-inaktif',
+            phone: '6282222222',
+            name: 'Siti',
+          },
           lastMessageAt: new Date(Date.now() - 30 * 3600 * 1000),
         },
       ]);
@@ -223,7 +237,9 @@ describe('Potongan 5: Automated Follow-Up Engine (Boundary & Anti-Duplicate Test
       context.mockPrisma.followUp.findMany.mockResolvedValue([]);
 
       // Simulasi WAHA service error / network down
-      mockWaha.sendMessage.mockRejectedValue(new Error('WAHA Instance Disconnected'));
+      mockWaha.sendMessage.mockRejectedValue(
+        new Error('WAHA Instance Disconnected'),
+      );
 
       const res = await request(app.getHttpServer())
         .post('/api/v1/followup/trigger')

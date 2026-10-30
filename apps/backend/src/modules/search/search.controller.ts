@@ -45,22 +45,52 @@ export class SearchController {
 
     switch (category) {
       case 'contacts':
-        results = [await this.searchService.searchContacts(query, tenantId, isSuperadmin)];
+        results = [
+          await this.searchService.searchContacts(
+            query,
+            tenantId,
+            isSuperadmin,
+          ),
+        ];
         break;
       case 'messages':
-        results = [await this.searchService.searchMessages(query, tenantId, isSuperadmin)];
+        results = [
+          await this.searchService.searchMessages(
+            query,
+            tenantId,
+            isSuperadmin,
+          ),
+        ];
         break;
       case 'knowledge':
-        results = [await this.searchService.searchKnowledge(query, tenantId, isSuperadmin)];
+        results = [
+          await this.searchService.searchKnowledge(
+            query,
+            tenantId,
+            isSuperadmin,
+          ),
+        ];
         break;
       case 'units':
-        results = [await this.searchService.searchUnits(query, tenantId, isSuperadmin)];
+        results = [
+          await this.searchService.searchUnits(query, tenantId, isSuperadmin),
+        ];
         break;
       case 'products':
-        results = [await this.searchService.searchProducts(query, tenantId, isSuperadmin)];
+        results = [
+          await this.searchService.searchProducts(
+            query,
+            tenantId,
+            isSuperadmin,
+          ),
+        ];
         break;
       default:
-        results = await this.searchService.searchAll(query, tenantId, isSuperadmin);
+        results = await this.searchService.searchAll(
+          query,
+          tenantId,
+          isSuperadmin,
+        );
     }
 
     return { q: query, results };
@@ -100,11 +130,19 @@ export class SearchController {
     // Luncurkan tiap kategori secara independen; emisi segera setelah selesai
     // Urutan: kontak → unit → knowledge → produk → pesan (dari tercepat ke terlambat)
     const promises = [
-      this.searchService.searchContacts(query, tenantId, isSuperadmin).then(send),
+      this.searchService
+        .searchContacts(query, tenantId, isSuperadmin)
+        .then(send),
       this.searchService.searchUnits(query, tenantId, isSuperadmin).then(send),
-      this.searchService.searchKnowledge(query, tenantId, isSuperadmin).then(send),
-      this.searchService.searchProducts(query, tenantId, isSuperadmin).then(send),
-      this.searchService.searchMessages(query, tenantId, isSuperadmin).then(send),
+      this.searchService
+        .searchKnowledge(query, tenantId, isSuperadmin)
+        .then(send),
+      this.searchService
+        .searchProducts(query, tenantId, isSuperadmin)
+        .then(send),
+      this.searchService
+        .searchMessages(query, tenantId, isSuperadmin)
+        .then(send),
     ];
 
     try {

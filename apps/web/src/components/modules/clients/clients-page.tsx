@@ -42,10 +42,12 @@ import {
   Search,
   KeyRound,
   Shield,
+  ShieldCheck,
   Bot,
   Layers,
   Sparkles,
   SlidersHorizontal,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthStore } from "@/lib/auth-store";
@@ -63,50 +65,141 @@ const AVAILABLE_MODULES = [
 
 export const PLAN_TIERS = [
   {
-    key: "trial",
-    name: "Free Trial",
-    price: 0,
-    priceLabel: "Gratis",
-    maxMau: 10,
-    maxAiResponses: 50,
-    desc: "10 MAU · 50 Respons AI (Gratis)",
+    key: "lite",
+    name: "Lite - UMKM",
+    price: 249000,
+    priceLabel: "Rp 249.000/bln",
+    yearlyPrice: 209000,
+    yearlyPriceLabel: "Rp 209.000/bln",
+    maxMau: 300,
+    maxAiResponses: 1000,
+    whatsappNumbers: 1,
+    maxProjects: 1,
+    maxUsers: 1,
+    setupFee: 0,
+    support: "Panduan & email",
+    desc: "300 MAU · 1.000 AI · 1 WA · 1 Proyek · 1 User",
+    badgeColor: "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300",
   },
   {
-    key: "pro",
-    name: "Pro",
-    price: 1500000,
-    priceLabel: "Rp 1.500k/bln",
-    maxMau: 2000,
-    maxAiResponses: 15000,
-    desc: "2.000 MAU · 15.000 Respons AI",
+    key: "bronze",
+    name: "Bronze - Starter",
+    price: 499000,
+    priceLabel: "Rp 499.000/bln",
+    yearlyPrice: 429000,
+    yearlyPriceLabel: "Rp 429.000/bln",
+    maxMau: 1000,
+    maxAiResponses: 4000,
+    whatsappNumbers: 1,
+    maxProjects: 1,
+    maxUsers: 3,
+    setupFee: 500000,
+    support: "WhatsApp, 2x24 jam",
+    desc: "1.000 MAU · 4.000 AI · 1 WA · 1 Proyek · 3 User",
+    badgeColor: "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-900 dark:text-slate-300",
   },
   {
-    key: "business",
-    name: "Business",
-    price: 2500000,
-    priceLabel: "Rp 2.500k/bln",
-    maxMau: 8000,
-    maxAiResponses: 50000,
-    desc: "8.000 MAU · 50.000 Respons AI",
+    key: "silver",
+    name: "Silver - Pro",
+    price: 999000,
+    priceLabel: "Rp 999.000/bln",
+    yearlyPrice: 849000,
+    yearlyPriceLabel: "Rp 849.000/bln",
+    maxMau: 2500,
+    maxAiResponses: 10000,
+    whatsappNumbers: 2,
+    maxProjects: 3,
+    maxUsers: 6,
+    setupFee: 500000,
+    support: "WhatsApp, 1x24 jam",
+    desc: "2.500 MAU · 10.000 AI · 2 WA · 3 Proyek · 6 User",
+    badgeColor: "bg-amber-50 text-amber-900 border-amber-400 dark:bg-amber-950/80 dark:text-amber-200",
+  },
+  {
+    key: "gold",
+    name: "Gold - Business",
+    price: 1999000,
+    priceLabel: "Rp 1.999.000/bln",
+    yearlyPrice: 1699000,
+    yearlyPriceLabel: "Rp 1.699.000/bln",
+    maxMau: 6000,
+    maxAiResponses: 24000,
+    whatsappNumbers: 4,
+    maxProjects: 8,
+    maxUsers: 12,
+    setupFee: 0,
+    support: "Dedicated PIC + SLA 4 jam",
+    desc: "6.000 MAU · 24.000 AI · 4 WA · 8 Proyek · 12 User",
+    badgeColor: "bg-blue-100 text-blue-900 border-blue-400 dark:bg-blue-950 dark:text-blue-200",
   },
   {
     key: "enterprise",
-    name: "Enterprise",
-    price: 5799000,
-    priceLabel: "Rp 5.799k/bln",
-    maxMau: 30000,
-    maxAiResponses: 150000,
-    desc: "30.000 MAU · 150.000 Respons AI",
+    name: "Enterprise - Corporate",
+    price: 0,
+    priceLabel: "Kustom",
+    yearlyPrice: 0,
+    yearlyPriceLabel: "Kustom",
+    maxMau: 25000,
+    maxAiResponses: 100000,
+    whatsappNumbers: 10,
+    maxProjects: 25,
+    maxUsers: 50,
+    setupFee: 0,
+    support: "Dedicated + SLA 2 jam",
+    desc: "25.000 MAU · 100.000 AI · 10 WA · 25 Proyek · 50 User · POC 30 hari",
+    badgeColor: "bg-slate-900 text-white border-slate-700 dark:bg-slate-800 dark:text-slate-200",
+  },
+  // ponytail: sentinel high value for unlimited developer mode
+  {
+    key: "developer",
+    name: "Developer Mode (Internal)",
+    price: 0,
+    priceLabel: "Unlimited",
+    yearlyPrice: 0,
+    yearlyPriceLabel: "Unlimited",
+    maxMau: 999999999,
+    maxAiResponses: 999999999,
+    whatsappNumbers: 999,
+    maxProjects: 999,
+    maxUsers: 999,
+    setupFee: 0,
+    support: "Internal Root Access",
+    desc: "Akses internal root tanpa batas untuk perusahaan pemilik SaaS",
+    badgeColor: "bg-emerald-950 text-emerald-200 border-emerald-500 dark:bg-emerald-900 dark:text-emerald-100",
   },
   {
     key: "custom",
     name: "Kustom",
     price: 0,
     priceLabel: "Kustom",
+    yearlyPrice: 0,
+    yearlyPriceLabel: "Kustom",
     maxMau: 1000,
     maxAiResponses: 10000,
-    desc: "Batas & kuota disesuaikan bebas",
+    whatsappNumbers: 2,
+    maxProjects: 3,
+    maxUsers: 5,
+    setupFee: 0,
+    support: "Dedicated Support",
+    desc: "Batas & kuota disesuaikan bebas secara manual",
+    badgeColor: "bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-950 dark:text-purple-300",
   },
+];
+
+// ponytail: default fallback catalog agar modal langsung tampil tanpa blocking fetch
+export const DEFAULT_TOPUP_CATALOG = [
+  { key: "BOOSTER_S", category: "booster", name: "Booster S", mau: 500, ai: 2000, price: 160000, desc: "+500 MAU & +2.000 respons AI" },
+  { key: "BOOSTER_M", category: "booster", name: "Booster M", mau: 1000, ai: 4000, price: 290000, desc: "+1.000 MAU & +4.000 respons AI" },
+  { key: "BOOSTER_L", category: "booster", name: "Booster L", mau: 2500, ai: 10000, price: 650000, desc: "+2.500 MAU & +10.000 respons AI" },
+  { key: "MAU_S", category: "mau", name: "Top-Up MAU S", mau: 500, ai: 0, price: 90000, desc: "+500 MAU sampai akhir bulan" },
+  { key: "MAU_M", category: "mau", name: "Top-Up MAU M", mau: 1000, ai: 0, price: 150000, desc: "+1.000 MAU sampai akhir bulan" },
+  { key: "MAU_L", category: "mau", name: "Top-Up MAU L", mau: 2500, ai: 0, price: 325000, desc: "+2.500 MAU sampai akhir bulan" },
+  { key: "AI_S", category: "ai", name: "Top-Up AI S", mau: 0, ai: 1000, price: 60000, desc: "+1.000 respons AI (tidak hangus)" },
+  { key: "AI_M", category: "ai", name: "Top-Up AI M", mau: 0, ai: 5000, price: 200000, desc: "+5.000 respons AI (tidak hangus)" },
+  { key: "AI_L", category: "ai", name: "Top-Up AI L", mau: 0, ai: 10000, price: 400000, desc: "+10.000 respons AI (tidak hangus)" },
+  { key: "ADDON_WA", category: "addon", name: "Tambah Nomor WhatsApp", whatsapp: 1, price: 150000, desc: "+1 slot nomor WhatsApp" },
+  { key: "ADDON_USER", category: "addon", name: "Tambah User Staf", users: 1, price: 50000, desc: "+1 slot user staf" },
+  { key: "ADDON_PROJECT", category: "addon", name: "Setup Proyek Tambahan", projects: 1, price: 500000, desc: "+1 slot proyek siteplan" },
 ];
 
 export function ClientsPage() {
@@ -185,22 +278,28 @@ export function ClientsPage() {
 
   // Dialog Edit Paket & Kuota Klien (MAU & AI Response)
   const [isEditQuotaOpen, setIsEditQuotaOpen] = useState(false);
-  const [quotaForm, setQuotaForm] = useState({
-    plan: "trial",
-    maxMau: 10,
-    maxAiResponses: 50,
+  const [quotaForm, setQuotaForm] = useState<{
+    plan: string | null;
+    maxMau: number;
+    maxAiResponses: number;
+    planPrice: number;
+  }>({
+    plan: null,
+    maxMau: 0,
+    maxAiResponses: 0,
     planPrice: 0,
   });
 
   const openEditQuotaModal = (client: any) => {
     const q = client.quota || {};
-    const currentPlan = q.plan || "trial";
-    const tier = PLAN_TIERS.find((p) => p.key === currentPlan) || PLAN_TIERS[0];
+    const currentPlan = q.plan ? String(q.plan).toLowerCase() : null;
+    const tier = currentPlan ? PLAN_TIERS.find((p) => p.key === currentPlan) : null;
     setQuotaForm({
       plan: currentPlan,
-      maxMau: typeof q.maxMau === "number" ? q.maxMau : tier.maxMau,
-      maxAiResponses: typeof q.maxAiResponses === "number" ? q.maxAiResponses : tier.maxAiResponses,
-      planPrice: typeof q.planPrice === "number" ? q.planPrice : tier.price,
+      maxMau: typeof q.maxMau === "number" ? q.maxMau : (tier ? tier.maxMau : 0),
+      maxAiResponses:
+        typeof q.maxAiResponses === "number" ? q.maxAiResponses : (tier ? tier.maxAiResponses : 0),
+      planPrice: typeof q.planPrice === "number" ? q.planPrice : (tier ? tier.price : 0),
     });
     setIsEditQuotaOpen(true);
   };
@@ -223,6 +322,52 @@ export function ClientsPage() {
       }
     } catch (e: any) {
       toast.error(e.message || "Gagal memperbarui kuota klien");
+    }
+  };
+
+  // Dialog Top-Up & Booster Klien (Phase 4)
+  const [isTopUpModalOpen, setIsTopUpModalOpen] = useState(false);
+  const [topUpCatalog, setTopUpCatalog] = useState<any[]>(DEFAULT_TOPUP_CATALOG);
+  const [selectedTopUpKey, setSelectedTopUpKey] = useState("BOOSTER_S");
+  const [topUpCategoryFilter, setTopUpCategoryFilter] = useState<"all" | "booster" | "mau" | "ai" | "addon">("all");
+  const [topUpNotes, setTopUpNotes] = useState("");
+  const [applyingTopUp, setApplyingTopUp] = useState(false);
+
+  const openTopUpModal = async () => {
+    setIsTopUpModalOpen(true);
+    try {
+      const res = await fetch("/api/v1/tenant/topup/catalog");
+      if (res.ok) {
+        const json = await res.json();
+        const list = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
+        if (list.length > 0) setTopUpCatalog(list);
+      }
+    } catch {}
+  };
+
+  const handleApplyTopUp = async () => {
+    if (!selectedClient) return;
+    setApplyingTopUp(true);
+    try {
+      const res = await fetch(`/api/v1/tenant/clients/${selectedClient.id}/topup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemKey: selectedTopUpKey, notes: topUpNotes }),
+      });
+      if (res.ok) {
+        toast.success("Paket top-up / add-on berhasil ditambahkan ke akun klien!");
+        setIsTopUpModalOpen(false);
+        setTopUpNotes("");
+        fetchClientDetail(selectedClient.id);
+        fetchClients();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.message || "Gagal menerapkan top-up");
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Gagal menerapkan top-up");
+    } finally {
+      setApplyingTopUp(false);
     }
   };
 
@@ -632,42 +777,67 @@ export function ClientsPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-4 text-xs">
             <div className="flex flex-wrap items-center gap-2.5 text-xs">
-              <div className="px-3.5 py-2 rounded-2xl bg-background border shadow-2xs text-center">
-                <span className="text-muted-foreground block text-[10px] font-medium">Total Akun</span>
-                <strong className="text-base font-bold text-foreground">{usersList.length} Staf</strong>
-              </div>
-              <div className="px-3.5 py-2 rounded-2xl bg-background border shadow-2xs text-center">
-                <span className="text-muted-foreground block text-[10px] font-medium">Modul Aktif</span>
-                <strong className="text-base font-bold text-emerald-600">{tenantActiveModules.length} Modul</strong>
-              </div>
-              <div className="px-3.5 py-2 rounded-2xl bg-background border shadow-2xs text-center">
-                <span className="text-muted-foreground block text-[10px] font-medium">Paket</span>
-                <strong className="text-base font-bold text-blue-600">{selectedClient.quota?.planName || "Free Trial"}</strong>
-              </div>
-              <div className="px-3.5 py-2 rounded-2xl bg-background border shadow-2xs text-center">
-                <span className="text-muted-foreground block text-[10px] font-medium">Nomor (MAU)</span>
-                <strong className="text-base font-mono font-bold text-foreground">
-                  {(selectedClient.quota?.mauUsed || 0).toLocaleString()} / {(selectedClient.quota?.maxMau || 10).toLocaleString()}
+              <div className="px-3 py-2 rounded-2xl bg-background border shadow-2xs text-center min-w-[70px]">
+                <span className="text-muted-foreground block text-[10px] font-medium">Staf (User)</span>
+                <strong className="text-sm font-bold text-foreground">
+                  {usersList.length} / {selectedClient.quota?.maxUsers ?? 1}
+                  {(selectedClient.quota?.extraUsers || 0) > 0 && (
+                    <span className="text-[10px] text-amber-600 font-semibold ml-0.5" title={`Add-on +${selectedClient.quota.extraUsers} staf`}>
+                      (+{selectedClient.quota.extraUsers})
+                    </span>
+                  )}
                 </strong>
               </div>
-              <div className="px-3.5 py-2 rounded-2xl bg-background border shadow-2xs text-center">
+              <div className="px-3 py-2 rounded-2xl bg-background border shadow-2xs text-center min-w-[70px]">
+                <span className="text-muted-foreground block text-[10px] font-medium">Nomor WA</span>
+                <strong className="text-sm font-bold text-foreground">
+                  {selectedClient.whatsappInstances?.length || 0} / {selectedClient.quota?.maxWhatsapp ?? 1}
+                  {(selectedClient.quota?.extraWhatsapp || 0) > 0 && (
+                    <span className="text-[10px] text-amber-600 font-semibold ml-0.5" title={`Add-on +${selectedClient.quota.extraWhatsapp} nomor WA`}>
+                      (+{selectedClient.quota.extraWhatsapp})
+                    </span>
+                  )}
+                </strong>
+              </div>
+              <div className="px-3 py-2 rounded-2xl bg-background border shadow-2xs text-center min-w-[70px]">
+                <span className="text-muted-foreground block text-[10px] font-medium">Proyek</span>
+                <strong className="text-sm font-bold text-foreground">
+                  {selectedClient.quota?.projectsUsed ?? (selectedClient._count?.resourceGroups || 0)} / {selectedClient.quota?.maxProjects ?? 1}
+                  {(selectedClient.quota?.extraProjects || 0) > 0 && (
+                    <span className="text-[10px] text-amber-600 font-semibold ml-0.5" title={`Add-on +${selectedClient.quota.extraProjects} proyek`}>
+                      (+{selectedClient.quota.extraProjects})
+                    </span>
+                  )}
+                </strong>
+              </div>
+              <div className="px-3 py-2 rounded-2xl bg-background border shadow-2xs text-center min-w-[70px]">
+                <span className="text-muted-foreground block text-[10px] font-medium">Paket</span>
+                <strong className={`text-sm font-bold ${selectedClient.quota?.plan ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
+                  {selectedClient.quota?.plan ? (selectedClient.quota?.planName || selectedClient.quota?.plan) : "Tanpa Paket"}
+                </strong>
+              </div>
+              <div className="px-3 py-2 rounded-2xl bg-background border shadow-2xs text-center min-w-[85px]">
+                <span className="text-muted-foreground block text-[10px] font-medium">Kontak (MAU)</span>
+                <strong className="text-sm font-mono font-bold text-foreground">
+                  {(selectedClient.quota?.mauUsed || 0).toLocaleString()} / {(selectedClient.quota?.maxMau || 0).toLocaleString()}
+                </strong>
+              </div>
+              <div className="px-3 py-2 rounded-2xl bg-background border shadow-2xs text-center min-w-[85px]">
                 <span className="text-muted-foreground block text-[10px] font-medium">Respons AI</span>
-                <strong className="text-base font-mono font-bold text-foreground">
-                  {(selectedClient.quota?.aiResponsesUsed || 0).toLocaleString()} / {(selectedClient.quota?.maxAiResponses || 50).toLocaleString()}
+                <strong className="text-sm font-mono font-bold text-foreground">
+                  {(selectedClient.quota?.aiResponsesUsed || 0).toLocaleString()} / {(selectedClient.quota?.maxAiResponses || 0).toLocaleString()}
                 </strong>
               </div>
               <Button
                 size="sm"
                 variant="outline"
-                className="h-10 px-3 text-xs gap-1.5 border-emerald-600/40 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 font-medium"
+                className="h-10 px-3 text-xs gap-1.5 border-emerald-600/40 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 font-medium shrink-0"
                 onClick={() => openEditQuotaModal(selectedClient)}
               >
                 <SlidersHorizontal className="h-3.5 w-3.5 text-emerald-600" />
                 Atur Kuota
               </Button>
-            </div>
             </div>
           </div>
         </Card>
@@ -961,12 +1131,56 @@ export function ClientsPage() {
                     Skema kuota dihitung dari jumlah kontak unik (1 nomor = 1 MAU) dan bubble chat balasan otomatis bot AI.
                   </p>
                 </div>
-                <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5 font-semibold" onClick={() => openEditQuotaModal(selectedClient)}>
-                  <SlidersHorizontal className="h-3.5 w-3.5" /> Ubah Paket / Kuota
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/30 text-xs gap-1.5 font-semibold"
+                    onClick={openTopUpModal}
+                  >
+                    <Zap className="h-3.5 w-3.5 text-amber-500" /> Beli Top-Up / Booster
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5 font-semibold"
+                    onClick={() => openEditQuotaModal(selectedClient)}
+                  >
+                    <SlidersHorizontal className="h-3.5 w-3.5" /> Ubah Paket / Kuota
+                  </Button>
+                </div>
               </div>
 
-              {/* Progress Meters */}
+              {/* Extra Quota Banner if Top-Up / Add-On Active */}
+              {(
+                (selectedClient.quota?.extraMau || 0) > 0 ||
+                (selectedClient.quota?.extraAiResponses || 0) > 0 ||
+                (selectedClient.quota?.extraUsers || 0) > 0 ||
+                (selectedClient.quota?.extraWhatsapp || 0) > 0 ||
+                (selectedClient.quota?.extraProjects || 0) > 0
+              ) && (
+                <div className="p-3.5 rounded-xl border border-amber-300/60 bg-amber-50/60 dark:bg-amber-950/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                  <div className="flex items-start sm:items-center gap-2 text-amber-900 dark:text-amber-200">
+                    <Sparkles className="h-4 w-4 text-amber-600 shrink-0 mt-0.5 sm:mt-0" />
+                    <div>
+                      <strong>Saldo Kuota Tambahan &amp; Add-On Aktif:</strong>{" "}
+                      <span className="opacity-95 font-medium">
+                        {[
+                          (selectedClient.quota?.extraMau || 0) > 0 && `+${selectedClient.quota.extraMau.toLocaleString()} MAU`,
+                          (selectedClient.quota?.extraAiResponses || 0) > 0 && `+${selectedClient.quota.extraAiResponses.toLocaleString()} Respons AI`,
+                          (selectedClient.quota?.extraUsers || 0) > 0 && `+${selectedClient.quota.extraUsers} User Staf`,
+                          (selectedClient.quota?.extraWhatsapp || 0) > 0 && `+${selectedClient.quota.extraWhatsapp} Nomor WA`,
+                          (selectedClient.quota?.extraProjects || 0) > 0 && `+${selectedClient.quota.extraProjects} Proyek`,
+                        ].filter(Boolean).join(" • ")}
+                      </span>
+                    </div>
+                  </div>
+                  <Badge className="bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-300 text-[10px] shrink-0 self-start sm:self-auto">
+                    Add-On / Booster Aktif
+                  </Badge>
+                </div>
+              )}
+
+              {/* Progress Meters: Kuota Utama */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="p-4 rounded-xl border bg-muted/20 space-y-2">
                   <div className="flex items-center justify-between text-xs">
@@ -974,7 +1188,12 @@ export function ClientsPage() {
                       <Users className="h-4 w-4 text-blue-600" /> Kontak Unik (MAU)
                     </span>
                     <span className="font-mono font-bold text-sm">
-                      {(selectedClient.quota?.mauUsed || 0).toLocaleString()} / {(selectedClient.quota?.maxMau || 10).toLocaleString()}
+                      {(selectedClient.quota?.mauUsed || 0).toLocaleString()} / {(selectedClient.quota?.maxMau || 0).toLocaleString()}
+                      {(selectedClient.quota?.extraMau || 0) > 0 && (
+                        <span className="text-[10px] text-amber-600 font-normal ml-1">
+                          (+{selectedClient.quota.extraMau.toLocaleString()})
+                        </span>
+                      )}
                     </span>
                   </div>
                   <div className="h-3 w-full bg-muted rounded-full overflow-hidden">
@@ -1002,7 +1221,12 @@ export function ClientsPage() {
                       <Bot className="h-4 w-4 text-emerald-600" /> Respons AI (Bubble Chat)
                     </span>
                     <span className="font-mono font-bold text-sm">
-                      {(selectedClient.quota?.aiResponsesUsed || 0).toLocaleString()} / {(selectedClient.quota?.maxAiResponses || 50).toLocaleString()}
+                      {(selectedClient.quota?.aiResponsesUsed || 0).toLocaleString()} / {(selectedClient.quota?.maxAiResponses || 0).toLocaleString()}
+                      {(selectedClient.quota?.extraAiResponses || 0) > 0 && (
+                        <span className="text-[10px] text-amber-600 font-normal ml-1">
+                          (+{selectedClient.quota.extraAiResponses.toLocaleString()})
+                        </span>
+                      )}
                     </span>
                   </div>
                   <div className="h-3 w-full bg-muted rounded-full overflow-hidden">
@@ -1025,21 +1249,88 @@ export function ClientsPage() {
                 </div>
               </div>
 
+              {/* Kapasitas Entitas & Add-On Slots */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-3.5 rounded-xl border bg-background flex items-center justify-between text-xs">
+                  <div className="space-y-0.5">
+                    <span className="text-muted-foreground flex items-center gap-1 font-medium">
+                      <Users className="h-3.5 w-3.5 text-blue-600" /> Slot User / Staf
+                    </span>
+                    <p className="text-xs text-muted-foreground">
+                      {(selectedClient.quota?.extraUsers || 0) > 0 ? `Termasuk +${selectedClient.quota.extraUsers} add-on` : "Sesuai kuota paket"}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-mono font-bold text-base text-foreground">
+                      {usersList.length} / {selectedClient.quota?.maxUsers ?? 1}
+                    </span>
+                    {(selectedClient.quota?.extraUsers || 0) > 0 && (
+                      <span className="block text-[10px] text-amber-600 font-semibold">(+{selectedClient.quota.extraUsers} Add-on)</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-xl border bg-background flex items-center justify-between text-xs">
+                  <div className="space-y-0.5">
+                    <span className="text-muted-foreground flex items-center gap-1 font-medium">
+                      <Phone className="h-3.5 w-3.5 text-indigo-600" /> Nomor WhatsApp
+                    </span>
+                    <p className="text-xs text-muted-foreground">
+                      {(selectedClient.quota?.extraWhatsapp || 0) > 0 ? `Termasuk +${selectedClient.quota.extraWhatsapp} add-on` : "Sesuai kuota paket"}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-mono font-bold text-base text-foreground">
+                      {selectedClient.whatsappInstances?.length || 0} / {selectedClient.quota?.maxWhatsapp ?? 1}
+                    </span>
+                    {(selectedClient.quota?.extraWhatsapp || 0) > 0 && (
+                      <span className="block text-[10px] text-amber-600 font-semibold">(+{selectedClient.quota.extraWhatsapp} Add-on)</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-xl border bg-background flex items-center justify-between text-xs">
+                  <div className="space-y-0.5">
+                    <span className="text-muted-foreground flex items-center gap-1 font-medium">
+                      <Building2 className="h-3.5 w-3.5 text-amber-600" /> Proyek Siteplan
+                    </span>
+                    <p className="text-xs text-muted-foreground">
+                      {(selectedClient.quota?.extraProjects || 0) > 0 ? `Termasuk +${selectedClient.quota.extraProjects} add-on` : "Sesuai kuota paket"}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-mono font-bold text-base text-foreground">
+                      {selectedClient.quota?.projectsUsed ?? (selectedClient._count?.resourceGroups || 0)} / {selectedClient.quota?.maxProjects ?? 1}
+                    </span>
+                    {(selectedClient.quota?.extraProjects || 0) > 0 && (
+                      <span className="block text-[10px] text-amber-600 font-semibold">(+{selectedClient.quota.extraProjects} Add-on)</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {/* Tier Cards Comparison */}
               <div>
-                <h5 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">
-                  Pilihan Paket Standar Platform
-                </h5>
+                <div className="flex items-center justify-between mb-3">
+                  <h5 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Pilihan Paket Standar Platform (4 Tier Resmi)
+                  </h5>
+                  {!selectedClient.quota?.plan && (
+                    <Badge variant="outline" className="text-[10px] text-amber-700 bg-amber-50 border-amber-300 dark:bg-amber-950/50 dark:text-amber-300 font-semibold">
+                      Akun ini belum memiliki paket aktif
+                    </Badge>
+                  )}
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   {PLAN_TIERS.filter(p => p.key !== "custom").map((p) => {
-                    const isCurrent = (selectedClient.quota?.plan || "trial") === p.key;
+                    const isCurrent = (selectedClient.quota?.plan || null) === p.key;
                     return (
                       <div
                         key={p.key}
                         className={cn(
                           "p-4 rounded-xl border flex flex-col justify-between transition-all",
                           isCurrent
-                            ? "border-emerald-600 bg-emerald-50/40 dark:bg-emerald-950/20 ring-2 ring-emerald-500/20"
+                            ? "border-emerald-600 bg-emerald-50/40 dark:bg-emerald-950/20 ring-2 ring-emerald-500/20 shadow-xs"
                             : "bg-background hover:bg-muted/30"
                         )}
                       >
@@ -1051,7 +1342,7 @@ export function ClientsPage() {
                             )}
                           </div>
                           <p className="font-bold text-base text-emerald-700 dark:text-emerald-300 mt-1">{p.priceLabel}</p>
-                          <div className="text-xs text-muted-foreground space-y-1 mt-3">
+                          <div className="text-xs text-muted-foreground space-y-1.5 mt-3">
                             <p className="flex items-center gap-1.5 font-medium text-foreground">
                               <Users className="h-3.5 w-3.5 text-blue-600 shrink-0" />
                               {p.maxMau.toLocaleString()} MAU
@@ -1059,6 +1350,18 @@ export function ClientsPage() {
                             <p className="flex items-center gap-1.5 font-medium text-foreground">
                               <Bot className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
                               {p.maxAiResponses.toLocaleString()} Respons AI
+                            </p>
+                            <p className="flex items-center gap-1.5 text-[11px]">
+                              <Phone className="h-3 w-3 text-indigo-500 shrink-0" />
+                              {p.whatsappNumbers} Nomor WhatsApp
+                            </p>
+                            <p className="flex items-center gap-1.5 text-[11px]">
+                              <Building2 className="h-3 w-3 text-amber-500 shrink-0" />
+                              {p.maxProjects} Proyek (Siteplan)
+                            </p>
+                            <p className="flex items-center gap-1.5 text-[11px]">
+                              <ShieldCheck className="h-3 w-3 text-teal-500 shrink-0" />
+                              {p.support}
                             </p>
                           </div>
                         </div>
@@ -1083,6 +1386,42 @@ export function ClientsPage() {
                   })}
                 </div>
               </div>
+
+              {/* Riwayat Pembelian Top-Up / Booster */}
+              {Array.isArray(selectedClient.quota?.topups) && selectedClient.quota.topups.length > 0 && (
+                <div className="pt-4 border-t space-y-3">
+                  <h5 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Riwayat Pembelian Top-Up &amp; Booster ({selectedClient.quota.topups.length})
+                  </h5>
+                  <div className="space-y-2">
+                    {selectedClient.quota.topups.map((t: any) => (
+                      <div key={t.id} className="p-3 rounded-xl border bg-muted/20 flex items-center justify-between text-xs">
+                        <div>
+                          <p className="font-bold text-foreground">
+                            {t.name} <span className="text-[10px] text-muted-foreground font-mono">({t.itemKey})</span>
+                          </p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">
+                            {t.mau > 0 ? `+${t.mau.toLocaleString()} MAU ` : ""}
+                            {t.ai > 0 ? `+${t.ai.toLocaleString()} Respons AI ` : ""}
+                            {t.whatsapp > 0 ? `+${t.whatsapp} Nomor WA ` : ""}
+                            {t.users > 0 ? `+${t.users} User ` : ""}
+                            {t.projects > 0 ? `+${t.projects} Proyek ` : ""}
+                            {t.notes ? `• ${t.notes}` : ""}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-emerald-600 font-mono">
+                            Rp {Number(t.price || 0).toLocaleString("id-ID")}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {new Date(t.createdAt).toLocaleDateString("id-ID")}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </Card>
           </TabsContent>
         </Tabs>
@@ -1104,6 +1443,30 @@ export function ClientsPage() {
               <div className="space-y-1.5">
                 <Label className="font-semibold">Pilih Skema Paket</Label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {/* Opsi 1: Tanpa Paket (Null) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuotaForm({
+                        plan: null,
+                        maxMau: 0,
+                        maxAiResponses: 0,
+                        planPrice: 0,
+                      });
+                    }}
+                    className={cn(
+                      "p-2.5 rounded-xl border text-left transition-all",
+                      quotaForm.plan === null
+                        ? "border-amber-600 bg-amber-50 dark:bg-amber-950/40 ring-1 ring-amber-600"
+                        : "hover:bg-muted/50 border-border"
+                    )}
+                  >
+                    <p className="font-bold text-xs text-amber-900 dark:text-amber-200">Tanpa Paket</p>
+                    <p className="text-[10px] text-muted-foreground font-semibold">Null</p>
+                    <p className="text-[9px] text-muted-foreground mt-0.5">Atur mandiri nanti</p>
+                  </button>
+
+                  {/* 4 Tier Resmi & Kustom */}
                   {PLAN_TIERS.map((tier) => {
                     const isSelected = quotaForm.plan === tier.key;
                     return (
@@ -1180,6 +1543,125 @@ export function ClientsPage() {
               </Button>
               <Button size="sm" onClick={handleSaveQuota} className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">
                 Simpan Paket &amp; Kuota
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* DIALOG: TOP-UP & BOOSTER KLIEN (PHASE 4) */}
+        <Dialog open={isTopUpModalOpen} onOpenChange={setIsTopUpModalOpen}>
+          <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Zap className="h-5 w-5 text-amber-500" />
+                Beli Top-Up Kuota / Booster: {selectedClient.name}
+              </DialogTitle>
+              <DialogDescription className="text-xs">
+                Pilih paket kuota tambahan atau add-on untuk akun klien ini. Kuota AI tidak pernah hangus.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2 text-xs">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="font-semibold">Pilih Paket Top-Up / Booster</Label>
+                  <span className="text-[10px] text-muted-foreground">
+                    {topUpCatalog.length} pilihan paket
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1 overflow-x-auto pb-1">
+                  {[
+                    { key: "all", label: "Semua" },
+                    { key: "booster", label: "Booster" },
+                    { key: "mau", label: "MAU" },
+                    { key: "ai", label: "Respons AI" },
+                    { key: "addon", label: "Add-On" },
+                  ].map((f) => (
+                    <button
+                      key={f.key}
+                      type="button"
+                      onClick={() => setTopUpCategoryFilter(f.key as any)}
+                      className={cn(
+                        "px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all shrink-0",
+                        topUpCategoryFilter === f.key
+                          ? "bg-amber-600 text-white shadow-xs"
+                          : "bg-muted/50 text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-1">
+                  {topUpCatalog
+                    .filter(
+                      (item) =>
+                        topUpCategoryFilter === "all" ||
+                        item.category === topUpCategoryFilter
+                    )
+                    .map((item) => {
+                      const isSelected = selectedTopUpKey === item.key;
+                      return (
+                        <div
+                          key={item.key}
+                          onClick={() => setSelectedTopUpKey(item.key)}
+                          className={cn(
+                            "p-3 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between",
+                            isSelected
+                              ? "border-amber-500 bg-amber-50/70 dark:bg-amber-950/40 ring-1 ring-amber-500 shadow-xs"
+                              : "hover:bg-muted/50 border-border"
+                          )}
+                        >
+                          <div>
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-xs text-foreground">
+                                {item.name}
+                              </span>
+                              <Badge
+                                variant="outline"
+                                className="text-[9px] uppercase font-mono bg-muted/30"
+                              >
+                                {item.category}
+                              </Badge>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-1">
+                              {item.desc}
+                            </p>
+                          </div>
+                          <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400 font-mono mt-2">
+                            Rp {Number(item.price || 0).toLocaleString("id-ID")}
+                          </p>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+
+              <div className="space-y-1.5 pt-2 border-t">
+                <Label className="font-semibold">Catatan Verifikasi Pembayaran (Opsional)</Label>
+                <Input
+                  value={topUpNotes}
+                  onChange={(e) => setTopUpNotes(e.target.value)}
+                  placeholder="Contoh: Bukti transfer BCA a.n Budi valid"
+                  className="h-8 text-xs"
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" size="sm" onClick={() => setIsTopUpModalOpen(false)}>
+                Batal
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleApplyTopUp}
+                disabled={applyingTopUp}
+                className="bg-amber-600 hover:bg-amber-700 text-white font-semibold gap-1.5"
+              >
+                <Zap className="h-3.5 w-3.5" />
+                {applyingTopUp ? "Menerapkan..." : "Terapkan Top-Up"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1694,14 +2176,24 @@ export function ClientsPage() {
                           {staffCount} Akun
                         </span>
                         <span>•</span>
-                        <Badge variant="outline" className="text-[10px] font-bold bg-muted/40 text-blue-700 dark:text-blue-300">
-                          {client.quota?.planName || "Free Trial"}
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-[10px] font-bold",
+                            client.quota?.plan
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300"
+                              : "bg-muted/60 text-amber-700 dark:text-amber-400 border-amber-300/60"
+                          )}
+                        >
+                          {client.quota?.plan
+                            ? (client.quota?.planName || client.quota?.plan)
+                            : "Tanpa Paket"}
                         </Badge>
                         <span className="font-mono text-[11px] text-muted-foreground">
-                          MAU: {(client.quota?.mauUsed || 0).toLocaleString()}/{(client.quota?.maxMau || 10).toLocaleString()}
+                          MAU: {(client.quota?.mauUsed || 0).toLocaleString()}/{(client.quota?.maxMau || 0).toLocaleString()}
                         </span>
                         <span className="font-mono text-[11px] text-muted-foreground">
-                          AI: {(client.quota?.aiResponsesUsed || 0).toLocaleString()}/{(client.quota?.maxAiResponses || 50).toLocaleString()}
+                          AI: {(client.quota?.aiResponsesUsed || 0).toLocaleString()}/{(client.quota?.maxAiResponses || 0).toLocaleString()}
                         </span>
                       </div>
                     </div>

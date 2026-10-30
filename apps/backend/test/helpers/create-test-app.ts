@@ -1,5 +1,9 @@
 import { Test, TestingModule, TestingModuleBuilder } from '@nestjs/testing';
-import { INestApplication, ValidationPipe, ModuleMetadata } from '@nestjs/common';
+import {
+  INestApplication,
+  ValidationPipe,
+  ModuleMetadata,
+} from '@nestjs/common';
 import { PrismaModule } from '../../src/core/prisma/prisma.module';
 import { PrismaService } from '../../src/core/prisma/prisma.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';

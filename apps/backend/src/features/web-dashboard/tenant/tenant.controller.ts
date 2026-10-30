@@ -243,7 +243,8 @@ export class TenantController {
     @Req() req: any,
     @Body()
     body: {
-      plan?: string;
+      plan?: string | null;
+      planName?: string | null;
       maxMau?: number;
       maxAiResponses?: number;
       planPrice?: number;
@@ -251,6 +252,53 @@ export class TenantController {
   ) {
     this.ensureSuperadmin(req);
     return this.tenantService.updateTenantQuota(tenantId, body);
+  }
+
+  // Katalog Top-Up & Add-On
+  @Get('topup/catalog')
+  getTopUpCatalog() {
+    return this.tenantService.getTopUpCatalog();
+  }
+
+  // Superadmin: Terapkan Top-Up / Add-on ke Klien
+  @Post('clients/:tenantId/topup')
+  async applyTenantTopUp(
+    @Param('tenantId') tenantId: string,
+    @Req() req: any,
+    @Body()
+    body: {
+      itemKey: string;
+      mau?: number;
+      ai?: number;
+      whatsapp?: number;
+      users?: number;
+      projects?: number;
+      notes?: string;
+    },
+  ) {
+    this.ensureSuperadmin(req);
+    return this.tenantService.applyTenantTopUp(tenantId, body);
+  }
+
+  // Tenant / Superadmin: Update Pengaturan Auto Top-Up Booster S
+  @Patch('clients/:tenantId/auto-topup')
+  async updateAutoTopUpSettings(
+    @Param('tenantId') tenantId: string,
+    @Req() req: any,
+    @Body() body: { autoTopUpEnabled: boolean; autoTopUpMonthlyLimit?: number },
+  ) {
+    this.ensureTenantAccess(tenantId, req);
+    return this.tenantService.updateAutoTopUpSettings(tenantId, body);
+  }
+
+  // Tenant / Superadmin: Evaluasi & Pemicu Notifikasi Kuota WhatsApp (80% & 100%)
+  @Post('clients/:tenantId/notify-quota')
+  async triggerQuotaNotification(
+    @Param('tenantId') tenantId: string,
+    @Req() req: any,
+  ) {
+    this.ensureTenantAccess(tenantId, req);
+    return this.tenantService.checkAndNotifyQuota(tenantId);
   }
 
   // Superadmin: Update hak akses menu untuk klien tertentu

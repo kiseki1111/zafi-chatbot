@@ -31,14 +31,22 @@ describe('Follow-Up Automation Flow (e2e)', () => {
   };
 
   const mockWaha = {
-    sendMessage: jest.fn().mockResolvedValue({ success: true, messageId: 'msg-flw-1' }),
-    sendTextMessage: jest.fn().mockResolvedValue({ success: true, messageId: 'msg-1' }),
+    sendMessage: jest
+      .fn()
+      .mockResolvedValue({ success: true, messageId: 'msg-flw-1' }),
+    sendTextMessage: jest
+      .fn()
+      .mockResolvedValue({ success: true, messageId: 'msg-1' }),
   };
 
   const mockAgentShared = {
     getRecentContext: jest.fn().mockResolvedValue([]),
-    callLLM: jest.fn().mockResolvedValue('Halo Kak, ada yang bisa dibantu kembali?'),
-    generateFollowUpText: jest.fn().mockResolvedValue('Halo Kak, ada yang bisa dibantu kembali?'),
+    callLLM: jest
+      .fn()
+      .mockResolvedValue('Halo Kak, ada yang bisa dibantu kembali?'),
+    generateFollowUpText: jest
+      .fn()
+      .mockResolvedValue('Halo Kak, ada yang bisa dibantu kembali?'),
   };
 
   beforeAll(async () => {
@@ -172,12 +180,20 @@ describe('Follow-Up Automation Flow (e2e)', () => {
         {
           contactId: 'c-already-followed',
           instanceName: 'zafi-property',
-          contact: { id: 'c-already-followed', phone: '62812345678', name: 'Dewi' },
+          contact: {
+            id: 'c-already-followed',
+            phone: '62812345678',
+            name: 'Dewi',
+          },
           lastMessageAt: pastDate,
         },
       ]);
       context.mockPrisma.followUp.findMany.mockResolvedValue([
-        { contactId: 'c-already-followed', instanceName: 'zafi-property', followedUpAt: new Date(Date.now() - 12 * 3600 * 1000) },
+        {
+          contactId: 'c-already-followed',
+          instanceName: 'zafi-property',
+          followedUpAt: new Date(Date.now() - 12 * 3600 * 1000),
+        },
       ]);
 
       const response = await request(app.getHttpServer())
@@ -199,7 +215,11 @@ describe('Follow-Up Automation Flow (e2e)', () => {
         {
           contactId: 'c-trigger-1',
           instanceName: 'zafi-property',
-          contact: { id: 'c-trigger-1', phone: '628199988877', name: 'Bambang' },
+          contact: {
+            id: 'c-trigger-1',
+            phone: '628199988877',
+            name: 'Bambang',
+          },
           lastMessageAt: new Date(Date.now() - 40 * 3600 * 1000),
         },
       ]);
@@ -214,8 +234,12 @@ describe('Follow-Up Automation Flow (e2e)', () => {
         instanceName: 'zafi-property',
         contactId: 'c-trigger-1',
       });
-      context.mockPrisma.message.create.mockResolvedValue({ id: 'msg-created-1' });
-      context.mockPrisma.followUp.create.mockResolvedValue({ id: 'flw-created-1' });
+      context.mockPrisma.message.create.mockResolvedValue({
+        id: 'msg-created-1',
+      });
+      context.mockPrisma.followUp.create.mockResolvedValue({
+        id: 'flw-created-1',
+      });
 
       const response = await request(app.getHttpServer())
         .post('/api/v1/followup/trigger')

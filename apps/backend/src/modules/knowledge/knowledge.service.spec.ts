@@ -22,6 +22,10 @@ describe('KnowledgeService', () => {
       findFirst: jest.fn(),
       update: jest.fn(),
     },
+    tenant: {
+      findUnique: jest.fn(),
+      findFirst: jest.fn(),
+    },
   };
 
   const mockOpenAIClient = {
@@ -177,12 +181,31 @@ describe('KnowledgeService', () => {
         updatedAt: new Date(),
       });
 
-      const res = await service.createFile('tenant-123', mockFile, 'Syarat KPR');
+      const res = await service.createFile(
+        'tenant-123',
+        mockFile,
+        'Syarat KPR',
+      );
       expect(res.id).toBe('kb-img-1');
       expect(res.content).toBe('Teks hasil ekstraksi dokumen KPR');
       expect(mockDataAgentService.syncKnowledgeBase).toHaveBeenCalledWith(
         'tenant-123',
       );
+    });
+
+    it('harus menolak ekstraksi OCR gambar jika tenant berada di paket Lite / Bronze (400)', async () => {
+      mockPrismaService.tenant.findUnique.mockResolvedValueOnce({
+        id: 't-lite',
+        metadata: { plan: 'lite' },
+      });
+      const mockImg = {
+        originalname: 'brosur.jpg',
+        buffer: Buffer.from('fake-image'),
+      } as Express.Multer.File;
+
+      await expect(
+        service.createFile('t-lite', mockImg, 'Brosur'),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('Berhasil menyimpan file media perusahaan (createMedia) tanpa blocking OCR', async () => {
@@ -246,11 +269,13 @@ describe('KnowledgeService', () => {
                 topics: [
                   {
                     title: 'Pricelist & Tipe Rumah Zafi Residence',
-                    content: 'Zafi Residence berlokasi di Jl. Ayani 2. Tipe 36 harga 182 juta.',
+                    content:
+                      'Zafi Residence berlokasi di Jl. Ayani 2. Tipe 36 harga 182 juta.',
                   },
                   {
                     title: 'Spesifikasi Bangunan Tipe 36',
-                    content: 'Spesifikasi: 2 kamar tidur, 1 kamar mandi, listrik 1300W.',
+                    content:
+                      'Spesifikasi: 2 kamar tidur, 1 kamar mandi, listrik 1300W.',
                   },
                   {
                     title: 'Persyaratan Berkas KPR',
@@ -263,7 +288,10 @@ describe('KnowledgeService', () => {
         ],
       });
 
-      const res = await service.previewSplitKnowledge('kb-big-doc', 'tenant-123');
+      const res = await service.previewSplitKnowledge(
+        'kb-big-doc',
+        'tenant-123',
+      );
 
       expect(res.originalId).toBe('kb-big-doc');
       expect(res.topics.length).toBe(3);
@@ -293,7 +321,9 @@ describe('KnowledgeService', () => {
           createdAt: new Date(),
         });
 
-      mockPrismaService.knowledgeBase.deleteMany.mockResolvedValueOnce({ count: 1 });
+      mockPrismaService.knowledgeBase.deleteMany.mockResolvedValueOnce({
+        count: 1,
+      });
 
       const res = await service.applySplitKnowledge(
         'kb-big-doc',
@@ -312,7 +342,9 @@ describe('KnowledgeService', () => {
       expect(mockPrismaService.knowledgeBase.deleteMany).toHaveBeenCalledWith({
         where: { id: 'kb-big-doc', tenantId: 'tenant-123' },
       });
-      expect(mockDataAgentService.syncKnowledgeBase).toHaveBeenCalledWith('tenant-123');
+      expect(mockDataAgentService.syncKnowledgeBase).toHaveBeenCalledWith(
+        'tenant-123',
+      );
     });
 
     it('berhasil memindahkan materi topik ke Knowledge Siteplan Cluster (moveToSiteplan)', async () => {
@@ -321,7 +353,12 @@ describe('KnowledgeService', () => {
         name: 'Zafi Residence',
         tenantId: 'tenant-123',
         description: JSON.stringify([
-          { id: 'k-old', title: 'Info Lama', category: 'Umum', content: 'Konten lama' },
+          {
+            id: 'k-old',
+            title: 'Info Lama',
+            category: 'Umum',
+            content: 'Konten lama',
+          },
         ]),
       });
 
@@ -329,7 +366,9 @@ describe('KnowledgeService', () => {
         id: 'group-zafi-1',
       });
 
-      mockPrismaService.knowledgeBase.deleteMany.mockResolvedValueOnce({ count: 1 });
+      mockPrismaService.knowledgeBase.deleteMany.mockResolvedValueOnce({
+        count: 1,
+      });
 
       const res = await service.moveToSiteplan('tenant-123', {
         groupId: 'group-zafi-1',
@@ -347,14 +386,18 @@ describe('KnowledgeService', () => {
         expect.objectContaining({
           where: { id: 'group-zafi-1' },
           data: expect.objectContaining({
-            description: expect.stringContaining('Spesifikasi Bangunan Tipe 36'),
+            description: expect.stringContaining(
+              'Spesifikasi Bangunan Tipe 36',
+            ),
           }),
         }),
       );
       expect(mockPrismaService.knowledgeBase.deleteMany).toHaveBeenCalledWith({
         where: { id: 'kb-source-1', tenantId: 'tenant-123' },
       });
-      expect(mockDataAgentService.syncKnowledgeBase).toHaveBeenCalledWith('tenant-123');
+      expect(mockDataAgentService.syncKnowledgeBase).toHaveBeenCalledWith(
+        'tenant-123',
+      );
     });
 
     it('berhasil memproses pemecahan data nyata data_rindang.docx dengan alokasi modular', async () => {
@@ -362,7 +405,8 @@ describe('KnowledgeService', () => {
         id: 'kb-rindang',
         tenantId: 'tenant-rindang',
         title: 'data_rindang.docx',
-        content: 'PT Rindang Alam Semesta. Unit: MAS 3= 90, SKYLAND= 70, RAS= 101. Harga: 182jt. Listrik: 1300VA. KPR: BSN & BSI.',
+        content:
+          'PT Rindang Alam Semesta. Unit: MAS 3= 90, SKYLAND= 70, RAS= 101. Harga: 182jt. Listrik: 1300VA. KPR: BSN & BSI.',
       });
 
       mockPrismaService.resourceGroup.findFirst.mockResolvedValueOnce({
@@ -372,20 +416,28 @@ describe('KnowledgeService', () => {
         description: '[]',
       });
 
-      mockPrismaService.knowledgeBase.create.mockResolvedValue({ id: 'kb-new-1' });
-      mockPrismaService.resourceGroup.update.mockResolvedValue({ id: 'group-rindang-1' });
-      mockPrismaService.knowledgeBase.deleteMany.mockResolvedValue({ count: 1 });
+      mockPrismaService.knowledgeBase.create.mockResolvedValue({
+        id: 'kb-new-1',
+      });
+      mockPrismaService.resourceGroup.update.mockResolvedValue({
+        id: 'group-rindang-1',
+      });
+      mockPrismaService.knowledgeBase.deleteMany.mockResolvedValue({
+        count: 1,
+      });
 
       // Topics hasil ekstraksi data_rindang.docx
       const topicsFromDocx = [
         {
           title: 'Profil Developer & Legalitas',
-          content: 'Nama developer: PT Rindang Alam Semesta. NIB: 8120014262925. Marketing: +62 878-4762-8400.',
+          content:
+            'Nama developer: PT Rindang Alam Semesta. NIB: 8120014262925. Marketing: +62 878-4762-8400.',
           target: 'knowledge' as const,
         },
         {
           title: 'Spesifikasi & Fasilitas Kawasan MAS 3',
-          content: 'Total unit: 90. Terjual: 15. Jalan lingkungan: Lebar 5m, aspal. Listrik: 1300VA. Air: Gorong2.',
+          content:
+            'Total unit: 90. Terjual: 15. Jalan lingkungan: Lebar 5m, aspal. Listrik: 1300VA. Air: Gorong2.',
           target: 'siteplan' as const,
           targetGroupId: 'group-rindang-1',
           targetCategory: 'Spesifikasi Bangunan',

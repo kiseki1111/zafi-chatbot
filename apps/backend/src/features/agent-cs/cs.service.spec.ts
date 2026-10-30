@@ -75,7 +75,9 @@ describe('CsService', () => {
         instanceName: 'main-wa',
         tenantId: 'tenant-123',
       });
-      mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue('Produk unggulan: Kopi Gayo');
+      mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue(
+        'Produk unggulan: Kopi Gayo',
+      );
       mockAgentShared.getAvailabilityContext.mockResolvedValue(null);
       mockPrisma.tenant.findUnique.mockResolvedValue({
         id: 'tenant-123',
@@ -106,7 +108,9 @@ describe('CsService', () => {
     });
 
     it('harus menyertakan Vision AI jika pesan membawa media URL gambar', async () => {
-      mockAgentShared.analyzeImage.mockResolvedValue('Foto bungkus kopi robusta 250gr');
+      mockAgentShared.analyzeImage.mockResolvedValue(
+        'Foto bungkus kopi robusta 250gr',
+      );
       mockAgentShared.getRecentContext.mockResolvedValue([]);
       mockPrisma.whatsappInstance.findUnique.mockResolvedValue({
         instanceName: 'main-wa',
@@ -131,7 +135,9 @@ describe('CsService', () => {
         mediaUrls: ['http://example.com/photo.jpg'],
       });
 
-      expect(mockAgentShared.analyzeImage).toHaveBeenCalledWith('http://example.com/photo.jpg');
+      expect(mockAgentShared.analyzeImage).toHaveBeenCalledWith(
+        'http://example.com/photo.jpg',
+      );
       expect(response.text).toContain('Robusta');
     });
 
@@ -144,7 +150,9 @@ describe('CsService', () => {
       mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue('');
       mockAgentShared.getAvailabilityContext.mockResolvedValue(null);
       mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-123' });
-      mockAgentShared.transcribeAudio.mockResolvedValue('Berapa harga kopi robusta?');
+      mockAgentShared.transcribeAudio.mockResolvedValue(
+        'Berapa harga kopi robusta?',
+      );
 
       mockAgentShared.callLLM.mockResolvedValue(
         JSON.stringify({
@@ -355,7 +363,9 @@ describe('CsService', () => {
       // Array videos harus kosong karena ini adalah link IG Reel, bukan file video biner .mp4
       expect(response.videos).toEqual([]);
       // Tautan harus disertakan di dalam teks balasan agar WhatsApp memunculkan rich link preview
-      expect(response.text).toContain('https://www.instagram.com/reel/DVkx0HGjnEi/');
+      expect(response.text).toContain(
+        'https://www.instagram.com/reel/DVkx0HGjnEi/',
+      );
       expect(response.text).toContain('Video Arah Menuju Zafi Residence');
     });
 
@@ -399,7 +409,8 @@ describe('CsService', () => {
       mockAgentShared.getRecentContext.mockResolvedValue([
         {
           senderType: 'bot',
-          content: 'Ini videonya kak https://www.instagram.com/reel/DVkx0HGjnEi/',
+          content:
+            'Ini videonya kak https://www.instagram.com/reel/DVkx0HGjnEi/',
         },
       ]);
       mockPrisma.whatsappInstance.findUnique.mockResolvedValue({
@@ -434,11 +445,15 @@ describe('CsService', () => {
       // Video tidak boleh dikirimkan karena tidak ada di database pengetahuan aktif
       expect(response.videos).toEqual([]);
       // Tautan usang di teks balasan juga harus dibersihkan
-      expect(response.text).not.toContain('https://www.instagram.com/reel/DVkx0HGjnEi/');
+      expect(response.text).not.toContain(
+        'https://www.instagram.com/reel/DVkx0HGjnEi/',
+      );
 
       // Prompt ke LLM harus menetralkan link lama dari chat history
       expect(mockAgentShared.callLLM).toHaveBeenCalledWith(
-        expect.stringContaining('[tautan media sebelumnya telah dihapus dari database]'),
+        expect.stringContaining(
+          '[tautan media sebelumnya telah dihapus dari database]',
+        ),
         expect.any(String),
         true,
       );
@@ -501,7 +516,9 @@ describe('CsService', () => {
         text: 'halo',
       });
 
-      expect(response.text).toBe('Halo Kak, ada yang bisa kami bantu seputar unit kami?');
+      expect(response.text).toBe(
+        'Halo Kak, ada yang bisa kami bantu seputar unit kami?',
+      );
     });
   });
 });

@@ -22,30 +22,37 @@ describe('Slice-9: Superadmin Kelola Klien & Slice-10: Tenant Products + Setting
     tenantId: null,
   };
 
-  const mockDataAgent = { syncKnowledgeBase: jest.fn().mockResolvedValue({ ok: true }) };
+  const mockDataAgent = {
+    syncKnowledgeBase: jest.fn().mockResolvedValue({ ok: true }),
+  };
 
   beforeAll(async () => {
-    context = await createTestApp(
-      { imports: [TenantModule] },
-      (b) =>
-        b
-          .overrideGuard(JwtAuthGuard)
-          .useValue({
-            canActivate: (ctx: any) => {
-              ctx.switchToHttp().getRequest().user = currentUser;
-              return true;
-            },
-          })
-          .overrideProvider(DataAgentService)
-          .useValue(mockDataAgent),
+    context = await createTestApp({ imports: [TenantModule] }, (b) =>
+      b
+        .overrideGuard(JwtAuthGuard)
+        .useValue({
+          canActivate: (ctx: any) => {
+            ctx.switchToHttp().getRequest().user = currentUser;
+            return true;
+          },
+        })
+        .overrideProvider(DataAgentService)
+        .useValue(mockDataAgent),
     );
     app = context.app;
   });
 
-  afterAll(async () => { if (app) await app.close(); });
+  afterAll(async () => {
+    if (app) await app.close();
+  });
   beforeEach(() => {
     jest.clearAllMocks();
-    currentUser = { sub: 'superadmin-1', email: 'superadmin@platform.id', roles: ['superadmin'], tenantId: null };
+    currentUser = {
+      sub: 'superadmin-1',
+      email: 'superadmin@platform.id',
+      roles: ['superadmin'],
+      tenantId: null,
+    };
   });
 
   // ------------------------------------------------------------------ //
@@ -57,7 +64,9 @@ describe('Slice-9: Superadmin Kelola Klien & Slice-10: Tenant Products + Setting
       it('Superadmin berhasil membaca daftar seluruh klien (200)', async () => {
         context.mockPrisma.tenant.findMany.mockResolvedValue([
           {
-            id: 't-1', name: 'Toko Kopi', metadata: { plan: 'trial', maxMau: 10, maxAiResponses: 50 },
+            id: 't-1',
+            name: 'Toko Kopi',
+            metadata: { plan: 'trial', maxMau: 10, maxAiResponses: 50 },
             createdAt: new Date(),
             whatsappInstances: [{ instanceName: 'inst-1' }],
             _count: { whatsappInstances: 1, products: 3, knowledgeBases: 2 },
@@ -78,8 +87,12 @@ describe('Slice-9: Superadmin Kelola Klien & Slice-10: Tenant Products + Setting
 
       it('Superadmin berhasil membaca detail + user list klien tertentu (200)', async () => {
         context.mockPrisma.tenant.findUnique.mockResolvedValue({
-          id: 't-1', name: 'Toko Kopi', metadata: {},
-          users: [{ id: 'u-1', name: 'Manager A', email: 'm@a.com', role: 'manager' }],
+          id: 't-1',
+          name: 'Toko Kopi',
+          metadata: {},
+          users: [
+            { id: 'u-1', name: 'Manager A', email: 'm@a.com', role: 'manager' },
+          ],
           whatsappInstances: [],
           _count: { whatsappInstances: 1, users: 1 },
         });
@@ -100,17 +113,32 @@ describe('Slice-9: Superadmin Kelola Klien & Slice-10: Tenant Products + Setting
 
         await request(app.getHttpServer())
           .post('/api/v1/tenant/clients')
-          .send({ companyName: 'Toko A', managerEmail: 'a@a.com', managerName: 'A', enabledMenus: [] })
+          .send({
+            companyName: 'Toko A',
+            managerEmail: 'a@a.com',
+            managerName: 'A',
+            enabledMenus: [],
+          })
           .expect(403);
       });
 
       it('Superadmin berhasil membuat tenant + akun manager sekaligus (201)', async () => {
-        currentUser = { sub: 'superadmin-1', roles: ['superadmin'], tenantId: null };
+        currentUser = {
+          sub: 'superadmin-1',
+          roles: ['superadmin'],
+          tenantId: null,
+        };
 
         context.mockPrisma.user.findUnique.mockResolvedValue(null);
-        context.mockPrisma.tenant.create.mockResolvedValue({ id: 't-new', name: 'Toko Baru' });
+        context.mockPrisma.tenant.create.mockResolvedValue({
+          id: 't-new',
+          name: 'Toko Baru',
+        });
         context.mockPrisma.user.create.mockResolvedValue({
-          id: 'u-new', email: 'manager@baru.com', name: 'Manager Baru', role: 'manager',
+          id: 'u-new',
+          email: 'manager@baru.com',
+          name: 'Manager Baru',
+          role: 'manager',
         });
 
         const res = await request(app.getHttpServer())
@@ -130,11 +158,13 @@ describe('Slice-9: Superadmin Kelola Klien & Slice-10: Tenant Products + Setting
     describe('3. Update Kuota & Menu Akses', () => {
       it('Superadmin berhasil mengubah paket & kuota tenant (200)', async () => {
         context.mockPrisma.tenant.findUnique.mockResolvedValue({
-          id: 't-1', metadata: { plan: 'trial', maxMau: 10 },
+          id: 't-1',
+          metadata: { plan: 'trial', maxMau: 10 },
           whatsappInstances: [],
         });
         context.mockPrisma.tenant.update.mockResolvedValue({
-          id: 't-1', metadata: { plan: 'pro', maxMau: 2000 },
+          id: 't-1',
+          metadata: { plan: 'pro', maxMau: 2000 },
           whatsappInstances: [],
         });
         context.mockPrisma.conversation.findMany.mockResolvedValue([]);
@@ -149,9 +179,13 @@ describe('Slice-9: Superadmin Kelola Klien & Slice-10: Tenant Products + Setting
       });
 
       it('Superadmin berhasil memperbarui hak akses menu klien (200)', async () => {
-        context.mockPrisma.tenant.findUnique.mockResolvedValue({ id: 't-1', metadata: {} });
+        context.mockPrisma.tenant.findUnique.mockResolvedValue({
+          id: 't-1',
+          metadata: {},
+        });
         context.mockPrisma.tenant.update.mockResolvedValue({
-          id: 't-1', metadata: { enabledMenus: ['crm', 'knowledge', 'followup'] },
+          id: 't-1',
+          metadata: { enabledMenus: ['crm', 'knowledge', 'followup'] },
         });
 
         const res = await request(app.getHttpServer())
@@ -165,13 +199,23 @@ describe('Slice-9: Superadmin Kelola Klien & Slice-10: Tenant Products + Setting
 
     describe('4. Manajemen Akun Staf Klien', () => {
       it('Superadmin berhasil membuat akun staf baru untuk tenant (201)', async () => {
-        context.mockPrisma.tenant.findUnique.mockResolvedValue({ id: 't-1', metadata: {} });
+        context.mockPrisma.tenant.findUnique.mockResolvedValue({
+          id: 't-1',
+          metadata: {},
+        });
         context.mockPrisma.user.findUnique.mockResolvedValue(null);
         context.mockPrisma.user.create.mockResolvedValue({
-          id: 'staff-1', name: 'Staff CS', email: 'cs@toko.com', role: 'operator',
-          tenantId: 't-1', createdAt: new Date(),
+          id: 'staff-1',
+          name: 'Staff CS',
+          email: 'cs@toko.com',
+          role: 'operator',
+          tenantId: 't-1',
+          createdAt: new Date(),
         });
-        context.mockPrisma.tenant.update.mockResolvedValue({ id: 't-1', metadata: {} });
+        context.mockPrisma.tenant.update.mockResolvedValue({
+          id: 't-1',
+          metadata: {},
+        });
 
         const res = await request(app.getHttpServer())
           .post('/api/v1/tenant/clients/t-1/users')
@@ -183,11 +227,18 @@ describe('Slice-9: Superadmin Kelola Klien & Slice-10: Tenant Products + Setting
 
       it('Superadmin berhasil menghapus akun staf klien (200)', async () => {
         // deleteTenantStaff: findFirst by {id, tenantId} lalu findUnique tenant lalu delete user
-        context.mockPrisma.user.findFirst.mockResolvedValue({ id: 'staff-1', tenantId: 't-1' });
-        context.mockPrisma.tenant.findUnique.mockResolvedValue({
-          id: 't-1', metadata: {},
+        context.mockPrisma.user.findFirst.mockResolvedValue({
+          id: 'staff-1',
+          tenantId: 't-1',
         });
-        context.mockPrisma.tenant.update.mockResolvedValue({ id: 't-1', metadata: {} });
+        context.mockPrisma.tenant.findUnique.mockResolvedValue({
+          id: 't-1',
+          metadata: {},
+        });
+        context.mockPrisma.tenant.update.mockResolvedValue({
+          id: 't-1',
+          metadata: {},
+        });
         context.mockPrisma.user.delete.mockResolvedValue({ id: 'staff-1' });
 
         const res = await request(app.getHttpServer())
@@ -216,20 +267,37 @@ describe('Slice-9: Superadmin Kelola Klien & Slice-10: Tenant Products + Setting
 
   describe('Slice-10 — Tenant: Produk & Pengaturan Bot', () => {
     beforeEach(() => {
-      currentUser = { sub: 'manager-2', email: 'mgr@toko.com', roles: ['manager'], tenantId: 't-prod' };
+      currentUser = {
+        sub: 'manager-2',
+        email: 'mgr@toko.com',
+        roles: ['manager'],
+        tenantId: 't-prod',
+      };
     });
 
     describe('1. CRUD Produk / Katalog', () => {
       it('Berhasil menambahkan produk baru ke katalog tenant (201)', async () => {
-        context.mockPrisma.user.findUnique.mockResolvedValue({ id: 'manager-2', tenantId: 't-prod' });
+        context.mockPrisma.user.findUnique.mockResolvedValue({
+          id: 'manager-2',
+          tenantId: 't-prod',
+        });
         context.mockPrisma.product.create.mockResolvedValue({
-          id: 'prod-1', name: 'Kopi Arabika 250gr', price: 55000, stock: 50,
-          category: 'minuman', tenantId: 't-prod',
+          id: 'prod-1',
+          name: 'Kopi Arabika 250gr',
+          price: 55000,
+          stock: 50,
+          category: 'minuman',
+          tenantId: 't-prod',
         });
 
         const res = await request(app.getHttpServer())
           .post('/api/v1/tenant/manager-2/products')
-          .send({ name: 'Kopi Arabika 250gr', price: 55000, stock: 50, category: 'minuman' })
+          .send({
+            name: 'Kopi Arabika 250gr',
+            price: 55000,
+            stock: 50,
+            category: 'minuman',
+          })
           .expect(201);
 
         expect(res.body.id).toBe('prod-1');
@@ -237,10 +305,18 @@ describe('Slice-9: Superadmin Kelola Klien & Slice-10: Tenant Products + Setting
       });
 
       it('Berhasil memperbarui harga produk (200)', async () => {
-        context.mockPrisma.user.findUnique.mockResolvedValue({ id: 'manager-2', tenantId: 't-prod' });
-        context.mockPrisma.product.findFirst.mockResolvedValue({ id: 'prod-1', tenantId: 't-prod' });
+        context.mockPrisma.user.findUnique.mockResolvedValue({
+          id: 'manager-2',
+          tenantId: 't-prod',
+        });
+        context.mockPrisma.product.findFirst.mockResolvedValue({
+          id: 'prod-1',
+          tenantId: 't-prod',
+        });
         context.mockPrisma.product.update.mockResolvedValue({
-          id: 'prod-1', price: 60000, stock: 45,
+          id: 'prod-1',
+          price: 60000,
+          stock: 45,
         });
 
         const res = await request(app.getHttpServer())
@@ -252,7 +328,11 @@ describe('Slice-9: Superadmin Kelola Klien & Slice-10: Tenant Products + Setting
       });
 
       it('Manager tenant lain DITOLAK mengelola produk tenant ini (403)', async () => {
-        currentUser = { sub: 'asing-1', roles: ['manager'], tenantId: 'tenant-asing' };
+        currentUser = {
+          sub: 'asing-1',
+          roles: ['manager'],
+          tenantId: 'tenant-asing',
+        };
 
         await request(app.getHttpServer())
           .post('/api/v1/tenant/manager-2/products')
@@ -263,16 +343,29 @@ describe('Slice-9: Superadmin Kelola Klien & Slice-10: Tenant Products + Setting
 
     describe('2. Pengaturan Bot (Agent Name, Tone, Prompt)', () => {
       it('Berhasil mengubah nama agen dan gaya bahasa bot (200)', async () => {
-        currentUser = { sub: 'manager-2', roles: ['manager'], tenantId: 't-prod' };
-        context.mockPrisma.user.findUnique.mockResolvedValue({ id: 'manager-2', tenantId: 't-prod' });
+        currentUser = {
+          sub: 'manager-2',
+          roles: ['manager'],
+          tenantId: 't-prod',
+        };
+        context.mockPrisma.user.findUnique.mockResolvedValue({
+          id: 'manager-2',
+          tenantId: 't-prod',
+        });
         context.mockPrisma.tenant.update.mockResolvedValue({
-          id: 't-prod', agentName: 'Hana', agentTone: 'profesional',
+          id: 't-prod',
+          agentName: 'Hana',
+          agentTone: 'profesional',
           systemPrompt: 'Kamu adalah asisten toko ramah.',
         });
 
         const res = await request(app.getHttpServer())
           .patch('/api/v1/tenant/manager-2/settings')
-          .send({ agentName: 'Hana', agentTone: 'profesional', systemPrompt: 'Kamu adalah asisten toko ramah.' })
+          .send({
+            agentName: 'Hana',
+            agentTone: 'profesional',
+            systemPrompt: 'Kamu adalah asisten toko ramah.',
+          })
           .expect(200);
 
         expect(res.body.agentName).toBe('Hana');
@@ -280,18 +373,28 @@ describe('Slice-9: Superadmin Kelola Klien & Slice-10: Tenant Products + Setting
       });
 
       it('Berhasil menyimpan seluruh field pengaturan termasuk gaya bahasa panjang (>100 char) (200)', async () => {
-        currentUser = { sub: 'manager-2', roles: ['manager'], tenantId: 't-prod' };
-        context.mockPrisma.user.findUnique.mockResolvedValue({ id: 'manager-2', tenantId: 't-prod' });
+        currentUser = {
+          sub: 'manager-2',
+          roles: ['manager'],
+          tenantId: 't-prod',
+        };
+        context.mockPrisma.user.findUnique.mockResolvedValue({
+          id: 'manager-2',
+          tenantId: 't-prod',
+        });
 
-        const longTone = 'Sopan, ramah, hangat, menggunakan emotikon senyum dan bahasa Indonesia yang santun. Selalu bantu pelanggan dengan sabar dan beri rekomendasi produk yang paling cocok.';
+        const longTone =
+          'Sopan, ramah, hangat, menggunakan emotikon senyum dan bahasa Indonesia yang santun. Selalu bantu pelanggan dengan sabar dan beri rekomendasi produk yang paling cocok.';
         const settingsPayload = {
           agentName: 'Zafira',
           agentTone: longTone,
           phone: '081234567890',
           operatingHours: 'Senin - Sabtu 08:00 - 20:00 WIB',
           address: 'Jl. Sudirman No. 45, Jakarta',
-          greetingMsg: 'Halo! Selamat datang di Toko Kami. Ada yang bisa kami bantu?',
-          systemPrompt: 'Anda adalah {agentName}. Gaya bicara: {botTone}. Jam kerja: {operatingHours}. Alamat: {storeAddress}. Kontak darurat: {fallbackContact}.',
+          greetingMsg:
+            'Halo! Selamat datang di Toko Kami. Ada yang bisa kami bantu?',
+          systemPrompt:
+            'Anda adalah {agentName}. Gaya bicara: {botTone}. Jam kerja: {operatingHours}. Alamat: {storeAddress}. Kontak darurat: {fallbackContact}.',
         };
 
         context.mockPrisma.tenant.update.mockResolvedValue({
@@ -309,12 +412,21 @@ describe('Slice-9: Superadmin Kelola Klien & Slice-10: Tenant Products + Setting
         expect(res.body.phone).toBe('081234567890');
         expect(res.body.operatingHours).toBe('Senin - Sabtu 08:00 - 20:00 WIB');
         expect(res.body.address).toBe('Jl. Sudirman No. 45, Jakarta');
-        expect(res.body.greetingMsg).toBe('Halo! Selamat datang di Toko Kami. Ada yang bisa kami bantu?');
+        expect(res.body.greetingMsg).toBe(
+          'Halo! Selamat datang di Toko Kami. Ada yang bisa kami bantu?',
+        );
       });
 
       it('Berhasil merender system prompt efektif dengan substitusi variabel dinamis (200)', async () => {
-        currentUser = { sub: 'manager-2', roles: ['manager'], tenantId: 't-prod' };
-        context.mockPrisma.user.findUnique.mockResolvedValue({ id: 'manager-2', tenantId: 't-prod' });
+        currentUser = {
+          sub: 'manager-2',
+          roles: ['manager'],
+          tenantId: 't-prod',
+        };
+        context.mockPrisma.user.findUnique.mockResolvedValue({
+          id: 'manager-2',
+          tenantId: 't-prod',
+        });
         context.mockPrisma.tenant.findUnique.mockResolvedValue({
           id: 't-prod',
           name: 'PT Zafi Digital',
@@ -323,7 +435,8 @@ describe('Slice-9: Superadmin Kelola Klien & Slice-10: Tenant Products + Setting
           phone: '08551234567',
           operatingHours: '08:00 - 17:00 WIB',
           address: 'Gedung Cyber Lt. 3',
-          systemPrompt: 'Anda adalah CS bernama {agentName} dari {tenantName}. Nada: {botTone}. Jam: {operatingHours}. Alamat: {storeAddress}. Hubungi: {fallbackContact}.',
+          systemPrompt:
+            'Anda adalah CS bernama {agentName} dari {tenantName}. Nada: {botTone}. Jam: {operatingHours}. Alamat: {storeAddress}. Hubungi: {fallbackContact}.',
         });
 
         const res = await request(app.getHttpServer())
@@ -339,14 +452,22 @@ describe('Slice-9: Superadmin Kelola Klien & Slice-10: Tenant Products + Setting
       });
 
       it('Fail-safe: otomatis menginjeksi gaya bahasa jika systemPrompt custom lupa menyertakan {botTone}', async () => {
-        currentUser = { sub: 'manager-2', roles: ['manager'], tenantId: 't-prod' };
-        context.mockPrisma.user.findUnique.mockResolvedValue({ id: 'manager-2', tenantId: 't-prod' });
+        currentUser = {
+          sub: 'manager-2',
+          roles: ['manager'],
+          tenantId: 't-prod',
+        };
+        context.mockPrisma.user.findUnique.mockResolvedValue({
+          id: 'manager-2',
+          tenantId: 't-prod',
+        });
         context.mockPrisma.tenant.findUnique.mockResolvedValue({
           id: 't-prod',
           name: 'Klinik Sehat',
           agentName: 'Dokter AI',
           agentTone: 'Empatik dan menenangkan',
-          systemPrompt: 'Jawab semua pertanyaan pasien mengenai jadwal dokter secara singkat.',
+          systemPrompt:
+            'Jawab semua pertanyaan pasien mengenai jadwal dokter secara singkat.',
         });
 
         const res = await request(app.getHttpServer())

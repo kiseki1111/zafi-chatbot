@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -156,6 +156,85 @@ function nowTime(): string {
   return `${String(d.getHours()).padStart(2, "0")}:${String(
     d.getMinutes(),
   ).padStart(2, "0")}`;
+}
+
+// ponytail: native 24-hour time formatting (HH:mm) matching WhatsApp standard
+function formatTime24(dateInput?: string | number | Date | null): string {
+  if (!dateInput) return nowTime();
+  let d = new Date(dateInput);
+  if (isNaN(d.getTime()) && typeof dateInput === "string") {
+    d = new Date(`1970-01-01 ${dateInput}`);
+  }
+  if (isNaN(d.getTime())) return String(dateInput);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(
+    d.getMinutes(),
+  ).padStart(2, "0")}`;
+}
+
+// ponytail: extract date grouping key (YYYY-MM-DD) for message separators
+function getMessageDateKey(msg: ChatMessage): string {
+  if (msg.createdAt) {
+    const d = new Date(msg.createdAt);
+    if (!isNaN(d.getTime())) {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
+  }
+  if (msg.timestamp && (msg.timestamp === "Kemarin" || msg.timestamp.includes("Mei"))) {
+    return msg.timestamp;
+  }
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
+// ponytail: WhatsApp-style date badge: "Hari ini", "Kemarin", or "DD/MM/YYYY" (e.g. 21/10/2026)
+function formatChatDateBadge(dateKey: string): string {
+  if (dateKey === "Kemarin") return "Kemarin";
+  if (!dateKey.includes("-")) return dateKey;
+
+  const [y, m, d] = dateKey.split("-").map(Number);
+  if (!y || !m || !d) return dateKey;
+
+  const msgDate = new Date(y, m - 1, d);
+  const now = new Date();
+  const isToday =
+    msgDate.getDate() === now.getDate() &&
+    msgDate.getMonth() === now.getMonth() &&
+    msgDate.getFullYear() === now.getFullYear();
+  if (isToday) return "Hari ini";
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday =
+    msgDate.getDate() === yesterday.getDate() &&
+    msgDate.getMonth() === yesterday.getMonth() &&
+    msgDate.getFullYear() === yesterday.getFullYear();
+  if (isYesterday) return "Kemarin";
+
+  return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`;
+}
+
+// ponytail: format contact list timestamp to 24-hour time or date
+function formatContactLastMessageAt(dateInput?: string | number | Date | null): string {
+  if (!dateInput) return "";
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return String(dateInput);
+
+  const now = new Date();
+  const isToday =
+    d.getDate() === now.getDate() &&
+    d.getMonth() === now.getMonth() &&
+    d.getFullYear() === now.getFullYear();
+  if (isToday) return formatTime24(d);
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday =
+    d.getDate() === yesterday.getDate() &&
+    d.getMonth() === yesterday.getMonth() &&
+    d.getFullYear() === yesterday.getFullYear();
+  if (isYesterday) return "Kemarin";
+
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 }
 
 // ---------- Sub-components ----------
@@ -917,7 +996,7 @@ export function ChatbotPage() {
       .then((r) => (r.ok ? r.json() : null))
       .then((res) => {
         const data = res?.data || res;
-        if (data && data.plan) setQuota(data);
+        if (data && (data.plan !== undefined || data.planName)) setQuota(data);
       })
       .catch(() => {});
   };
@@ -981,7 +1060,7 @@ export function ChatbotPage() {
           mode: c.mode || 'bot',
           unread: c.unreadCount,
           lastMessage: c.messages?.[0]?.content,
-          lastMessageAt: new Date(c.lastMessageAt).toLocaleTimeString(),
+          lastMessageAt: formatContactLastMessageAt(c.lastMessageAt),
         };
       });
       setContacts((prev) => {
@@ -1037,7 +1116,8 @@ export function ChatbotPage() {
           direction: m.senderType === 'customer' ? 'in' : 'out',
           text: m.content,
           status: m.status?.toLowerCase() || 'sent',
-          timestamp: new Date(m.createdAt).toLocaleTimeString(),
+          timestamp: formatTime24(m.createdAt),
+          createdAt: m.createdAt,
           isAI: m.senderType === 'bot' || m.senderType === 'ai',
           isFollowUp,
           senderName: m.senderType === 'agent' ? (m.sender?.name || 'Admin') : undefined,
@@ -1127,7 +1207,8 @@ export function ChatbotPage() {
                 direction: m.senderType === 'customer' ? 'in' : 'out',
                 text: m.content,
                 status: m.status?.toLowerCase() || 'sent',
-                timestamp: new Date(m.createdAt).toLocaleTimeString(),
+                timestamp: formatTime24(m.createdAt),
+                createdAt: m.createdAt,
                 isAI: m.senderType === 'bot' || m.senderType === 'ai',
                 isFollowUp,
                 senderName: m.senderType === 'agent' ? (m.sender?.name || 'Admin') : undefined,
@@ -1163,7 +1244,8 @@ export function ChatbotPage() {
                 contactId: raw.conversationId,
                 direction: raw.senderType === 'customer' ? 'in' : 'out',
                 text: raw.content || '',
-                timestamp: new Date(raw.createdAt || Date.now()).toLocaleTimeString(),
+                timestamp: formatTime24(raw.createdAt || Date.now()),
+                createdAt: raw.createdAt || new Date().toISOString(),
                 status: 'delivered',
                 isAI: isBot,
                 isFollowUp,
@@ -1337,7 +1419,8 @@ export function ChatbotPage() {
         direction: "out",
         text: trimmed,
         status: "sent",
-        timestamp: new Date().toLocaleTimeString(),
+        timestamp: formatTime24(new Date()),
+        createdAt: new Date().toISOString(),
         isAI: false,
         senderName: me,
         messageType: "image",
@@ -1372,7 +1455,8 @@ export function ChatbotPage() {
       direction: "out",
       text: trimmed,
       status: "sent",
-      timestamp: new Date().toLocaleTimeString(),
+      timestamp: formatTime24(new Date()),
+      createdAt: new Date().toISOString(),
       isAI: false,
       senderName: isHuman ? me : undefined,
     };
@@ -1402,7 +1486,8 @@ export function ChatbotPage() {
             direction: "out",
             text: "Terima kasih atas pesannya! Informasi ini telah dicatat oleh sistem AI dan segera ditindaklanjuti.",
             status: "read",
-            timestamp: new Date().toLocaleTimeString(),
+            timestamp: formatTime24(new Date()),
+            createdAt: new Date().toISOString(),
             isAI: true,
           };
           setMessages((prev) => [...prev, botReply]);
@@ -1753,13 +1838,28 @@ export function ChatbotPage() {
                         </div>
                       </div>
                     ) : (
-                      activeMessages.map((m) => (
-                        <MessageBubble
-                          key={m.id}
-                          msg={m}
-                          contactName={activeContact.name}
-                        />
-                      ))
+                      activeMessages.map((m, idx) => {
+                        const dateKey = getMessageDateKey(m);
+                        const prevDateKey = idx > 0 ? getMessageDateKey(activeMessages[idx - 1]) : null;
+                        const showDateBadge = idx === 0 || dateKey !== prevDateKey;
+                        const dateLabel = formatChatDateBadge(dateKey);
+
+                        return (
+                          <Fragment key={m.id}>
+                            {showDateBadge && dateLabel && (
+                              <div className="flex justify-center my-3 select-none">
+                                <span className="px-3 py-1 rounded-lg text-[11px] font-medium bg-muted/90 dark:bg-zinc-800/90 text-muted-foreground border border-border/40 shadow-xs">
+                                  {dateLabel}
+                                </span>
+                              </div>
+                            )}
+                            <MessageBubble
+                              msg={m}
+                              contactName={activeContact.name}
+                            />
+                          </Fragment>
+                        );
+                      })
                     )}
                     <div ref={bottomRef} />
                   </div>

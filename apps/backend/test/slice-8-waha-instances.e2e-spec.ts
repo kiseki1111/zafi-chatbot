@@ -33,31 +33,36 @@ describe('Slice-8: WAHA Instance Management (Create, Lifecycle, Delete, Security
   const mockCs = { handleMessage: jest.fn() };
 
   beforeAll(async () => {
-    context = await createTestApp(
-      { imports: [WahaModule] },
-      (b) =>
-        b
-          .overrideGuard(JwtAuthGuard)
-          .useValue({
-            canActivate: (ctx: any) => {
-              ctx.switchToHttp().getRequest().user = currentUser;
-              return true;
-            },
-          })
-          .overrideProvider(WahaService)
-          .useValue(mockWaha)
-          .overrideProvider(OmnichannelQueueService)
-          .useValue(mockQueue)
-          .overrideProvider(CsService)
-          .useValue(mockCs),
+    context = await createTestApp({ imports: [WahaModule] }, (b) =>
+      b
+        .overrideGuard(JwtAuthGuard)
+        .useValue({
+          canActivate: (ctx: any) => {
+            ctx.switchToHttp().getRequest().user = currentUser;
+            return true;
+          },
+        })
+        .overrideProvider(WahaService)
+        .useValue(mockWaha)
+        .overrideProvider(OmnichannelQueueService)
+        .useValue(mockQueue)
+        .overrideProvider(CsService)
+        .useValue(mockCs),
     );
     app = context.app;
   });
 
-  afterAll(async () => { if (app) await app.close(); });
+  afterAll(async () => {
+    if (app) await app.close();
+  });
   beforeEach(() => {
     jest.clearAllMocks();
-    currentUser = { sub: 'manager-1', email: 'manager@toko.com', roles: ['manager'], tenantId: 'tenant-wa' };
+    currentUser = {
+      sub: 'manager-1',
+      email: 'manager@toko.com',
+      roles: ['manager'],
+      tenantId: 'tenant-wa',
+    };
   });
 
   describe('1. Batas Pembuatan Instance Baru', () => {
@@ -144,7 +149,9 @@ describe('Slice-8: WAHA Instance Management (Create, Lifecycle, Delete, Security
         tenantId: 'tenant-wa',
       });
       mockWaha.logoutSession.mockResolvedValue({});
-      context.mockPrisma.whatsappInstance.delete.mockResolvedValue({ instanceName: 'toko-kopi' });
+      context.mockPrisma.whatsappInstance.delete.mockResolvedValue({
+        instanceName: 'toko-kopi',
+      });
 
       const res = await request(app.getHttpServer())
         .delete('/api/v1/waha/instances/toko-kopi')

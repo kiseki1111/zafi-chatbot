@@ -68,7 +68,9 @@ describe('Knowledge Base Flow (e2e)', () => {
           updatedAt: new Date(),
         },
       ];
-      context.mockPrisma.knowledgeBase.findMany.mockResolvedValue(dummyKnowledge);
+      context.mockPrisma.knowledgeBase.findMany.mockResolvedValue(
+        dummyKnowledge,
+      );
 
       const response = await request(app.getHttpServer())
         .get('/api/v1/knowledge')
@@ -109,7 +111,9 @@ describe('Knowledge Base Flow (e2e)', () => {
 
       expect(response.body.title).toBe('Kebijakan Retur');
       expect(response.body.id).toBe('kb-2');
-      expect(mockDataAgent.syncKnowledgeBase).toHaveBeenCalledWith('tenant-knowledge-1');
+      expect(mockDataAgent.syncKnowledgeBase).toHaveBeenCalledWith(
+        'tenant-knowledge-1',
+      );
     });
   });
 
@@ -155,7 +159,9 @@ describe('Knowledge Base Flow (e2e)', () => {
         id: 'kb-2',
         tenantId: 'tenant-knowledge-1',
       });
-      context.mockPrisma.knowledgeBase.deleteMany.mockResolvedValue({ count: 1 });
+      context.mockPrisma.knowledgeBase.deleteMany.mockResolvedValue({
+        count: 1,
+      });
 
       const response = await request(app.getHttpServer())
         .delete('/api/v1/knowledge/kb-2')

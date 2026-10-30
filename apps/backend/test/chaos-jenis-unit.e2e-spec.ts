@@ -36,7 +36,8 @@ describe('Chaos & E2E Suite: Jenis Unit (propertyType: BANGUNAN vs TANAH)', () =
         }),
     );
     app = context.app;
-    agentSharedService = context.module.get<AgentSharedService>(AgentSharedService);
+    agentSharedService =
+      context.module.get<AgentSharedService>(AgentSharedService);
     searchService = context.module.get<SearchService>(SearchService);
   });
 
@@ -170,7 +171,9 @@ describe('Chaos & E2E Suite: Jenis Unit (propertyType: BANGUNAN vs TANAH)', () =
         id: 'group-proper-1',
         tenantId: 'tenant-proper-1',
       });
-      context.mockPrisma.resourceItem.createMany.mockResolvedValue({ count: 10 });
+      context.mockPrisma.resourceItem.createMany.mockResolvedValue({
+        count: 10,
+      });
 
       const res = await request(app.getHttpServer())
         .post('/api/v1/availability/groups/group-proper-1/batch-items')
@@ -207,8 +210,18 @@ describe('Chaos & E2E Suite: Jenis Unit (propertyType: BANGUNAN vs TANAH)', () =
           id: 'group-proper-1',
           name: 'Cluster Mawar',
           items: [
-            { id: 'i-1', code: 'M-01', propertyType: null, status: 'AVAILABLE' },
-            { id: 'i-2', code: 'M-02', propertyType: 'TANAH', status: 'AVAILABLE' },
+            {
+              id: 'i-1',
+              code: 'M-01',
+              propertyType: null,
+              status: 'AVAILABLE',
+            },
+            {
+              id: 'i-2',
+              code: 'M-02',
+              propertyType: 'TANAH',
+              status: 'AVAILABLE',
+            },
           ],
         },
       ];
@@ -251,7 +264,8 @@ describe('Chaos & E2E Suite: Jenis Unit (propertyType: BANGUNAN vs TANAH)', () =
         },
       ]);
 
-      const contextString = await agentSharedService.getAvailabilityContext('tenant-proper-1');
+      const contextString =
+        await agentSharedService.getAvailabilityContext('tenant-proper-1');
 
       // Verifikasi bahwa unit rumah diformat dengan [Bangunan Rumah] dan Tipe
       expect(contextString).toContain('A-01 [Bangunan Rumah] (Tipe 45/90)');
@@ -274,7 +288,11 @@ describe('Chaos & E2E Suite: Jenis Unit (propertyType: BANGUNAN vs TANAH)', () =
         },
       ]);
 
-      const result = await searchService.searchUnits('tanah', 'tenant-1', false);
+      const result = await searchService.searchUnits(
+        'tanah',
+        'tenant-1',
+        false,
+      );
 
       expect(result.items).toHaveLength(1);
       expect(result.items[0].title).toContain('K-01');
@@ -398,7 +416,9 @@ describe('Chaos & E2E Suite: Jenis Unit (propertyType: BANGUNAN vs TANAH)', () =
         id: 'group-proper-1',
         tenantId: 'tenant-proper-1',
       });
-      context.mockPrisma.resourceItem.createMany.mockResolvedValue({ count: 200 });
+      context.mockPrisma.resourceItem.createMany.mockResolvedValue({
+        count: 200,
+      });
 
       const res = await request(app.getHttpServer())
         .post('/api/v1/availability/groups/group-proper-1/batch-items')
@@ -416,8 +436,14 @@ describe('Chaos & E2E Suite: Jenis Unit (propertyType: BANGUNAN vs TANAH)', () =
       expect(context.mockPrisma.resourceItem.createMany).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.arrayContaining([
-            expect.objectContaining({ code: 'MASSIVE-KAV-01', propertyType: 'TANAH' }),
-            expect.objectContaining({ code: 'MASSIVE-KAV-200', propertyType: 'TANAH' }),
+            expect.objectContaining({
+              code: 'MASSIVE-KAV-01',
+              propertyType: 'TANAH',
+            }),
+            expect.objectContaining({
+              code: 'MASSIVE-KAV-200',
+              propertyType: 'TANAH',
+            }),
           ]),
         }),
       );
@@ -460,13 +486,24 @@ describe('Chaos & E2E Suite: Jenis Unit (propertyType: BANGUNAN vs TANAH)', () =
         },
       ]);
 
-      const contextOutput = await agentSharedService.getAvailabilityContext('tenant-proper-1');
+      const contextOutput =
+        await agentSharedService.getAvailabilityContext('tenant-proper-1');
 
-      expect(contextOutput).toContain('Acuan Tipe & Rincian Harga di Perumahan ini');
-      expect(contextOutput).toContain('Harga Tanah Saja (Luas 120 m2): Rp 90.000.000');
-      expect(contextOutput).toContain('Harga Bangunan Saja (Biaya Bangun) (Tipe 36): Rp 160.000.000');
-      expect(contextOutput).toContain('Paket Lengkap (Tanah + Bangunan) (Tipe 36/120): Rp 250.000.000');
-      expect(contextOutput).toContain('C-20 [Paket Lengkap: Tanah + Bangunan] (Tipe 36/120)');
+      expect(contextOutput).toContain(
+        'Acuan Tipe & Rincian Harga di Perumahan ini',
+      );
+      expect(contextOutput).toContain(
+        'Harga Tanah Saja (Luas 120 m2): Rp 90.000.000',
+      );
+      expect(contextOutput).toContain(
+        'Harga Bangunan Saja (Biaya Bangun) (Tipe 36): Rp 160.000.000',
+      );
+      expect(contextOutput).toContain(
+        'Paket Lengkap (Tanah + Bangunan) (Tipe 36/120): Rp 250.000.000',
+      );
+      expect(contextOutput).toContain(
+        'C-20 [Paket Lengkap: Tanah + Bangunan] (Tipe 36/120)',
+      );
       expect(contextOutput).toContain('C-21 [Tanah Kosong] (Luas 120 m2)');
     });
 
@@ -511,8 +548,11 @@ describe('Chaos & E2E Suite: Jenis Unit (propertyType: BANGUNAN vs TANAH)', () =
           items: [],
         },
       ]);
-      const partialOutput = await agentSharedService.getAvailabilityContext('tenant-proper-1');
-      expect(partialOutput).toContain('Harga Tanah Saja (Luas 150 m2): Rp 75.000.000');
+      const partialOutput =
+        await agentSharedService.getAvailabilityContext('tenant-proper-1');
+      expect(partialOutput).toContain(
+        'Harga Tanah Saja (Luas 150 m2): Rp 75.000.000',
+      );
       expect(partialOutput).not.toContain('Harga Bangunan Saja');
 
       // 2. Corrupted JSON / empty object
@@ -524,7 +564,8 @@ describe('Chaos & E2E Suite: Jenis Unit (propertyType: BANGUNAN vs TANAH)', () =
           items: [],
         },
       ]);
-      const emptyOutput = await agentSharedService.getAvailabilityContext('tenant-proper-1');
+      const emptyOutput =
+        await agentSharedService.getAvailabilityContext('tenant-proper-1');
       expect(emptyOutput).toContain('Perumahan: "Cluster Kosong"');
 
       // 3. String serialized JSON
@@ -532,12 +573,18 @@ describe('Chaos & E2E Suite: Jenis Unit (propertyType: BANGUNAN vs TANAH)', () =
         {
           id: 'g-string-json',
           name: 'Cluster String JSON',
-          pricingTemplates: JSON.stringify({ packageType: '36/72', packagePrice: 180000000 }),
+          pricingTemplates: JSON.stringify({
+            packageType: '36/72',
+            packagePrice: 180000000,
+          }),
           items: [],
         },
       ]);
-      const stringOutput = await agentSharedService.getAvailabilityContext('tenant-proper-1');
-      expect(stringOutput).toContain('Paket Lengkap (Tanah + Bangunan) (Tipe 36/72): Rp 180.000.000');
+      const stringOutput =
+        await agentSharedService.getAvailabilityContext('tenant-proper-1');
+      expect(stringOutput).toContain(
+        'Paket Lengkap (Tanah + Bangunan) (Tipe 36/72): Rp 180.000.000',
+      );
     });
 
     it('[Chaos 7: Extreme Price Values (Trillions) and Zero / Null Handling]', async () => {
@@ -568,7 +615,8 @@ describe('Chaos & E2E Suite: Jenis Unit (propertyType: BANGUNAN vs TANAH)', () =
         },
       ]);
 
-      const output = await agentSharedService.getAvailabilityContext('tenant-proper-1');
+      const output =
+        await agentSharedService.getAvailabilityContext('tenant-proper-1');
       expect(output).toContain('Rp 5.000.000.000.000');
       expect(output).toContain('Rp 7.000.000.000.000');
       expect(output).toContain('VVIP-01 [Paket Lengkap: Tanah + Bangunan]');

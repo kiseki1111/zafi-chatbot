@@ -16,15 +16,13 @@ describe('SearchModule (Omnisearch End-to-End Test)', () => {
   };
 
   beforeAll(async () => {
-    context = await createTestApp(
-      { imports: [SearchModule] },
-      (b) =>
-        b.overrideGuard(JwtAuthGuard).useValue({
-          canActivate: (ctx: any) => {
-            ctx.switchToHttp().getRequest().user = currentUser;
-            return true;
-          },
-        }),
+    context = await createTestApp({ imports: [SearchModule] }, (b) =>
+      b.overrideGuard(JwtAuthGuard).useValue({
+        canActivate: (ctx: any) => {
+          ctx.switchToHttp().getRequest().user = currentUser;
+          return true;
+        },
+      }),
     );
     app = context.app;
   });
@@ -60,7 +58,13 @@ describe('SearchModule (Omnisearch End-to-End Test)', () => {
           phone: '62812345678',
           status: 'Follow-Up',
           company: 'PT Maju',
-          conversations: [{ id: 'conv-1', instanceName: 'zafi-bot', lastMessageAt: new Date() }],
+          conversations: [
+            {
+              id: 'conv-1',
+              instanceName: 'zafi-bot',
+              lastMessageAt: new Date(),
+            },
+          ],
         },
       ]);
       context.mockPrisma.message.findMany.mockResolvedValue([]);
@@ -75,7 +79,9 @@ describe('SearchModule (Omnisearch End-to-End Test)', () => {
       expect(res.body.q).toBe('Budi');
       expect(Array.isArray(res.body.results)).toBe(true);
 
-      const contactCategory = res.body.results.find((r: any) => r.category === 'contact');
+      const contactCategory = res.body.results.find(
+        (r: any) => r.category === 'contact',
+      );
       expect(contactCategory).toBeDefined();
       expect(contactCategory.items[0].title).toBe('Budi Santoso');
       expect(contactCategory.items[0].subtitle).toContain('62812345678');
@@ -139,11 +145,13 @@ describe('SearchModule (Omnisearch End-to-End Test)', () => {
         .expect(200);
 
       // Verifikasi query resourceItem menyertakan group.tenantId = 'tenant-zafi'
-      const unitQueryArg = context.mockPrisma.resourceItem.findMany.mock.calls[0][0];
+      const unitQueryArg =
+        context.mockPrisma.resourceItem.findMany.mock.calls[0][0];
       expect(unitQueryArg.where.group).toEqual({ tenantId: 'tenant-zafi' });
 
       // Verifikasi query knowledgeBase menyertakan tenantId = 'tenant-zafi'
-      const kbQueryArg = context.mockPrisma.knowledgeBase.findMany.mock.calls[0][0];
+      const kbQueryArg =
+        context.mockPrisma.knowledgeBase.findMany.mock.calls[0][0];
       expect(kbQueryArg.where.tenantId).toBe('tenant-zafi');
     });
   });

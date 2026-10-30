@@ -193,7 +193,9 @@ WAJIB MERESPON DALAM FORMAT JSON BERIKUT:
 
     // S-CS2: Handle image by converting to text via Vision AI
     if (mediaUrls && mediaUrls.length > 0) {
-      this.logger.log(`[CS-BOT] Menganalisis ${mediaUrls.length} gambar via Vision AI...`);
+      this.logger.log(
+        `[CS-BOT] Menganalisis ${mediaUrls.length} gambar via Vision AI...`,
+      );
       const imgDesc = await this.agentSharedService.analyzeImage(mediaUrls[0]);
       if (imgDesc) {
         text += `\n[Informasi Visual Gambar dari Pelanggan: ${imgDesc}]`;
@@ -202,12 +204,17 @@ WAJIB MERESPON DALAM FORMAT JSON BERIKUT:
 
     // S-CS3: Handle voice note (audio) by converting to text via OpenRouter STT
     if (message.audioUrl) {
-      this.logger.log(`[CS-BOT] Mentranskripsi voice note via OpenRouter STT...`);
-      const transcript = await this.agentSharedService.transcribeAudio(message.audioUrl);
+      this.logger.log(
+        `[CS-BOT] Mentranskripsi voice note via OpenRouter STT...`,
+      );
+      const transcript = await this.agentSharedService.transcribeAudio(
+        message.audioUrl,
+      );
       if (transcript) {
-        text = text && !text.includes('[Pelanggan mengirimkan pesan suara')
-          ? `${text}\n[Pesan Suara Pelanggan: "${transcript}"]`
-          : `[Pesan Suara Pelanggan: "${transcript}"]`;
+        text =
+          text && !text.includes('[Pelanggan mengirimkan pesan suara')
+            ? `${text}\n[Pesan Suara Pelanggan: "${transcript}"]`
+            : `[Pesan Suara Pelanggan: "${transcript}"]`;
       }
     }
 
@@ -297,7 +304,10 @@ WAJIB MERESPON DALAM FORMAT JSON BERIKUT:
         /https?:\/\/(www\.)?(instagram\.com|instagr\.am|tiktok\.com|youtube\.com|youtu\.be|facebook\.com|fb\.watch)\/[^\s]+/gi,
         (url) => {
           const cleanUrl = url.split('?')[0];
-          if (!activeKnowledgeSource.includes(url) && !activeKnowledgeSource.includes(cleanUrl)) {
+          if (
+            !activeKnowledgeSource.includes(url) &&
+            !activeKnowledgeSource.includes(cleanUrl)
+          ) {
             return '[tautan media sebelumnya telah dihapus dari database]';
           }
           return url;
@@ -392,7 +402,8 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
           return true;
         }
         const hasVideoExt = /\.(mp4|mov|avi|mkv|webm|m4v)($|\?)/i.test(lower);
-        const isLocalUpload = lower.startsWith('/uploads/') || lower.includes('/uploads/');
+        const isLocalUpload =
+          lower.startsWith('/uploads/') || lower.includes('/uploads/');
         return !hasVideoExt && !isLocalUpload;
       };
 
@@ -424,7 +435,8 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
         return (
           activeKnowledgeSource.includes(url) ||
           activeKnowledgeSource.includes(cleanUrl) ||
-          (url.includes('/uploads/') && activeKnowledgeSource.includes(url.split('/uploads/')[1]))
+          (url.includes('/uploads/') &&
+            activeKnowledgeSource.includes(url.split('/uploads/')[1]))
         );
       };
 
@@ -450,7 +462,10 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
       // Tautan sosial media / web (Reels, TikTok, YouTube, Drive, dll.) SELALU dipindahkan ke teks link preview
       // agar WhatsApp menampilkan kartu link yang dapat diklik, dan WAHA tidak crash saat mencoba unduh file biner.
       // File biner (.mp4 lokal/eksternal) HANYA dikirimkan di array aiVideos jika pengguna menanyakan video.
-      const userAskedVideo = /\b(video|vidio|rekaman|virtual tour|vt|reels?|ig|instagram|tiktok|youtube|yt|short|shorts|film|tonton|lihat|link)\b/i.test(text);
+      const userAskedVideo =
+        /\b(video|vidio|rekaman|virtual tour|vt|reels?|ig|instagram|tiktok|youtube|yt|short|shorts|film|tonton|lihat|link)\b/i.test(
+          text,
+        );
       const aiVideos: { url: string; caption: string }[] = [];
       const extractedWebVideos: { url: string; caption: string }[] = [];
 
@@ -484,18 +499,20 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
       }
 
       // Jika AI mencoba menuliskan tautan media sosial usang di dalam teks balasan, bersihkan
-      aiText = aiText.replace(
-        /https?:\/\/(www\.)?(instagram\.com|instagr\.am|tiktok\.com|youtube\.com|youtu\.be)\/[^\s]+/gi,
-        (matchedUrl) => {
-          if (!isKnownInActiveDatabase(matchedUrl)) {
-            this.logger.warn(
-              `[CS-BOT] Membersihkan tautan media usang '${matchedUrl}' dari teks balasan karena tidak ada di database aktif.`,
-            );
-            return '';
-          }
-          return matchedUrl;
-        },
-      ).trim();
+      aiText = aiText
+        .replace(
+          /https?:\/\/(www\.)?(instagram\.com|instagr\.am|tiktok\.com|youtube\.com|youtu\.be)\/[^\s]+/gi,
+          (matchedUrl) => {
+            if (!isKnownInActiveDatabase(matchedUrl)) {
+              this.logger.warn(
+                `[CS-BOT] Membersihkan tautan media usang '${matchedUrl}' dari teks balasan karena tidak ada di database aktif.`,
+              );
+              return '';
+            }
+            return matchedUrl;
+          },
+        )
+        .trim();
 
       // ponytail: multi-layer dynamic safety net to guarantee bot never responds with 0 characters
       if (!aiText && aiImages.length > 0) {
@@ -510,9 +527,18 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
         aiText = `Halo Kak, berikut video yang Kakak minta ya 🙏`;
       } else if (!aiText) {
         const lowerInput = (text || '').toLowerCase();
-        const isMedia = /\b(foto|gambar|video|brosur|denah|siteplan|spesifikasi|pricelist|file|dokumen|pdf)\b/i.test(lowerInput);
-        const isLocationOrSurvey = /\b(lokasi|alamat|lapangan|survey|cek|lihat|kunjungan|jadwal)\b/i.test(lowerInput);
-        const isCommercial = /\b(harga|biaya|kpr|cicilan|angsuran|booking|pesan|beli|ambil|stok|unit)\b/i.test(lowerInput);
+        const isMedia =
+          /\b(foto|gambar|video|brosur|denah|siteplan|spesifikasi|pricelist|file|dokumen|pdf)\b/i.test(
+            lowerInput,
+          );
+        const isLocationOrSurvey =
+          /\b(lokasi|alamat|lapangan|survey|cek|lihat|kunjungan|jadwal)\b/i.test(
+            lowerInput,
+          );
+        const isCommercial =
+          /\b(harga|biaya|kpr|cicilan|angsuran|booking|pesan|beli|ambil|stok|unit)\b/i.test(
+            lowerInput,
+          );
 
         if (isMedia && isLocationOrSurvey) {
           aiText = `Halo Kak, untuk foto atau dokumentasi fisik lokasi lapangan saat ini belum tersimpan di sistem kami. Kakak bisa langsung konfirmasi ke tim ${tenantName} ${fallbackContact} agar bisa dikirimkan dokumentasi terbaru langsung dari tim lapangan ya 🙏`;
@@ -561,7 +587,11 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
         .replace('-customer', '');
 
       let tenantId: string | null = null;
-      if (sessionName && sessionName !== 'unknown' && sessionName !== 'unknown-session') {
+      if (
+        sessionName &&
+        sessionName !== 'unknown' &&
+        sessionName !== 'unknown-session'
+      ) {
         const inst = await this.prisma.whatsappInstance.findUnique({
           where: { instanceName: sessionName },
         });
@@ -584,7 +614,9 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
         ...existingMeta,
         ...(lead.perumahan ? { perumahan: lead.perumahan } : {}),
         ...(lead.tipeUnit ? { tipeUnit: lead.tipeUnit } : {}),
-        ...(lead.hargaUnit ? { hargaUnit: Number(lead.hargaUnit) || lead.hargaUnit } : {}),
+        ...(lead.hargaUnit
+          ? { hargaUnit: Number(lead.hargaUnit) || lead.hargaUnit }
+          : {}),
       };
 
       if (!contact) {
@@ -624,7 +656,11 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
           },
         });
 
-        if (sessionName && sessionName !== 'unknown' && sessionName !== 'unknown-session') {
+        if (
+          sessionName &&
+          sessionName !== 'unknown' &&
+          sessionName !== 'unknown-session'
+        ) {
           await this.prisma.conversation
             .upsert({
               where: {
@@ -649,13 +685,22 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
         return;
       }
 
-      const existingLogs: Array<{ status?: string; notes?: string; timestamp: string }> =
-        Array.isArray(existingMeta.statusLogs) ? [...existingMeta.statusLogs] : [];
+      const existingLogs: Array<{
+        status?: string;
+        notes?: string;
+        timestamp: string;
+      }> = Array.isArray(existingMeta.statusLogs)
+        ? [...existingMeta.statusLogs]
+        : [];
 
-      const cleanNewNotes = lead.notes && typeof lead.notes === 'string' ? lead.notes.trim() : '';
+      const cleanNewNotes =
+        lead.notes && typeof lead.notes === 'string' ? lead.notes.trim() : '';
       const newStatus = lead.status || contact.status;
       const lastLog = existingLogs[existingLogs.length - 1];
-      const isChanged = !lastLog || lastLog.status !== newStatus || (cleanNewNotes && lastLog.notes !== cleanNewNotes);
+      const isChanged =
+        !lastLog ||
+        lastLog.status !== newStatus ||
+        (cleanNewNotes && lastLog.notes !== cleanNewNotes);
 
       if (isChanged && (newStatus || cleanNewNotes)) {
         existingLogs.push({

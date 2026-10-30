@@ -53,7 +53,9 @@ describe('ChatsController - Unit Tests (Feature 1 Profile & Bio)', () => {
 
       const res = await controller.getContactProfile('conv-abc');
 
-      expect(mockChatsService.getContactProfile).toHaveBeenCalledWith('conv-abc');
+      expect(mockChatsService.getContactProfile).toHaveBeenCalledWith(
+        'conv-abc',
+      );
       expect(res).toEqual(mockResult);
     });
   });

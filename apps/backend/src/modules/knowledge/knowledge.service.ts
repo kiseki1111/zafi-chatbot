@@ -7,7 +7,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
-import { OPENAI_CLIENT, OPENAI_VISION_MODEL } from '../../core/openai/openai.module';
+import {
+  OPENAI_CLIENT,
+  OPENAI_VISION_MODEL,
+} from '../../core/openai/openai.module';
 import { OpenAI } from 'openai';
 import { DataAgentService } from '../../features/knowledge-ingest/data-agent.service';
 const pdfParse = require('pdf-parse');
@@ -18,6 +21,7 @@ import * as fs from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { isFeatureAllowed } from '../../features/web-dashboard/tenant/tenant.service';
 
 const execAsync = promisify(exec);
 
@@ -29,7 +33,9 @@ export class KnowledgeService {
     private readonly prisma: PrismaService,
     @Inject(OPENAI_CLIENT) private readonly openai: OpenAI,
     private readonly dataAgentService: DataAgentService,
-    @Optional() @Inject(OPENAI_VISION_MODEL) private readonly visionModel?: string,
+    @Optional()
+    @Inject(OPENAI_VISION_MODEL)
+    private readonly visionModel?: string,
   ) {}
 
   async findAll(tenantId: string) {
@@ -173,12 +179,12 @@ export class KnowledgeService {
             'meta-llama/llama-3.2-11b-vision-instruct',
             'z-ai/glm-5.3-flash',
             'xiaomi/mimo-v2.5',
-          ].filter((m, idx, arr): m is string => Boolean(m) && arr.indexOf(m) === idx)
-        : [
-            this.visionModel || 'gpt-4o-mini',
-            'gpt-4o-mini',
-            'gpt-4o',
-          ].filter((m, idx, arr) => Boolean(m) && arr.indexOf(m) === idx);
+          ].filter(
+            (m, idx, arr): m is string => Boolean(m) && arr.indexOf(m) === idx,
+          )
+        : [this.visionModel || 'gpt-4o-mini', 'gpt-4o-mini', 'gpt-4o'].filter(
+            (m, idx, arr) => Boolean(m) && arr.indexOf(m) === idx,
+          );
 
       const prompt = `Anda adalah asisten OCR tingkat tinggi yang bertugas membaca dan mengekstrak seluruh informasi dari dokumen/brosur/gambar ini.
 
@@ -202,7 +208,7 @@ Tugas Anda:
             String(model).toLowerCase().includes('glm') ||
             String(model).toLowerCase().includes('r1');
           const requestPayload: any = {
-            model: model as string,
+            model: model,
             messages: [
               {
                 role: 'user',
@@ -341,6 +347,24 @@ Tugas Anda:
     file: Express.Multer.File,
     title?: string,
   ) {
+    const ext = file?.originalname?.split('.').pop()?.toLowerCase();
+    const imageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'bmp', 'tiff'];
+    // ponytail: feature gating OCR extraction for Lite & Bronze
+    if (tenantId && imageExtensions.includes(ext || '')) {
+      const tenant = await Promise.resolve(
+        this.prisma.tenant?.findUnique?.({ where: { id: tenantId } }),
+      ).catch(() => null);
+      if (
+        tenant &&
+        (tenant.metadata as any)?.plan &&
+        !isFeatureAllowed(tenant.metadata, 'ocrExtract')
+      ) {
+        throw new BadRequestException(
+          'Fitur ekstraksi OCR dokumen & gambar dengan AI eksklusif untuk paket Silver ke atas.',
+        );
+      }
+    }
+
     const content = await this.processFile(file);
     const finalTitle = title || file.originalname;
 
@@ -428,8 +452,9 @@ Tugas Anda:
       this.optimizeVideoInBackground(file.path, file.originalname);
     }
 
-    const host =
-      req?.get ? req.get('host') || 'localhost:3000' : 'localhost:3000';
+    const host = req?.get
+      ? req.get('host') || 'localhost:3000'
+      : 'localhost:3000';
     const protocol =
       req?.headers && req.headers['x-forwarded-proto']
         ? req.headers['x-forwarded-proto']

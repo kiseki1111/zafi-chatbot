@@ -74,11 +74,6 @@ export const OPENAI_VISION_MODEL = 'OPENAI_VISION_MODEL';
       },
     },
   ],
-  exports: [
-    OPENAI_CLIENT,
-    OPENAI_MODEL,
-    EMBEDDING_MODEL,
-    OPENAI_VISION_MODEL,
-  ],
+  exports: [OPENAI_CLIENT, OPENAI_MODEL, EMBEDDING_MODEL, OPENAI_VISION_MODEL],
 })
 export class OpenAiModule {}

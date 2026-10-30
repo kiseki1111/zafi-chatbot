@@ -63,9 +63,7 @@ export class ContactsService {
       include: {
         tags: { include: { tag: true } },
         conversations: {
-          where: tenantId
-            ? { whatsappInstance: { tenantId } }
-            : undefined,
+          where: tenantId ? { whatsappInstance: { tenantId } } : undefined,
           take: 1,
           orderBy: { lastMessageAt: 'desc' },
           include: {
@@ -112,7 +110,11 @@ export class ContactsService {
             break;
           }
         }
-        if (!displayName || displayName === c.phone || displayName.startsWith('+')) {
+        if (
+          !displayName ||
+          displayName === c.phone ||
+          displayName.startsWith('+')
+        ) {
           displayName = 'Anonim';
         }
       }
@@ -176,9 +178,7 @@ export class ContactsService {
       include: {
         tags: { include: { tag: true } },
         conversations: {
-          where: tenantId
-            ? { whatsappInstance: { tenantId } }
-            : undefined,
+          where: tenantId ? { whatsappInstance: { tenantId } } : undefined,
           orderBy: { lastMessageAt: 'desc' },
           include: {
             assignedTo: { select: { id: true, name: true } },
@@ -237,11 +237,7 @@ export class ContactsService {
     return contact;
   }
 
-  async updateContact(
-    id: string,
-    dto: UpdateContactDto,
-    tenantId?: string,
-  ) {
+  async updateContact(id: string, dto: UpdateContactDto, tenantId?: string) {
     const where: any = { id };
     if (tenantId) {
       where.AND = [
@@ -266,14 +262,21 @@ export class ContactsService {
     if (!contact) throw new NotFoundException('Contact not found');
 
     const currentMeta = (contact.metadata as Record<string, any>) || {};
-    const updatedMeta = dto.metadata !== undefined ? { ...currentMeta, ...dto.metadata } : { ...currentMeta };
+    const updatedMeta =
+      dto.metadata !== undefined
+        ? { ...currentMeta, ...dto.metadata }
+        : { ...currentMeta };
     if (
       (dto.status !== undefined && dto.status !== contact.status) ||
-      (dto.notes !== undefined && dto.notes.trim() !== (contact.notes || '').trim())
+      (dto.notes !== undefined &&
+        dto.notes.trim() !== (contact.notes || '').trim())
     ) {
-      const logs = Array.isArray(updatedMeta.statusLogs) ? [...updatedMeta.statusLogs] : [];
+      const logs = Array.isArray(updatedMeta.statusLogs)
+        ? [...updatedMeta.statusLogs]
+        : [];
       const newStatus = dto.status !== undefined ? dto.status : contact.status;
-      const newNotes = dto.notes !== undefined ? dto.notes : (contact.notes || '');
+      const newNotes =
+        dto.notes !== undefined ? dto.notes : contact.notes || '';
       logs.push({
         status: newStatus,
         notes: newNotes,

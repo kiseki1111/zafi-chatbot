@@ -39,7 +39,10 @@ describe('ChatsService', () => {
         ChatsService,
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: WahaService, useValue: mockWahaService },
-        { provide: require('./chat-stream.service').ChatStreamService, useValue: mockChatStreamService },
+        {
+          provide: require('./chat-stream.service').ChatStreamService,
+          useValue: mockChatStreamService,
+        },
       ],
     }).compile();
 

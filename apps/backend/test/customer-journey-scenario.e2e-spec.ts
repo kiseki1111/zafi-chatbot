@@ -70,7 +70,9 @@ describe('Skenario Rantai Pengguna (Customer to Owner Journey)', () => {
     });
 
     it('1B. Kirim Gambar: Vision AI memproses gambar produk dan menyertakannya ke konteks', async () => {
-      mockAgentShared.analyzeImage.mockResolvedValue('Baju Kaos Hitam Ukuran XL');
+      mockAgentShared.analyzeImage.mockResolvedValue(
+        'Baju Kaos Hitam Ukuran XL',
+      );
       mockAgentShared.getRecentContext.mockResolvedValue([]);
       mockPrisma.whatsappInstance.findUnique.mockResolvedValue({
         instanceName: 'wa-store',
@@ -93,7 +95,9 @@ describe('Skenario Rantai Pengguna (Customer to Owner Journey)', () => {
         mediaUrls: ['https://example.com/baju.jpg'],
       });
 
-      expect(mockAgentShared.analyzeImage).toHaveBeenCalledWith('https://example.com/baju.jpg');
+      expect(mockAgentShared.analyzeImage).toHaveBeenCalledWith(
+        'https://example.com/baju.jpg',
+      );
       expect(res.text).toContain('85.000');
     });
   });
@@ -101,7 +105,10 @@ describe('Skenario Rantai Pengguna (Customer to Owner Journey)', () => {
   describe('Fase 2: Pemesanan & Pencatatan Transaksi (Order Execution)', () => {
     it('2A. Customer Fix Order: Bot menghasilkan objek order untuk diproses backend', async () => {
       mockAgentShared.getRecentContext.mockResolvedValue([
-        { senderType: 'user', content: 'Mau pesan 2 porsi Kopi Gayo ke Jl Merdeka no 5' },
+        {
+          senderType: 'user',
+          content: 'Mau pesan 2 porsi Kopi Gayo ke Jl Merdeka no 5',
+        },
       ]);
       mockPrisma.whatsappInstance.findUnique.mockResolvedValue({
         instanceName: 'wa-store',
@@ -184,7 +191,10 @@ describe('Skenario Rantai Pengguna (Customer to Owner Journey)', () => {
         instanceName: 'wa-property',
         tenantId: 'tenant-test',
       });
-      mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-test', name: 'Zafi Properti' });
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        id: 'tenant-test',
+        name: 'Zafi Properti',
+      });
       mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue('');
       mockAgentShared.getAvailabilityContext.mockResolvedValue(null);
       mockPrisma.product.findMany.mockResolvedValue([]);

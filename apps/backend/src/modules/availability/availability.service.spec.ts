@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AvailabilityService } from './availability.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
 
 describe('AvailabilityService', () => {
   let service: AvailabilityService;
@@ -13,6 +13,7 @@ describe('AvailabilityService', () => {
     resourceGroup: {
       findMany: jest.fn(),
       findFirst: jest.fn(),
+      count: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
@@ -81,6 +82,36 @@ describe('AvailabilityService', () => {
       expect(result.id).toBe('g2');
       expect(result.category).toBe('bus');
     });
+
+    it('harus menolak pembuatan proyek jika paket Lite telah mencapai batas maksimal 1 proyek', async () => {
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        id: 't-lite',
+        metadata: { plan: 'lite' }, // max 1 proyek
+      });
+      mockPrisma.resourceGroup.count.mockResolvedValue(1); // sudah ada 1 proyek
+
+      await expect(
+        service.createGroup('t-lite', { name: 'Proyek Kedua' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('harus mengizinkan pembuatan proyek jika kuota paket belum penuh', async () => {
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        id: 't-silver',
+        metadata: { plan: 'silver' }, // max 3 proyek
+      });
+      mockPrisma.resourceGroup.count.mockResolvedValue(1); // baru ada 1 proyek
+      mockPrisma.resourceGroup.create.mockResolvedValue({
+        id: 'g-silver-2',
+        name: 'Proyek Cluster 2',
+        items: [],
+      });
+
+      const res = await service.createGroup('t-silver', {
+        name: 'Proyek Cluster 2',
+      });
+      expect(res.id).toBe('g-silver-2');
+    });
   });
 
   describe('updateGroup', () => {
@@ -93,7 +124,10 @@ describe('AvailabilityService', () => {
     });
 
     it('harus berhasil memperbarui grup jika valid', async () => {
-      mockPrisma.resourceGroup.findFirst.mockResolvedValue({ id: 'g1', tenantId: 'tenant-1' });
+      mockPrisma.resourceGroup.findFirst.mockResolvedValue({
+        id: 'g1',
+        tenantId: 'tenant-1',
+      });
       mockPrisma.resourceGroup.update.mockResolvedValue({
         id: 'g1',
         name: 'Cluster Mawar Updated',
@@ -111,7 +145,10 @@ describe('AvailabilityService', () => {
 
   describe('addItem', () => {
     it('harus menambahkan kursi atau unit kavling baru ke dalam grup', async () => {
-      mockPrisma.resourceGroup.findFirst.mockResolvedValue({ id: 'g1', tenantId: 'tenant-1' });
+      mockPrisma.resourceGroup.findFirst.mockResolvedValue({
+        id: 'g1',
+        tenantId: 'tenant-1',
+      });
       mockPrisma.resourceItem.create.mockResolvedValue({
         id: 'item-1',
         groupId: 'g1',
@@ -132,7 +169,10 @@ describe('AvailabilityService', () => {
 
   describe('addBatchItems', () => {
     it('harus membuat beberapa nomor kursi/unit secara berurutan', async () => {
-      mockPrisma.resourceGroup.findFirst.mockResolvedValue({ id: 'g1', tenantId: 'tenant-1' });
+      mockPrisma.resourceGroup.findFirst.mockResolvedValue({
+        id: 'g1',
+        tenantId: 'tenant-1',
+      });
       mockPrisma.resourceItem.createMany.mockResolvedValue({ count: 3 });
 
       const result = await service.addBatchItems(

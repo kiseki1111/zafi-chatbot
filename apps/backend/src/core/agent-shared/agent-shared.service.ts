@@ -210,7 +210,9 @@ export class AgentSharedService {
         return knowledges
           .map((k) => {
             const title = (k.metadata as any)?.title;
-            return title ? `[DOKUMEN PENGETAHUAN: ${title}]\n${k.content}` : k.content;
+            return title
+              ? `[DOKUMEN PENGETAHUAN: ${title}]\n${k.content}`
+              : k.content;
           })
           .join('\n\n');
       }
@@ -274,7 +276,7 @@ export class AgentSharedService {
 
       return matchedItems
         .map((k) => {
-          const title = (k.metadata as any)?.title;
+          const title = k.metadata?.title;
           return title
             ? `[DOKUMEN PENGETAHUAN: ${title}]\n${k.content}`
             : k.content;
@@ -332,20 +334,39 @@ export class AgentSharedService {
             if (config && typeof config === 'object') {
               const lines: string[] = [];
               if (config.landPrice || config.landArea) {
-                const areaStr = config.landArea ? ` (Luas ${config.landArea})` : '';
-                const priceStr = config.landPrice ? `: Rp ${Number(config.landPrice).toLocaleString('id-ID')}` : '';
+                const areaStr = config.landArea
+                  ? ` (Luas ${config.landArea})`
+                  : '';
+                const priceStr = config.landPrice
+                  ? `: Rp ${Number(config.landPrice).toLocaleString('id-ID')}`
+                  : '';
                 lines.push(`* Harga Tanah Saja${areaStr}${priceStr}`);
               }
               if (config.buildingPrice || config.buildingType) {
-                const typeStr = config.buildingType ? ` (Tipe ${config.buildingType})` : '';
-                const priceStr = config.buildingPrice ? `: Rp ${Number(config.buildingPrice).toLocaleString('id-ID')}` : '';
-                lines.push(`* Harga Bangunan Saja (Biaya Bangun)${typeStr}${priceStr}`);
+                const typeStr = config.buildingType
+                  ? ` (Tipe ${config.buildingType})`
+                  : '';
+                const priceStr = config.buildingPrice
+                  ? `: Rp ${Number(config.buildingPrice).toLocaleString('id-ID')}`
+                  : '';
+                lines.push(
+                  `* Harga Bangunan Saja (Biaya Bangun)${typeStr}${priceStr}`,
+                );
               }
-              const pkgPrice = config.packagePrice || ((Number(config.landPrice) || 0) + (Number(config.buildingPrice) || 0));
+              const pkgPrice =
+                config.packagePrice ||
+                (Number(config.landPrice) || 0) +
+                  (Number(config.buildingPrice) || 0);
               if (pkgPrice || config.packageType) {
-                const typeStr = config.packageType ? ` (Tipe ${config.packageType})` : '';
-                const priceStr = pkgPrice ? `: Rp ${Number(pkgPrice).toLocaleString('id-ID')}` : '';
-                lines.push(`* Paket Lengkap (Tanah + Bangunan)${typeStr}${priceStr}`);
+                const typeStr = config.packageType
+                  ? ` (Tipe ${config.packageType})`
+                  : '';
+                const priceStr = pkgPrice
+                  ? `: Rp ${Number(pkgPrice).toLocaleString('id-ID')}`
+                  : '';
+                lines.push(
+                  `* Paket Lengkap (Tanah + Bangunan)${typeStr}${priceStr}`,
+                );
               }
               if (lines.length > 0) {
                 templatesStr =
@@ -386,10 +407,15 @@ export class AgentSharedService {
         let isIllustrationActive = true;
         let templates = g.pricingTemplates as any;
         if (typeof templates === 'string') {
-          try { templates = JSON.parse(templates); } catch {}
+          try {
+            templates = JSON.parse(templates);
+          } catch {}
         }
         if (templates && typeof templates === 'object') {
-          if (templates.isIllustrationActive === false || templates.isSiteplanActive === false) {
+          if (
+            templates.isIllustrationActive === false ||
+            templates.isSiteplanActive === false
+          ) {
             isIllustrationActive = false;
           }
         }
@@ -698,16 +724,15 @@ export class AgentSharedService {
 
     for (const model of candidateModels) {
       try {
-        this.logger.log(`[Vision AI] Mencoba analisis gambar dengan model: ${model}...`);
+        this.logger.log(
+          `[Vision AI] Mencoba analisis gambar dengan model: ${model}...`,
+        );
         const response = await this.openai.chat.completions.create({
           model: model,
           messages: [
             {
               role: 'user',
-              content: [
-                { type: 'text', text: prompt },
-                imageContent,
-              ] as any,
+              content: [{ type: 'text', text: prompt }, imageContent] as any,
             },
           ],
           max_tokens: 500,
@@ -716,10 +741,14 @@ export class AgentSharedService {
         const msg: any = response.choices[0]?.message;
         const description = (msg?.content || msg?.reasoning || '').trim();
         if (description) {
-          this.logger.log(`[Vision AI] Sukses menganalisis gambar (${model}): "${description.substring(0, 80)}..."`);
+          this.logger.log(
+            `[Vision AI] Sukses menganalisis gambar (${model}): "${description.substring(0, 80)}..."`,
+          );
           return description;
         }
-        this.logger.warn(`[Vision AI] Model ${model} mengembalikan respon kosong, mencoba fallback...`);
+        this.logger.warn(
+          `[Vision AI] Model ${model} mengembalikan respon kosong, mencoba fallback...`,
+        );
       } catch (e: any) {
         const errorDetail = e.response?.data || e.message || e;
         this.logger.warn(
@@ -728,7 +757,9 @@ export class AgentSharedService {
       }
     }
 
-    this.logger.error('[Vision AI] Seluruh model vision (termasuk fallback) gagal.');
+    this.logger.error(
+      '[Vision AI] Seluruh model vision (termasuk fallback) gagal.',
+    );
     return '';
   }
 
@@ -748,8 +779,7 @@ export class AgentSharedService {
       // Perbaiki URL WAHA internal (localhost:3000/api/files/...) -> baseUrl WAHA
       // sekaligus tambahkan header X-Api-Key (WAHA minta autentikasi)
       if (isWahaInternal) {
-        const baseUrl =
-          process.env.WAHA_API_URL || 'http://127.0.0.1:3000';
+        const baseUrl = process.env.WAHA_API_URL || 'http://127.0.0.1:3000';
         const pathPart = mediaUrl.substring(mediaUrl.indexOf('/api/files/'));
         targetUrl = `${baseUrl.replace(/\/+$/, '')}${pathPart}`;
       }
@@ -787,7 +817,8 @@ export class AgentSharedService {
         const localPath = path.join(process.cwd(), audioUrl);
         if (fs.existsSync(localPath)) {
           const buffer = fs.readFileSync(localPath);
-          const ext = path.extname(localPath).replace('.', '').toLowerCase() || 'ogg';
+          const ext =
+            path.extname(localPath).replace('.', '').toLowerCase() || 'ogg';
           return { buffer, format: ext === 'opus' ? 'ogg' : ext };
         }
       }
@@ -826,15 +857,21 @@ export class AgentSharedService {
         timeout: 30000,
       });
 
-      const contentType = String(res.headers['content-type'] || 'audio/ogg').toLowerCase();
+      const contentType = String(
+        res.headers['content-type'] || 'audio/ogg',
+      ).toLowerCase();
       let format = 'ogg';
-      if (contentType.includes('mp3') || contentType.includes('mpeg')) format = 'mp3';
+      if (contentType.includes('mp3') || contentType.includes('mpeg'))
+        format = 'mp3';
       else if (contentType.includes('wav')) format = 'wav';
-      else if (contentType.includes('m4a') || contentType.includes('mp4')) format = 'm4a';
+      else if (contentType.includes('m4a') || contentType.includes('mp4'))
+        format = 'm4a';
 
       return { buffer: Buffer.from(res.data), format };
     } catch (e: any) {
-      this.logger.warn(`[STT Audio] Gagal mengambil audio dari ${audioUrl}: ${e.message}`);
+      this.logger.warn(
+        `[STT Audio] Gagal mengambil audio dari ${audioUrl}: ${e.message}`,
+      );
       return null;
     }
   }
@@ -865,7 +902,9 @@ export class AgentSharedService {
 
     for (const model of candidateModels) {
       try {
-        this.logger.log(`[STT Audio] Mentranskripsi voice note via OpenRouter (${model})...`);
+        this.logger.log(
+          `[STT Audio] Mentranskripsi voice note via OpenRouter (${model})...`,
+        );
         const response = await this.openai.chat.completions.create({
           model: model,
           messages: [
@@ -889,7 +928,9 @@ export class AgentSharedService {
         const msg: any = response.choices[0]?.message;
         const transcript = (msg?.content || msg?.reasoning || '').trim();
         if (transcript) {
-          this.logger.log(`[STT Audio] Sukses transkripsi (${model}): "${transcript.substring(0, 80)}..."`);
+          this.logger.log(
+            `[STT Audio] Sukses transkripsi (${model}): "${transcript.substring(0, 80)}..."`,
+          );
           return transcript;
         }
       } catch (e: any) {

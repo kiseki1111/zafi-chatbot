@@ -4,6 +4,7 @@ import { PrismaService } from '../../../core/prisma/prisma.service';
 import { WahaService } from '../waha.service';
 import { AgentSharedService } from '../../../core/agent-shared/agent-shared.service';
 import { ChatStreamService } from '../../chats/chat-stream.service';
+import { isFeatureAllowed } from '../../../features/web-dashboard/tenant/tenant.service';
 
 @Injectable()
 export class FollowUpService {
@@ -51,6 +52,22 @@ export class FollowUpService {
       throw new BadRequestException('Tenant not found');
     }
 
+    // ponytail: validasi kustom jam kirim follow-up (eksklusif Silver ke atas)
+    if (data.scheduleTime && data.scheduleTime !== '10:00') {
+      const tenant = await Promise.resolve(
+        this.prisma.tenant?.findUnique?.({ where: { id: targetTenantId } }),
+      ).catch(() => null);
+      if (
+        tenant &&
+        (tenant.metadata as any)?.plan &&
+        !isFeatureAllowed(tenant.metadata, 'customFollowUp')
+      ) {
+        throw new BadRequestException(
+          'Fitur kustom jam kirim follow-up eksklusif untuk paket Silver ke atas.',
+        );
+      }
+    }
+
     return this.prisma.followUpConfig.upsert({
       where: { tenantId: targetTenantId },
       update: data,
@@ -73,7 +90,8 @@ export class FollowUpService {
     }
 
     // Jika inactivityHours === 0, ambang batas inaktivitas adalah 1 menit (mode testing cepat)
-    const minutes = config.inactivityHours === 0 ? 1 : config.inactivityHours * 60;
+    const minutes =
+      config.inactivityHours === 0 ? 1 : config.inactivityHours * 60;
     const inactivityMs = minutes * 60 * 1000;
     const cutoffTime = new Date(Date.now() - inactivityMs);
 
@@ -115,12 +133,17 @@ export class FollowUpService {
 
     const followedUpMap = new Map<string, Date | null>();
     for (const f of followedUp) {
-      followedUpMap.set(`${f.contactId}:${f.instanceName}`, f.followedUpAt || null);
+      followedUpMap.set(
+        `${f.contactId}:${f.instanceName}`,
+        f.followedUpAt || null,
+      );
     }
 
     return conversations
       .filter((c) => {
-        const lastFollowUpDate = followedUpMap.get(`${c.contactId}:${c.instanceName}`);
+        const lastFollowUpDate = followedUpMap.get(
+          `${c.contactId}:${c.instanceName}`,
+        );
         if (lastFollowUpDate === undefined) return true;
         if (lastFollowUpDate === null) return false;
         // ponytail: re-eligible if customer interacted after previous follow-up
@@ -198,7 +221,9 @@ Bahasa: Indonesia. Maksimal 2 emoji. Tanpa markdown.`;
       let contact: any = null;
       if (contactId) {
         try {
-          contact = await this.prisma.contact.findUnique({ where: { id: contactId } });
+          contact = await this.prisma.contact.findUnique({
+            where: { id: contactId },
+          });
         } catch {}
       }
       if (!contact) {
@@ -352,7 +377,9 @@ Bahasa: Indonesia. Maksimal 2 emoji. Tanpa markdown.`;
 
   async processFollowUps(instanceName?: string, tenantId?: string) {
     if (this.isProcessing && process.env.NODE_ENV !== 'test') {
-      this.logger.warn('Follow-up batch is already in progress, skipping duplicate concurrent run.');
+      this.logger.warn(
+        'Follow-up batch is already in progress, skipping duplicate concurrent run.',
+      );
       return { processed: 0, sent: 0, errors: 0, busy: true };
     }
     this.isProcessing = true;
@@ -390,33 +417,33 @@ Bahasa: Indonesia. Maksimal 2 emoji. Tanpa markdown.`;
         );
 
         if (message) {
-        this.logger.log(
-          `Generated follow-up for ${contact.contactPhone}: "${message.substring(0, 50)}..."`,
-        );
-        const result = await this.sendFollowUp(
-          contact.contactPhone,
-          contact.instanceName,
-          message,
-          contact.contactId,
-        );
-        if (result.success) {
-          sent++;
+          this.logger.log(
+            `Generated follow-up for ${contact.contactPhone}: "${message.substring(0, 50)}..."`,
+          );
+          const result = await this.sendFollowUp(
+            contact.contactPhone,
+            contact.instanceName,
+            message,
+            contact.contactId,
+          );
+          if (result.success) {
+            sent++;
+          } else {
+            errors++;
+          }
         } else {
+          this.logger.warn(`No message generated for ${contact.contactPhone}`);
           errors++;
         }
-      } else {
-        this.logger.warn(`No message generated for ${contact.contactPhone}`);
-        errors++;
-      }
 
-      // Jeda 2 menit antar nomor untuk keamanan anti-spam WhatsApp (kecuali kontak terakhir)
-      if (i < inactiveContacts.length - 1) {
-        this.logger.log(
-          `[Follow-Up Anti-Spam] Menunggu jeda 2 menit sebelum berpindah ke nomor berikutnya...`,
-        );
-        await this.sleep(120000);
+        // Jeda 2 menit antar nomor untuk keamanan anti-spam WhatsApp (kecuali kontak terakhir)
+        if (i < inactiveContacts.length - 1) {
+          this.logger.log(
+            `[Follow-Up Anti-Spam] Menunggu jeda 2 menit sebelum berpindah ke nomor berikutnya...`,
+          );
+          await this.sleep(120000);
+        }
       }
-    }
 
       return { processed: inactiveContacts.length, sent, errors };
     } finally {
@@ -467,7 +494,10 @@ Bahasa: Indonesia. Maksimal 2 emoji. Tanpa markdown.`;
     }
 
     const totalFollowUps = await this.prisma.followUp.count({ where });
-    const inactiveContacts = await this.getInactiveContacts(undefined, tenantId);
+    const inactiveContacts = await this.getInactiveContacts(
+      undefined,
+      tenantId,
+    );
     return {
       totalFollowedUp: totalFollowUps,
       pendingCount: inactiveContacts.length,
@@ -512,11 +542,36 @@ Bahasa: Indonesia. Maksimal 2 emoji. Tanpa markdown.`;
 
   async manualTrigger(instanceName?: string, tenantId?: string) {
     this.logger.log('Manual follow-up triggered');
+    // ponytail: validasi trigger manual antrean (eksklusif Silver ke atas)
+    const targetTenantId =
+      tenantId ||
+      (
+        await Promise.resolve(this.prisma.tenant?.findFirst?.()).catch(
+          () => null,
+        )
+      )?.id;
+    if (targetTenantId) {
+      const tenant = await Promise.resolve(
+        this.prisma.tenant?.findUnique?.({ where: { id: targetTenantId } }),
+      ).catch(() => null);
+      if (
+        tenant &&
+        (tenant.metadata as any)?.plan &&
+        !isFeatureAllowed(tenant.metadata, 'manualFollowUp')
+      ) {
+        throw new BadRequestException(
+          'Fitur antrean follow-up manual & trigger sekarang eksklusif untuk paket Silver ke atas.',
+        );
+      }
+    }
     return this.processFollowUps(instanceName, tenantId);
   }
 
   // Tambah kontak baru ke antrean follow-up
-  async addToQueue(data: { phone: string; name?: string; instanceName?: string }, tenantId?: string) {
+  async addToQueue(
+    data: { phone: string; name?: string; instanceName?: string },
+    tenantId?: string,
+  ) {
     const cleanPhone = (data.phone || '').replace(/[^0-9]/g, '');
     if (!cleanPhone) {
       throw new Error('Nomor WhatsApp wajib diisi');
@@ -557,7 +612,8 @@ Bahasa: Indonesia. Maksimal 2 emoji. Tanpa markdown.`;
 
     // Set lastMessageAt ke waktu lampau agar langsung masuk daftar inaktif
     const config = await this.getConfig(tenantId);
-    const minutes = config.inactivityHours === 0 ? 1 : config.inactivityHours * 60;
+    const minutes =
+      config.inactivityHours === 0 ? 1 : config.inactivityHours * 60;
     const pastTime = new Date(Date.now() - (minutes + 1) * 60 * 1000);
 
     const conversation = await this.prisma.conversation.upsert({
@@ -621,7 +677,10 @@ Bahasa: Indonesia. Maksimal 2 emoji. Tanpa markdown.`;
         instanceName,
       },
     });
-    return { success: true, message: 'Kontak berhasil dihapus dari antrean follow-up' };
+    return {
+      success: true,
+      message: 'Kontak berhasil dihapus dari antrean follow-up',
+    };
   }
 
   // Bersihkan antrean follow-up (abort nomor lain agar tersisa hanya nomor yang ditest)
@@ -629,7 +688,10 @@ Bahasa: Indonesia. Maksimal 2 emoji. Tanpa markdown.`;
     const cleanExcept = exceptPhone ? exceptPhone.replace(/[^0-9]/g, '') : null;
     const inactive = await this.getInactiveContacts();
     for (const item of inactive) {
-      if (cleanExcept && item.contactPhone?.replace(/[^0-9]/g, '') === cleanExcept) {
+      if (
+        cleanExcept &&
+        item.contactPhone?.replace(/[^0-9]/g, '') === cleanExcept
+      ) {
         continue;
       }
       await this.prisma.followUp.upsert({
@@ -665,7 +727,7 @@ Bahasa: Indonesia. Maksimal 2 emoji. Tanpa markdown.`;
       throw new Error('Nomor telepon wajib diisi');
     }
     const name = data.name || `Pelanggan Test (+${cleanPhone})`;
-    
+
     // Hitung delay menit: default 1 menit jika diminta
     const delayMinutes =
       data.inactivityMinutes !== undefined
@@ -761,7 +823,9 @@ Bahasa: Indonesia. Maksimal 2 emoji. Tanpa markdown.`;
     // 9. Jika autoTriggerInSeconds disetel, jalankan timeout
     if (data.autoTriggerInSeconds && data.autoTriggerInSeconds > 0) {
       setTimeout(() => {
-        this.logger.log(`[AUTO-TRIGGER] Menjalankan follow-up otomatis untuk ${cleanPhone} setelah ${data.autoTriggerInSeconds} detik`);
+        this.logger.log(
+          `[AUTO-TRIGGER] Menjalankan follow-up otomatis untuk ${cleanPhone} setelah ${data.autoTriggerInSeconds} detik`,
+        );
         this.processFollowUps(instanceName);
       }, data.autoTriggerInSeconds * 1000);
     }

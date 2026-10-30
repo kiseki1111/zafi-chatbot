@@ -17,7 +17,9 @@ describe('WahaController - Unit Tests (Feature 6 Call Reject & Webhooks)', () =>
     sendSeen: jest.fn().mockResolvedValue(undefined),
     sendTypingPresence: jest.fn().mockResolvedValue(undefined),
     rejectCall: jest.fn().mockResolvedValue({ status: 'rejected' }),
-    downloadAndStoreMedia: jest.fn().mockResolvedValue('/uploads/incoming/voice.ogg'),
+    downloadAndStoreMedia: jest
+      .fn()
+      .mockResolvedValue('/uploads/incoming/voice.ogg'),
   };
 
   const mockPrismaService = {
@@ -28,7 +30,9 @@ describe('WahaController - Unit Tests (Feature 6 Call Reject & Webhooks)', () =>
       upsert: jest.fn().mockResolvedValue({}),
     },
     contact: {
-      findFirst: jest.fn().mockResolvedValue({ id: 'contact-01', phone: '628999888777' }),
+      findFirst: jest
+        .fn()
+        .mockResolvedValue({ id: 'contact-01', phone: '628999888777' }),
       create: jest.fn().mockResolvedValue({ id: 'contact-01' }),
       update: jest.fn().mockResolvedValue({ id: 'contact-01' }),
     },
@@ -102,7 +106,9 @@ describe('WahaController - Unit Tests (Feature 6 Call Reject & Webhooks)', () =>
             conversationId: 'conv-123',
             senderType: 'system',
             messageType: 'CALL',
-            content: expect.stringContaining('Panggilan WhatsApp masuk (Otomatis ditolak)'),
+            content: expect.stringContaining(
+              'Panggilan WhatsApp masuk (Otomatis ditolak)',
+            ),
           }),
         }),
       );

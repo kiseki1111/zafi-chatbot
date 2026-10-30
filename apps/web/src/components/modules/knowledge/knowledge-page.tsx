@@ -8,7 +8,7 @@ import {
   Loader2, Plus, Trash2, Pencil, FileText, AlignLeft,
   BookOpen, Upload, X, Check, Brain, AlertTriangle, ImageIcon,
   Video, Paperclip, ExternalLink, Copy, Eye, Download, Search, Sparkles,
-  Building2, CheckCircle2, Split, Info, Layers
+  Building2, CheckCircle2, Split, Info, Layers, Lock
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,27 @@ type ModalMode = "create-text" | "create-file" | "create-media" | "edit" | null;
 export function KnowledgePage() {
   const { user } = useAuthStore();
   const tenantId = user?.tenantId;
+  const [tenantPlan, setTenantPlan] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchId = tenantId || user?.tenantId || (user?.id && !user.id.startsWith("u-") ? user.id : "demo");
+    if (!fetchId) return;
+    fetch(`/api/v1/tenant/clients/${fetchId}/quota`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        const d = res?.data || res;
+        if (d?.plan !== undefined) setTenantPlan(d.plan);
+      })
+      .catch(() => {});
+  }, [tenantId, user?.tenantId, user?.id]);
+
+  const canUseOcr =
+    tenantPlan === "silver" ||
+    tenantPlan === "gold" ||
+    tenantPlan === "enterprise" ||
+    tenantPlan === "developer" ||
+    user?.role === "superadmin";
+
   const {
     runKnowledgeFileUpload,
     runKnowledgeTextCreate,
@@ -662,12 +683,26 @@ export function KnowledgePage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => openCreate("create-file")}
-              className="h-7.5 text-xs gap-1 px-2 border-border shrink-0"
+              onClick={() => {
+                if (!canUseOcr) {
+                  toast.info(
+                    "Fitur Ekstrak Dokumen AI (OCR brosur/pricelist) eksklusif untuk paket Silver ke atas. Silakan masukkan materi teks secara langsung atau upgrade paket.",
+                  );
+                  return;
+                }
+                openCreate("create-file");
+              }}
+              className={cn(
+                "h-7.5 text-xs gap-1 px-2 border-border shrink-0",
+                !canUseOcr && "opacity-80 bg-muted/30 border-amber-300/60"
+              )}
               title="Unggah Dokumen PDF, Word, Excel, atau Foto/Gambar untuk diekstrak teksnya via AI OCR ke RAG"
             >
-              <Upload className="h-3 w-3" />
+              {!canUseOcr ? <Lock className="h-3 w-3 text-amber-500" /> : <Upload className="h-3 w-3" />}
               <span>Ekstrak Dokumen AI</span>
+              {!canUseOcr && (
+                <span className="text-[9px] px-1 py-0 rounded bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 font-bold border border-amber-300">Silver+</span>
+              )}
             </Button>
             <Button
               size="sm"

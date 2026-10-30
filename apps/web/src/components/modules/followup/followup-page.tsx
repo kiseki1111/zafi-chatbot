@@ -17,8 +17,9 @@ import {
 } from "@/components/ui/table";
 import {
   BellRing, Clock, Users, Send, Loader2, RefreshCw, History,
-  Settings, Zap, User, Sun, Sunset, Sunrise, Moon, Sparkles, Check, Trash2, Plus, Save, AlertTriangle,
+  Settings, Zap, User, Sun, Sunset, Sunrise, Moon, Sparkles, Check, Trash2, Plus, Save, AlertTriangle, Lock,
 } from "lucide-react";
+import { useAuthStore } from "@/lib/auth-store";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -57,6 +58,27 @@ interface HistoryEntry {
 }
 
 export function FollowupPage() {
+  const { user } = useAuthStore();
+  const [tenantPlan, setTenantPlan] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchId = user?.tenantId || (user?.id && !user.id.startsWith("u-") ? user.id : "demo");
+    fetch(`/api/v1/tenant/clients/${fetchId}/quota`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        const d = res?.data || res;
+        if (d?.plan !== undefined) setTenantPlan(d.plan);
+      })
+      .catch(() => {});
+  }, [user?.tenantId, user?.id]);
+
+  const canCustomFollowUp =
+    tenantPlan === "silver" ||
+    tenantPlan === "gold" ||
+    tenantPlan === "enterprise" ||
+    tenantPlan === "developer" ||
+    user?.role === "superadmin";
+
   const [config, setConfig] = useState<FollowUpConfig>({
     isEnabled: false,
     scheduleTime: "09:00",
@@ -310,17 +332,34 @@ export function FollowupPage() {
           </Button>
           <Button
             size="sm"
-            onClick={() => setIsConfirmTriggerOpen(true)}
+            onClick={() => {
+              if (!canCustomFollowUp) {
+                toast.info("Fitur antrean follow-up manual & trigger sekarang eksklusif untuk paket Silver ke atas.");
+                return;
+              }
+              setIsConfirmTriggerOpen(true);
+            }}
             disabled={triggering || !config.isEnabled}
-            className="h-8 text-xs gap-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs font-semibold"
+            className={cn(
+              "h-8 text-xs gap-1.5 px-3 shadow-xs font-semibold",
+              canCustomFollowUp
+                ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                : "border border-amber-300 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 hover:bg-amber-100"
+            )}
+            title={!canCustomFollowUp ? "Eksklusif paket Silver ke atas" : undefined}
           >
             {triggering ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : !canCustomFollowUp ? (
+              <Lock className="h-3.5 w-3.5 text-amber-600" />
             ) : (
               <Zap className="h-3.5 w-3.5" />
             )}
             <span className="hidden sm:inline">Trigger Sekarang</span>
             <span className="sm:hidden">Trigger</span>
+            {!canCustomFollowUp && (
+              <Badge className="ml-0.5 bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-300 text-[9px] px-1 py-0">Silver+</Badge>
+            )}
           </Button>
         </div>
       </div>
@@ -387,10 +426,17 @@ export function FollowupPage() {
 
             {/* Jam Pengiriman */}
             <div className="space-y-2">
-              <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                <Clock className="h-3.5 w-3.5 text-emerald-600" />
-                Waktu Kirim ({config.scheduleTime || "09:00"} WIB)
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 text-emerald-600" />
+                  Waktu Kirim ({canCustomFollowUp ? (config.scheduleTime || "10:00") : "10:00"} WIB)
+                </Label>
+                {!canCustomFollowUp && (
+                  <Badge variant="outline" className="text-[10px] text-amber-700 bg-amber-50 border-amber-300 dark:bg-amber-950 dark:text-amber-300 gap-1">
+                    <Lock className="h-3 w-3" /> Dasar: 10:00 WIB (Kustom: Silver+)
+                  </Badge>
+                )}
+              </div>
               <div className="grid grid-cols-4 gap-1.5">
                 {[
                   { label: "Pagi", time: "09:00", icon: Sunrise },
@@ -404,16 +450,24 @@ export function FollowupPage() {
                     <button
                       key={preset.time}
                       type="button"
-                      onClick={() => setConfig({ ...config, scheduleTime: preset.time })}
+                      onClick={() => {
+                        if (!canCustomFollowUp) {
+                          toast.info("Pilihan jam kirim follow-up kustom eksklusif untuk paket Silver ke atas (Default 10:00 WIB).");
+                          return;
+                        }
+                        setConfig({ ...config, scheduleTime: preset.time });
+                      }}
                       className={`flex flex-col items-center justify-center p-2 rounded-xl border text-center transition-all min-h-[44px] ${
-                        isSelected
-                          ? "bg-emerald-600 text-white border-emerald-600 shadow-xs font-bold"
-                          : "bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground border-border/50"
+                        !canCustomFollowUp
+                          ? "opacity-60 cursor-not-allowed bg-muted/40 border-border text-muted-foreground"
+                          : isSelected
+                            ? "bg-emerald-600 text-white border-emerald-600 shadow-xs font-bold"
+                            : "bg-background text-foreground hover:bg-muted border-border font-medium"
                       }`}
                     >
-                      <Icon className="h-3.5 w-3.5 mb-0.5 shrink-0" />
-                      <span className="text-xs leading-tight">{preset.label}</span>
-                      <span className={`text-[10px] ${isSelected ? "text-emerald-100" : "text-muted-foreground"}`}>{preset.time}</span>
+                      <Icon className="h-4 w-4 mb-1" />
+                      <span className="text-[11px] font-semibold">{preset.label}</span>
+                      <span className="text-[9px] opacity-75">{preset.time}</span>
                     </button>
                   );
                 })}
@@ -627,6 +681,7 @@ export function FollowupPage() {
                           year: "numeric",
                           hour: "2-digit",
                           minute: "2-digit",
+                          hour12: false,
                         })}
                       </TableCell>
                     </TableRow>

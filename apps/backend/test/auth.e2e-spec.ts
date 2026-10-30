@@ -62,8 +62,12 @@ describe('Auth Flow (e2e)', () => {
       context.mockPrisma.user.findUnique.mockResolvedValue(dummyUser);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       context.mockPrisma.user.update.mockResolvedValue(dummyUser);
-      context.mockPrisma.refreshToken.create.mockResolvedValue({ id: 'rt-1' } as any);
-      context.mockPrisma.auditLog.create.mockResolvedValue({ id: 'log-1' } as any);
+      context.mockPrisma.refreshToken.create.mockResolvedValue({
+        id: 'rt-1',
+      } as any);
+      context.mockPrisma.auditLog.create.mockResolvedValue({
+        id: 'log-1',
+      } as any);
 
       const response = await request(app.getHttpServer())
         .post('/api/v1/auth/login')
@@ -88,7 +92,9 @@ describe('Auth Flow (e2e)', () => {
         });
 
       expect(response.status).toBe(403);
-      expect(response.body.message).toContain('Pendaftaran publik dinonaktifkan');
+      expect(response.body.message).toContain(
+        'Pendaftaran publik dinonaktifkan',
+      );
     });
   });
 
@@ -109,7 +115,9 @@ describe('Auth Flow (e2e)', () => {
 
   describe('POST /api/v1/auth/logout', () => {
     it('harus menolak logout tanpa token otentikasi (401)', async () => {
-      const response = await request(app.getHttpServer()).post('/api/v1/auth/logout');
+      const response = await request(app.getHttpServer()).post(
+        '/api/v1/auth/logout',
+      );
       expect(response.status).toBe(401);
     });
   });

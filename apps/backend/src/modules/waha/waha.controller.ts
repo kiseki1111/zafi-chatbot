@@ -28,6 +28,7 @@ import { IncomingMessage } from '../../core/omnichannel/interfaces/incoming-mess
 import { ChatStreamService } from '../chats/chat-stream.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
+import { resolveTenantCapacity } from '../../features/web-dashboard/tenant/tenant.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('api/v1/waha')
@@ -55,7 +56,9 @@ export class WahaController implements OnApplicationBootstrap {
         ),
       );
       this.cleanDuplicateContacts().catch((e) =>
-        this.logger.warn(`[Self-Healing] Gagal membersihkan kontak duplikat: ${e.message}`),
+        this.logger.warn(
+          `[Self-Healing] Gagal membersihkan kontak duplikat: ${e.message}`,
+        ),
       );
     }, 3000);
   }
@@ -83,19 +86,38 @@ export class WahaController implements OnApplicationBootstrap {
 
         // Urutkan: kontak dengan pesan terbanyak / data CRM terkaya diprioritaskan
         const sorted = contacts.sort((a, b) => {
-          const aMsgs = a.conversations.reduce((sum, c) => sum + c.messages.length, 0);
-          const bMsgs = b.conversations.reduce((sum, c) => sum + c.messages.length, 0);
-          const aScore = (aMsgs > 0 ? 10 : 0) + (a.notes ? 5 : 0) + (a.status !== 'NEW' ? 3 : 0);
-          const bScore = (bMsgs > 0 ? 10 : 0) + (b.notes ? 5 : 0) + (b.status !== 'NEW' ? 3 : 0);
+          const aMsgs = a.conversations.reduce(
+            (sum, c) => sum + c.messages.length,
+            0,
+          );
+          const bMsgs = b.conversations.reduce(
+            (sum, c) => sum + c.messages.length,
+            0,
+          );
+          const aScore =
+            (aMsgs > 0 ? 10 : 0) +
+            (a.notes ? 5 : 0) +
+            (a.status !== 'NEW' ? 3 : 0);
+          const bScore =
+            (bMsgs > 0 ? 10 : 0) +
+            (b.notes ? 5 : 0) +
+            (b.status !== 'NEW' ? 3 : 0);
           return bScore - aScore;
         });
 
         const toRemove = sorted.slice(1);
         for (const extra of toRemove) {
-          const extraMsgs = extra.conversations.reduce((sum, c) => sum + c.messages.length, 0);
+          const extraMsgs = extra.conversations.reduce(
+            (sum, c) => sum + c.messages.length,
+            0,
+          );
           if (extraMsgs === 0) {
-            await this.prisma.contact.delete({ where: { id: extra.id } }).catch(() => null);
-            this.logger.log(`[Self-Healing] Hapus kontak duplikat kosong: ${dup.phone} (ID: ${extra.id})`);
+            await this.prisma.contact
+              .delete({ where: { id: extra.id } })
+              .catch(() => null);
+            this.logger.log(
+              `[Self-Healing] Hapus kontak duplikat kosong: ${dup.phone} (ID: ${extra.id})`,
+            );
           }
         }
       }
@@ -201,10 +223,42 @@ export class WahaController implements OnApplicationBootstrap {
         where: { instanceName: cleanName },
       });
 
-      if (existing && existing.tenantId && existing.tenantId !== effectiveTenantId) {
+      if (
+        existing &&
+        existing.tenantId &&
+        existing.tenantId !== effectiveTenantId
+      ) {
         throw new BadRequestException(
           `Nama sesi "${cleanName}" sudah digunakan oleh akun lain. Silakan pilih nama lain.`,
         );
+      }
+
+      // ponytail: validasi batas kuota nomor WhatsApp per tier
+      if (effectiveTenantId) {
+        const tenant = this.prisma.tenant?.findUnique
+          ? await Promise.resolve(
+              this.prisma.tenant.findUnique({
+                where: { id: effectiveTenantId },
+              }),
+            ).catch(() => null)
+          : null;
+        if (tenant) {
+          const capacity = resolveTenantCapacity(tenant.metadata);
+          if (!capacity.isDeveloper && capacity.planKey !== null) {
+            const instanceCount = this.prisma.whatsappInstance?.count
+              ? ((await Promise.resolve(
+                  this.prisma.whatsappInstance.count({
+                    where: { tenantId: effectiveTenantId },
+                  }),
+                ).catch(() => 0)) ?? 0)
+              : 0;
+            if (instanceCount >= capacity.maxWhatsapp) {
+              throw new BadRequestException(
+                `Batas kuota nomor WhatsApp (${capacity.maxWhatsapp} nomor) untuk paket ${capacity.planName} telah tercapai. Silakan tingkatkan paket Anda.`,
+              );
+            }
+          }
+        }
       }
 
       const rawWebhooks: string[] = [];
@@ -281,9 +335,7 @@ export class WahaController implements OnApplicationBootstrap {
         where: { instanceName: id },
       });
       if (instance && instance.tenantId && instance.tenantId !== tenantId) {
-        throw new ForbiddenException(
-          'Akses ditolak: sesi ini milik akun lain',
-        );
+        throw new ForbiddenException('Akses ditolak: sesi ini milik akun lain');
       }
     }
 
@@ -354,7 +406,8 @@ export class WahaController implements OnApplicationBootstrap {
     } catch (error) {
       this.logger.warn(`QR code for ${id} not available: ${error.message}`);
       return res.status(error.response?.status || 404).send({
-        error: error.message || 'QR Code belum tersedia atau server WAHA offline.',
+        error:
+          error.message || 'QR Code belum tersedia atau server WAHA offline.',
       });
     }
   }
@@ -389,17 +442,23 @@ export class WahaController implements OnApplicationBootstrap {
   async proxyWahaFile(@Req() req: any, @Res() res: any) {
     try {
       const idx = req.url.indexOf('/files/');
-      const pathPart = idx !== -1 ? req.url.substring(idx + '/files/'.length) : '';
+      const pathPart =
+        idx !== -1 ? req.url.substring(idx + '/files/'.length) : '';
       const file = await this.wahaService.getMediaStreamOrBuffer(pathPart);
       if (!file || !file.data) {
         return res.status(404).send({ error: 'File not found' });
       }
-      res.setHeader('Content-Type', file.mimetype || 'application/octet-stream');
+      res.setHeader(
+        'Content-Type',
+        file.mimetype || 'application/octet-stream',
+      );
       res.setHeader('Accept-Ranges', 'bytes');
       res.setHeader('Content-Disposition', 'inline');
       return res.send(file.data);
     } catch (e: any) {
-      return res.status(e.response?.status || 404).send({ error: 'File not found' });
+      return res
+        .status(e.response?.status || 404)
+        .send({ error: 'File not found' });
     }
   }
 
@@ -502,7 +561,10 @@ export class WahaController implements OnApplicationBootstrap {
       this.configService?.get<string>('WAHA_WEBHOOK_SECRET');
     const querySecret = req?.query?.secret;
 
-    if (configuredSecret && (process.env.NODE_ENV !== 'test' || req !== undefined)) {
+    if (
+      configuredSecret &&
+      (process.env.NODE_ENV !== 'test' || req !== undefined)
+    ) {
       if (
         headerSecret !== configuredSecret &&
         querySecret !== configuredSecret
@@ -598,7 +660,8 @@ export class WahaController implements OnApplicationBootstrap {
     // Handle call.received: Tolak otomatis dan catat pesan notifikasi
     if (payload?.event === 'call.received' || payload?.event === 'call') {
       const callData = payload.payload;
-      const caller = callData?.from || callData?.caller || callData?.participant;
+      const caller =
+        callData?.from || callData?.caller || callData?.participant;
       const callId = callData?.id;
       const sessionName = payload.session;
 
@@ -609,7 +672,9 @@ export class WahaController implements OnApplicationBootstrap {
       }
 
       if (caller && sessionName) {
-        const cleanCaller = caller.replace(/@(c\.us|s\.whatsapp\.net)$/i, '').replace(/^\+/, '');
+        const cleanCaller = caller
+          .replace(/@(c\.us|s\.whatsapp\.net)$/i, '')
+          .replace(/^\+/, '');
         try {
           const inst = await this.prisma.whatsappInstance.findUnique({
             where: { instanceName: sessionName },
@@ -666,11 +731,13 @@ export class WahaController implements OnApplicationBootstrap {
           });
 
           // Kirim balasan otomatis ke penelpon
-          await this.wahaService.sendMessage(
-            sessionName,
-            caller,
-            'Halo, mohon maaf nomor ini beroperasi secara otomatis dan tidak dapat menerima panggilan suara/video. Silakan tinggalkan pesan melalui chat teks, kami akan segera merespons. Terima kasih! 🙏',
-          ).catch(() => null);
+          await this.wahaService
+            .sendMessage(
+              sessionName,
+              caller,
+              'Halo, mohon maaf nomor ini beroperasi secara otomatis dan tidak dapat menerima panggilan suara/video. Silakan tinggalkan pesan melalui chat teks, kami akan segera merespons. Terima kasih! 🙏',
+            )
+            .catch(() => null);
         } catch (e) {
           this.logger.warn(`Failed to process call.received: ${e.message}`);
         }
@@ -698,7 +765,10 @@ export class WahaController implements OnApplicationBootstrap {
       // Jika nomor berupa LID (@lid), minta WAHA resolve ke nomor telepon asli (@c.us)
       if (rawNumber && rawNumber.includes('@lid') && sessionName) {
         try {
-          const wahaContact = await this.wahaService.getContact(sessionName, rawNumber);
+          const wahaContact = await this.wahaService.getContact(
+            sessionName,
+            rawNumber,
+          );
           if (wahaContact?.id && !wahaContact.id.includes('@lid')) {
             rawNumber = wahaContact.id;
           }
@@ -720,15 +790,24 @@ export class WahaController implements OnApplicationBootstrap {
         message.type === 'ptt' ||
         message.type === 'audio' ||
         message.type === 'voice' ||
-        (message._data && (message._data.mimetype?.startsWith('audio/') || message._data.type === 'ptt' || message._data.type === 'audio'))
+        (message._data &&
+          (message._data.mimetype?.startsWith('audio/') ||
+            message._data.type === 'ptt' ||
+            message._data.type === 'audio')),
       );
       const isVideoMsg = Boolean(
         message.type === 'video' ||
-        (message._data && (message._data.mimetype?.startsWith('video/') || message._data.type === 'video'))
+        (message._data &&
+          (message._data.mimetype?.startsWith('video/') ||
+            message._data.type === 'video')),
       );
       const isImageMsg = Boolean(
         message.type === 'image' ||
-        (!isAudioMsg && !isVideoMsg && (message._data && (message._data.mimetype?.startsWith('image/') || message._data.type === 'image')))
+        (!isAudioMsg &&
+          !isVideoMsg &&
+          message._data &&
+          (message._data.mimetype?.startsWith('image/') ||
+            message._data.type === 'image')),
       );
       const isMediaMsg = Boolean(
         message.hasMedia ||
@@ -736,7 +815,7 @@ export class WahaController implements OnApplicationBootstrap {
         isVideoMsg ||
         isImageMsg ||
         message.media?.url ||
-        message.mediaUrl
+        message.mediaUrl,
       );
 
       let extractedMediaUrl =
@@ -771,10 +850,7 @@ export class WahaController implements OnApplicationBootstrap {
               OR: phoneConditions,
               ...(sessionTenantId
                 ? {
-                    OR: [
-                      { tenantId: sessionTenantId },
-                      { tenantId: null },
-                    ],
+                    OR: [{ tenantId: sessionTenantId }, { tenantId: null }],
                   }
                 : {}),
             },
@@ -797,7 +873,8 @@ export class WahaController implements OnApplicationBootstrap {
           );
 
           if (contact) {
-            const existingMeta = (contact.metadata as Record<string, any>) || {};
+            const existingMeta =
+              (contact.metadata as Record<string, any>) || {};
             const hasSelfDeclared = Boolean(existingMeta.selfDeclaredName);
             const hasRealName =
               contact.name &&
@@ -812,14 +889,20 @@ export class WahaController implements OnApplicationBootstrap {
             };
 
             // Nama dari nomor (pushname) hanya mengisi jika belum ada nama yang dinyatakan sendiri
-            const shouldApplyProfileName = !hasSelfDeclared && (!hasRealName || contact.name === defaultAnonName);
+            const shouldApplyProfileName =
+              !hasSelfDeclared &&
+              (!hasRealName || contact.name === defaultAnonName);
 
             await this.prisma.contact.update({
               where: { id: contact.id },
               data: {
                 phone: contactNumber,
-                ...(sessionTenantId && !contact.tenantId ? { tenantId: sessionTenantId } : {}),
-                ...(shouldApplyProfileName && isValidPushName ? { name: contactName } : {}),
+                ...(sessionTenantId && !contact.tenantId
+                  ? { tenantId: sessionTenantId }
+                  : {}),
+                ...(shouldApplyProfileName && isValidPushName
+                  ? { name: contactName }
+                  : {}),
                 metadata: updatedMeta,
               },
             });
@@ -831,7 +914,12 @@ export class WahaController implements OnApplicationBootstrap {
                 phone: contactNumber,
                 name: isValidPushName ? contactName : defaultAnonName,
                 metadata: {
-                  ...(contactName ? { profileName: contactName, nameSource: isValidPushName ? 'profile' : 'none' } : {}),
+                  ...(contactName
+                    ? {
+                        profileName: contactName,
+                        nameSource: isValidPushName ? 'profile' : 'none',
+                      }
+                    : {}),
                 },
               },
             });
@@ -863,12 +951,12 @@ export class WahaController implements OnApplicationBootstrap {
           const finalMessageType = isAudioMsg
             ? 'audio'
             : isVideoMsg
-            ? 'video'
-            : isImageMsg
-            ? 'image'
-            : isMediaMsg
-            ? (message.type || 'media')
-            : (message.type || 'text');
+              ? 'video'
+              : isImageMsg
+                ? 'image'
+                : isMediaMsg
+                  ? message.type || 'media'
+                  : message.type || 'text';
 
           let defaultContent = '';
           if (isAudioMsg) defaultContent = 'Mengirim pesan suara';
@@ -965,11 +1053,11 @@ export class WahaController implements OnApplicationBootstrap {
         }
 
         const deliverableSender =
-          (realPhoneJid && realPhoneJid.includes('@c.us'))
+          realPhoneJid && realPhoneJid.includes('@c.us')
             ? realPhoneJid
-            : (rawNumber && rawNumber.includes('@c.us'))
-            ? rawNumber
-            : message.from;
+            : rawNumber && rawNumber.includes('@c.us')
+              ? rawNumber
+              : message.from;
         const sender = deliverableSender;
         const msgId = message.id?._serialized || message.id || 'unknown';
         // Hanya media gambar yang diteruskan ke mediaUrls Vision AI agar tidak crash saat menerima audio/video
@@ -978,19 +1066,27 @@ export class WahaController implements OnApplicationBootstrap {
             ? message.media?.url
               ? [message.media.url]
               : message.mediaUrl
-              ? [message.mediaUrl]
-              : []
+                ? [message.mediaUrl]
+                : []
             : undefined;
 
         const audioUrl = isAudioMsg
-          ? (storedMediaUrl || extractedMediaUrl || message.media?.url || message.mediaUrl)
+          ? storedMediaUrl ||
+            extractedMediaUrl ||
+            message.media?.url ||
+            message.mediaUrl
           : undefined;
 
         if (isAudioMsg && !text) {
           text = '[Pelanggan mengirimkan pesan suara / Voice Note]';
         }
 
-        if (text || (mediaUrls && mediaUrls.length > 0) || audioUrl || message.hasMedia) {
+        if (
+          text ||
+          (mediaUrls && mediaUrls.length > 0) ||
+          audioUrl ||
+          message.hasMedia
+        ) {
           // Tangkap ID conversation aktif dari webhook saat ini
           const activeConvId = currentConversationId;
 
@@ -1140,7 +1236,9 @@ export class WahaController implements OnApplicationBootstrap {
                       })
                     : await this.prisma.contact.findFirst({
                         where: {
-                          ...(sessionTenantId ? { tenantId: sessionTenantId } : {}),
+                          ...(sessionTenantId
+                            ? { tenantId: sessionTenantId }
+                            : {}),
                           OR: [
                             { phone: contactNumber },
                             { phone: rawNumber },
@@ -1151,14 +1249,26 @@ export class WahaController implements OnApplicationBootstrap {
                         },
                       });
                   if (contact) {
-                    const existingMeta = (contact.metadata as Record<string, any>) || {};
-                    const existingLogs: Array<{ status?: string; notes?: string; timestamp: string }> =
-                      Array.isArray(existingMeta.statusLogs) ? [...existingMeta.statusLogs] : [];
+                    const existingMeta =
+                      (contact.metadata as Record<string, any>) || {};
+                    const existingLogs: Array<{
+                      status?: string;
+                      notes?: string;
+                      timestamp: string;
+                    }> = Array.isArray(existingMeta.statusLogs)
+                      ? [...existingMeta.statusLogs]
+                      : [];
 
-                    const cleanLeadNotes = reply.lead.notes && typeof reply.lead.notes === 'string' ? reply.lead.notes.trim() : '';
+                    const cleanLeadNotes =
+                      reply.lead.notes && typeof reply.lead.notes === 'string'
+                        ? reply.lead.notes.trim()
+                        : '';
                     const newStatus = reply.lead.status || contact.status;
                     const lastLog = existingLogs[existingLogs.length - 1];
-                    const isChanged = !lastLog || lastLog.status !== newStatus || (cleanLeadNotes && lastLog.notes !== cleanLeadNotes);
+                    const isChanged =
+                      !lastLog ||
+                      lastLog.status !== newStatus ||
+                      (cleanLeadNotes && lastLog.notes !== cleanLeadNotes);
 
                     if (isChanged && (newStatus || cleanLeadNotes)) {
                       existingLogs.push({
@@ -1170,9 +1280,15 @@ export class WahaController implements OnApplicationBootstrap {
 
                     const updatedMeta = {
                       ...existingMeta,
-                      ...(reply.lead.perumahan && { perumahan: reply.lead.perumahan }),
-                      ...(reply.lead.tipeUnit && { tipeUnit: reply.lead.tipeUnit }),
-                      ...(reply.lead.hargaUnit && { hargaUnit: reply.lead.hargaUnit }),
+                      ...(reply.lead.perumahan && {
+                        perumahan: reply.lead.perumahan,
+                      }),
+                      ...(reply.lead.tipeUnit && {
+                        tipeUnit: reply.lead.tipeUnit,
+                      }),
+                      ...(reply.lead.hargaUnit && {
+                        hargaUnit: reply.lead.hargaUnit,
+                      }),
                       statusLogs: existingLogs,
                     };
 
@@ -1182,11 +1298,15 @@ export class WahaController implements OnApplicationBootstrap {
                       where: { id: contact.id },
                       data: {
                         ...(reply.lead.customerName &&
-                          (!contact.name || contact.name === contact.phone || contact.name.startsWith('+')) && {
+                          (!contact.name ||
+                            contact.name === contact.phone ||
+                            contact.name.startsWith('+')) && {
                             name: reply.lead.customerName,
                           }),
                         ...(reply.lead.status && { status: reply.lead.status }),
-                        ...(latestNotes !== undefined && { notes: latestNotes }),
+                        ...(latestNotes !== undefined && {
+                          notes: latestNotes,
+                        }),
                         metadata: updatedMeta,
                       },
                     });
@@ -1205,18 +1325,23 @@ export class WahaController implements OnApplicationBootstrap {
                       /siteplan|denah/i.test(reply.text || ''))
                   ) {
                     try {
-                      const instance = await this.prisma.whatsappInstance.findUnique({
-                        where: { instanceName: sessionName },
-                        select: { tenantId: true },
-                      });
-                      const effectiveTenantId = instance?.tenantId || sessionTenantId;
+                      const instance =
+                        await this.prisma.whatsappInstance.findUnique({
+                          where: { instanceName: sessionName },
+                          select: { tenantId: true },
+                        });
+                      const effectiveTenantId =
+                        instance?.tenantId || sessionTenantId;
 
                       const matchedGroup =
                         (effectiveTenantId && reply.lead?.perumahan
                           ? await this.prisma.resourceGroup.findFirst({
                               where: {
                                 tenantId: effectiveTenantId,
-                                name: { contains: reply.lead.perumahan, mode: 'insensitive' as const },
+                                name: {
+                                  contains: reply.lead.perumahan,
+                                  mode: 'insensitive' as const,
+                                },
                               },
                             })
                           : null) ||
@@ -1227,17 +1352,26 @@ export class WahaController implements OnApplicationBootstrap {
                           : null) ||
                         (await this.prisma.resourceGroup.findFirst({
                           where: {
-                            tenant: { whatsappInstances: { some: { instanceName: sessionName } } },
+                            tenant: {
+                              whatsappInstances: {
+                                some: { instanceName: sessionName },
+                              },
+                            },
                           },
                         }));
                       if (matchedGroup) {
                         let isIllustrationActive = true;
                         let templates = matchedGroup.pricingTemplates as any;
                         if (typeof templates === 'string') {
-                          try { templates = JSON.parse(templates); } catch {}
+                          try {
+                            templates = JSON.parse(templates);
+                          } catch {}
                         }
                         if (templates && typeof templates === 'object') {
-                          if (templates.isIllustrationActive === false || templates.isSiteplanActive === false) {
+                          if (
+                            templates.isIllustrationActive === false ||
+                            templates.isSiteplanActive === false
+                          ) {
                             isIllustrationActive = false;
                           }
                         }
@@ -1247,15 +1381,22 @@ export class WahaController implements OnApplicationBootstrap {
                           continue;
                         }
 
-                        const freshSiteplan = await this.availabilityService.generateSiteplanImage(matchedGroup.id);
+                        const freshSiteplan =
+                          await this.availabilityService.generateSiteplanImage(
+                            matchedGroup.id,
+                          );
                         img = {
                           ...img,
                           url: freshSiteplan.url,
-                          caption: img.caption || `Denah Siteplan ${matchedGroup.name}`,
+                          caption:
+                            img.caption ||
+                            `Denah Siteplan ${matchedGroup.name}`,
                         };
                       }
                     } catch (e: any) {
-                      this.logger.warn(`Failed to generate on-demand siteplan: ${e.message}`);
+                      this.logger.warn(
+                        `Failed to generate on-demand siteplan: ${e.message}`,
+                      );
                     }
                   }
 
@@ -1265,7 +1406,8 @@ export class WahaController implements OnApplicationBootstrap {
                       text: `[Waha Bot img] URL: ${img.url}, Caption: ${img.caption}`,
                     });
                   } else {
-                    const isDoc = /\.(pdf|doc|docx|xls|xlsx|csv|txt)($|\?)/i.test(img.url);
+                    const isDoc =
+                      /\.(pdf|doc|docx|xls|xlsx|csv|txt)($|\?)/i.test(img.url);
                     await this.wahaService.sendMedia(
                       sessionName,
                       sender,
@@ -1273,7 +1415,8 @@ export class WahaController implements OnApplicationBootstrap {
                       img.caption || '',
                     );
                     await saveBotReply(
-                      img.caption || (isDoc ? 'Mengirim dokumen' : 'Mengirim gambar'),
+                      img.caption ||
+                        (isDoc ? 'Mengirim dokumen' : 'Mengirim gambar'),
                       isDoc ? 'document' : 'image',
                       { mediaUrl: img.url },
                     );

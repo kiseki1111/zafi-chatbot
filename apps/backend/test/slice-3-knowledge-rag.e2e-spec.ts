@@ -145,7 +145,11 @@ describe('Potongan 3: Knowledge Base RAG Ingestion (Boundary & Multi-Tenant Isol
 
       const res = await request(app.getHttpServer())
         .post('/api/v1/knowledge/file')
-        .attach('file', Buffer.from('Daftar Menu: Kopi Susu, Teh Manis'), 'menu.txt')
+        .attach(
+          'file',
+          Buffer.from('Daftar Menu: Kopi Susu, Teh Manis'),
+          'menu.txt',
+        )
         .expect(201);
 
       expect(res.body.id).toBe('kb-file-1');
@@ -224,7 +228,8 @@ describe('Potongan 3: Knowledge Base RAG Ingestion (Boundary & Multi-Tenant Isol
       context.mockPrisma.knowledgeBase.findFirst.mockResolvedValueOnce({
         id: 'kb-doc-1',
         title: 'Buku Katalog Lengkap',
-        content: 'Isi katalog lengkap properti dan syarat KPR serta spesifikasi unit.',
+        content:
+          'Isi katalog lengkap properti dan syarat KPR serta spesifikasi unit.',
         tenantId: 'tenant-A',
         metadata: { title: 'Buku Katalog Lengkap' },
       });
@@ -236,8 +241,14 @@ describe('Potongan 3: Knowledge Base RAG Ingestion (Boundary & Multi-Tenant Isol
             message: {
               content: JSON.stringify({
                 topics: [
-                  { title: 'Tipe & Harga', content: 'Rincian harga tipe 36 dan 45' },
-                  { title: 'Spesifikasi', content: 'Listrik 1300W, 2 kamar tidur' },
+                  {
+                    title: 'Tipe & Harga',
+                    content: 'Rincian harga tipe 36 dan 45',
+                  },
+                  {
+                    title: 'Spesifikasi',
+                    content: 'Listrik 1300W, 2 kamar tidur',
+                  },
                 ],
               }),
             },
@@ -282,7 +293,9 @@ describe('Potongan 3: Knowledge Base RAG Ingestion (Boundary & Multi-Tenant Isol
           createdAt: new Date(),
         });
 
-      context.mockPrisma.knowledgeBase.deleteMany.mockResolvedValueOnce({ count: 1 });
+      context.mockPrisma.knowledgeBase.deleteMany.mockResolvedValueOnce({
+        count: 1,
+      });
 
       const res = await request(app.getHttpServer())
         .post('/api/v1/knowledge/kb-doc-1/split-apply')

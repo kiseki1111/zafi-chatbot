@@ -26,6 +26,7 @@ import { promisify } from 'util';
 import { AvailabilityService } from './availability.service';
 import { Public } from '../../common/decorators/public.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { isFeatureAllowed } from '../../features/web-dashboard/tenant/tenant.service';
 
 const execAsync = promisify(exec);
 
@@ -85,6 +86,25 @@ export class AvailabilityController {
       file.mimetype.startsWith('video/') ||
       /\.(mov|mp4|mkv|avi|webm)$/i.test(file.originalname);
 
+    // ponytail: feature gating galeri video properti untuk Lite & Bronze
+    const effectiveTenantId = req?.user?.tenantId || req?.query?.tenantId;
+    if (effectiveTenantId && (isVideo || req?.query?.purpose === 'gallery')) {
+      const tenant = await Promise.resolve(
+        this.availabilityService.prisma?.tenant?.findUnique?.({
+          where: { id: effectiveTenantId },
+        }),
+      ).catch(() => null);
+      if (
+        tenant &&
+        (tenant.metadata as any)?.plan &&
+        !isFeatureAllowed(tenant.metadata, 'mediaGallery')
+      ) {
+        throw new BadRequestException(
+          'Fitur galeri foto & video properti eksklusif untuk paket Silver ke atas.',
+        );
+      }
+    }
+
     const finalFilename = file.filename;
     const finalMimetype = isVideo ? 'video/mp4' : file.mimetype;
     const finalSize = file.size;
@@ -113,10 +133,15 @@ export class AvailabilityController {
     };
   }
 
-  private async optimizeVideoInBackground(filePath: string, originalName: string) {
+  private async optimizeVideoInBackground(
+    filePath: string,
+    originalName: string,
+  ) {
     const tempOutputPath = `${filePath}.opt.mp4`;
     const fileSize = fs.existsSync(filePath) ? fs.statSync(filePath).size : 0;
-    this.logger.log(`[FFMPEG-ASYNC-START] File: ${originalName} | Size: ${(fileSize / 1024 / 1024).toFixed(2)} MB`);
+    this.logger.log(
+      `[FFMPEG-ASYNC-START] File: ${originalName} | Size: ${(fileSize / 1024 / 1024).toFixed(2)} MB`,
+    );
 
     try {
       const startTime = Date.now();
@@ -126,21 +151,34 @@ export class AvailabilityController {
       );
       const durationMs = Date.now() - startTime;
 
-      if (fs.existsSync(tempOutputPath) && fs.statSync(tempOutputPath).size > 0) {
+      if (
+        fs.existsSync(tempOutputPath) &&
+        fs.statSync(tempOutputPath).size > 0
+      ) {
         const finalSize = fs.statSync(tempOutputPath).size;
         // Atomically replace file asli dengan file yang sudah teroptimasi
         fs.unlinkSync(filePath);
         fs.renameSync(tempOutputPath, filePath);
 
-        this.logger.log(`[FFMPEG-ASYNC-SUCCESS] Video ${originalName} berhasil dioptimasi dalam ${durationMs}ms!`);
-        this.logger.log(`[FFMPEG-ASYNC-STATS] Ukuran asli: ${(fileSize / 1024 / 1024).toFixed(2)} MB -> Hasil: ${(finalSize / 1024 / 1024).toFixed(2)} MB`);
+        this.logger.log(
+          `[FFMPEG-ASYNC-SUCCESS] Video ${originalName} berhasil dioptimasi dalam ${durationMs}ms!`,
+        );
+        this.logger.log(
+          `[FFMPEG-ASYNC-STATS] Ukuran asli: ${(fileSize / 1024 / 1024).toFixed(2)} MB -> Hasil: ${(finalSize / 1024 / 1024).toFixed(2)} MB`,
+        );
       } else {
-        this.logger.warn(`[FFMPEG-ASYNC-WARN] Output file tidak ditemukan atau 0 bytes. Tetap memakai file asli.`);
+        this.logger.warn(
+          `[FFMPEG-ASYNC-WARN] Output file tidak ditemukan atau 0 bytes. Tetap memakai file asli.`,
+        );
       }
     } catch (err: any) {
-      this.logger.error(`[FFMPEG-ASYNC-ERROR] Gagal konversi video ${originalName}: ${err.message}`);
+      this.logger.error(
+        `[FFMPEG-ASYNC-ERROR] Gagal konversi video ${originalName}: ${err.message}`,
+      );
       if (fs.existsSync(tempOutputPath)) {
-        try { fs.unlinkSync(tempOutputPath); } catch {}
+        try {
+          fs.unlinkSync(tempOutputPath);
+        } catch {}
       }
     }
   }
@@ -170,11 +208,12 @@ export class AvailabilityController {
       description?: string;
       siteplanImage?: string;
       pricingTemplates?: any;
+      tenantId?: string;
     },
   ) {
     const isSuper = req?.user?.roles?.includes('superadmin');
     const effectiveTenantId = isSuper
-      ? tenantId || req?.user?.tenantId
+      ? tenantId || body?.tenantId || req?.user?.tenantId
       : req?.user?.tenantId;
     if (!effectiveTenantId) {
       throw new ForbiddenException(
@@ -203,10 +242,7 @@ export class AvailabilityController {
 
   @Public()
   @Post('groups/:id/generate-siteplan')
-  async generateSiteplan(
-    @Param('id') id: string,
-    @Req() req: any,
-  ) {
+  async generateSiteplan(@Param('id') id: string, @Req() req: any) {
     const tenantId = this.resolveTenantId(req);
     return this.availabilityService.generateSiteplanImage(id, tenantId);
   }

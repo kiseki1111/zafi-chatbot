@@ -7,6 +7,7 @@ jest.mock('@nestjs/schedule', () => ({
 }));
 
 import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException } from '@nestjs/common';
 import { FollowUpService } from './follow-up.service';
 import { PrismaService } from '../../../core/prisma/prisma.service';
 import { WahaService } from '../waha.service';
@@ -49,6 +50,7 @@ describe('FollowUpService', () => {
     },
     tenant: {
       findFirst: jest.fn(),
+      findUnique: jest.fn(),
     },
   };
 
@@ -59,12 +61,18 @@ describe('FollowUpService', () => {
 
   const mockAgentShared = {
     getRecentContext: jest.fn().mockResolvedValue([]),
-    callLLM: jest.fn().mockResolvedValue('Halo Kak, ada yang bisa dibantu kembali?'),
+    callLLM: jest
+      .fn()
+      .mockResolvedValue('Halo Kak, ada yang bisa dibantu kembali?'),
     generateFollowUpText: jest.fn(),
   };
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockPrisma.tenant.findUnique.mockResolvedValue(null);
+    mockPrisma.tenant.findFirst.mockResolvedValue(null);
+    mockPrisma.followUpConfig.findUnique.mockResolvedValue(null);
+    mockPrisma.followUpConfig.findFirst.mockResolvedValue(null);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -126,11 +134,76 @@ describe('FollowUpService', () => {
       });
       expect(result.scheduleTime).toBe('08:30');
     });
+
+    it('harus menolak kustom scheduleTime jika tenant berada di paket Lite (400)', async () => {
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        id: 't-lite',
+        metadata: { plan: 'lite' },
+      });
+
+      let error: any = null;
+      try {
+        await service.updateConfig({ scheduleTime: '14:00' }, 't-lite');
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(BadRequestException);
+    });
+
+    it('harus mengizinkan kustom scheduleTime jika tenant berada di paket Silver', async () => {
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        id: 't-silver',
+        metadata: { plan: 'silver' },
+      });
+      mockPrisma.followUpConfig.upsert.mockResolvedValue({
+        id: 'cfg-silver',
+        tenantId: 't-silver',
+        scheduleTime: '14:00',
+      });
+
+      const res = await service.updateConfig(
+        { scheduleTime: '14:00' },
+        't-silver',
+      );
+      expect(res.scheduleTime).toBe('14:00');
+    });
+  });
+
+  describe('manualTrigger - Feature Gating', () => {
+    it('harus menolak manual trigger jika tenant berada di paket Lite (400)', async () => {
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        id: 't-lite',
+        metadata: { plan: 'lite' },
+      });
+
+      let error: any = null;
+      try {
+        await service.manualTrigger(undefined, 't-lite');
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(BadRequestException);
+    });
+
+    it('harus mengizinkan manual trigger jika tenant berada di paket Developer / Silver', async () => {
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        id: 't-dev',
+        metadata: { plan: 'developer' },
+      });
+      mockPrisma.followUpConfig.findUnique.mockResolvedValue({
+        isEnabled: false,
+      });
+
+      const res = await service.manualTrigger(undefined, 't-dev');
+      expect(res).toBeDefined();
+    });
   });
 
   describe('getInactiveContacts', () => {
     it('harus mengembalikan array kosong jika follow up tidak aktif (isEnabled=false)', async () => {
-      mockPrisma.followUpConfig.findUnique.mockResolvedValue({ isEnabled: false });
+      mockPrisma.followUpConfig.findUnique.mockResolvedValue({
+        isEnabled: false,
+      });
 
       const result = await service.getInactiveContacts(undefined, 'tenant-1');
       expect(result).toEqual([]);
@@ -155,7 +228,11 @@ describe('FollowUpService', () => {
 
       // Kontak sudah difollow-up dan belum ada chat balasan setelahnya
       mockPrisma.followUp.findMany.mockResolvedValue([
-        { contactId: 'contact-1', instanceName: 'session-wa', followedUpAt: new Date(Date.now() - 10 * 3600 * 1000) },
+        {
+          contactId: 'contact-1',
+          instanceName: 'session-wa',
+          followedUpAt: new Date(Date.now() - 10 * 3600 * 1000),
+        },
       ]);
 
       const result = await service.getInactiveContacts(undefined, 'tenant-1');
@@ -177,12 +254,18 @@ describe('FollowUpService', () => {
           contactId: 'contact-rechat',
           contact: { id: 'contact-rechat', phone: '62899999999', name: 'Andi' },
           lastMessageAt: customerReplyDate, // Chat baru customer lebih baru daripada follow-up lama
-          messages: [{ content: 'Mau tanya lagi min', createdAt: customerReplyDate }],
+          messages: [
+            { content: 'Mau tanya lagi min', createdAt: customerReplyDate },
+          ],
         },
       ]);
 
       mockPrisma.followUp.findMany.mockResolvedValue([
-        { contactId: 'contact-rechat', instanceName: 'session-wa', followedUpAt: followUpOldDate },
+        {
+          contactId: 'contact-rechat',
+          instanceName: 'session-wa',
+          followedUpAt: followUpOldDate,
+        },
       ]);
 
       const result = await service.getInactiveContacts(undefined, 'tenant-1');
@@ -194,7 +277,11 @@ describe('FollowUpService', () => {
   describe('sendFollowUp', () => {
     it('harus mengirim pesan ke WAHA, mencatat ke tabel messages, conversation, dan riwayat follow-up', async () => {
       const mockContact = { id: 'c-100', phone: '628123456789', name: 'Rina' };
-      const mockConv = { id: 'conv-100', instanceName: 'zafi-property', contactId: 'c-100' };
+      const mockConv = {
+        id: 'conv-100',
+        instanceName: 'zafi-property',
+        contactId: 'c-100',
+      };
 
       mockPrisma.contact.findUnique.mockResolvedValue(mockContact);
       mockPrisma.contact.findFirst.mockResolvedValue(mockContact);
@@ -203,10 +290,19 @@ describe('FollowUpService', () => {
       mockPrisma.message.create.mockResolvedValue({ id: 'msg-rec-1' });
       mockPrisma.followUp.create.mockResolvedValue({ id: 'flw-1' });
 
-      const res = await service.sendFollowUp('628123456789', 'zafi-property', 'Halo Rina, ada promo baru nih!', 'c-100');
+      const res = await service.sendFollowUp(
+        '628123456789',
+        'zafi-property',
+        'Halo Rina, ada promo baru nih!',
+        'c-100',
+      );
 
       expect(res.success).toBe(true);
-      expect(mockWaha.sendMessage).toHaveBeenCalledWith('zafi-property', '628123456789', 'Halo Rina, ada promo baru nih!');
+      expect(mockWaha.sendMessage).toHaveBeenCalledWith(
+        'zafi-property',
+        '628123456789',
+        'Halo Rina, ada promo baru nih!',
+      );
       expect(mockPrisma.message.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -247,11 +343,16 @@ describe('FollowUpService', () => {
         },
       ]);
       mockPrisma.followUp.findMany.mockResolvedValue([]);
-      mockPrisma.contact.findUnique.mockResolvedValue({ id: 'c-1', phone: '628111' });
+      mockPrisma.contact.findUnique.mockResolvedValue({
+        id: 'c-1',
+        phone: '628111',
+      });
       mockPrisma.conversation.findFirst.mockResolvedValue({ id: 'conv-1' });
 
       // Spy sleep method
-      const sleepSpy = jest.spyOn(service as any, 'sleep').mockResolvedValue(undefined as never);
+      const sleepSpy = jest
+        .spyOn(service as any, 'sleep')
+        .mockResolvedValue(undefined);
 
       const result = await service.processFollowUps('session-wa', 'tenant-1');
 
@@ -267,13 +368,22 @@ describe('FollowUpService', () => {
         hour: '2-digit',
         minute: '2-digit',
         hour12: false,
-      }).format(new Date()).replace('.', ':');
+      })
+        .format(new Date())
+        .replace('.', ':');
 
       mockPrisma.followUpConfig.findMany.mockResolvedValue([
-        { id: 'cfg-wib', tenantId: 'tenant-wib', isEnabled: true, scheduleTime: nowWib },
+        {
+          id: 'cfg-wib',
+          tenantId: 'tenant-wib',
+          isEnabled: true,
+          scheduleTime: nowWib,
+        },
       ]);
 
-      const processSpy = jest.spyOn(service, 'processFollowUps').mockResolvedValue({ processed: 0, sent: 0, errors: 0 });
+      const processSpy = jest
+        .spyOn(service, 'processFollowUps')
+        .mockResolvedValue({ processed: 0, sent: 0, errors: 0 });
 
       await service.scheduledFollowUp();
 
@@ -290,7 +400,9 @@ describe('FollowUpService', () => {
         { instanceName: 'inst-1' },
       ]);
       mockPrisma.followUp.count.mockResolvedValue(15);
-      mockPrisma.followUpConfig.findUnique.mockResolvedValue({ isEnabled: true });
+      mockPrisma.followUpConfig.findUnique.mockResolvedValue({
+        isEnabled: true,
+      });
       mockPrisma.conversation.findMany.mockResolvedValue([]);
 
       const stats = await service.getStats('tenant-1');

@@ -333,7 +333,7 @@ export function SystemLogsPage() {
                           </div>
                           <div className="text-[10px] text-muted-foreground font-sans flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            {new Date(log.timestamp).toLocaleTimeString("id-ID")}
+                            {new Date(log.timestamp).toLocaleTimeString("id-ID", { hour12: false })}
                           </div>
                         </div>
                       </div>
@@ -473,7 +473,7 @@ export function SystemLogsPage() {
 
                         <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground shrink-0 font-sans">
                           <Clock className="h-3 w-3" />
-                          {new Date(l.createdAt).toLocaleTimeString("id-ID")}
+                          {new Date(l.createdAt).toLocaleTimeString("id-ID", { hour12: false })}
                         </div>
                       </div>
                     );

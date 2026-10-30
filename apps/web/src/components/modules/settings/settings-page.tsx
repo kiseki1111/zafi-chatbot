@@ -10,8 +10,9 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Bot, Save, Smartphone, ShieldCheck, Loader2, Plus, Trash2, QrCode, Palette, Wrench, Settings, Users, Sparkles, CheckCircle2 } from "lucide-react";
+import { Bot, Save, Smartphone, ShieldCheck, Loader2, Plus, Trash2, QrCode, Palette, Wrench, Settings, Users, Sparkles, CheckCircle2, Zap } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthStore } from "@/lib/auth-store";
 import { cn } from "@/lib/utils";
@@ -87,6 +88,8 @@ function BotSettingsTab() {
     maxMau: number;
     mauUsed: number;
     mauPercent: number;
+    softLimitMau?: number;
+    isGracePeriod?: boolean;
     isMauExceeded: boolean;
     maxAiResponses: number;
     aiResponsesUsed: number;
@@ -105,7 +108,7 @@ function BotSettingsTab() {
       .then((r) => (r.ok ? r.json() : null))
       .then((res) => {
         const data = res?.data || res;
-        if (data && data.plan) setQuota(data);
+        if (data && (data.plan !== undefined || data.planName)) setQuota(data);
       })
       .catch(() => {});
   }, [user?.tenantId, user?.id, user?.role]);
@@ -242,9 +245,16 @@ function BotSettingsTab() {
                     <Users className="h-3 w-3 text-blue-600" />
                     Kontak Unik (MAU)
                   </span>
-                  <span className="font-semibold font-mono text-foreground">
-                    {quota.mauUsed.toLocaleString()} / {quota.maxMau.toLocaleString()} ({quota.mauPercent}%)
-                  </span>
+                  <div className="flex items-center gap-1.5 font-mono text-foreground font-semibold">
+                    {quota.isGracePeriod && (
+                      <span className="text-[9px] font-sans font-bold text-amber-700 bg-amber-100 dark:bg-amber-950 px-1 rounded border border-amber-300">
+                        Tenggang 110%
+                      </span>
+                    )}
+                    <span>
+                      {quota.mauUsed.toLocaleString()} / {quota.maxMau.toLocaleString()} ({quota.mauPercent}%)
+                    </span>
+                  </div>
                 </div>
                 <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
                   <div
@@ -252,9 +262,11 @@ function BotSettingsTab() {
                       "h-full transition-all duration-500 rounded-full",
                       quota.isMauExceeded
                         ? "bg-rose-600"
-                        : quota.mauPercent >= 80
+                        : quota.isGracePeriod
                           ? "bg-amber-500"
-                          : "bg-blue-600"
+                          : quota.mauPercent >= 80
+                            ? "bg-amber-500"
+                            : "bg-blue-600"
                     )}
                     style={{ width: `${quota.mauPercent}%` }}
                   />
@@ -289,6 +301,49 @@ function BotSettingsTab() {
             </div>
           </div>
         </Card>
+      )}
+
+      {quota && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 rounded-xl border bg-background text-xs">
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-1.5 font-semibold text-foreground">
+              <Zap className="h-4 w-4 text-amber-500" />
+              <span>Auto Top-Up Booster S saat Kuota 100%</span>
+              {!['silver', 'gold', 'enterprise', 'developer'].includes(quota.plan) && (
+                <span className="text-[9px] px-1 py-0 rounded bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 font-bold border border-amber-300">
+                  Silver+
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Otomatis menambah Booster S (+500 MAU &amp; +2.000 AI) saat kuota habis agar bot tidak terhenti.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Switch
+              checked={Boolean((quota as any).autoTopUpEnabled)}
+              disabled={!['silver', 'gold', 'enterprise', 'developer'].includes(quota.plan)}
+              onCheckedChange={async (enabled) => {
+                const targetId = user?.tenantId || (user?.id && !user.id.startsWith("u-") ? user.id : "demo");
+                if (!targetId) return;
+                try {
+                  const res = await fetch(`/api/v1/tenant/clients/${targetId}/auto-topup`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ autoTopUpEnabled: enabled }),
+                  });
+                  if (res.ok) {
+                    const data = await res.json();
+                    setQuota(data?.data || data);
+                    toast.success(`Auto Top-Up ${enabled ? 'diaktifkan' : 'dinonaktifkan'}`);
+                  }
+                } catch {
+                  toast.error('Gagal memperbarui auto top-up');
+                }
+              }}
+            />
+          </div>
+        </div>
       )}
 
       <Card>

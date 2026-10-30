@@ -37,20 +37,30 @@ export class ChatStreamService {
   }
 
   // Subscribe ke stream berdasarkan conversationId atau seluruh instance
-  subscribe(conversationId?: string, instanceName?: string): Observable<MessageEvent> {
+  subscribe(
+    conversationId?: string,
+    instanceName?: string,
+  ): Observable<MessageEvent> {
     return this.events$.asObservable().pipe(
       filter((e) => {
         if (conversationId && e.data.conversationId !== conversationId) {
           return false;
         }
-        if (instanceName && e.data.instanceName && e.data.instanceName !== instanceName) {
+        if (
+          instanceName &&
+          e.data.instanceName &&
+          e.data.instanceName !== instanceName
+        ) {
           return false;
         }
         return true;
       }),
-      map((e) => ({
-        data: e,
-      } as MessageEvent)),
+      map(
+        (e) =>
+          ({
+            data: e,
+          }) as MessageEvent,
+      ),
     );
   }
 }

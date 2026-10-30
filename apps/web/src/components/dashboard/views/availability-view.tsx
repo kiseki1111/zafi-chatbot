@@ -15,7 +15,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Plus, Search, Edit3, Trash2, CheckCircle2, Clock, XCircle, Wrench, Layers, RefreshCw, Upload, Image, FileVideo, ExternalLink, Play, Copy, Check, Film, BookOpen, Sparkles, FileText, User, AlertTriangle, Home, LandPlot, Building2, SlidersHorizontal, Calculator, Tag, Move, Download, Camera, MapPin, Compass, LayoutGrid, RotateCw, X
+  Plus, Search, Edit3, Trash2, CheckCircle2, Clock, XCircle, Wrench, Layers, RefreshCw, Upload, Image, FileVideo, ExternalLink, Play, Copy, Check, Film, BookOpen, Sparkles, FileText, User, AlertTriangle, Home, LandPlot, Building2, SlidersHorizontal, Calculator, Tag, Move, Download, Camera, MapPin, Compass, LayoutGrid, RotateCw, X, Lock
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { useBackgroundTasksStore } from "@/lib/background-tasks-store";
@@ -258,6 +258,25 @@ export function AvailabilityView() {
   ]);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [isGeneratingJpg, setIsGeneratingJpg] = useState(false);
+  const [tenantPlan, setTenantPlan] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchId = tenantId || user?.tenantId || "demo";
+    fetch(`/api/v1/tenant/clients/${fetchId}/quota`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        const d = res?.data || res;
+        if (d?.plan !== undefined) setTenantPlan(d.plan);
+      })
+      .catch(() => {});
+  }, [tenantId, user?.tenantId]);
+
+  const canUseMediaGallery =
+    tenantPlan === "silver" ||
+    tenantPlan === "gold" ||
+    tenantPlan === "enterprise" ||
+    tenantPlan === "developer" ||
+    user?.role === "superadmin";
 
   // Fetch groups
   const fetchGroups = async () => {
@@ -2597,18 +2616,25 @@ export function AvailabilityView() {
               </div>
             </div>
 
-            <Button
-              size="sm"
-              onClick={() => {
-                setUploadFile(null);
-                setUploadName("");
-                setUploadDesc("");
-                setIsUploadModalOpen(true);
-              }}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5 font-semibold h-9 px-4 shrink-0 shadow-2xs"
-            >
-              <Upload className="h-4 w-4" /> Upload Foto / Video
-            </Button>
+            {!canUseMediaGallery ? (
+              <Badge variant="outline" className="border-amber-400 text-amber-700 bg-amber-50 dark:bg-amber-950 dark:text-amber-300 gap-1.5 py-1.5 px-3">
+                <Lock className="h-3.5 w-3.5 text-amber-500" />
+                <span>Galeri foto &amp; video properti tersedia di paket Silver ke atas</span>
+              </Badge>
+            ) : (
+              <Button
+                size="sm"
+                onClick={() => {
+                  setUploadFile(null);
+                  setUploadName("");
+                  setUploadDesc("");
+                  setIsUploadModalOpen(true);
+                }}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1.5 font-semibold h-9 px-4 shrink-0 shadow-2xs"
+              >
+                <Upload className="h-4 w-4" /> Upload Foto / Video
+              </Button>
+            )}
           </div>
 
           {mediaList.length === 0 ? (

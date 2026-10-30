@@ -106,6 +106,7 @@ export const createMockPrisma = () => ({
     create: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
+    count: jest.fn().mockResolvedValue(0),
   },
   resourceItem: {
     findUnique: jest.fn(),

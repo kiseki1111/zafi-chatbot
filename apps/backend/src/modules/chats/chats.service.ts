@@ -122,7 +122,11 @@ export class ChatsService {
       }
       // 4. Paling bawah: Jika tidak teridentifikasi atau Anonim -> tetap tampilkan nomor telepon
       else {
-        displayName = cleanPhone ? `+${cleanPhone}` : (c.contact?.phone ? `+${c.contact.phone.replace(/^\+/, '')}` : 'Pelanggan');
+        displayName = cleanPhone
+          ? `+${cleanPhone}`
+          : c.contact?.phone
+            ? `+${c.contact.phone.replace(/^\+/, '')}`
+            : 'Pelanggan';
       }
 
       return {
@@ -139,7 +143,9 @@ export class ChatsService {
       const existing = seen.get(key);
       if (!existing) {
         seen.set(key, conv);
-      } else if ((conv.messages?.length || 0) > (existing.messages?.length || 0)) {
+      } else if (
+        (conv.messages?.length || 0) > (existing.messages?.length || 0)
+      ) {
         seen.set(key, conv);
       }
     }
@@ -211,21 +217,31 @@ export class ChatsService {
       if (phone.includes('@lid') || phone.length > 13) {
         try {
           const lidId = phone.includes('@') ? phone : `${phone}@lid`;
-          const wahaContact = await this.wahaService.getContact(instanceName, lidId);
+          const wahaContact = await this.wahaService.getContact(
+            instanceName,
+            lidId,
+          );
           if (wahaContact?.id && !wahaContact.id.includes('@lid')) {
-            const realPhone = wahaContact.id.replace(/@(c\.us|s\.whatsapp\.net)$/i, '');
+            const realPhone = wahaContact.id.replace(
+              /@(c\.us|s\.whatsapp\.net)$/i,
+              '',
+            );
             // Update juga ke DB agar permanen benar
-            await this.prisma.contact.update({
-              where: { id: conversation.contactId },
-              data: { phone: realPhone },
-            }).catch(() => null);
+            await this.prisma.contact
+              .update({
+                where: { id: conversation.contactId },
+                data: { phone: realPhone },
+              })
+              .catch(() => null);
             phone = realPhone;
           }
         } catch {}
       }
 
       [pfpUrl, bio] = await Promise.all([
-        this.wahaService.getContactProfilePicture(instanceName, phone).catch(() => null),
+        this.wahaService
+          .getContactProfilePicture(instanceName, phone)
+          .catch(() => null),
         this.wahaService.getContactAbout(instanceName, phone).catch(() => null),
       ]);
     }
@@ -449,7 +465,8 @@ export class ChatsService {
     try {
       const { default: axios } = await import('axios');
       const wahaUrl = process.env.WAHA_API_URL || 'http://127.0.0.1:3000';
-      const apiKey = process.env.WAHA_API_KEY || process.env.WHATSAPP_API_KEY || '';
+      const apiKey =
+        process.env.WAHA_API_KEY || process.env.WHATSAPP_API_KEY || '';
 
       await axios.post(
         `${wahaUrl}/api/sendImage`,

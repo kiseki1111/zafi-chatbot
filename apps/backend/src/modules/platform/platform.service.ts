@@ -26,6 +26,14 @@ export class PlatformService {
     return row?.value ?? null;
   }
 
+  async getPricingPlans() {
+    const config = await this.getConfig('pricing');
+    if (Array.isArray(config) && config.length > 0) {
+      return config;
+    }
+    return null;
+  }
+
   async setConfig(key: string, value: any) {
     return this.prisma.platformConfig.upsert({
       where: { key },
@@ -111,7 +119,9 @@ export class PlatformService {
         return {
           id: t.id,
           name: t.name,
-          plan: meta.plan ?? 'trial',
+          plan: meta.plan ?? null,
+          planName:
+            meta.planName ?? (meta.plan ? meta.plan : 'Belum Ada Paket'),
           maxMau,
           maxAiResponses: maxAi,
           mauUsed,
