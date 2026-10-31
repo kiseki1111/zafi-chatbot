@@ -1,8 +1,8 @@
-import { INestApplication } from '@nestjs/common';
+﻿import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { SearchModule } from '../src/modules/search/search.module';
-import { createTestApp, TestAppContext } from './helpers/create-test-app';
-import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard';
+import { SearchModule } from '../../src/modules/search/search.module';
+import { createTestApp, TestAppContext } from '../helpers/create-test-app';
+import { JwtAuthGuard } from '../../src/common/guards/jwt-auth.guard';
 
 describe('SearchModule (Omnisearch End-to-End Test)', () => {
   let context: TestAppContext;

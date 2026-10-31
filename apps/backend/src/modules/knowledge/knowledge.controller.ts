@@ -105,6 +105,34 @@ export class KnowledgeController {
       limits: {
         fileSize: 300 * 1024 * 1024, // 300MB
       },
+      fileFilter: (req, file, cb) => {
+        const ext = extname(file.originalname).toLowerCase().replace('.', '');
+        const allowed = [
+          'jpg',
+          'jpeg',
+          'png',
+          'webp',
+          'mp4',
+          'mov',
+          'mkv',
+          'avi',
+          'webm',
+          'pdf',
+          'ogg',
+          'mp3',
+          'wav',
+        ];
+        if (allowed.includes(ext)) {
+          cb(null, true);
+        } else {
+          cb(
+            new BadRequestException(
+              'Format file tidak didukung. Hanya gambar, video, audio, dan PDF yang diizinkan.',
+            ),
+            false,
+          );
+        }
+      },
     }),
   )
   async uploadMedia(

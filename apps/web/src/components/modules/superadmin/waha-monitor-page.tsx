@@ -21,6 +21,9 @@ interface InstanceItem {
   phone?: string;
   profileName?: string;
   tenantId?: string | null;
+  messagesCount?: number;
+  tokensUsed?: number;
+  estimatedCostIdr?: number;
   dbStats?: any;
 }
 
@@ -257,6 +260,13 @@ export function WahaMonitorPage() {
                       {inst.phone ? `+${inst.phone}` : "Belum ada nomor tertaut"}
                       {inst.profileName ? ` · ${inst.profileName}` : ""}
                     </p>
+                    <div className="flex items-center gap-2.5 text-[11px] text-muted-foreground font-mono mt-1">
+                      <span>Pesan: {(inst.messagesCount ?? inst.dbStats?.messagesCount ?? 0).toLocaleString()}</span>
+                      <span>•</span>
+                      <span className="text-emerald-700 dark:text-emerald-400 font-semibold">
+                        Token: {(inst.tokensUsed ?? inst.dbStats?.tokensUsed ?? 0).toLocaleString()} tk (~Rp {(inst.estimatedCostIdr ?? inst.dbStats?.estimatedCostIdr ?? 0).toLocaleString()})
+                      </span>
+                    </div>
                   </div>
                 </div>
 

@@ -1,4 +1,4 @@
-import { INestApplication } from '@nestjs/common';
+﻿import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 
 jest.mock('bcrypt', () => ({
@@ -6,15 +6,15 @@ jest.mock('bcrypt', () => ({
   compare: jest.fn().mockResolvedValue(true),
 }));
 
-import { TenantModule } from '../src/features/web-dashboard/tenant/tenant.module';
-import { AvailabilityModule } from '../src/modules/availability/availability.module';
-import { WahaModule } from '../src/modules/waha/waha.module';
-import { createTestApp, TestAppContext } from './helpers/create-test-app';
-import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard';
-import { DataAgentService } from '../src/features/knowledge-ingest/data-agent.service';
-import { WahaService } from '../src/modules/waha/waha.service';
-import { OmnichannelQueueService } from '../src/core/omnichannel/omnichannel-queue.service';
-import { CsService } from '../src/features/agent-cs/cs.service';
+import { TenantModule } from '../../src/features/web-dashboard/tenant/tenant.module';
+import { AvailabilityModule } from '../../src/modules/availability/availability.module';
+import { WahaModule } from '../../src/modules/waha/waha.module';
+import { createTestApp, TestAppContext } from '../helpers/create-test-app';
+import { JwtAuthGuard } from '../../src/common/guards/jwt-auth.guard';
+import { DataAgentService } from '../../src/features/knowledge-ingest/data-agent.service';
+import { WahaService } from '../../src/modules/waha/waha.service';
+import { OmnichannelQueueService } from '../../src/core/omnichannel/omnichannel-queue.service';
+import { CsService } from '../../src/features/agent-cs/cs.service';
 
 describe('Tier Phase 1: Validasi Kapasitas Riil & Soft-Limit 110%', () => {
   let context: TestAppContext;

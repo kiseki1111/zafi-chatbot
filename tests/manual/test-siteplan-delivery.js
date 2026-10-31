@@ -4,8 +4,8 @@ const path = require('path');
 // 1. Load Environment Variables from .env
 function loadEnv() {
   const envPaths = [
-    path.resolve(__dirname, '../.env'),
-    path.resolve(__dirname, '../apps/backend/.env'),
+    path.resolve(__dirname, '../../.env'),
+    path.resolve(__dirname, '../../apps/backend/.env'),
     path.resolve(process.cwd(), '.env'),
   ];
   for (const p of envPaths) {

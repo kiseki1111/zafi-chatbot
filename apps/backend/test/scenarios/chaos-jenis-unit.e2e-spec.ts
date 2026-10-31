@@ -1,12 +1,12 @@
-import { INestApplication } from '@nestjs/common';
+﻿import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { AvailabilityModule } from '../src/modules/availability/availability.module';
-import { SearchModule } from '../src/modules/search/search.module';
-import { AgentSharedModule } from '../src/core/agent-shared/agent-shared.module';
-import { createTestApp, TestAppContext } from './helpers/create-test-app';
-import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard';
-import { AgentSharedService } from '../src/core/agent-shared/agent-shared.service';
-import { SearchService } from '../src/modules/search/search.service';
+import { AvailabilityModule } from '../../src/modules/availability/availability.module';
+import { SearchModule } from '../../src/modules/search/search.module';
+import { AgentSharedModule } from '../../src/core/agent-shared/agent-shared.module';
+import { createTestApp, TestAppContext } from '../helpers/create-test-app';
+import { JwtAuthGuard } from '../../src/common/guards/jwt-auth.guard';
+import { AgentSharedService } from '../../src/core/agent-shared/agent-shared.service';
+import { SearchService } from '../../src/modules/search/search.service';
 
 describe('Chaos & E2E Suite: Jenis Unit (propertyType: BANGUNAN vs TANAH)', () => {
   let context: TestAppContext;

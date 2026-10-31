@@ -417,6 +417,12 @@ export function resolveTenantCapacity(metadata: any) {
     extraUsers: extraUsers,
     extraProjects: extraProj,
     isDeveloper,
+    isTrial: Boolean(metadata?.isTrial),
+    isTrialExpired: Boolean(
+      metadata?.isTrial &&
+        metadata?.trialExpiresAt &&
+        new Date(metadata.trialExpiresAt).getTime() < Date.now(),
+    ),
   };
 }
 
@@ -430,6 +436,13 @@ export function isFeatureAllowed(
     | 'manualFollowUp'
     | 'autoTopUp',
 ): boolean {
+  const isTrialExpired = Boolean(
+    metadata?.isTrial &&
+      metadata?.trialExpiresAt &&
+      new Date(metadata.trialExpiresAt).getTime() < Date.now(),
+  );
+  if (isTrialExpired) return false;
+
   const raw = metadata?.plan ? String(metadata.plan).toLowerCase() : null;
   if (!raw) return false;
   if (
@@ -647,6 +660,13 @@ export class TenantService {
           : 0,
       quotaAlerts: Array.isArray(meta.quotaAlerts) ? meta.quotaAlerts : [],
       topups: Array.isArray(meta.topups) ? meta.topups : [],
+      tokensUsed:
+        Number(meta.totalTokensUsed) || Math.round(aiResponsesUsed * 1700),
+      estimatedCostIdr: Math.round(
+        ((Number(meta.totalTokensUsed) || Math.round(aiResponsesUsed * 1700)) /
+          1000) *
+          2.56,
+      ),
     };
   }
 
@@ -1702,45 +1722,77 @@ Berikan jawaban yang natural seperti CS manusia sungguhan. Jangan menggunakan ba
     );
   }
 
-  // Superadmin: Create new tenant + manager account + menu configuration
+  // Superadmin: Create new tenant + manager account (Auto-Trial 14 Hari)
   async createClient(data: {
     companyName: string;
     category?: string;
     managerName: string;
     managerEmail: string;
     managerPassword?: string;
-    enabledMenus: string[];
+    enabledMenus?: string[];
   }) {
-    const defaultPassword = data.managerPassword || 'Manager@123';
+    const defaultPassword = data.managerPassword || 'Trial@123';
     const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 
-    // 1. Create Tenant with enabledMenus in metadata
-    const tenant = await this.prisma.tenant.create({
-      data: {
-        name: data.companyName,
-        category: data.category || 'general',
-        agentName: 'Asisten AI',
-        metadata: {
-          enabledMenus: data.enabledMenus,
-          plan: null,
-          planName: null,
-          maxMau: 0,
-          maxAiResponses: 0,
-          planPrice: 0,
+    const trialDays = 14;
+    const trialExpiresAt = new Date(
+      Date.now() + trialDays * 24 * 60 * 60 * 1000,
+    ).toISOString();
+
+    const enabledMenus =
+      Array.isArray(data.enabledMenus) && data.enabledMenus.length > 0
+        ? data.enabledMenus
+        : [
+            'overview',
+            'crm',
+            'chatbot',
+            'knowledge',
+            'availability',
+            'followup',
+            'settings',
+          ];
+
+    // ponytail: atomic transaction untuk pembuatan tenant & user awal tanpa orphaned data
+    const [tenant, user] = await this.prisma.$transaction(async (tx) => {
+      const newTenant = await tx.tenant.create({
+        data: {
+          name: data.companyName,
+          category: data.category || 'general',
+          agentName: 'Asisten AI',
+          metadata: {
+            enabledMenus,
+            plan: 'lite',
+            planName: 'Lite (Trial 14 Hari)',
+            isTrial: true,
+            trialStartedAt: new Date().toISOString(),
+            trialExpiresAt,
+            maxMau: 300,
+            maxAiResponses: 1000,
+            planPrice: 0,
+          },
         },
-      },
+      });
+
+      const newUser = await tx.user.create({
+        data: {
+          name: data.managerName,
+          email: data.managerEmail,
+          password: hashedPassword,
+          role: 'manager',
+          tenantId: newTenant.id,
+        },
+      });
+
+      return [newTenant, newUser];
     });
 
-    // 2. Create User Manager
-    const user = await this.prisma.user.create({
-      data: {
-        name: data.managerName,
-        email: data.managerEmail,
-        password: hashedPassword,
-        role: 'manager',
-        tenantId: tenant.id,
-      },
+    const expDateStr = new Date(trialExpiresAt).toLocaleDateString('id-ID', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
     });
+
+    const welcomeMessage = `Halo ${data.managerName || 'Bapak/Ibu'}, akun trial 14 hari ${data.companyName} Anda sudah aktif!\n\n🔗 Dashboard: https://app.zafii.tech\n📧 Email: ${data.managerEmail}\n🔑 Password: ${defaultPassword}\n⏳ Masa Berlaku: 14 Hari (s/d ${expDateStr})\n\nSilakan login ke dashboard untuk mencoba bot AI WhatsApp dan fitur CRM kami. Bila ada kendala, tim kami siap membantu!`;
 
     return {
       tenant,
@@ -1751,6 +1803,9 @@ Berikan jawaban yang natural seperti CS manusia sungguhan. Jangan menggunakan ba
         role: user.role,
       },
       rawPassword: defaultPassword,
+      isTrial: true,
+      trialExpiresAt,
+      welcomeMessage,
     };
   }
 

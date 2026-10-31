@@ -43,7 +43,8 @@ export class AuthController {
     return result;
   }
 
-  // Closed-Door Policy: Pendaftaran publik dinonaktifkan
+  // Batasi percobaan pendaftaran & login maksimal 10x per menit per IP (Anti-Spam & Anti-Brute-Force)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('register')
   @HttpCode(HttpStatus.FORBIDDEN)
   async register() {

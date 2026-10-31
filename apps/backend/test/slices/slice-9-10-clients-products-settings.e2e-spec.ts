@@ -1,4 +1,4 @@
-import { INestApplication } from '@nestjs/common';
+﻿import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 
 jest.mock('bcrypt', () => ({
@@ -6,10 +6,10 @@ jest.mock('bcrypt', () => ({
   compare: jest.fn().mockResolvedValue(true),
 }));
 
-import { TenantModule } from '../src/features/web-dashboard/tenant/tenant.module';
-import { createTestApp, TestAppContext } from './helpers/create-test-app';
-import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard';
-import { DataAgentService } from '../src/features/knowledge-ingest/data-agent.service';
+import { TenantModule } from '../../src/features/web-dashboard/tenant/tenant.module';
+import { createTestApp, TestAppContext } from '../helpers/create-test-app';
+import { JwtAuthGuard } from '../../src/common/guards/jwt-auth.guard';
+import { DataAgentService } from '../../src/features/knowledge-ingest/data-agent.service';
 
 describe('Slice-9: Superadmin Kelola Klien & Slice-10: Tenant Products + Settings (Boundary)', () => {
   let context: TestAppContext;

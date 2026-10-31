@@ -1,9 +1,9 @@
 const fs = require('fs');
 const path = require('path');
-const OpenAI = require(path.join(__dirname, '../apps/backend/node_modules/openai'));
+const OpenAI = require(path.join(__dirname, '../../apps/backend/node_modules/openai'));
 
 // Parse .env manually
-const envPath = path.join(__dirname, '../apps/backend/.env');
+const envPath = path.join(__dirname, '../../apps/backend/.env');
 if (fs.existsSync(envPath)) {
   const envContent = fs.readFileSync(envPath, 'utf8');
   envContent.split(/\r?\n/).forEach((line) => {

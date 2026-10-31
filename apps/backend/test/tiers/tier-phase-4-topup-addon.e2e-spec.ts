@@ -1,10 +1,10 @@
-import { INestApplication } from '@nestjs/common';
+﻿import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 
-import { TenantModule } from '../src/features/web-dashboard/tenant/tenant.module';
-import { createTestApp, TestAppContext } from './helpers/create-test-app';
-import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard';
-import { DataAgentService } from '../src/features/knowledge-ingest/data-agent.service';
+import { TenantModule } from '../../src/features/web-dashboard/tenant/tenant.module';
+import { createTestApp, TestAppContext } from '../helpers/create-test-app';
+import { JwtAuthGuard } from '../../src/common/guards/jwt-auth.guard';
+import { DataAgentService } from '../../src/features/knowledge-ingest/data-agent.service';
 
 describe('Tier Phase 4: Modul Manajemen Top-Up, Booster & Add-On', () => {
   let context: TestAppContext;

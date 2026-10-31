@@ -1,8 +1,8 @@
-import { INestApplication } from '@nestjs/common';
+﻿import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { AvailabilityModule } from '../src/modules/availability/availability.module';
-import { createTestApp, TestAppContext } from './helpers/create-test-app';
-import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard';
+import { AvailabilityModule } from '../../src/modules/availability/availability.module';
+import { createTestApp, TestAppContext } from '../helpers/create-test-app';
+import { JwtAuthGuard } from '../../src/common/guards/jwt-auth.guard';
 
 describe('Potongan 4: Modul Vertikal Siteplan Properti & Denah Kursi Bus (Boundary & Lifecycle Test)', () => {
   let context: TestAppContext;

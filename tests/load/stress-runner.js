@@ -128,6 +128,17 @@ async function main() {
       'x-webhook-secret': process.env.WAHA_WEBHOOK_SECRET || 'rahasia_waha_webhook_super_aman_789!',
     }
   );
+
+  // Skenario 3: Auth Rate-Limiter & Brute-Force Shield Test
+  await runScenario(
+    '3. Auth Rate-Limiter Verification (POST /auth/login)',
+    `${BASE_URL}/api/v1/auth/login`,
+    'POST',
+    (i) => ({
+      email: `bot_${i}@spam.com`,
+      passwordPlain: 'SpamPassword123!',
+    })
+  );
 }
 
 main();

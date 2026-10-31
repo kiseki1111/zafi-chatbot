@@ -1,8 +1,8 @@
-import { INestApplication } from '@nestjs/common';
+﻿import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { AuthModule } from '../src/features/web-dashboard/auth/auth.module';
-import { PlatformModule } from '../src/modules/platform/platform.module';
-import { createTestApp, TestAppContext } from './helpers/create-test-app';
+import { AuthModule } from '../../src/features/web-dashboard/auth/auth.module';
+import { PlatformModule } from '../../src/modules/platform/platform.module';
+import { createTestApp, TestAppContext } from '../helpers/create-test-app';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 

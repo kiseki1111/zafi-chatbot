@@ -1,4 +1,4 @@
-import { INestApplication } from '@nestjs/common';
+﻿import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 
 jest.mock('@nestjs/schedule', () => ({
@@ -12,15 +12,15 @@ jest.mock('@nestjs/schedule', () => ({
   },
 }));
 
-import { FollowUpModule } from '../src/modules/waha/follow-up/follow-up.module';
-import { AvailabilityModule } from '../src/modules/availability/availability.module';
-import { KnowledgeModule } from '../src/modules/knowledge/knowledge.module';
-import { createTestApp, TestAppContext } from './helpers/create-test-app';
-import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard';
-import { WahaService } from '../src/modules/waha/waha.service';
-import { AgentSharedService } from '../src/core/agent-shared/agent-shared.service';
-import { DataAgentService } from '../src/features/knowledge-ingest/data-agent.service';
-import { OPENAI_CLIENT } from '../src/core/openai/openai.module';
+import { FollowUpModule } from '../../src/modules/waha/follow-up/follow-up.module';
+import { AvailabilityModule } from '../../src/modules/availability/availability.module';
+import { KnowledgeModule } from '../../src/modules/knowledge/knowledge.module';
+import { createTestApp, TestAppContext } from '../helpers/create-test-app';
+import { JwtAuthGuard } from '../../src/common/guards/jwt-auth.guard';
+import { WahaService } from '../../src/modules/waha/waha.service';
+import { AgentSharedService } from '../../src/core/agent-shared/agent-shared.service';
+import { DataAgentService } from '../../src/features/knowledge-ingest/data-agent.service';
+import { OPENAI_CLIENT } from '../../src/core/openai/openai.module';
 
 describe('Tier Phase 2: Feature Gating Modul (Lite & Bronze Restrictions)', () => {
   let context: TestAppContext;

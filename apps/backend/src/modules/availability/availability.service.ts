@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -12,6 +13,8 @@ const sharp = require('sharp');
 
 @Injectable()
 export class AvailabilityService {
+  private readonly logger = new Logger(AvailabilityService.name);
+
   constructor(public readonly prisma: PrismaService) {}
 
   async getGroups(tenantId: string) {
@@ -36,7 +39,7 @@ export class AvailabilityService {
         orderBy: { createdAt: 'desc' },
       });
     } catch (error: any) {
-      console.error('Error getGroups in AvailabilityService:', error);
+      this.logger.error('Error getGroups in AvailabilityService:', error?.stack || error?.message);
       return [];
     }
   }
@@ -87,7 +90,7 @@ export class AvailabilityService {
         include: { items: true },
       });
     } catch (error: any) {
-      console.error('Error createGroup in AvailabilityService:', error);
+      this.logger.error('Error createGroup in AvailabilityService:', error?.stack || error?.message);
       throw error;
     }
   }

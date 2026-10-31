@@ -25,13 +25,14 @@ import { SearchModule } from './modules/search/search.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['.env', 'apps/backend/.env'],
+      envFilePath: ['.env', '../../.env'],
       load: [jwtConfig],
     }),
     ThrottlerModule.forRoot([
       {
-        ttl: 900000,
-        limit: 3000,
+        name: 'default',
+        ttl: 60000,
+        limit: 120,
       },
     ]),
     ScheduleModule.forRoot(),

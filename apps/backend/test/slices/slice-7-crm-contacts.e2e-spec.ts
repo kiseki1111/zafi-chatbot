@@ -1,8 +1,8 @@
-import { INestApplication } from '@nestjs/common';
+﻿import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { ContactsModule } from '../src/modules/contacts/contacts.module';
-import { createTestApp, TestAppContext } from './helpers/create-test-app';
-import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard';
+import { ContactsModule } from '../../src/modules/contacts/contacts.module';
+import { createTestApp, TestAppContext } from '../helpers/create-test-app';
+import { JwtAuthGuard } from '../../src/common/guards/jwt-auth.guard';
 
 describe('Slice-7: CRM Contacts (CRUD + Search Filter + Tenant Isolation)', () => {
   let context: TestAppContext;

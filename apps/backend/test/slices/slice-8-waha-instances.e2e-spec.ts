@@ -1,11 +1,11 @@
-import { INestApplication } from '@nestjs/common';
+﻿import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { WahaModule } from '../src/modules/waha/waha.module';
-import { createTestApp, TestAppContext } from './helpers/create-test-app';
-import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard';
-import { WahaService } from '../src/modules/waha/waha.service';
-import { OmnichannelQueueService } from '../src/core/omnichannel/omnichannel-queue.service';
-import { CsService } from '../src/features/agent-cs/cs.service';
+import { WahaModule } from '../../src/modules/waha/waha.module';
+import { createTestApp, TestAppContext } from '../helpers/create-test-app';
+import { JwtAuthGuard } from '../../src/common/guards/jwt-auth.guard';
+import { WahaService } from '../../src/modules/waha/waha.service';
+import { OmnichannelQueueService } from '../../src/core/omnichannel/omnichannel-queue.service';
+import { CsService } from '../../src/features/agent-cs/cs.service';
 
 describe('Slice-8: WAHA Instance Management (Create, Lifecycle, Delete, Security)', () => {
   let context: TestAppContext;

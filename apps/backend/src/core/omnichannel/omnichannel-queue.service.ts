@@ -209,6 +209,7 @@ export class OmnichannelQueueService implements BeforeApplicationShutdown {
 
       const capacity = resolveTenantCapacity(tenant.metadata);
       if (capacity.isDeveloper) return false;
+      if (capacity.isTrialExpired) return true; // ponytail: trial 14 hari kadaluarsa otomatis hentikan bot
       if (capacity.planKey === null) return true; // Akun tanpa paket dianggap limit
 
       const instanceNames =

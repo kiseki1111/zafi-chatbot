@@ -174,11 +174,13 @@ export class ChatsService {
       );
     }
 
+    const safeTake = Math.min(Math.max(1, Number(take) || 20), 100);
+
     const messages = await this.prisma.message.findMany({
       where: { conversationId },
       orderBy: { createdAt: 'desc' },
       skip,
-      take,
+      take: safeTake,
       include: {
         sender: {
           select: { id: true, name: true },

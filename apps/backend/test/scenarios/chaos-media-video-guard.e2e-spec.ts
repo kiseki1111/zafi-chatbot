@@ -1,9 +1,9 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { CsService } from '../src/features/agent-cs/cs.service';
-import { WahaService } from '../src/modules/waha/waha.service';
-import { PrismaService } from '../src/core/prisma/prisma.service';
+﻿import { Test, TestingModule } from '@nestjs/testing';
+import { CsService } from '../../src/features/agent-cs/cs.service';
+import { WahaService } from '../../src/modules/waha/waha.service';
+import { PrismaService } from '../../src/core/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
-import { AgentSharedService } from '../src/core/agent-shared/agent-shared.service';
+import { AgentSharedService } from '../../src/core/agent-shared/agent-shared.service';
 import axios from 'axios';
 
 jest.mock('axios');

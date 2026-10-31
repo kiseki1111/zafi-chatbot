@@ -38,6 +38,10 @@ export class SearchService {
     limit = 6,
   ): Promise<SearchCategoryResult> {
     const t0 = Date.now();
+    // ponytail: fail-closed isolation jika non-superadmin tidak memiliki tenantId
+    if (!isSuperadmin && !tenantId) {
+      return { category: 'contact', items: [], totalMs: 0 };
+    }
     const where: any = {
       phone: { not: { contains: 'broadcast' } },
       OR: [
@@ -96,6 +100,10 @@ export class SearchService {
     limit = 5,
   ): Promise<SearchCategoryResult> {
     const t0 = Date.now();
+    // ponytail: fail-closed isolation jika non-superadmin tidak memiliki tenantId
+    if (!isSuperadmin && !tenantId) {
+      return { category: 'message', items: [], totalMs: 0 };
+    }
     const where: any = {
       content: { contains: q, mode: 'insensitive' },
       senderType: { in: ['customer', 'bot', 'agent'] },
@@ -154,6 +162,10 @@ export class SearchService {
     limit = 5,
   ): Promise<SearchCategoryResult> {
     const t0 = Date.now();
+    // ponytail: fail-closed isolation jika non-superadmin tidak memiliki tenantId
+    if (!isSuperadmin && !tenantId) {
+      return { category: 'knowledge', items: [], totalMs: 0 };
+    }
     const where: any = {
       OR: [{ content: { contains: q, mode: 'insensitive' } }],
     };
@@ -190,6 +202,10 @@ export class SearchService {
     limit = 6,
   ): Promise<SearchCategoryResult> {
     const t0 = Date.now();
+    // ponytail: fail-closed isolation jika non-superadmin tidak memiliki tenantId
+    if (!isSuperadmin && !tenantId) {
+      return { category: 'unit', items: [], totalMs: 0 };
+    }
     const where: any = {
       OR: [
         { code: { contains: q, mode: 'insensitive' } },
@@ -245,6 +261,10 @@ export class SearchService {
     limit = 5,
   ): Promise<SearchCategoryResult> {
     const t0 = Date.now();
+    // ponytail: fail-closed isolation jika non-superadmin tidak memiliki tenantId
+    if (!isSuperadmin && !tenantId) {
+      return { category: 'product', items: [], totalMs: 0 };
+    }
     const where: any = {
       OR: [
         { name: { contains: q, mode: 'insensitive' } },

@@ -3,7 +3,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import * as fs from 'fs';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { ForbiddenException, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -11,6 +11,11 @@ import helmet from 'helmet';
 
 async function bootstrap() {
   if (!process.env.DATABASE_URL) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'DATABASE_URL environment variable is required in production.',
+      );
+    }
     process.env.DATABASE_URL =
       'postgresql://postgres:secret_password@127.0.0.1:5432/rbac_api_db?schema=public';
   }
@@ -23,6 +28,13 @@ async function bootstrap() {
 
   // Normalisasi url webhook WAHA yang berulang atau memiliki prefix ganda
   app.use((req: any, res: any, next: any) => {
+    // ponytail: pasang correlation ID (x-request-id) untuk pelacakan log & debugging
+    const reqId =
+      req.headers['x-request-id'] ||
+      `req_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    req.id = reqId;
+    res.setHeader('X-Request-Id', reqId);
+
     if (req.url && req.url.startsWith('/api/waha/webhook')) {
       const queryIdx = req.url.indexOf('?');
       const query = queryIdx !== -1 ? req.url.substring(queryIdx) : '';
@@ -75,9 +87,34 @@ async function bootstrap() {
   } else {
     app.use(helmet());
   }
-  // 2. Mengaktifkan CORS fleksibel untuk frontend & webhook client
+  // 2. Mengaktifkan CORS aman: hanya izinkan origin resmi dan localhost dev
+  const allowedOrigins = (
+    process.env.CORS_ORIGIN ||
+    process.env.FRONTEND_URL ||
+    'http://localhost:3000,http://localhost:3001,https://app.zafii.tech,https://zafii.tech'
+  )
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
   app.enableCors({
-    origin: true,
+    origin: (origin, callback) => {
+      // Izinkan request tanpa origin (seperti mobile apps, curl, server-to-server webhook)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+        return callback(null, true);
+      }
+      // Di mode dev, izinkan semua origin localhost
+      if (
+        process.env.NODE_ENV !== 'production' &&
+        /^https?:\/\/localhost(:\d+)?$/.test(origin)
+      ) {
+        return callback(null, true);
+      }
+      return callback(
+        new ForbiddenException(`CORS origin not allowed: ${origin}`),
+      );
+    },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     credentials: true,
   });

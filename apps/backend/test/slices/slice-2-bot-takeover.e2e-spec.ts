@@ -1,11 +1,11 @@
-import { INestApplication } from '@nestjs/common';
+﻿import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { ChatsModule } from '../src/modules/chats/chats.module';
-import { OmnichannelQueueService } from '../src/core/omnichannel/omnichannel-queue.service';
-import { CsService } from '../src/features/agent-cs/cs.service';
-import { WahaService } from '../src/modules/waha/waha.service';
-import { createTestApp, TestAppContext } from './helpers/create-test-app';
-import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard';
+import { ChatsModule } from '../../src/modules/chats/chats.module';
+import { OmnichannelQueueService } from '../../src/core/omnichannel/omnichannel-queue.service';
+import { CsService } from '../../src/features/agent-cs/cs.service';
+import { WahaService } from '../../src/modules/waha/waha.service';
+import { createTestApp, TestAppContext } from '../helpers/create-test-app';
+import { JwtAuthGuard } from '../../src/common/guards/jwt-auth.guard';
 
 describe('Potongan 2: Bot WhatsApp & Human Takeover (Boundary & Lifecycle Test)', () => {
   let context: TestAppContext;

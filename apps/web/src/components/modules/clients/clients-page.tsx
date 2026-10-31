@@ -48,6 +48,7 @@ import {
   Sparkles,
   SlidersHorizontal,
   Zap,
+  Copy,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthStore } from "@/lib/auth-store";
@@ -226,14 +227,22 @@ export function ClientsPage() {
 
   // Dialog Tambah Klien Baru
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [createdTrialInfo, setCreatedTrialInfo] = useState<{
+    open: boolean;
+    companyName: string;
+    email: string;
+    passwordPlain: string;
+    expiresAt: string;
+    welcomeMessage: string;
+  } | null>(null);
   const [addForm, setAddForm] = useState({
     companyName: "",
     category: "general",
     managerName: "",
     managerEmail: "",
-    managerPassword: "Password@123",
+    managerPassword: "Trial@123",
     customFeatureNotes: "",
-    enabledMenus: ["chatbot", "crm"],
+    enabledMenus: ["chatbot", "crm", "overview", "settings"],
   });
 
   // Dialog Edit Profil & Konfigurasi Klien
@@ -424,16 +433,36 @@ export function ClientsPage() {
       });
 
       if (res.ok) {
-        toast.success("Klien baru & akun manager berhasil dibuat!");
+        const data = await res.json().catch(() => ({}));
         setIsAddModalOpen(false);
+
+        const expDate = data.trialExpiresAt
+          ? new Date(data.trialExpiresAt).toLocaleDateString("id-ID", {
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+            })
+          : "14 Hari ke Depan";
+
+        setCreatedTrialInfo({
+          open: true,
+          companyName: addForm.companyName,
+          email: addForm.managerEmail,
+          passwordPlain: addForm.managerPassword || "Trial@123",
+          expiresAt: expDate,
+          welcomeMessage:
+            data.welcomeMessage ||
+            `Halo ${addForm.managerName || "Bapak/Ibu"}, akun trial 14 hari ${addForm.companyName} Anda sudah aktif!\n\n🔗 Dashboard: https://app.zafii.tech\n📧 Email: ${addForm.managerEmail}\n🔑 Password: ${addForm.managerPassword || "Trial@123"}\n⏳ Masa Berlaku: 14 Hari (s/d ${expDate})\n\nSilakan login ke dashboard untuk mencoba bot AI WhatsApp dan fitur CRM kami. Bila ada kendala, tim kami siap membantu!`,
+        });
+
         setAddForm({
           companyName: "",
           category: "general",
           managerName: "",
           managerEmail: "",
-          managerPassword: "Password@123",
+          managerPassword: "Trial@123",
           customFeatureNotes: "",
-          enabledMenus: ["chatbot", "crm"],
+          enabledMenus: ["chatbot", "crm", "overview", "settings"],
         });
         fetchClients();
       } else {
@@ -828,6 +857,15 @@ export function ClientsPage() {
                 <strong className="text-sm font-mono font-bold text-foreground">
                   {(selectedClient.quota?.aiResponsesUsed || 0).toLocaleString()} / {(selectedClient.quota?.maxAiResponses || 0).toLocaleString()}
                 </strong>
+              </div>
+              <div className="px-3 py-2 rounded-2xl bg-background border shadow-2xs text-center min-w-[95px]">
+                <span className="text-muted-foreground block text-[10px] font-medium">Token Digunakan</span>
+                <strong className="text-sm font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                  {(selectedClient.quota?.tokensUsed || 0).toLocaleString()}
+                </strong>
+                <span className="block text-[9px] text-muted-foreground font-mono">
+                  ~Rp {(selectedClient.quota?.estimatedCostIdr || 0).toLocaleString()}
+                </span>
               </div>
               <Button
                 size="sm"
@@ -2195,6 +2233,9 @@ export function ClientsPage() {
                         <span className="font-mono text-[11px] text-muted-foreground">
                           AI: {(client.quota?.aiResponsesUsed || 0).toLocaleString()}/{(client.quota?.maxAiResponses || 0).toLocaleString()}
                         </span>
+                        <span className="font-mono text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">
+                          Token: {(client.quota?.tokensUsed || 0).toLocaleString()} tk (~Rp {(client.quota?.estimatedCostIdr || 0).toLocaleString()})
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -2303,7 +2344,75 @@ export function ClientsPage() {
             <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setIsAddModalOpen(false)}>Batal</Button>
             <Button size="sm" onClick={handleCreateClient} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-              Simpan Perusahaan
+              Buat Akun Trial 14 Hari
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIALOG: SUKSES GENERATE TRIAL KLIEN (ONE-CLICK COPY WHATSAPP) */}
+      <Dialog
+        open={Boolean(createdTrialInfo?.open)}
+        onOpenChange={(open) => !open && setCreatedTrialInfo(null)}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-emerald-600">
+              <Sparkles className="h-5 w-5" />
+              Akun Trial 14 Hari Berhasil Dibuat!
+            </DialogTitle>
+            <DialogDescription>
+              Klien langsung aktif dengan paket Lite (300 MAU, 1.000 respons AI, 1 nomor WhatsApp).
+            </DialogDescription>
+          </DialogHeader>
+
+          {createdTrialInfo && (
+            <div className="space-y-3 text-xs">
+              <div className="rounded-lg border border-border/80 bg-muted/40 p-3.5 space-y-2">
+                <div className="flex justify-between items-center text-muted-foreground">
+                  <span>Perusahaan:</span>
+                  <span className="font-semibold text-foreground">{createdTrialInfo.companyName}</span>
+                </div>
+                <div className="flex justify-between items-center text-muted-foreground">
+                  <span>Email Login:</span>
+                  <span className="font-mono font-semibold text-foreground">{createdTrialInfo.email}</span>
+                </div>
+                <div className="flex justify-between items-center text-muted-foreground">
+                  <span>Password:</span>
+                  <span className="font-mono font-semibold text-foreground">{createdTrialInfo.passwordPlain}</span>
+                </div>
+                <div className="flex justify-between items-center text-muted-foreground">
+                  <span>Masa Berlaku:</span>
+                  <Badge variant="outline" className="text-emerald-600 border-emerald-500/40 font-mono text-[11px]">
+                    14 Hari (s/d {createdTrialInfo.expiresAt})
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="rounded-md border bg-background p-2.5 text-[11px] text-muted-foreground font-mono whitespace-pre-wrap max-h-36 overflow-y-auto">
+                {createdTrialInfo.welcomeMessage}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
+              onClick={() => {
+                if (createdTrialInfo?.welcomeMessage) {
+                  navigator.clipboard.writeText(createdTrialInfo.welcomeMessage);
+                  toast.success("Pesan WhatsApp berhasil disalin! Silakan paste ke chat calon klien.");
+                }
+              }}
+            >
+              <Copy className="h-4 w-4" />
+              Salin Pesan WhatsApp
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setCreatedTrialInfo(null)}
+            >
+              Selesai
             </Button>
           </DialogFooter>
         </DialogContent>

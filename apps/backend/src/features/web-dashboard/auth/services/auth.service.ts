@@ -2,6 +2,7 @@ import {
   Injectable,
   UnauthorizedException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -20,9 +21,10 @@ export class AuthService {
 
   //Fungsi Login Utama mematuhi Security Hardening Layer TDD
   async login(dto: LoginDto, ipAddress: string, userAgent: string) {
-    //Cari user berdasarkan email memanfaatkan relasi userRoles resmi
+    //Cari user beserta status tenant untuk evaluasi masa trial
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email, deletedAt: null },
+      include: { tenant: true },
     });
 
     // Cek mode bypass dari env
@@ -53,6 +55,19 @@ export class AuthService {
         },
       });
       throw new UnauthorizedException('Alamat email atau password keliru.');
+    }
+
+    // ponytail: validasi kedaluwarsa akun trial 14 hari
+    if (user.role !== 'superadmin' && user.tenant) {
+      const meta = (user.tenant.metadata as any) || {};
+      if (meta.isTrial && meta.trialExpiresAt) {
+        const isExpired = new Date(meta.trialExpiresAt).getTime() < Date.now();
+        if (isExpired) {
+          throw new ForbiddenException(
+            'Masa trial 14 hari akun Anda telah berakhir. Silakan hubungi tim kami untuk memperpanjang atau upgrade ke paket berbayar.',
+          );
+        }
+      }
     }
 
     //Ekstraksi kode peran yang dikantongi pengguna untuk payload JWT
@@ -129,21 +144,26 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(dto.passwordPlain, 10);
 
-    const tenant = await this.prisma.tenant.create({
-      data: {
-        name: dto.name ? `Toko ${dto.name}` : 'Toko Baru',
-        phone: dto.phone,
-      },
-    });
+    // ponytail: atomic transaction untuk pembuatan tenant & user awal
+    const { tenant, user } = await this.prisma.$transaction(async (tx) => {
+      const newTenant = await tx.tenant.create({
+        data: {
+          name: dto.name ? `Toko ${dto.name}` : 'Toko Baru',
+          phone: dto.phone,
+        },
+      });
 
-    const user = await this.prisma.user.create({
-      data: {
-        email: dto.email,
-        name: dto.name,
-        password: hashedPassword,
-        role: 'manager',
-        tenantId: tenant.id,
-      },
+      const newUser = await tx.user.create({
+        data: {
+          email: dto.email,
+          name: dto.name,
+          password: hashedPassword,
+          role: 'manager',
+          tenantId: newTenant.id,
+        },
+      });
+
+      return { tenant: newTenant, user: newUser };
     });
 
     const userRolesArray = [user.role];

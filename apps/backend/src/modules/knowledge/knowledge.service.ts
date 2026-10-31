@@ -513,7 +513,7 @@ ${cleanDesc ? `Keterangan: ${cleanDesc}` : ''}`.trim();
         updatedAt: result.updatedAt,
       };
     } catch (error: any) {
-      this.logger.error('DB Insert Error:', error);
+      this.logger.error('DB Insert Error:', error?.stack || error?.message);
       throw new BadRequestException('Database insert failed: ' + error.message);
     }
   }

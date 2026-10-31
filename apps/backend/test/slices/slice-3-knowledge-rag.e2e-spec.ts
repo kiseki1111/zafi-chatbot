@@ -1,10 +1,10 @@
-import { INestApplication } from '@nestjs/common';
+﻿import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { KnowledgeModule } from '../src/modules/knowledge/knowledge.module';
-import { createTestApp, TestAppContext } from './helpers/create-test-app';
-import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard';
-import { OPENAI_CLIENT } from '../src/core/openai/openai.module';
-import { DataAgentService } from '../src/features/knowledge-ingest/data-agent.service';
+import { KnowledgeModule } from '../../src/modules/knowledge/knowledge.module';
+import { createTestApp, TestAppContext } from '../helpers/create-test-app';
+import { JwtAuthGuard } from '../../src/common/guards/jwt-auth.guard';
+import { OPENAI_CLIENT } from '../../src/core/openai/openai.module';
+import { DataAgentService } from '../../src/features/knowledge-ingest/data-agent.service';
 
 describe('Potongan 3: Knowledge Base RAG Ingestion (Boundary & Multi-Tenant Isolation Test)', () => {
   let context: TestAppContext;

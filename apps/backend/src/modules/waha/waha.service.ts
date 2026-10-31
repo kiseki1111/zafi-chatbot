@@ -362,12 +362,41 @@ export class WahaService implements OnApplicationBootstrap {
           where: tenantId ? { tenantId } : {},
           orderBy: { createdAt: 'desc' },
         });
-        return dbInstances.map((inst) => ({
-          name: inst.instanceName,
-          status: inst.status,
-          me: { id: inst.phone, pushName: inst.profileName },
-          dbStats: inst,
-        }));
+        return Promise.all(
+          dbInstances.map(async (inst) => {
+            const botMessages = await Promise.resolve(
+              this.prisma.message.findMany({
+                where: {
+                  senderType: 'bot',
+                  conversation: { instanceName: inst.instanceName },
+                },
+                select: { metadata: true },
+              }),
+            ).catch(() => []);
+
+            let sessionTokens = 0;
+            for (const m of botMessages) {
+              const meta = m.metadata as any;
+              sessionTokens += Number(meta?.tokens?.total) || 1230;
+            }
+            const estimatedCostIdr = Math.round((sessionTokens / 1000) * 2.56);
+
+            return {
+              name: inst.instanceName,
+              status: inst.status,
+              me: { id: inst.phone, pushName: inst.profileName },
+              messagesCount: botMessages.length,
+              tokensUsed: sessionTokens,
+              estimatedCostIdr,
+              dbStats: {
+                ...inst,
+                messagesCount: botMessages.length,
+                tokensUsed: sessionTokens,
+                estimatedCostIdr,
+              },
+            };
+          }),
+        );
       }
 
       const activeNames = new Set(wahaSessions.map((ws) => ws.name));
@@ -398,7 +427,37 @@ export class WahaService implements OnApplicationBootstrap {
               profileName: ws.me?.pushName,
             },
           });
-          return { ...ws, dbStats: instance };
+
+          // ponytail: hitung akumulasi pesan bot & token yang terpakai pada sesi WAHA ini
+          const botMessages = await Promise.resolve(
+            this.prisma.message.findMany({
+              where: {
+                senderType: 'bot',
+                conversation: { instanceName: ws.name },
+              },
+              select: { metadata: true },
+            }),
+          ).catch(() => []);
+
+          let sessionTokens = 0;
+          for (const m of botMessages) {
+            const meta = m.metadata as any;
+            sessionTokens += Number(meta?.tokens?.total) || 1230;
+          }
+          const estimatedCostIdr = Math.round((sessionTokens / 1000) * 2.56);
+
+          return {
+            ...ws,
+            messagesCount: botMessages.length,
+            tokensUsed: sessionTokens,
+            estimatedCostIdr,
+            dbStats: {
+              ...instance,
+              messagesCount: botMessages.length,
+              tokensUsed: sessionTokens,
+              estimatedCostIdr,
+            },
+          };
         }),
       );
 

@@ -17,9 +17,10 @@
     "test:web:e2e": "npm run test:e2e -w nextjs_tailwind_shadcn_ts",
     "test:security": "node tests/security/penetration-test.js",
     "test:stress": "node tests/load/stress-runner.js",
+    "test:load": "k6 run tests/load/api-load-test.js",
     "test:persona": "node scripts/persona-user-tester.js",
     "test:waha:real": "node apps/backend/scripts/test-waha-real.js",
-    "test:waha:voice": "node scripts/test-send-voice-note.js",
-    "test:waha:siteplan": "node scripts/test-siteplan-delivery.js"
+    "test:waha:voice": "node tests/manual/test-send-voice-note.js",
+    "test:waha:siteplan": "node tests/manual/test-siteplan-delivery.js"
   }
 }

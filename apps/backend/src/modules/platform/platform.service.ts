@@ -128,6 +128,12 @@ export class PlatformService {
           aiUsed,
           mauPercent: maxMau ? Math.round((mauUsed / maxMau) * 100) : 0,
           aiPercent: maxAi ? Math.round((aiUsed / maxAi) * 100) : 0,
+          tokensUsed: Number(meta.totalTokensUsed) || Math.round(aiUsed * 1700),
+          estimatedCostIdr: Math.round(
+            ((Number(meta.totalTokensUsed) || Math.round(aiUsed * 1700)) /
+              1000) *
+              2.56,
+          ),
           instances: t._count.whatsappInstances,
         };
       }),
