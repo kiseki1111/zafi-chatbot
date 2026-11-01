@@ -12,11 +12,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Bot, Save, Smartphone, ShieldCheck, Loader2, Plus, Trash2, QrCode, Palette, Wrench, Settings, Users, Sparkles, CheckCircle2, Zap } from "lucide-react";
+import { Bot, Save, Smartphone, ShieldCheck, Loader2, Plus, Trash2, QrCode, Palette, Wrench, Settings, Users, Sparkles, CheckCircle2, Zap, Compass } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthStore } from "@/lib/auth-store";
 import { cn } from "@/lib/utils";
 import { WarnaWebsiteTab } from "./color-tab";
+import { OnboardingWizardDialog } from "@/components/modules/onboarding/onboarding-wizard-dialog";
+import { useMenuGuide } from "@/lib/use-menu-guide";
+import { MenuGuideBanner } from "@/components/dashboard/menu-guide-banner";
 
 export function SettingsPage({ defaultTab = "bot" }: { defaultTab?: string }) {
   const [activeTab, setActiveTab] = React.useState(defaultTab);
@@ -78,6 +81,10 @@ function BotSettingsTab() {
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [showPrompt, setShowPrompt] = React.useState(false);
+  const [onboardingOpen, setOnboardingOpen] = React.useState(false);
+  const [tenantInfo, setTenantInfo] = React.useState<any>(null);
+
+  const { seen, markSeen, reset } = useMenuGuide("settings");
 
   // Quota & Billing state
   const [quota, setQuota] = React.useState<{
@@ -134,6 +141,7 @@ function BotSettingsTab() {
           const data = json?.data || json;
           const tenant = data?.tenant;
           if (tenant) {
+            setTenantInfo(tenant);
             setSettings({
               agentName: tenant.agentName || "Luna",
               phone: tenant.phone || "",
@@ -217,6 +225,15 @@ function BotSettingsTab() {
 
   return (
     <div className="space-y-6">
+      {!seen && (
+        <MenuGuideBanner
+          title="Pengaturan Bisnis & Asisten AI"
+          description="Sesuaikan profil perusahaan, jam operasional, warna tema, serta gaya bahasa asisten AI saat membalas pesan WhatsApp pelanggan."
+          actionLabel="Jalankan Panduan Onboarding"
+          onAction={() => setOnboardingOpen(true)}
+          onClose={markSeen}
+        />
+      )}
 
       {quota && (
         <Card className="p-3 bg-muted/20 border shadow-2xs">
@@ -347,13 +364,21 @@ function BotSettingsTab() {
       )}
 
       <Card>
-
-          <CardHeader className="pb-3 border-b mb-4">
-            <div>
-              <CardTitle className="text-lg">Identitas Asisten Bot (Menjawab Pesan)</CardTitle>
-              <CardDescription>Atur nama, gaya bahasa, dan perilaku asisten saat membalas pesan masuk.</CardDescription>
-            </div>
-          </CardHeader>
+        <CardHeader className="pb-3 border-b mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <CardTitle className="text-lg">Identitas Asisten Bot (Menjawab Pesan)</CardTitle>
+            <CardDescription>Atur nama, gaya bahasa, dan perilaku asisten saat membalas pesan masuk.</CardDescription>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setOnboardingOpen(true)}
+            className="text-xs h-8 gap-1.5 self-start sm:self-auto border-emerald-600/30 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+          >
+            <Compass className="h-3.5 w-3.5 text-emerald-600" /> Jalankan Panduan Onboarding
+          </Button>
+        </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid gap-6 md:grid-cols-2">
             <div className="space-y-4">
@@ -489,6 +514,41 @@ function BotSettingsTab() {
           </div>
         </CardContent>
       </Card>
+
+      <OnboardingWizardDialog
+        open={onboardingOpen}
+        onOpenChange={setOnboardingOpen}
+        initialData={{
+          storeName: tenantInfo?.name || "",
+          category: tenantInfo?.category || "general",
+          phone: settings.phone,
+          address: settings.address,
+          agentName: settings.agentName,
+          agentTone: settings.agentTone,
+          instructions: tenantInfo?.extraInfo || "",
+        }}
+        onSuccess={() => {
+          // Refresh settings dari server
+          const targetId = user?.tenantId || (user?.id?.startsWith('u-') ? 'demo' : user?.id) || 'demo';
+          fetch(`/api/v1/tenant/${targetId}/dashboard`)
+            .then(r => r.ok ? r.json() : null)
+            .then(d => {
+              const t = d?.data?.tenant || d?.tenant;
+              if (t) {
+                setTenantInfo(t);
+                setSettings({
+                  agentName: t.agentName || "Luna",
+                  phone: t.phone || "",
+                  agentTone: t.agentTone || "ramah dan profesional",
+                  operatingHours: t.operatingHours || "",
+                  address: t.address || "",
+                  greetingMsg: t.greetingMsg || "",
+                  systemPrompt: t.systemPrompt || "",
+                });
+              }
+            });
+        }}
+      />
     </div>
   );
 }

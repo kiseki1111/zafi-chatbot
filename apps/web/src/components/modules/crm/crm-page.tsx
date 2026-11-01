@@ -34,7 +34,10 @@ import {
   FileSpreadsheet,
   History,
   Clock,
+  HelpCircle,
 } from "lucide-react";
+import { useMenuGuide } from "@/lib/use-menu-guide";
+import { MenuGuideBanner } from "@/components/dashboard/menu-guide-banner";
 import { useAppStore } from "@/lib/app-store";
 import { useAuthStore } from "@/lib/auth-store";
 import { MOCK_CRM_CONTACTS } from "@/lib/mock-data";
@@ -168,6 +171,8 @@ export function CrmPage() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [selectedLogContact, setSelectedLogContact] = useState<ContactData | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { seen, markSeen, reset } = useMenuGuide("crm");
 
   // Debounce search — hanya filter setelah user berhenti mengetik 400ms
   const handleSearchChange = (val: string) => {
@@ -468,7 +473,18 @@ export function CrmPage() {
               <Users className="h-5 w-5" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-foreground truncate">Pelanggan</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg sm:text-xl font-bold tracking-tight text-foreground truncate">Pelanggan</h1>
+                <button
+                  type="button"
+                  onClick={reset}
+                  title="Buka Panduan Pelanggan"
+                  aria-label="Buka panduan pelanggan"
+                  className="text-muted-foreground hover:text-emerald-600 p-1 rounded-md transition-colors"
+                >
+                  <HelpCircle className="h-4 w-4" />
+                </button>
+              </div>
               <p className="text-xs text-muted-foreground mt-0.5 truncate">{filteredContacts.length} data pelanggan terdaftar</p>
             </div>
           </div>
@@ -521,6 +537,17 @@ export function CrmPage() {
           </div>
         </div>
       </div>
+
+      {!seen && (
+        <MenuGuideBanner
+          title="Buku Kontak & Lead Pelanggan"
+          description="Semua kontak yang pernah chat ke WhatsApp tersimpan otomatis di sini, lengkap dengan catatan prospek, status deal, dan riwayat interaksi."
+          actionLabel="Tambah pelanggan baru"
+          onAction={handleAddRow}
+          onClose={markSeen}
+          className="mb-2"
+        />
+      )}
 
       {/* Main Container: Tabel mengisi seluruh div tanpa gap / padding padding internal */}
       <div className="rounded-xl border bg-card flex-1 flex flex-col min-h-0 overflow-hidden shadow-xs">

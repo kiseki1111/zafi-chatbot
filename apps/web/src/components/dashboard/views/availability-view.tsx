@@ -15,8 +15,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Plus, Search, Edit3, Trash2, CheckCircle2, Clock, XCircle, Wrench, Layers, RefreshCw, Upload, Image, FileVideo, ExternalLink, Play, Copy, Check, Film, BookOpen, Sparkles, FileText, User, AlertTriangle, Home, LandPlot, Building2, SlidersHorizontal, Calculator, Tag, Move, Download, Camera, MapPin, Compass, LayoutGrid, RotateCw, X, Lock
+  Plus, Search, Edit3, Trash2, CheckCircle2, Clock, XCircle, Wrench, Layers, RefreshCw, Upload, Image, FileVideo, ExternalLink, Play, Copy, Check, Film, BookOpen, Sparkles, FileText, User, AlertTriangle, Home, LandPlot, Building2, SlidersHorizontal, Calculator, Tag, Move, Download, Camera, MapPin, Compass, LayoutGrid, RotateCw, X, Lock, HelpCircle
 } from "lucide-react";
+import { useMenuGuide } from "@/lib/use-menu-guide";
+import { MenuGuideBanner } from "@/components/dashboard/menu-guide-banner";
 import { useAuthStore } from "@/lib/auth-store";
 import { useBackgroundTasksStore } from "@/lib/background-tasks-store";
 import { useToast } from "@/hooks/use-toast";
@@ -206,6 +208,8 @@ export function AvailabilityView() {
     packageType: "",
     packagePrice: "",
   });
+
+  const { seen, markSeen, reset } = useMenuGuide("availability");
 
   // Direct Canva-style Mouse Selection, Drag to Move & Resize
   const [viewMode, setViewMode] = useState<"canvas" | "matrix">("canvas");
@@ -1695,8 +1699,17 @@ export function AvailabilityView() {
     <div className="space-y-6">
       {/* Top Header */}
       <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
           <h2 className="text-lg sm:text-xl font-bold tracking-tight text-foreground truncate">Siteplan</h2>
+          <button
+            type="button"
+            onClick={reset}
+            title="Buka Panduan Siteplan"
+            aria-label="Buka panduan siteplan"
+            className="text-muted-foreground hover:text-emerald-600 p-1 rounded-md transition-colors"
+          >
+            <HelpCircle className="h-4 w-4" />
+          </button>
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
@@ -1711,6 +1724,16 @@ export function AvailabilityView() {
           </Button>
         </div>
       </div>
+
+      {!seen && (
+        <MenuGuideBanner
+          title="Denah Siteplan & Ketersediaan Unit"
+          description="Kelola blok kavling atau unit perumahan secara visual. Bot WhatsApp otomatis mengetahui status unit mana saja yang ready, booked, atau sudah sold out."
+          actionLabel="Tambah unit kavling"
+          onAction={openCreateModal}
+          onClose={markSeen}
+        />
+      )}
 
       {/* Tabs / Grup Selector & Actions */}
       {groups.length > 0 && (

@@ -79,6 +79,12 @@ export class TenantController {
     return this.tenantService.getDashboardOverview(targetId);
   }
 
+  @Patch(':userId/checklist/dismiss')
+  async dismissChecklist(@Param('userId') userId: string, @Req() req: any) {
+    const targetId = this.resolveTenantUserId(userId, req);
+    return this.tenantService.dismissChecklist(targetId);
+  }
+
   @Patch(':userId/settings')
   async updateSettings(
     @Param('userId') userId: string,

@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Brain, Save, RefreshCw, Key, ShieldCheck, Cpu } from "lucide-react";
+import { Brain, Save, RefreshCw, Key, ShieldCheck, Cpu, ToggleRight, Sparkles } from "lucide-react";
 
 interface AiConfig {
   defaultProvider: string;
@@ -33,17 +33,27 @@ const DEFAULT_CONFIG: AiConfig = {
 
 export function AiConfigPage() {
   const [config, setConfig] = useState<AiConfig>(DEFAULT_CONFIG);
+  const [disableGlobalOnboarding, setDisableGlobalOnboarding] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const fetchConfig = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/v1/platform/config/ai_config");
-      const json = await res.json();
+      const [aiRes, obRes] = await Promise.all([
+        fetch("/api/v1/platform/config/ai_config"),
+        fetch("/api/v1/platform/config/disable_global_onboarding"),
+      ]);
+      const json = await aiRes.json();
       const val = json?.data || json;
       if (val && typeof val === "object") {
         setConfig({ ...DEFAULT_CONFIG, ...val });
+      }
+
+      if (obRes.ok) {
+        const obJson = await obRes.json();
+        const obVal = obJson?.data?.value ?? obJson?.value;
+        setDisableGlobalOnboarding(Boolean(obVal === true || obVal === 'true'));
       }
     } catch {
       // fallback
@@ -60,12 +70,19 @@ export function AiConfigPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      await fetch("/api/v1/platform/config/ai_config", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ value: config }),
-      });
-      toast.success("Konfigurasi AI platform berhasil disimpan!");
+      await Promise.all([
+        fetch("/api/v1/platform/config/ai_config", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ value: config }),
+        }),
+        fetch("/api/v1/platform/config/disable_global_onboarding", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ value: disableGlobalOnboarding }),
+        }),
+      ]);
+      toast.success("Konfigurasi AI & Sistem platform berhasil disimpan!");
     } catch {
       toast.error("Gagal menyimpan konfigurasi");
     } finally {
@@ -176,6 +193,36 @@ export function AiConfigPage() {
               />
               <p className="text-[10px] text-muted-foreground">Nilai rendah (0.1-0.3) membuat jawaban lebih faktual & minim halusinasi.</p>
             </div>
+          </div>
+        </Card>
+
+        {/* Global Onboarding & User Experience Control */}
+        <Card className="p-5 space-y-4 border-amber-500/20 bg-gradient-to-r from-amber-500/5 to-transparent">
+          <div className="flex items-center gap-2 border-b pb-3">
+            <Sparkles className="h-4 w-4 text-amber-600" />
+            <h3 className="font-bold text-sm">Kontrol Onboarding Pengguna Global</h3>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 p-3 rounded-xl bg-card border">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-xs text-foreground">
+                  Nonaktifkan Onboarding Otomatis untuk Semua Akun Klien
+                </span>
+                {disableGlobalOnboarding && (
+                  <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-300">
+                    Nonaktif Global
+                  </Badge>
+                )}
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Jika diaktifkan, wizard onboarding 3-langkah <strong>TIDAK AKAN PERNAH</strong> muncul secara otomatis pada akun tenant baru mana pun saat pertama kali login.
+              </p>
+            </div>
+            <Switch
+              checked={disableGlobalOnboarding}
+              onCheckedChange={setDisableGlobalOnboarding}
+            />
           </div>
         </Card>
 

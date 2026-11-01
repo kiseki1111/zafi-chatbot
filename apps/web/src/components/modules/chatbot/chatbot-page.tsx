@@ -65,7 +65,11 @@ import {
   Play,
   Pause,
   Mic,
+  FileText,
+  HelpCircle,
 } from "lucide-react";
+import { useMenuGuide } from "@/lib/use-menu-guide";
+import { MenuGuideBanner } from "@/components/dashboard/menu-guide-banner";
 import type {
   Contact,
   ChatMessage,
@@ -890,7 +894,7 @@ function ContactInfoPanel({
 
 export function ChatbotPage() {
   const { user } = useAuthStore();
-  const { activeContactId, setActiveContactId, activeSessionId, setActiveSessionId } = useAppStore();
+  const { activeContactId, setActiveContactId, activeSessionId, setActiveSessionId, setView } = useAppStore();
   const me = user?.name ?? "Saya";
   const [sessions, setSessions] = useState<{id: string, name: string, status: string, battery?: number}[]>([]);
   const sessionId = activeSessionId || "";
@@ -1006,6 +1010,8 @@ export function ChatbotPage() {
     isMauExceeded: false,
     isAiResponsesExceeded: false,
   });
+
+  const { seen, markSeen, reset } = useMenuGuide("chatbot");
 
   const fetchQuota = () => {
     const fetchId =
@@ -1659,8 +1665,28 @@ export function ChatbotPage() {
               Online
             </span>
           )}
+          <button
+            type="button"
+            onClick={reset}
+            title="Buka Panduan Bot WhatsApp"
+            aria-label="Buka panduan bot whatsapp"
+            className="text-muted-foreground hover:text-emerald-600 p-1 rounded-md transition-colors"
+          >
+            <HelpCircle className="h-4 w-4" />
+          </button>
         </div>
       </div>
+
+      {!seen && (
+        <MenuGuideBanner
+          title="Pusat Percakapan WhatsApp"
+          description="Semua chat WhatsApp pelanggan masuk ke sini. Bot AI otomatis membalas pertanyaan pelanggan 24/7 kecuali Anda mengambil alih percakapan (mode Admin)."
+          actionLabel="Hubungkan WhatsApp"
+          onAction={() => setView("settings")}
+          onClose={markSeen}
+          className="mb-1"
+        />
+      )}
 
       {/* ===== Main 3-column ===== */}
       <div className="flex-1 flex gap-2 min-h-0">

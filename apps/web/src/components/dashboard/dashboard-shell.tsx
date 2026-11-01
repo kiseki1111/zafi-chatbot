@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/lib/auth-store";
 import { useAppStore } from "@/lib/app-store";
@@ -9,6 +9,7 @@ import { Topbar } from "./topbar";
 import { BottomNav } from "./bottom-nav";
 import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/skeleton";
+import { OnboardingWizardDialog } from "@/components/modules/onboarding/onboarding-wizard-dialog";
 
 // ponytail: Lazy load semua halaman biar Next.js nggak compile semuanya di awal.
 const Loading = () => <div className="p-8 space-y-4"><Skeleton className="h-8 w-64" /><Skeleton className="h-[400px] w-full" /></div>;
@@ -43,11 +44,15 @@ export function DashboardShell() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const viewParam = searchParams.get("view");
+
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [onboardingInitialData, setOnboardingInitialData] = useState<any>({});
+
   // 1. Sync URL -> State (On Load or Back Button)
   useEffect(() => {
     if (!user) return;
 
-    // Load custom color palette if available (reset ke default dulu jika tidak ada palette per-akun)
+    // Load custom color palette & cek status isOnboarded
     if (user.role === "superadmin" || !user.tenantId) {
       document.documentElement.style.setProperty("--brand-primary", "#059669");
       document.documentElement.style.setProperty("--brand-secondary", "#0d9488");
@@ -65,6 +70,30 @@ export function DashboardShell() {
           document.documentElement.style.setProperty("--brand-primary", primary);
           document.documentElement.style.setProperty("--brand-secondary", secondary);
           document.documentElement.style.setProperty("--brand-accent", accent);
+
+          // Cek status Onboarding: jika belum onboarded DAN tidak dinonaktifkan secara global oleh superadmin
+          const isGlobalDisabled = Boolean(
+            data?.isGlobalOnboardingDisabled ||
+            data?.data?.isGlobalOnboardingDisabled
+          );
+
+          if (
+            tenant &&
+            tenant.isOnboarded === false &&
+            !isGlobalDisabled &&
+            user.role !== "superadmin"
+          ) {
+            setOnboardingInitialData({
+              storeName: tenant.name || "",
+              category: tenant.category || "general",
+              phone: tenant.phone || "",
+              address: tenant.address || "",
+              agentName: tenant.agentName || "Luna",
+              agentTone: tenant.agentTone || "Santai & Ramah (Kak, Sis, Bro)",
+              instructions: tenant.extraInfo || "",
+            });
+            setOnboardingOpen(true);
+          }
         })
         .catch(() => {
           document.documentElement.style.setProperty("--brand-primary", "#059669");
@@ -147,6 +176,13 @@ export function DashboardShell() {
         {/* Mobile Bottom Navigation for PWA */}
         <BottomNav />
       </div>
+
+      {/* Onboarding Wizard Dialog */}
+      <OnboardingWizardDialog
+        open={onboardingOpen}
+        onOpenChange={setOnboardingOpen}
+        initialData={onboardingInitialData}
+      />
     </div>
   );
 }

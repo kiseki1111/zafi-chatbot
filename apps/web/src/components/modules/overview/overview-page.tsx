@@ -14,6 +14,7 @@ import {
   Settings, ArrowRight, CheckCircle2, XCircle,
   Loader2, RefreshCw, BookOpen, Zap, Activity, Sparkles, Users,
 } from "lucide-react";
+import { GettingStartedChecklist, SetupChecklistData } from "@/components/dashboard/getting-started-checklist";
 
 interface TenantData {
   name: string;
@@ -44,6 +45,7 @@ export function OverviewPage() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [sessions, setSessions] = useState<WaSession[]>([]);
   const [knowledgeCount, setKnowledgeCount] = useState(0);
+  const [setupChecklist, setSetupChecklist] = useState<SetupChecklistData | undefined>(undefined);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -56,6 +58,7 @@ export function OverviewPage() {
     let loadedMetrics: Metrics | null = null;
     let loadedSessions: WaSession[] = [];
     let loadedKbCount = 0;
+    let loadedChecklist: SetupChecklistData | undefined = undefined;
 
     try {
       // 1. Tenant dashboard
@@ -66,6 +69,7 @@ export function OverviewPage() {
         const dash = raw?.data || raw;
         if (dash?.tenant) loadedTenant = dash.tenant;
         if (dash?.metrics) loadedMetrics = dash.metrics;
+        if (dash?.setupChecklist) loadedChecklist = dash.setupChecklist;
       }
     } catch {}
 
@@ -125,6 +129,7 @@ export function OverviewPage() {
     setMetrics(loadedMetrics || (isDemo ? MOCK_METRICS : defaultEmptyMetrics));
     setSessions(loadedSessions.length > 0 ? loadedSessions : (isDemo ? MOCK_SESSIONS : []));
     setKnowledgeCount(loadedKbCount || (isDemo ? MOCK_METRICS.knowledgeCount : 0));
+    setSetupChecklist(loadedChecklist);
     setLoading(false);
   }
 
@@ -236,6 +241,12 @@ export function OverviewPage() {
           </Button>
         </div>
       </div>
+
+      {/* Getting Started Checklist */}
+      <GettingStartedChecklist
+        data={setupChecklist}
+        onDismiss={() => setSetupChecklist(prev => prev ? { ...prev, checklistDismissed: true } : undefined)}
+      />
 
       {/* Empty State Banner jika belum ada bot WA */}
       {totalSessions === 0 && (

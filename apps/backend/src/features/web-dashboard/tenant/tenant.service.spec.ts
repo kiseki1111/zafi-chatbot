@@ -21,18 +21,35 @@ describe('TenantService', () => {
     },
     whatsappInstance: {
       findMany: jest.fn(),
+      count: jest.fn(),
     },
     conversation: {
       findMany: jest.fn(),
+      count: jest.fn(),
+    },
+    knowledgeBase: {
+      count: jest.fn(),
     },
     message: {
       count: jest.fn(),
     },
     product: {
       findMany: jest.fn(),
+      findFirst: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
+      count: jest.fn(),
+    },
+    platformConfig: {
+      findUnique: jest.fn(),
+      upsert: jest.fn(),
+    },
+    salesRecord: {
+      findMany: jest.fn(),
+    },
+    contact: {
+      count: jest.fn(),
     },
   };
 
@@ -422,6 +439,42 @@ describe('TenantService', () => {
       await expect(
         service.verifyProductMediaUpload('t-unpaid', true),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('Global Onboarding Toggle: getDashboardOverview mengembalikan isOnboarded=true dan isGlobalOnboardingDisabled=true saat toggle ON', async () => {
+      const mockTenant = {
+        id: 't-new',
+        name: 'Klien Baru',
+        isOnboarded: false, // Aslinya belum onboarding
+        metadata: { plan: 'lite' },
+        whatsappInstances: [],
+      };
+
+      mockPrisma.tenant.findUnique.mockResolvedValue(mockTenant);
+      mockPrisma.product.count.mockResolvedValue(0);
+      mockPrisma.user.count.mockResolvedValue(1);
+      mockPrisma.whatsappInstance.count.mockResolvedValue(0);
+      mockPrisma.whatsappInstance.findMany.mockResolvedValue([]);
+      mockPrisma.conversation.count.mockResolvedValue(0);
+      mockPrisma.conversation.findMany.mockResolvedValue([]);
+      mockPrisma.message.count.mockResolvedValue(0);
+      mockPrisma.salesRecord.findMany.mockResolvedValue([]);
+      mockPrisma.contact.count.mockResolvedValue(0);
+
+      // 1. Saat toggle OFF (disable_global_onboarding = null/false) -> isOnboarded tetap false
+      mockPrisma.platformConfig.findUnique.mockResolvedValue(null);
+      const resOff = await service.getDashboardOverview('t-new');
+      expect(resOff.tenant.isOnboarded).toBe(false);
+      expect(resOff.isGlobalOnboardingDisabled).toBe(false);
+
+      // 2. Saat toggle ON (disable_global_onboarding = true) -> isOnboarded otomatis menjadi true
+      mockPrisma.platformConfig.findUnique.mockResolvedValue({
+        key: 'disable_global_onboarding',
+        value: true,
+      });
+      const resOn = await service.getDashboardOverview('t-new');
+      expect(resOn.tenant.isOnboarded).toBe(true);
+      expect(resOn.isGlobalOnboardingDisabled).toBe(true);
     });
   });
 });

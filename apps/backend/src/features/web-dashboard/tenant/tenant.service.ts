@@ -1133,8 +1133,41 @@ export class TenantService {
     // Quota usage (MAU & AI responses)
     const quota = await this.getTenantQuota(tenantId, tenant);
 
+    // ponytail: hitung status checklist setup lanjutan secara otomatis dari data nyata
+    const [connectedWaCount, teamMemberCount, globalOnboardingConfig] = await Promise.all([
+      this.prisma.whatsappInstance.count({
+        where: { tenantId, status: 'WORKING' },
+      }),
+      this.prisma.user.count({
+        where: { tenantId },
+      }),
+      this.prisma.platformConfig.findUnique({
+        where: { key: 'disable_global_onboarding' },
+      }).catch(() => null),
+    ]);
+
+    const isGlobalOnboardingDisabled = Boolean(
+      globalOnboardingConfig?.value === true ||
+        (globalOnboardingConfig?.value as any)?.disabled === true ||
+        globalOnboardingConfig?.value === 'true',
+    );
+
+    const tenantMeta = (tenant.metadata as Record<string, any>) || {};
+
+    const setupChecklist = {
+      hasWhatsappConnected: connectedWaCount > 0,
+      hasProduct: productsCount > 0,
+      hasTeamMember: teamMemberCount > 1, // lebih dari sekadar akun pertama
+      checklistDismissed: Boolean(tenantMeta.checklistDismissed),
+    };
+
     return {
-      tenant,
+      tenant: {
+        ...tenant,
+        // Jika superadmin menonaktifkan onboarding global, anggap tenant sudah onboarded
+        isOnboarded: isGlobalOnboardingDisabled ? true : Boolean(tenant.isOnboarded),
+      },
+      isGlobalOnboardingDisabled,
       metrics: {
         productsCount,
         lowStockCount,
@@ -1152,6 +1185,7 @@ export class TenantService {
       },
       quota,
       revenueTrend,
+      setupChecklist,
       insights: {
         topProduct: topProduct?.name || '-',
         topProductStock: topProduct?.stock || 0,
@@ -1711,18 +1745,52 @@ Berikan jawaban yang natural seperti CS manusia sungguhan. Jangan menggunakan ba
     if (!user || !user.tenantId)
       throw new NotFoundException('Tenant not found');
 
+    const currentTenant = await this.prisma.tenant.findUnique({
+      where: { id: user.tenantId },
+    });
+    const currentMeta = (currentTenant?.metadata as Record<string, any>) || {};
+
+    // ponytail: menu dasar yang wajib selalu didapatkan tenant apapun kategorinya:
+    // WAJIB menyertakan 'products' (Katalog Produk), chatbot, knowledge, crm, followup, overview, settings
+    const baseMenus = [
+      'overview',
+      'chatbot',
+      'products', // Selalu aktif untuk semua bidang!
+      'knowledge',
+      'crm',
+      'followup',
+      'settings',
+    ];
+
+    const categoryExtra =
+      dto.category === 'properti'
+        ? ['availability']
+        : dto.category === 'transport'
+          ? ['bus_layout']
+          : [];
+
+    const mergedEnabledMenus = Array.from(
+      new Set([...(currentMeta.enabledMenus || []), ...baseMenus, ...categoryExtra]),
+    );
+
+    const updatedMetadata = {
+      ...currentMeta,
+      botToken: dto.botToken || currentMeta.botToken || '',
+      enabledMenus: mergedEnabledMenus,
+    };
+
     const tenant = await this.prisma.tenant.update({
       where: { id: user.tenantId },
       data: {
-        name: dto.storeName,
-        category: dto.category,
-        phone: dto.phone,
-        address: dto.address,
-        agentName: dto.agentName,
-        agentTone: dto.agentTone,
-        extraInfo: dto.instructions,
+        name: dto.storeName || currentTenant?.name,
+        category: dto.category || currentTenant?.category || 'general',
+        phone: dto.phone || currentTenant?.phone,
+        address: dto.address || currentTenant?.address,
+        agentName: dto.agentName || currentTenant?.agentName || 'Luna',
+        agentTone: dto.agentTone || currentTenant?.agentTone || 'ramah dan profesional',
+        extraInfo: dto.instructions || currentTenant?.extraInfo,
         isOnboarded: true,
-        metadata: { botToken: dto.botToken || '' },
+        metadata: updatedMetadata,
       },
     });
 
@@ -1730,6 +1798,43 @@ Berikan jawaban yang natural seperti CS manusia sungguhan. Jangan menggunakan ba
     await this.dataAgentService.syncKnowledgeBase(user.tenantId);
 
     return tenant;
+  }
+
+  // Dismiss setup checklist (hanya mengubah metadata.checklistDismissed = true)
+  async dismissChecklist(userIdOrTenantId: string) {
+    let resolvedTenantId: string | null = null;
+    const directTenant = await this.prisma.tenant.findUnique({
+      where: { id: userIdOrTenantId },
+    });
+
+    if (directTenant) {
+      resolvedTenantId = directTenant.id;
+    } else {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userIdOrTenantId },
+      });
+      resolvedTenantId = user?.tenantId || null;
+    }
+
+    if (!resolvedTenantId) {
+      throw new NotFoundException('Tenant not found');
+    }
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: resolvedTenantId },
+    });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+
+    const meta = (tenant.metadata as Record<string, any>) || {};
+    return this.prisma.tenant.update({
+      where: { id: resolvedTenantId },
+      data: {
+        metadata: {
+          ...meta,
+          checklistDismissed: true,
+        },
+      },
+    });
   }
 
   // Superadmin: List all client tenants with user and enabledMenus

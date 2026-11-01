@@ -17,8 +17,10 @@ import {
 } from "@/components/ui/table";
 import {
   BellRing, Clock, Users, Send, Loader2, RefreshCw, History,
-  Settings, Zap, User, Sun, Sunset, Sunrise, Moon, Sparkles, Check, Trash2, Plus, Save, AlertTriangle, Lock,
+  Settings, Zap, User, Sun, Sunset, Sunrise, Moon, Sparkles, Check, Trash2, Plus, Save, AlertTriangle, Lock, HelpCircle,
 } from "lucide-react";
+import { useMenuGuide } from "@/lib/use-menu-guide";
+import { MenuGuideBanner } from "@/components/dashboard/menu-guide-banner";
 import { useAuthStore } from "@/lib/auth-store";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -107,6 +109,8 @@ export function FollowupPage() {
     name: "",
     instanceName: "",
   });
+
+  const { seen, markSeen, reset } = useMenuGuide("followup");
 
   useEffect(() => {
     fetch("/api/v1/waha/instances/db")
@@ -320,10 +324,19 @@ export function FollowupPage() {
     <div className="space-y-6">
       {/* Header - Compact & Responsive (No bloated explanation) */}
       <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
           <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground truncate">
             Follow-Up
           </h2>
+          <button
+            type="button"
+            onClick={reset}
+            title="Buka Panduan Follow-Up"
+            aria-label="Buka panduan follow-up"
+            className="text-muted-foreground hover:text-emerald-600 p-1 rounded-md transition-colors"
+          >
+            <HelpCircle className="h-4 w-4" />
+          </button>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Button variant="outline" size="sm" onClick={loadAll} className="h-8 text-xs gap-1.5 px-2.5">
@@ -363,6 +376,14 @@ export function FollowupPage() {
           </Button>
         </div>
       </div>
+
+      {!seen && (
+        <MenuGuideBanner
+          title="Follow-Up Otomatis Pelanggan"
+          description="Atur jadwal dan jeda waktu follow-up otomatis agar calon pembeli yang sempat berhenti merespons chat dihubungi kembali oleh bot AI secara sopan."
+          onClose={markSeen}
+        />
+      )}
 
       {/* Stats Cards - Centered & Proportional (Zero empty space) */}
       <div className="grid grid-cols-3 gap-2 sm:gap-3">

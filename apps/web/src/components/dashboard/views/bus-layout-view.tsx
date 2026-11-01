@@ -35,7 +35,10 @@ import {
   CheckCircle2,
   Sparkles,
   Info,
+  HelpCircle,
 } from "lucide-react";
+import { useMenuGuide } from "@/lib/use-menu-guide";
+import { MenuGuideBanner } from "@/components/dashboard/menu-guide-banner";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -234,6 +237,8 @@ export function BusLayoutView() {
     price: 250000,
   });
 
+  const { seen, markSeen, reset } = useMenuGuide("bus_layout");
+
   const canvasRef = useRef<HTMLDivElement>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
@@ -396,6 +401,15 @@ export function BusLayoutView() {
                 <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4.5 font-semibold shrink-0">
                   {activeFleet.totalSeats} Kursi
                 </Badge>
+                <button
+                  type="button"
+                  onClick={reset}
+                  title="Buka Panduan Denah Kursi Bus"
+                  aria-label="Buka panduan denah kursi bus"
+                  className="text-muted-foreground hover:text-emerald-600 p-1 rounded-md transition-colors"
+                >
+                  <HelpCircle className="h-4 w-4" />
+                </button>
               </div>
             </div>
           </div>
@@ -433,6 +447,16 @@ export function BusLayoutView() {
           </div>
         )}
       </div>
+
+      {!seen && (
+        <MenuGuideBanner
+          title="Denah Kursi Bus & Tiket Armada"
+          description="Atur tata letak kursi bus secara visual untuk rute perjalanan armada Anda. Status kursi yang terisi atau kosong dapat diakses real-time oleh bot pemesanan tiket."
+          actionLabel="Tambah armada bus"
+          onAction={() => setIsNewBusOpen(true)}
+          onClose={markSeen}
+        />
+      )}
 
       {/* Toolbar: Toggle Mode Drag & Drop vs Mode Booking */}
       <Card className="p-3">

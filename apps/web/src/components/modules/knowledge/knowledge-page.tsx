@@ -8,8 +8,10 @@ import {
   Loader2, Plus, Trash2, Pencil, FileText, AlignLeft,
   BookOpen, Upload, X, Check, Brain, AlertTriangle, ImageIcon,
   Video, Paperclip, ExternalLink, Copy, Eye, Download, Search, Sparkles,
-  Building2, CheckCircle2, Split, Info, Layers, Lock
+  Building2, CheckCircle2, Split, Info, Layers, Lock, HelpCircle
 } from "lucide-react";
+import { useMenuGuide } from "@/lib/use-menu-guide";
+import { MenuGuideBanner } from "@/components/dashboard/menu-guide-banner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -98,6 +100,8 @@ export function KnowledgePage() {
   const [editingItem, setEditingItem] = useState<KnowledgeItem | null>(null);
   const [previewItem, setPreviewItem] = useState<KnowledgeItem | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+
+  const { seen, markSeen, reset } = useMenuGuide("knowledge");
 
   // AI Knowledge Split state
   interface SplitTopic {
@@ -666,6 +670,15 @@ export function KnowledgePage() {
             <h1 className="text-sm sm:text-base font-bold tracking-tight text-foreground">
               Knowledge Base
             </h1>
+            <button
+              type="button"
+              onClick={reset}
+              title="Buka Panduan Knowledge Base"
+              aria-label="Buka panduan knowledge base"
+              className="text-muted-foreground hover:text-emerald-600 p-1 rounded-md transition-colors"
+            >
+              <HelpCircle className="h-4 w-4" />
+            </button>
           </div>
 
           {/* Action buttons */}
@@ -761,6 +774,16 @@ export function KnowledgePage() {
           </div>
         </div>
       </div>
+
+      {!seen && (
+        <MenuGuideBanner
+          title="Basis Pengetahuan (Knowledge Base)"
+          description="Upload dokumen, foto, brosur, atau teks panduan bisnis Anda agar jawaban bot AI selalu akurat sesuai informasi resmi perusahaan."
+          actionLabel="Upload dokumen pertama"
+          onAction={() => openCreate("create-media")}
+          onClose={markSeen}
+        />
+      )}
 
       {/* Content */}
       {loading ? (

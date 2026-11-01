@@ -37,7 +37,10 @@ import {
   FileText,
   X,
   Video,
+  HelpCircle,
 } from "lucide-react";
+import { useMenuGuide } from "@/lib/use-menu-guide";
+import { MenuGuideBanner } from "@/components/dashboard/menu-guide-banner";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useBackgroundTasksStore } from "@/lib/background-tasks-store";
@@ -249,6 +252,8 @@ export function ProductsPage() {
     tenantPlan === "enterprise" ||
     tenantPlan === "developer" ||
     user?.role === "superadmin";
+
+  const { seen, markSeen, reset } = useMenuGuide("products");
 
   // ponytail: soft=true untuk refresh setelah save background — tanpa skeleton flash
   const fetchProducts = async (soft = false) => {
@@ -673,9 +678,20 @@ export function ProductsPage() {
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-card border rounded-xl shadow-2xs">
         <div>
-          <h1 className="text-xl font-bold flex items-center gap-2">
-            <Package className="h-5 w-5 text-emerald-600" /> Katalog & Stok Produk
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold flex items-center gap-2">
+              <Package className="h-5 w-5 text-emerald-600" /> Katalog & Stok Produk
+            </h1>
+            <button
+              type="button"
+              onClick={reset}
+              title="Buka Panduan Menu"
+              aria-label="Buka panduan menu"
+              className="text-muted-foreground hover:text-emerald-600 p-1 rounded-md transition-colors"
+            >
+              <HelpCircle className="h-4 w-4" />
+            </button>
+          </div>
           <p className="text-xs text-muted-foreground mt-0.5">
             Kelola data produk, foto, video, variasi harga & stok. Otomatis disinkronisasi ke Asisten AI WhatsApp untuk menjawab pelanggan.
           </p>
@@ -700,6 +716,16 @@ export function ProductsPage() {
           </Button>
         </div>
       </div>
+
+      {!seen && (
+        <MenuGuideBanner
+          title="Panduan Katalog Produk"
+          description="Tambahkan produk agar AI bisa menjawab pertanyaan harga, stok, dan spesifikasi ke pelanggan secara instan di WhatsApp."
+          actionLabel="Tambah produk pertama"
+          onAction={handleOpenAdd}
+          onClose={markSeen}
+        />
+      )}
 
       {/* Shopee-like Status Filter Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
