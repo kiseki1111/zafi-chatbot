@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
   Req,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ContactsService } from './contacts.service';
 import { CreateContactDto, UpdateContactDto } from './dto/contact.dto';
@@ -21,12 +22,17 @@ export class ContactsController {
 
   private resolveTenantId(req: any): string | undefined {
     const isSuper =
-      req?.user?.roles?.includes('superadmin') ||
-      req?.user?.role === 'superadmin';
+      req?.user?.roles?.some((r: string) => r?.toLowerCase() === 'superadmin') ||
+      req?.user?.role?.toLowerCase() === 'superadmin';
     if (isSuper) {
       return req?.query?.tenantId;
     }
-    return req?.user?.tenantId || req?.query?.tenantId;
+    if (!req?.user?.tenantId) {
+      throw new ForbiddenException(
+        'Akses ditolak: Akun Anda tidak terhubung dengan tenant manapun',
+      );
+    }
+    return req.user.tenantId;
   }
 
   @Get()

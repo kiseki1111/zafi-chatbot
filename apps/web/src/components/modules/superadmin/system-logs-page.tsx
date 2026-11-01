@@ -95,6 +95,19 @@ export function SystemLogsPage() {
       const data = json?.data || json;
       if (data) {
         setAiStats(data);
+        if (data.recentLogs && data.recentLogs.length > 0) {
+          // ponytail: auto-pilih log teratas agar panel detail tidak kosong
+          setSelectedAiLog((prev) => {
+            if (!prev) {
+              const first = data.recentLogs[0];
+              if (first?.id && !first.id.startsWith("err-") && !first.id.startsWith("stream-")) {
+                fetchGenerationDetail(first.id);
+              }
+              return first;
+            }
+            return prev;
+          });
+        }
       }
     } catch {
       toast.error("Gagal mengambil log & statistik OpenRouter");
@@ -270,31 +283,42 @@ export function SystemLogsPage() {
           </div>
 
           {/* Table & Detail */}
-          <div className="grid lg:grid-cols-3 gap-4">
-            <Card className="lg:col-span-2 overflow-hidden flex flex-col max-h-[640px]">
-              <div className="p-3 border-b bg-muted/40 text-xs font-semibold flex items-center justify-between">
-                <span className="flex items-center gap-1.5">
-                  <Brain className="h-3.5 w-3.5 text-indigo-600" /> Riwayat Permintaan AI Terbaru
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+            <Card className="lg:col-span-7 overflow-hidden flex flex-col h-[560px] shadow-xs">
+              <div className="p-3.5 border-b bg-muted/40 text-xs font-semibold flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Brain className="h-4 w-4 text-indigo-600" /> Riwayat Permintaan AI Terbaru
                 </span>
-                <span className="text-[10px] text-muted-foreground font-normal">
+                <Badge variant="secondary" className="text-[10px] font-normal">
                   {filteredAiLogs.length} request terekam
-                </span>
+                </Badge>
               </div>
 
-              <div className="flex-1 overflow-auto divide-y divide-border/40 text-xs">
+              <div className="flex-1 overflow-y-auto divide-y divide-border/40 text-xs">
                 {loadingAi ? (
                   <div className="p-4 space-y-2">
                     {[1, 2, 3, 4, 5].map((i) => (
-                      <Skeleton key={i} className="h-11 w-full" />
+                      <Skeleton key={i} className="h-12 w-full rounded-lg" />
                     ))}
                   </div>
                 ) : filteredAiLogs.length === 0 ? (
-                  <div className="p-12 text-center text-muted-foreground text-xs">
-                    Belum ada log AI terekam. Panggilan chat dari WhatsApp / Simulator akan otomatis tercatat di sini.
+                  <div className="h-full flex flex-col items-center justify-center p-8 text-center text-muted-foreground text-xs space-y-2">
+                    <Brain className="h-8 w-8 text-muted-foreground/40" />
+                    <p className="font-medium text-foreground">Belum ada log AI terekam</p>
+                    <p className="text-[11px] max-w-xs text-muted-foreground">
+                      Panggilan chat dari WhatsApp / Simulator akan otomatis tercatat di sini beserta latensi dan jumlah token.
+                    </p>
                   </div>
                 ) : (
                   filteredAiLogs.map((log) => {
                     const isSelected = selectedAiLog?.id === log.id;
+                    const latencyColor =
+                      log.durationMs < 3000
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800"
+                        : log.durationMs < 8000
+                        ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800"
+                        : "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border-indigo-800";
+
                     return (
                       <div
                         key={log.id}
@@ -307,7 +331,7 @@ export function SystemLogsPage() {
                           }
                         }}
                         className={`p-3 cursor-pointer hover:bg-muted/50 transition-colors flex items-center justify-between gap-3 ${
-                          isSelected ? "bg-indigo-50 dark:bg-indigo-950/40 border-l-2 border-indigo-600" : ""
+                          isSelected ? "bg-indigo-50/80 dark:bg-indigo-950/40 border-l-3 border-indigo-600" : ""
                         }`}
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
@@ -326,8 +350,10 @@ export function SystemLogsPage() {
 
                         <div className="flex items-center gap-3 shrink-0 text-right font-mono text-[11px]">
                           <div>
-                            <span className="font-semibold">{log.durationMs.toLocaleString()}ms</span>
-                            <p className="text-[10px] text-muted-foreground font-sans">
+                            <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold border ${latencyColor}`}>
+                              {log.durationMs.toLocaleString()}ms
+                            </span>
+                            <p className="text-[10px] text-muted-foreground font-sans mt-0.5">
                               {log.totalTokens} tokens
                             </p>
                           </div>
@@ -344,51 +370,62 @@ export function SystemLogsPage() {
             </Card>
 
             {/* Right: Detail Card */}
-            <Card className="flex flex-col max-h-[640px]">
-              <div className="p-3 border-b bg-muted/40 text-xs font-semibold flex items-center justify-between">
-                <span className="flex items-center gap-1.5">
-                  <Code className="h-3.5 w-3.5 text-indigo-600" /> Detail Generasi AI
+            <Card className="lg:col-span-5 overflow-hidden flex flex-col h-[560px] shadow-xs">
+              <div className="p-3.5 border-b bg-muted/40 text-xs font-semibold flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Code className="h-4 w-4 text-indigo-600" /> Detail Generasi AI
                 </span>
+                {selectedAiLog && (
+                  <Badge
+                    variant="outline"
+                    className={`text-[10px] ${
+                      selectedAiLog.status === "SUCCESS"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-300"
+                        : "bg-rose-50 text-rose-700 border-rose-300"
+                    }`}
+                  >
+                    {selectedAiLog.status}
+                  </Badge>
+                )}
               </div>
 
-              <div className="flex-1 overflow-auto p-3 text-xs space-y-3">
+              <div className="flex-1 overflow-y-auto p-3.5 text-xs space-y-3">
                 {selectedAiLog ? (
                   <>
-                    <div className="space-y-1.5 bg-muted/40 p-2.5 rounded-lg border">
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground text-[10px] uppercase font-semibold">Model</span>
-                        <Badge variant="outline" className="text-[10px]">
-                          {selectedAiLog.model}
-                        </Badge>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="bg-muted/40 p-2.5 rounded-lg border">
+                        <span className="text-muted-foreground text-[10px] uppercase font-semibold">Model Engine</span>
+                        <p className="font-semibold text-foreground truncate mt-0.5">{selectedAiLog.model}</p>
                       </div>
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-muted-foreground">Status</span>
-                        <span className={selectedAiLog.status === "SUCCESS" ? "text-emerald-600 font-bold" : "text-rose-600 font-bold"}>
-                          {selectedAiLog.status}
-                        </span>
+                      <div className="bg-muted/40 p-2.5 rounded-lg border">
+                        <span className="text-muted-foreground text-[10px] uppercase font-semibold">Durasi Latensi</span>
+                        <p className="font-mono font-semibold text-foreground mt-0.5">{selectedAiLog.durationMs}ms</p>
                       </div>
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-muted-foreground">Durasi Latensi</span>
-                        <span className="font-mono font-semibold">{selectedAiLog.durationMs}ms</span>
+                      <div className="bg-muted/40 p-2.5 rounded-lg border">
+                        <span className="text-muted-foreground text-[10px] uppercase font-semibold">Prompt Tokens</span>
+                        <p className="font-mono font-semibold text-foreground mt-0.5">{selectedAiLog.promptTokens}</p>
                       </div>
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-muted-foreground">Total Token</span>
-                        <span className="font-mono font-semibold">{selectedAiLog.totalTokens} (Prompt: {selectedAiLog.promptTokens}, Jawaban: {selectedAiLog.completionTokens})</span>
+                      <div className="bg-muted/40 p-2.5 rounded-lg border">
+                        <span className="text-muted-foreground text-[10px] uppercase font-semibold">Output Tokens</span>
+                        <p className="font-mono font-semibold text-foreground mt-0.5">{selectedAiLog.completionTokens}</p>
                       </div>
                     </div>
 
                     {selectedAiLog.error && (
                       <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-[11px]">
-                        <p className="font-bold">Error:</p>
-                        <p className="font-mono break-all">{selectedAiLog.error}</p>
+                        <p className="font-bold">Error Pesan:</p>
+                        <p className="font-mono break-all mt-1">{selectedAiLog.error}</p>
                       </div>
                     )}
 
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-semibold text-muted-foreground uppercase">Raw OpenRouter API Response</p>
-                      <div className="p-2.5 rounded-lg bg-slate-950 text-slate-200 font-mono text-[10px] max-h-60 overflow-auto">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-semibold text-muted-foreground uppercase">Raw OpenRouter Response</p>
+                        <span className="text-[10px] font-mono text-muted-foreground">ID: {selectedAiLog.id}</span>
+                      </div>
+                      <div className="p-3 rounded-lg bg-slate-950 text-slate-200 font-mono text-[10px] max-h-[300px] overflow-auto border border-slate-800">
                         {loadingGenDetail ? (
-                          <div className="text-slate-400 py-4 text-center">Memuat data dari OpenRouter...</div>
+                          <div className="text-slate-400 py-6 text-center">Memuat data dari OpenRouter...</div>
                         ) : rawGenDetail ? (
                           <pre className="whitespace-pre-wrap break-all">{JSON.stringify(rawGenDetail, null, 2)}</pre>
                         ) : (
@@ -398,8 +435,12 @@ export function SystemLogsPage() {
                     </div>
                   </>
                 ) : (
-                  <div className="h-full flex items-center justify-center text-muted-foreground text-xs text-center p-6">
-                    Pilih salah satu log di sebelah kiri untuk melihat detail performa AI & statistik token.
+                  <div className="h-full flex flex-col items-center justify-center text-muted-foreground text-xs text-center p-8 space-y-2">
+                    <Brain className="h-8 w-8 text-muted-foreground/30" />
+                    <p className="font-medium text-foreground">Belum Ada Log Terpilih</p>
+                    <p className="text-[11px] max-w-xs text-muted-foreground">
+                      Pilih salah satu log di sebelah kiri untuk melihat detail performa AI & statistik token.
+                    </p>
                   </div>
                 )}
               </div>
@@ -425,15 +466,18 @@ export function SystemLogsPage() {
             </p>
           </div>
 
-          <div className="grid lg:grid-cols-3 gap-4">
-            <Card className="lg:col-span-2 overflow-hidden flex flex-col max-h-[640px]">
-              <div className="p-3 border-b bg-muted/40 text-xs font-semibold flex items-center justify-between">
-                <span className="flex items-center gap-1.5">
-                  <Terminal className="h-3.5 w-3.5 text-emerald-600" /> Incoming Webhook Stream
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+            <Card className="lg:col-span-7 overflow-hidden flex flex-col h-[560px] shadow-xs">
+              <div className="p-3.5 border-b bg-muted/40 text-xs font-semibold flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Terminal className="h-4 w-4 text-emerald-600" /> Incoming Webhook Stream
                 </span>
+                <Badge variant="secondary" className="text-[10px] font-normal">
+                  {filteredWebhook.length} event
+                </Badge>
               </div>
 
-              <div className="flex-1 overflow-auto divide-y divide-border/40 text-xs font-mono">
+              <div className="flex-1 overflow-y-auto divide-y divide-border/40 text-xs font-mono">
                 {loadingWebhook ? (
                   <div className="p-4 space-y-2">
                     {[1, 2, 3, 4, 5].map((i) => (
@@ -482,11 +526,16 @@ export function SystemLogsPage() {
               </div>
             </Card>
 
-            <Card className="flex flex-col max-h-[640px]">
-              <div className="p-3 border-b bg-muted/40 text-xs font-semibold flex items-center justify-between">
-                <span className="flex items-center gap-1.5">
-                  <Code className="h-3.5 w-3.5 text-indigo-600" /> Detail JSON Webhook
+            <Card className="lg:col-span-5 overflow-hidden flex flex-col h-[560px] shadow-xs">
+              <div className="p-3.5 border-b bg-muted/40 text-xs font-semibold flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Code className="h-4 w-4 text-indigo-600" /> Detail JSON Webhook
                 </span>
+                {selectedLog && (
+                  <Badge variant="outline" className="text-[10px] font-mono">
+                    {selectedLog.event}
+                  </Badge>
+                )}
               </div>
 
               <div className="flex-1 overflow-auto p-3 text-[11px] font-mono bg-slate-950 text-slate-200">

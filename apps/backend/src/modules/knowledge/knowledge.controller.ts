@@ -30,22 +30,18 @@ export class KnowledgeController {
   ) {}
 
   private resolveTenantId(req: any): string {
-    const isSuperadmin = req.user?.roles?.includes('superadmin');
-    if (isSuperadmin && (req.query?.tenantId || req.body?.tenantId)) {
-      return (req.query?.tenantId || req.body?.tenantId) as string;
+    const isSuperadmin =
+      req.user?.roles?.some((r: string) => r?.toLowerCase() === 'superadmin') ||
+      req.user?.role?.toLowerCase() === 'superadmin';
+    if (isSuperadmin) {
+      return (req.query?.tenantId || req.body?.tenantId || req.user?.tenantId) as string;
     }
-    if (req.user?.tenantId) {
-      return req.user.tenantId;
+    if (!req.user?.tenantId) {
+      throw new ForbiddenException(
+        'Akses ditolak: Akun Anda tidak terhubung dengan tenant manapun',
+      );
     }
-    if (req.query?.tenantId) {
-      return req.query.tenantId as string;
-    }
-    if (req.body?.tenantId) {
-      return req.body.tenantId as string;
-    }
-    throw new ForbiddenException(
-      'Akses ditolak: Akun Anda tidak terhubung dengan tenant manapun',
-    );
+    return req.user.tenantId;
   }
 
   @Get()

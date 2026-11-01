@@ -10,7 +10,14 @@ import {
   UseGuards,
   Req,
   ForbiddenException,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname, join } from 'path';
+import * as fs from 'fs';
 import { TenantService } from './tenant.service';
 import { OnboardingDto } from './dto/onboarding.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
@@ -22,25 +29,32 @@ export class TenantController {
 
   private resolveTenantUserId(requestedId: string, req: any): string {
     const user = req?.user;
-    const isSuperadmin = user?.roles?.includes('superadmin');
+    const isSuperadmin =
+      user?.roles?.some((r: string) => r?.toLowerCase() === 'superadmin') ||
+      user?.role?.toLowerCase() === 'superadmin';
     if (isSuperadmin) {
       return requestedId;
     }
-    // Strict Tenant Isolation: Non-superadmin is strictly bounded to their own tenant or user ID
-    if (
-      user?.tenantId &&
-      requestedId !== user.tenantId &&
-      requestedId !== user.sub
-    ) {
+    if (!user?.tenantId) {
+      throw new ForbiddenException(
+        'Akses ditolak: Akun Anda tidak terhubung ke tenant manapun.',
+      );
+    }
+    // Strict Tenant Isolation: Non-superadmin is strictly bounded to their own tenant
+    if (requestedId !== user.tenantId && requestedId !== user.sub) {
       throw new ForbiddenException(
         'Akses ditolak: Anda tidak memiliki izin mengakses data tenant lain.',
       );
     }
-    return user?.tenantId || user?.sub || requestedId;
+    return user.tenantId;
   }
 
   private ensureSuperadmin(req: any) {
-    if (!req?.user?.roles?.includes('superadmin')) {
+    const user = req?.user;
+    const isSuper =
+      user?.roles?.some((r: string) => r?.toLowerCase() === 'superadmin') ||
+      user?.role?.toLowerCase() === 'superadmin';
+    if (!isSuper) {
       throw new ForbiddenException(
         'Akses ditolak: Hanya Superadmin yang berhak mengakses fungsi ini.',
       );
@@ -48,8 +62,11 @@ export class TenantController {
   }
 
   private ensureTenantAccess(tenantId: string, req: any) {
-    const isSuper = req?.user?.roles?.includes('superadmin');
-    if (!isSuper && req?.user?.tenantId !== tenantId) {
+    const user = req?.user;
+    const isSuper =
+      user?.roles?.some((r: string) => r?.toLowerCase() === 'superadmin') ||
+      user?.role?.toLowerCase() === 'superadmin';
+    if (!isSuper && user?.tenantId !== tenantId) {
       throw new ForbiddenException(
         'Akses ditolak: Anda tidak berhak mengelola data tenant lain.',
       );
@@ -76,6 +93,8 @@ export class TenantController {
       systemPrompt?: string;
       operatingHours?: string;
       address?: string;
+      colorPalette?: { primary?: string; secondary?: string; accent?: string };
+      productGallery?: any[];
     },
   ) {
     const targetId = this.resolveTenantUserId(userId, req);
@@ -140,6 +159,7 @@ export class TenantController {
       price: number;
       stock: number;
       description: string;
+      imageUrl: string;
       attributes: any;
     }>,
   ) {
@@ -155,6 +175,82 @@ export class TenantController {
   ) {
     const targetId = this.resolveTenantUserId(userId, req);
     return this.tenantService.deleteTenantProduct(targetId, productId);
+  }
+
+  // ponytail: endpoint upload media khusus produk — terisolasi dari availability/siteplan
+  @Post(':userId/products/upload')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (req, file, cb) => {
+          const uploadPath = join(process.cwd(), 'uploads');
+          if (!fs.existsSync(uploadPath)) {
+            fs.mkdirSync(uploadPath, { recursive: true });
+          }
+          cb(null, uploadPath);
+        },
+        filename: (req, file, cb) => {
+          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          const ext = extname(file.originalname).toLowerCase();
+          const cleanName = file.originalname
+            .replace(/\.[^/.]+$/, '')
+            .replace(/[^a-zA-Z0-9]/g, '_');
+          const isVideo =
+            file.mimetype.startsWith('video/') ||
+            /\.(mov|mp4|mkv|avi|webm)$/i.test(file.originalname);
+          const finalExt = isVideo ? '.mp4' : ext;
+          cb(null, `${uniqueSuffix}-${cleanName}${finalExt}`);
+        },
+      }),
+      limits: {
+        fileSize: 300 * 1024 * 1024,
+      },
+      fileFilter: (req, file, cb) => {
+        const ext = extname(file.originalname).toLowerCase().replace('.', '');
+        const allowed = ['jpg', 'jpeg', 'png', 'webp', 'mp4', 'mov', 'mkv', 'avi', 'webm'];
+        if (allowed.includes(ext)) {
+          cb(null, true);
+        } else {
+          cb(
+            new BadRequestException(
+              'Format file tidak didukung. Hanya gambar dan video yang diizinkan.',
+            ),
+            false,
+          );
+        }
+      },
+    }),
+  )
+  async uploadProductMedia(
+    @Param('userId') userId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: any,
+  ) {
+    if (!file) {
+      throw new BadRequestException('File tidak ditemukan');
+    }
+    const targetId = this.resolveTenantUserId(userId, req);
+    const isVideo =
+      file.mimetype.startsWith('video/') ||
+      /\.(mov|mp4|mkv|avi|webm)$/i.test(file.originalname);
+
+    await this.tenantService.verifyProductMediaUpload(targetId, isVideo);
+
+    const host = req.get('host') || 'localhost:3000';
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+    const baseUrl = process.env.PUBLIC_URL || `${protocol}://${host}`;
+    const relativeUrl = `/uploads/${file.filename}`;
+
+    return {
+      url: relativeUrl,
+      fullUrl: `${baseUrl}${relativeUrl}`,
+      filename: file.filename,
+      originalName: file.originalname,
+      mimetype: isVideo ? 'video/mp4' : file.mimetype,
+      size: file.size,
+      mediaType: isVideo ? 'video' : 'image',
+      canPlayNative: isVideo ? file.size <= 16 * 1024 * 1024 : true,
+    };
   }
 
   @Get(':userId/knowledge')

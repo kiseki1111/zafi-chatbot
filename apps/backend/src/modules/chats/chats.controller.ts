@@ -76,16 +76,25 @@ export class ChatsController {
       : this.chatsService.getContactProfile(id);
   }
 
+  private getTenantIdFromReq(req: any): string | undefined {
+    const isSuper =
+      req?.user?.roles?.some((r: string) => r?.toLowerCase() === 'superadmin') ||
+      req?.user?.role?.toLowerCase() === 'superadmin';
+    return isSuper ? undefined : req?.user?.tenantId;
+  }
+
   // Admin takeover conversation
   @Post(':id/takeover')
   takeover(@Param('id') id: string, @Req() req: any) {
-    return this.chatsService.takeoverConversation(id, req.user?.sub);
+    const tenantId = this.getTenantIdFromReq(req);
+    return this.chatsService.takeoverConversation(id, req.user?.sub, tenantId);
   }
 
   // Release back to bot
   @Post(':id/release')
-  release(@Param('id') id: string) {
-    return this.chatsService.releaseConversation(id);
+  release(@Param('id') id: string, @Req() req: any) {
+    const tenantId = this.getTenantIdFromReq(req);
+    return this.chatsService.releaseConversation(id, tenantId);
   }
 
   // Admin send text message
@@ -96,7 +105,13 @@ export class ChatsController {
     @Body() body: { text: string },
   ) {
     if (!body.text?.trim()) throw new BadRequestException('text required');
-    return this.chatsService.sendMessage(id, req.user?.sub, body.text.trim());
+    const tenantId = this.getTenantIdFromReq(req);
+    return this.chatsService.sendMessage(
+      id,
+      req.user?.sub,
+      body.text.trim(),
+      tenantId,
+    );
   }
 
   // Admin send image (base64 or URL)
@@ -112,12 +127,14 @@ export class ChatsController {
       caption?: string;
     },
   ) {
+    const tenantId = this.getTenantIdFromReq(req);
     if (body.imageUrl) {
       return this.chatsService.sendImageUrl(
         id,
         req.user?.sub,
         body.imageUrl,
         body.caption,
+        tenantId,
       );
     }
     if (body.base64 && body.mimeType) {
@@ -127,6 +144,7 @@ export class ChatsController {
         body.base64,
         body.mimeType,
         body.caption,
+        tenantId,
       );
     }
     throw new BadRequestException('imageUrl or (base64 + mimeType) required');

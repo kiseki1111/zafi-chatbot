@@ -420,19 +420,22 @@ export class AgentSharedService {
           }
         }
 
-        let mediaStr = '';
+        let siteplanHighlight = '';
         if (!isIllustrationActive) {
-          mediaStr = `\n[STATUS SITEPLAN PERUMAHAN ${g.name.toUpperCase()}: NONAKTIF / BELUM TERSEDIA]\n(PERINGATAN KERAS: Fitur gambar denah siteplan untuk ${g.name} DINONAKTIFKAN oleh manajemen. DILARANG mengirimkan gambar siteplan di array "images" (array "images" WAJIB KOSONG []). Jika pelanggan meminta denah/siteplan/tata letak perumahan ${g.name}, Anda WAJIB menginfokan dengan ramah bahwa denah siteplan sedang diperbarui/belum tersedia di sistem, dan ARAHKAN pelanggan untuk langsung menghubungi tim Marketing kami {fallbackContact} agar dibantu dikirimkan denah lengkapnya secara manual!).\n`;
+          siteplanHighlight = `\n[STATUS DENAH SITEPLAN KAVLING PERUMAHAN ${g.name.toUpperCase()}: NONAKTIF / BELUM TERSEDIA]\n(PERINGATAN: Fitur gambar denah siteplan/tata letak kavling untuk ${g.name} sedang dinonaktifkan. DILARANG mengirimkan gambar denah siteplan di array "images". Jika pelanggan meminta denah/siteplan kavling, Anda WAJIB menginfokan dengan ramah bahwa denah siteplan sedang diperbarui dan arahkan pelanggan untuk langsung menghubungi tim Marketing kami {fallbackContact}).\n`;
         } else {
           const fallbackSiteplanUrl = `/uploads/incoming/siteplan-${g.id}.jpg`;
-          let siteplanHighlight = `\n[FOTO SITEPLAN UTAMA PERUMAHAN ${g.name.toUpperCase()}] "Denah Siteplan ${g.name}": ${fallbackSiteplanUrl}\n(WAJIB: Jika pelanggan bertanya/meminta siteplan, denah, atau gambar letak kavling ${g.name}, Anda WAJIB menyertakan URL foto ini ke array "images"!).\n`;
+          siteplanHighlight = `\n[FOTO SITEPLAN UTAMA PERUMAHAN ${g.name.toUpperCase()}] "Denah Siteplan ${g.name}": ${fallbackSiteplanUrl}\n(WAJIB: Jika pelanggan bertanya/meminta siteplan, denah, atau gambar letak kavling ${g.name}, Anda WAJIB menyertakan URL foto ini ke array "images"!).\n`;
+        }
 
-          if (g.siteplanImage) {
-            try {
-              const raw = g.siteplanImage.trim();
-              if (raw.startsWith('[')) {
-                const medias = JSON.parse(raw);
-                if (Array.isArray(medias) && medias.length > 0) {
+        let galleryMediaList = '';
+        if (g.siteplanImage) {
+          try {
+            const raw = g.siteplanImage.trim();
+            if (raw.startsWith('[')) {
+              const medias = JSON.parse(raw);
+              if (Array.isArray(medias) && medias.length > 0) {
+                if (isIllustrationActive) {
                   const siteplan = medias.find(
                     (m: any) =>
                       m.name?.toLowerCase().includes('siteplan') ||
@@ -442,27 +445,37 @@ export class AgentSharedService {
                   if (siteplan) {
                     siteplanHighlight = `\n[FOTO SITEPLAN UTAMA PERUMAHAN ${g.name.toUpperCase()}] "${siteplan.name}": ${siteplan.url}\n(WAJIB: Jika pelanggan bertanya/meminta siteplan, denah, atau gambar letak kavling ${g.name}, Anda WAJIB menyertakan URL foto ini ke array "images"!).\n`;
                   }
-                  mediaStr =
-                    siteplanHighlight +
+                }
+
+                // ponytail: Jika denah siteplan nonaktif, HANYA sembunyikan denah siteplan; SEMUA VIDEO & FOTO LAIN TETAP TERSEDIA
+                const availableMedias = isIllustrationActive
+                  ? medias
+                  : medias.filter(
+                      (m: any) =>
+                        m.type === 'video' ||
+                        (!m.name?.toLowerCase().includes('siteplan') &&
+                          !m.name?.toLowerCase().includes('denah') &&
+                          !m.url?.includes('siteplan')),
+                    );
+
+                if (availableMedias.length > 0) {
+                  galleryMediaList =
                     '\nDaftar Foto & Video yang tersedia untuk dikirimkan ke pelanggan:\n' +
-                    medias
+                    availableMedias
                       .map(
                         (m: any) =>
                           `  - [${m.type === 'video' ? 'VIDEO' : 'FOTO'}] "${m.name}": ${m.url}${m.description ? ` (${m.description})` : ''}`,
                       )
                       .join('\n');
                 }
-              } else if (raw) {
-                siteplanHighlight = `\n[FOTO SITEPLAN UTAMA PERUMAHAN ${g.name.toUpperCase()}] "Denah Siteplan ${g.name}": ${raw}\n(WAJIB: Jika pelanggan bertanya/meminta siteplan, denah, atau gambar letak kavling ${g.name}, Anda WAJIB menyertakan URL foto ini ke array "images"!).\n`;
-                mediaStr = `${siteplanHighlight}Foto/Video Siteplan: ${raw}`;
               }
-            } catch (e) {}
-          }
-
-          if (!mediaStr) {
-            mediaStr = siteplanHighlight;
-          }
+            } else if (raw && isIllustrationActive) {
+              galleryMediaList = `Foto/Video Siteplan: ${raw}`;
+            }
+          } catch (e) {}
         }
+
+        const mediaStr = `${siteplanHighlight}${galleryMediaList ? '\n' + galleryMediaList : ''}`;
 
         let descStr = '';
         if (g.description) {

@@ -18,6 +18,7 @@ const ClientsPage = dynamic(() => import("@/components/modules/clients/clients-p
 const AvailabilityPage = dynamic(() => import("./views/availability-view").then(mod => mod.AvailabilityView), { loading: Loading });
 const BusLayoutPage = dynamic(() => import("./views/bus-layout-view").then(mod => mod.BusLayoutView), { loading: Loading });
 const ChatbotPage = dynamic(() => import("@/components/modules/chatbot/chatbot-page").then(mod => mod.ChatbotPage), { loading: Loading });
+const ProductsPage = dynamic(() => import("@/components/modules/products/products-page").then(mod => mod.ProductsPage), { loading: Loading });
 const KnowledgePage = dynamic(() => import("@/components/modules/knowledge/knowledge-page").then(mod => mod.KnowledgePage), { loading: Loading });
 const FollowupPage = dynamic(() => import("@/components/modules/followup/followup-page").then(mod => mod.FollowupPage), { loading: Loading });
 const SettingsPage = dynamic(() => import("@/components/modules/settings/settings-page").then(mod => mod.SettingsPage), { loading: Loading });
@@ -115,6 +116,7 @@ export function DashboardShell() {
       case "bus_layout": return <BusLayoutPage />;
       case "availability": return <AvailabilityPage />;
       case "chatbot": return <ChatbotPage />;
+      case "products": return <ProductsPage />;
       case "knowledge": return <KnowledgePage />;
       case "followup": return <FollowupPage />;
       case "settings": return <SettingsPage />;
@@ -135,8 +137,8 @@ export function DashboardShell() {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         <Topbar />
         <main className={cn(
-          "flex-1 overflow-x-hidden",
-          (view === "chatbot" || view === "crm") ? "p-0 lg:p-2 pb-16 lg:pb-2 overflow-hidden flex flex-col" : "p-4 lg:p-6 pb-20 lg:pb-6 overflow-y-auto"
+          "flex-1 overflow-x-hidden [scrollbar-gutter:stable]",
+          (view === "chatbot" || view === "crm") ? "p-0 lg:p-2 pb-16 lg:pb-2 overflow-hidden flex flex-col" : "p-4 lg:p-6 pb-20 lg:pb-6 overflow-y-scroll"
         )}>
           <div key={view} className={cn("animate-in fade-in-50 slide-in-from-bottom-2 duration-200 ease-out", (view === "chatbot" || view === "crm") && "flex-1 flex flex-col min-h-0")}>
             {render()}

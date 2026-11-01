@@ -259,11 +259,25 @@ export class ChatsService {
   }
 
   // Admin takeover: set mode=human, assign agent
-  async takeoverConversation(conversationId: string, agentId?: string) {
+  async takeoverConversation(
+    conversationId: string,
+    agentId?: string,
+    tenantId?: string,
+  ) {
     const conversation = await this.prisma.conversation.findUnique({
       where: { id: conversationId },
+      include: { whatsappInstance: true },
     });
     if (!conversation) throw new NotFoundException('Conversation not found');
+    if (
+      tenantId &&
+      conversation.whatsappInstance?.tenantId &&
+      conversation.whatsappInstance.tenantId !== tenantId
+    ) {
+      throw new ForbiddenException(
+        'Akses ditolak: Percakapan bukan milik tenant Anda',
+      );
+    }
 
     let validAgentId: string | null = null;
     if (agentId) {
@@ -302,11 +316,21 @@ export class ChatsService {
   }
 
   // Release conversation back to bot
-  async releaseConversation(conversationId: string) {
+  async releaseConversation(conversationId: string, tenantId?: string) {
     const conversation = await this.prisma.conversation.findUnique({
       where: { id: conversationId },
+      include: { whatsappInstance: true },
     });
     if (!conversation) throw new NotFoundException('Conversation not found');
+    if (
+      tenantId &&
+      conversation.whatsappInstance?.tenantId &&
+      conversation.whatsappInstance.tenantId !== tenantId
+    ) {
+      throw new ForbiddenException(
+        'Akses ditolak: Percakapan bukan milik tenant Anda',
+      );
+    }
 
     return this.prisma.conversation.update({
       where: { id: conversationId },
@@ -319,12 +343,22 @@ export class ChatsService {
     conversationId: string,
     agentId: string | undefined,
     text: string,
+    tenantId?: string,
   ) {
     const conversation = await this.prisma.conversation.findUnique({
       where: { id: conversationId },
-      include: { contact: true },
+      include: { contact: true, whatsappInstance: true },
     });
     if (!conversation) throw new NotFoundException('Conversation not found');
+    if (
+      tenantId &&
+      conversation.whatsappInstance?.tenantId &&
+      conversation.whatsappInstance.tenantId !== tenantId
+    ) {
+      throw new ForbiddenException(
+        'Akses ditolak: Percakapan bukan milik tenant Anda',
+      );
+    }
 
     const chatId = conversation.contact.phone;
     const instanceName = conversation.instanceName;
@@ -380,12 +414,22 @@ export class ChatsService {
     agentId: string | undefined,
     imageUrl: string,
     caption?: string,
+    tenantId?: string,
   ) {
     const conversation = await this.prisma.conversation.findUnique({
       where: { id: conversationId },
-      include: { contact: true },
+      include: { contact: true, whatsappInstance: true },
     });
     if (!conversation) throw new NotFoundException('Conversation not found');
+    if (
+      tenantId &&
+      conversation.whatsappInstance?.tenantId &&
+      conversation.whatsappInstance.tenantId !== tenantId
+    ) {
+      throw new ForbiddenException(
+        'Akses ditolak: Percakapan bukan milik tenant Anda',
+      );
+    }
 
     const chatId = conversation.contact.phone;
     const instanceName = conversation.instanceName;
@@ -432,12 +476,22 @@ export class ChatsService {
     base64: string,
     mimeType: string,
     caption?: string,
+    tenantId?: string,
   ) {
     const conversation = await this.prisma.conversation.findUnique({
       where: { id: conversationId },
-      include: { contact: true },
+      include: { contact: true, whatsappInstance: true },
     });
     if (!conversation) throw new NotFoundException('Conversation not found');
+    if (
+      tenantId &&
+      conversation.whatsappInstance?.tenantId &&
+      conversation.whatsappInstance.tenantId !== tenantId
+    ) {
+      throw new ForbiddenException(
+        'Akses ditolak: Percakapan bukan milik tenant Anda',
+      );
+    }
 
     const chatId = conversation.contact.phone;
     const instanceName = conversation.instanceName;

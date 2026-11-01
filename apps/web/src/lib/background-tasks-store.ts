@@ -8,7 +8,7 @@ export type TaskStatus = "pending" | "running" | "needs_action" | "success" | "e
 export interface BackgroundTask {
   id: string;
   title: string;
-  category: "knowledge" | "siteplan" | "general";
+  category: "knowledge" | "siteplan" | "product" | "general";
   status: TaskStatus;
   statusText: string;
   progress?: number;
@@ -73,6 +73,17 @@ interface BackgroundTasksState {
     keepOriginal?: boolean;
     tenantId?: string;
     onSuccess?: (topicsCount: number) => void;
+    onError?: (err: Error) => void;
+  }) => Promise<void>;
+
+  // ponytail: simpan/hapus produk di background — modal langsung tutup, user bebas lanjut kerja.
+  // Menangani create, update (harga/deskripsi/foto), dan delete produk.
+  runProductMutation: (params: {
+    mode: "create" | "update" | "delete";
+    targetId: string;
+    productId?: string;
+    payload?: any;
+    onSuccess?: () => void;
     onError?: (err: Error) => void;
   }) => Promise<void>;
 }
@@ -587,6 +598,78 @@ export const useBackgroundTasksStore = create<BackgroundTasksState>(
           completedAt: Date.now(),
         });
         toast.error(`Gagal memecah "${item.title}": ${errorMsg}`);
+        onError?.(err);
+      }
+    },
+
+    runProductMutation: async ({ mode, targetId, productId, payload, onSuccess, onError }) => {
+      const title =
+        mode === "delete"
+          ? `Hapus Produk: ${payload?.name || "Produk"}`
+          : mode === "create"
+          ? `Tambah Produk: ${payload?.name || ""}`
+          : `Perbarui Produk: ${payload?.name || "Produk"}`;
+      const taskId = get().addTask({
+        title,
+        category: "product",
+        status: "running",
+        statusText: mode === "delete" ? "Menghapus produk..." : "Menyimpan produk ke database...",
+      });
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+      try {
+        const url =
+          mode === "create"
+            ? `/api/v1/tenant/${targetId}/products`
+            : `/api/v1/tenant/${targetId}/products/${productId}`;
+        const method = mode === "create" ? "POST" : mode === "update" ? "PATCH" : "DELETE";
+
+        const res = await fetch(url, {
+          method,
+          headers: method === "DELETE" ? undefined : { "Content-Type": "application/json" },
+          body: method === "DELETE" ? undefined : JSON.stringify(payload),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        if (!res.ok) {
+          let msg = `Server error (${res.status})`;
+          try {
+            const j = await res.json();
+            msg = j?.message || j?.error || msg;
+            if (Array.isArray(msg)) msg = msg[0];
+          } catch {}
+          throw new Error(msg);
+        }
+
+        get().updateTask(taskId, {
+          status: "success",
+          statusText: "Berhasil! Sinkronisasi AI knowledge sedang berjalan di background.",
+          completedAt: Date.now(),
+        });
+        toast.success(
+          mode === "delete" ? "Produk berhasil dihapus!" : mode === "create" ? "Produk baru berhasil ditambahkan!" : "Produk berhasil diperbarui!",
+        );
+        onSuccess?.();
+
+        setTimeout(() => {
+          get().removeTask(taskId);
+        }, 12000);
+      } catch (err: any) {
+        clearTimeout(timeoutId);
+        const errorMsg =
+          err?.name === "AbortError"
+            ? "Permintaan timeout (melebihi 30 detik)"
+            : err?.message || "Gagal memproses produk";
+        get().updateTask(taskId, {
+          status: "error",
+          statusText: "Gagal: " + errorMsg,
+          error: errorMsg,
+          completedAt: Date.now(),
+        });
+        toast.error(`Gagal memproses produk: ${errorMsg}`);
         onError?.(err);
       }
     },

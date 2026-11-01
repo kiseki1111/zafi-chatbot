@@ -49,6 +49,7 @@ import {
   SlidersHorizontal,
   Zap,
   Copy,
+  Package,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthStore } from "@/lib/auth-store";
@@ -57,11 +58,12 @@ import { useAppStore } from "@/lib/app-store";
 // Daftar semua modul yang dapat diaktifkan per klien / akun
 const AVAILABLE_MODULES = [
   { key: "chatbot", label: "Bot WhatsApp", icon: MessageCircle, desc: "Chatbot AI & live takeover" },
+  { key: "products", label: "Katalog Produk", icon: Package, desc: "Katalog barang, harga, variasi & stok" },
   { key: "crm", label: "Pelanggan (CRM)", icon: Users, desc: "Manajemen kontak pelanggan" },
-  { key: "bus_layout", label: "Denah Kursi Bus", icon: Bus, desc: "Visualisasi denah kursi 17 seats" },
-  { key: "availability", label: "Siteplan Properti", icon: Grid3X3, desc: "Denah blok unit kaveling/rumah" },
   { key: "knowledge", label: "Knowledge Base AI", icon: Book, desc: "Pelatihan dokumen untuk asisten AI" },
   { key: "followup", label: "Follow-Up Otomatis", icon: BellRing, desc: "Pengingat otomatis via WhatsApp" },
+  { key: "availability", label: "Siteplan Properti", icon: Grid3X3, desc: "Denah blok unit kaveling/rumah" },
+  { key: "bus_layout", label: "Denah Kursi Bus", icon: Bus, desc: "Visualisasi denah kursi 17 seats" },
 ];
 
 export const PLAN_TIERS = [
@@ -242,7 +244,8 @@ export function ClientsPage() {
     managerEmail: "",
     managerPassword: "Trial@123",
     customFeatureNotes: "",
-    enabledMenus: ["chatbot", "crm", "overview", "settings"],
+    // ponytail: menu default wajib klien baru: bot whatsapp, products, knowledge, pelanggan, follow up otomatis
+    enabledMenus: ["chatbot", "products", "knowledge", "crm", "followup", "overview", "settings"],
   });
 
   // Dialog Edit Profil & Konfigurasi Klien
@@ -462,7 +465,7 @@ export function ClientsPage() {
           managerEmail: "",
           managerPassword: "Trial@123",
           customFeatureNotes: "",
-          enabledMenus: ["chatbot", "crm", "overview", "settings"],
+          enabledMenus: ["chatbot", "products", "knowledge", "crm", "followup", "overview", "settings"],
         });
         fetchClients();
       } else {
@@ -555,7 +558,7 @@ export function ClientsPage() {
   // Handler: Buka Modal Edit Menu Tenant
   const openEditMenusModal = (client: any) => {
     const meta = (client.metadata as any) || {};
-    setEditMenus(meta.enabledMenus || ["chatbot", "crm"]);
+    setEditMenus(meta.enabledMenus || ["chatbot", "products", "knowledge", "crm", "followup", "overview", "settings"]);
     setEditCategory(client.category || "general");
     setIsEditMenusModalOpen(true);
   };
@@ -591,7 +594,7 @@ export function ClientsPage() {
   const openAddStaffModal = () => {
     if (!selectedClient) return;
     const meta = (selectedClient.metadata as any) || {};
-    const defaultMenus = meta.enabledMenus || ["chatbot", "crm"];
+    const defaultMenus = meta.enabledMenus || ["chatbot", "products", "knowledge", "crm", "followup", "overview", "settings"];
     setStaffForm({
       name: "",
       email: "",
@@ -634,7 +637,7 @@ export function ClientsPage() {
   const openEditStaffModal = (staff: any) => {
     setEditingStaff(staff);
     const meta = (selectedClient.metadata as any) || {};
-    const defaultMenus = meta.enabledMenus || ["chatbot", "crm"];
+    const defaultMenus = meta.enabledMenus || ["chatbot", "products", "knowledge", "crm", "followup", "overview", "settings"];
     setEditStaffForm({
       name: staff.name || "",
       email: staff.email || "",
@@ -729,7 +732,7 @@ export function ClientsPage() {
   // =========================================================================
   if (selectedClient) {
     const meta = (selectedClient.metadata as any) || {};
-    const enabledList = meta.enabledMenus || ["chatbot", "crm"];
+    const enabledList = meta.enabledMenus || ["chatbot", "products", "knowledge", "crm", "followup", "overview", "settings"];
     const usersList = selectedClient.users || [];
 
     // Filter modul yang memang aktif pada tenant ini
@@ -2294,7 +2297,14 @@ export function ClientsPage() {
 
             <div>
               <Label>Kategori Bisnis</Label>
-              <Select value={addForm.category} onValueChange={(v) => setAddForm({ ...addForm, category: v })}>
+              <Select
+                value={addForm.category}
+                onValueChange={(v) => {
+                  const base = ["chatbot", "products", "knowledge", "crm", "followup", "overview", "settings"];
+                  const extra = v === "properti" ? ["availability"] : v === "transport" ? ["bus_layout"] : [];
+                  setAddForm({ ...addForm, category: v, enabledMenus: [...base, ...extra] });
+                }}
+              >
                 <SelectTrigger size="sm" className="mt-1 h-8 w-full text-xs">
                   <SelectValue />
                 </SelectTrigger>
@@ -2304,6 +2314,37 @@ export function ClientsPage() {
                   <SelectItem value="transport" className="text-xs">Transportasi / Bus</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="pt-2 border-t space-y-1.5">
+              <span className="font-semibold text-foreground text-xs">Menu & Modul Default Klien:</span>
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300 text-[10px]">
+                  ✓ Bot WhatsApp
+                </Badge>
+                <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300 text-[10px]">
+                  ✓ Katalog Produk
+                </Badge>
+                <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300 text-[10px]">
+                  ✓ Knowledge Base
+                </Badge>
+                <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300 text-[10px]">
+                  ✓ Pelanggan (CRM)
+                </Badge>
+                <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300 text-[10px]">
+                  ✓ Follow-Up Otomatis
+                </Badge>
+                {addForm.category === "properti" && (
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300 text-[10px]">
+                    ✓ Siteplan Properti
+                  </Badge>
+                )}
+                {addForm.category === "transport" && (
+                  <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-300 text-[10px]">
+                    ✓ Denah Kursi Bus
+                  </Badge>
+                )}
+              </div>
             </div>
 
             <div className="pt-2 border-t space-y-2">

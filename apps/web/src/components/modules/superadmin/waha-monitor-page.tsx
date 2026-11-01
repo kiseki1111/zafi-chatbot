@@ -219,6 +219,10 @@ export function WahaMonitorPage() {
             const sName = inst.name || inst.instanceName || "unknown";
             const isWorking = inst.status === "WORKING" || inst.status === "CONNECTED";
             const isLoading = !!actionLoading[sName];
+            const rawPhone = inst.phone || (inst as any).me?.id || inst.dbStats?.phone || "";
+            const cleanPhone = rawPhone.replace(/@(c\.us|s\.whatsapp\.net|lid)$/i, "").replace(/^\+/, "");
+            const profileName = inst.profileName || (inst as any).me?.pushName || inst.dbStats?.profileName || "";
+            const tenantId = inst.tenantId || inst.dbStats?.tenantId;
 
             return (
               <div
@@ -250,15 +254,19 @@ export function WahaMonitorPage() {
                       >
                         {inst.status}
                       </Badge>
-                      {inst.tenantId && (
+                      {tenantId && (
                         <span className="text-[10px] text-muted-foreground font-mono">
-                          Tenant: {inst.tenantId.slice(0, 8)}...
+                          Tenant: {tenantId.slice(0, 8)}...
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {inst.phone ? `+${inst.phone}` : "Belum ada nomor tertaut"}
-                      {inst.profileName ? ` · ${inst.profileName}` : ""}
+                    <p className="text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                      {cleanPhone ? (
+                        <span className="font-mono text-foreground font-medium">+{cleanPhone}</span>
+                      ) : (
+                        <span>Belum ada nomor tertaut</span>
+                      )}
+                      {profileName && <span>· {profileName}</span>}
                     </p>
                     <div className="flex items-center gap-2.5 text-[11px] text-muted-foreground font-mono mt-1">
                       <span>Pesan: {(inst.messagesCount ?? inst.dbStats?.messagesCount ?? 0).toLocaleString()}</span>

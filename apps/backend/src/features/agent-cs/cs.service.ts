@@ -42,7 +42,7 @@ ATURAN MENJAWAB KETERSEDIAAN UNIT / PLANSITE:
    Anda WAJIB mengarahkan mereka untuk langsung menghubungi tim Sales / Marketing resmi kami {fallbackContact} agar jadwal survey atau pemesanan unit dapat segera diproses.
 4. JIKA PELANGGAN MEMINTA DENAH, SITEPLAN, GAMBAR BLOK/KAVLING, ATAU TATA LETAK PERUMAHAN:
    - Jika di database PLANSITE tercantum [FOTO SITEPLAN UTAMA PERUMAHAN ...], Anda WAJIB menyertakan URL file gambar siteplan resmi tersebut ke dalam array "images" dengan format { "url": "URL_SITEPLAN", "caption": "Denah Siteplan NamaPerumahan" } dan jelaskan secara ramah pada balasan teks bahwa gambar denah siteplan kavling terbaru telah dilampirkan.
-   - JIKA STATUS SITEPLAN TERTERA [STATUS SITEPLAN PERUMAHAN ... : NONAKTIF / BELUM TERSEDIA], DILARANG menyertakan gambar apapun di array "images" (array "images" WAJIB KOSONG []). Anda WAJIB menjelaskan dengan ramah bahwa denah siteplan saat ini sedang diperbarui/belum tersedia di sistem, dan ARAHKAN pelanggan untuk langsung menghubungi tim Marketing kami di nomor {fallbackContact} agar dibantu dikirimkan denah/siteplan secara manual.
+   - JIKA STATUS DENAH SITEPLAN TERTERA [STATUS DENAH SITEPLAN KAVLING PERUMAHAN ... : NONAKTIF / BELUM TERSEDIA], DILARANG menyertakan gambar denah/siteplan di array "images" (hanya gambar denah siteplan yang diblokir; foto/video lain dari daftar media TETAP BOLEH dikirimkan jika diminta). Anda WAJIB menjelaskan dengan ramah bahwa denah siteplan saat ini sedang diperbarui/belum tersedia di sistem, dan ARAHKAN pelanggan untuk langsung menghubungi tim Marketing kami di nomor {fallbackContact} agar dibantu dikirimkan denah/siteplan secara manual.
 
 ATURAN PENGIRIMAN GAMBAR & VIDEO (STRICT):
 1. Array "videos" dan "images" HANYA untuk FILE MEDIA LANGSUNG yang tersimpan di sistem/database (format path /uploads/... atau file langsung berakhiran .mp4, .jpg, .png).
@@ -51,6 +51,7 @@ ATURAN PENGIRIMAN GAMBAR & VIDEO (STRICT):
 4. Jika pelanggan meminta foto/gambar, brosur perusahaan, atau DENAH / SITEPLAN PERUMAHAN (termasuk dari daftar [MEDIA_PERUSAHAAN] atau [FOTO SITEPLAN UTAMA PERUMAHAN]), Anda WAJIB memasukkan file foto siteplan tersebut ke array "images" dengan format { "url": "URL_DARI_DATABASE", "caption": "Nama Media" }, DAN TETAP ISI property "text" dengan kalimat pengantar ramah. Jika file foto/gambar TIDAK TERSEDIA di database, JANGAN kosongkan property "text"; sampaikan secara luwes bahwa file belum tersedia dan arahkan ke {fallbackContact}.
 5. Jangan pernah mengarang URL (dilarang menggunakan example.com atau link fiktif).
 6. DILARANG MENGAMBIL LINK DARI RIWAYAT CHAT LAMA: Semua media (gambar/video/brosur) yang Anda kirimkan WAJIB bersumber dari DATABASE TOKO atau DATA PLANSITE yang aktif saat ini. DILARANG KERAS mengulangi atau mengambil kembali tautan media dari riwayat percakapan lama jika media tersebut sudah tidak tercantum di DATABASE TOKO saat ini (karena sudah dihapus oleh pemilik toko). Jika tidak ada di DATABASE TOKO saat ini, berarti media tersebut SUDAH TIDAK TERSEDIA.
+7. PEMILIHAN FOTO PRODUK BERDASARKAN DESKRIPSI: Setiap foto produk memiliki nomor urut dan deskripsi (contoh: "1. /uploads/xxx.jpg — Tampak depan rumah"). JIKA pelanggan meminta foto tertentu (misal: "kirim foto tampak depan", "foto taman", "foto kamar mandi"), Anda WAJIB memilih dan mengirim foto dari "Foto Produk" yang DESKRIPSI-nya paling cocok dengan permintaan pelanggan ke array "images" dengan format { "url": "URL_FOTO_TERSEBUT", "caption": "Deskripsi Foto" }. Jika ada lebih dari satu foto yang cocok, kirimkan semuanya. Jika pelanggan minta "foto produk" secara umum tanpa spesifikasi, kirimkan foto utama (nomor 1).
 
 ATURAN FALLBACK (PERTANYAAN DI LUAR DATABASE):
 JANGAN NGARANG. Jika informasi yang ditanyakan TIDAK ADA di DATABASE TOKO, balas dengan menolak secara halus menggunakan kalimat ini:
@@ -266,13 +267,49 @@ WAJIB MERESPON DALAM FORMAT JSON BERIKUT:
       .catch(() => []);
 
     if (products && products.length > 0) {
+      // ponytail: sertakan rincian harga, stok, variasi, dan deskripsi produk agar AI Luna menjawab akurat
       const stockInfo = products
-        .map(
-          (p) =>
-            `- ${p.name}: Harga Rp ${Number(p.price || 0).toLocaleString('id-ID')} [Sisa stok: ${p.stock}]`,
-        )
+        .map((p) => {
+          let line = `- ${p.name} (Kategori: ${p.category || 'Umum'}): Harga Rp ${Number(p.price || 0).toLocaleString('id-ID')} [Total Stok: ${p.stock}]`;
+          if (p.description) {
+            line += `\n  Deskripsi: ${p.description}`;
+          }
+          const attrs = p.attributes as any;
+          if (attrs?.hasVariations && Array.isArray(attrs?.variations) && attrs.variations.length > 0) {
+            const varLines = attrs.variations
+              .map((v: any) => `    * ${v.name}: Rp ${Number(v.price || 0).toLocaleString('id-ID')} (Stok: ${v.stock})`)
+              .join('\n');
+            line += `\n  Pilihan Variasi:\n${varLines}`;
+          }
+          if (Array.isArray(attrs?.images) && attrs.images.length > 0) {
+            // ponytail: daftar tiap foto + deskripsinya agar AI bisa pilih foto sesuai permintaan customer.
+            // URL blob:/object temporary (sisa upload gagal) difilter — tidak bisa dikirim via WhatsApp.
+            const validImages = attrs.images.filter((img: any) => {
+              const url = typeof img === 'string' ? img : img?.url;
+              return url && !url.startsWith('blob:') && !url.startsWith('data:');
+            });
+            const photoLines = validImages
+              .map((img: any, i: number) => {
+                const url = typeof img === 'string' ? img : img?.url;
+                const desc = typeof img === 'string' ? '' : img?.description || '';
+                return `    ${i + 1}. ${url}${desc ? ` — ${desc}` : ' (tanpa deskripsi)'}`;
+              })
+              .join('\n');
+            if (photoLines) {
+              line += `\n  Foto Produk (${validImages.length} foto):\n${photoLines}`;
+            }
+          }
+          if (
+            attrs?.videoUrl &&
+            !attrs.videoUrl.startsWith('blob:') &&
+            !attrs.videoUrl.startsWith('data:')
+          ) {
+            line += `\n  Video Demo Produk: Tersedia (${attrs.videoUrl})`;
+          }
+          return line;
+        })
         .join('\n');
-      context += `\n\n=== INFO PRODUK & STOK REAL-TIME SAAT INI (PENTING) ===\n${stockInfo}`;
+      context += `\n\n=== KATALOG PRODUK, VARIASI & STOK REAL-TIME (DATABASE RESMI) ===\n${stockInfo}`;
     }
 
     const activeKnowledgeSource = `${context || ''}\n${availabilityContext || ''}`;

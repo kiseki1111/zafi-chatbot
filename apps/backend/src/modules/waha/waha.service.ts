@@ -381,9 +381,15 @@ export class WahaService implements OnApplicationBootstrap {
             }
             const estimatedCostIdr = Math.round((sessionTokens / 1000) * 2.56);
 
+            const cleanPhone = (inst.phone || '').replace(/@(c\.us|s\.whatsapp\.net)$/i, '');
             return {
               name: inst.instanceName,
+              instanceName: inst.instanceName,
               status: inst.status,
+              phone: cleanPhone,
+              rawPhone: inst.phone,
+              profileName: inst.profileName,
+              tenantId: inst.tenantId,
               me: { id: inst.phone, pushName: inst.profileName },
               messagesCount: botMessages.length,
               tokensUsed: sessionTokens,
@@ -446,8 +452,17 @@ export class WahaService implements OnApplicationBootstrap {
           }
           const estimatedCostIdr = Math.round((sessionTokens / 1000) * 2.56);
 
+          const rawPhone = ws.me?.id || instance.phone || null;
+          const cleanPhone = rawPhone ? rawPhone.replace(/@(c\.us|s\.whatsapp\.net)$/i, '') : null;
+          const profileName = ws.me?.pushName || instance.profileName || null;
+
           return {
             ...ws,
+            instanceName: ws.name,
+            phone: cleanPhone,
+            rawPhone,
+            profileName,
+            tenantId: instance.tenantId,
             messagesCount: botMessages.length,
             tokensUsed: sessionTokens,
             estimatedCostIdr,

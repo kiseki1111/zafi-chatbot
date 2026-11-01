@@ -28,6 +28,7 @@ export const VIEW_TITLES: Record<ViewKey, { title: string; desc: string }> = {
   ai_config: { title: "Model AI & Sistem", desc: "Konfigurasi engine AI, default model, dan parameter kecerdasan buatan" },
   system_logs: { title: "Log Sistem & Webhook", desc: "Riwayat event webhook WhatsApp dan audit log sistem real-time" },
   overview: { title: "Dashboard", desc: "Ringkasan performa asisten AI Anda" },
+  products: { title: "Katalog Produk", desc: "Kelola master data produk, variasi, harga, dan stok untuk asisten AI" },
   bus_layout: { title: "Visualisasi Kursi Bus (17 Seats)", desc: "Denah ketersediaan kursi & reservasi tiket armada 17 seat" },
   availability: { title: "Siteplan", desc: "Kelola denah blok, tipe rumah, dan status ketersediaan unit perumahan" },
   chatbot: { title: "Bot WhatsApp", desc: "Koneksi & sesi WhatsApp" },

@@ -18,6 +18,7 @@ export interface User {
 export type ViewKey =
   | "overview"
   | "clients"
+  | "products"
   | "availability"
   | "bus_layout"
   | "chatbot"

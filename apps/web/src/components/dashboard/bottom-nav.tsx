@@ -25,6 +25,7 @@ import {
   Bus,
   ShieldCheck,
   ChevronRight,
+  Package,
   User as UserIcon,
 } from "lucide-react";
 import {
@@ -98,6 +99,7 @@ export function BottomNav() {
 
   // Icon helper – always renders an icon, falls back to ChevronRight for unknown keys
   const iconMap: Record<string, React.ElementType> = {
+    products: Package,
     settings: Settings,
     followup: BellRing,
     availability: Grid3X3,

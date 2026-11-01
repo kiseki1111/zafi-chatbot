@@ -19,6 +19,7 @@ export const MOCK_TENANT: TenantMock = {
 export const MOCK_METRICS = {
   knowledgeCount: 42,
   totalChats: 1284,
+  totalContacts: 128,
   botSuccessRate: 96.5,
 };
 

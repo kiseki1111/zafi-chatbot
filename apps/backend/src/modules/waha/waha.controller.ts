@@ -306,38 +306,52 @@ export class WahaController implements OnApplicationBootstrap {
     }
   }
 
+  private async ensureInstanceBelongsToUserTenant(
+    instanceName: string,
+    req: any,
+  ) {
+    const isSuper =
+      req?.user?.roles?.some((r: string) => r?.toLowerCase() === 'superadmin') ||
+      req?.user?.role?.toLowerCase() === 'superadmin';
+    if (isSuper) return;
+
+    const tenantId = req?.user?.tenantId;
+    if (!tenantId) {
+      throw new ForbiddenException(
+        'Akses ditolak: Akun Anda tidak terhubung dengan tenant manapun',
+      );
+    }
+    const instance = await this.prisma.whatsappInstance.findUnique({
+      where: { instanceName },
+    });
+    if (instance && instance.tenantId && instance.tenantId !== tenantId) {
+      throw new ForbiddenException(
+        'Akses ditolak: Sesi WAHA ini milik akun lain',
+      );
+    }
+  }
+
   @Post('instances/:id/restart')
-  async restartInstance(@Param('id') id: string) {
+  async restartInstance(@Param('id') id: string, @Req() req: any) {
+    await this.ensureInstanceBelongsToUserTenant(id, req);
     return this.wahaService.restartSession(id);
   }
 
   @Post('instances/:id/stop')
-  async stopInstance(@Param('id') id: string) {
+  async stopInstance(@Param('id') id: string, @Req() req: any) {
+    await this.ensureInstanceBelongsToUserTenant(id, req);
     return this.wahaService.stopSession(id);
   }
 
   @Post('instances/:id/logout')
-  async logoutInstance(@Param('id') id: string) {
+  async logoutInstance(@Param('id') id: string, @Req() req: any) {
+    await this.ensureInstanceBelongsToUserTenant(id, req);
     return this.wahaService.logoutSession(id);
   }
 
   @Delete('instances/:id')
   async deleteInstance(@Param('id') id: string, @Req() req: any) {
-    const tenantId =
-      req.query?.tenantId &&
-      req.query.tenantId !== 'undefined' &&
-      req.query.tenantId !== 'null'
-        ? req.query.tenantId
-        : req.user?.tenantId;
-
-    if (tenantId && req.user?.role !== 'superadmin') {
-      const instance = await this.prisma.whatsappInstance.findUnique({
-        where: { instanceName: id },
-      });
-      if (instance && instance.tenantId && instance.tenantId !== tenantId) {
-        throw new ForbiddenException('Akses ditolak: sesi ini milik akun lain');
-      }
-    }
+    await this.ensureInstanceBelongsToUserTenant(id, req);
 
     try {
       await this.wahaService.logoutSession(id);
@@ -419,13 +433,19 @@ export class WahaController implements OnApplicationBootstrap {
 
   @SkipThrottle()
   @Get('instances/:id/status')
-  async getInstanceStatus(@Param('id') id: string) {
+  async getInstanceStatus(@Param('id') id: string, @Req() req: any) {
+    await this.ensureInstanceBelongsToUserTenant(id, req);
     return this.wahaService.getSession(id);
   }
 
   @SkipThrottle()
   @Get('instances/:id/qr')
-  async getQrCode(@Param('id') id: string, @Res() res: any) {
+  async getQrCode(
+    @Param('id') id: string,
+    @Req() req: any,
+    @Res() res: any,
+  ) {
+    await this.ensureInstanceBelongsToUserTenant(id, req);
     try {
       const qrBuffer = await this.wahaService.getQrCode(id);
       res.setHeader('Content-Type', 'image/png');
@@ -494,7 +514,9 @@ export class WahaController implements OnApplicationBootstrap {
   async sendMessage(
     @Param('id') id: string,
     @Body() body: { chatId: string; text: string },
+    @Req() req: any,
   ) {
+    await this.ensureInstanceBelongsToUserTenant(id, req);
     const inst = await this.prisma.whatsappInstance.findUnique({
       where: { instanceName: id },
     });

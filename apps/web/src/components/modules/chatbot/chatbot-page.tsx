@@ -891,18 +891,20 @@ export function ChatbotPage() {
              .filter((d: any) => d.status?.toLowerCase() === 'working')
              .map((d: any) => ({ id: d.name, name: d.name, status: d.status?.toLowerCase() || 'stopped' }));
          }
-         // Selalu sediakan Sesi Dev Simulator untuk testing lokal
-         if (!mapped.some((m) => m.id === "dev-session")) {
-           mapped.push({ id: "dev-session", name: "Sesi Simulasi (Dev)", status: "working" });
-         }
+         // ponytail: jika hanya 1 sesi, otomatis pilih langsung
          setSessions(mapped);
-         if (!sessionId && mapped.length > 0) {
+         if (mapped.length === 1) {
            setSessionId(mapped[0].id);
+         } else if (mapped.length > 1) {
+           if (!sessionId || !mapped.some((m) => m.id === sessionId)) {
+             setSessionId(mapped[0].id);
+           }
+         } else {
+           setSessionId("");
          }
       }).catch(() => {
-        const fallback = [{ id: "dev-session", name: "Sesi Simulasi (Dev)", status: "working" }];
-        setSessions(fallback);
-        if (!sessionId) setSessionId("dev-session");
+        setSessions([]);
+        setSessionId("");
       });
   }, [user?.tenantId, user?.role]);
 
@@ -1583,31 +1585,48 @@ export function ChatbotPage() {
           <div className="h-6 w-6 rounded-md bg-emerald-600 text-white grid place-items-center shrink-0">
             <MessageCircle className="h-3.5 w-3.5" />
           </div>
-          <Select value={sessionId} onValueChange={setSessionId}>
-            <SelectTrigger className="w-[180px] sm:w-[220px] h-7 text-xs bg-muted/50 border-0 gap-1.5">
-              <SelectValue placeholder="Pilih sesi WAHA" />
-            </SelectTrigger>
-            <SelectContent>
-              {sessions.length === 0 && <SelectItem value="none" disabled>Tidak ada sesi aktif</SelectItem>}
-              {sessions.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={cn(
-                        "h-2 w-2 rounded-full",
-                        s.status === "working"
-                          ? "bg-emerald-500"
-                          : s.status === "starting"
-                            ? "bg-amber-500"
-                            : "bg-rose-500",
-                      )}
-                    />
-                    <span className="text-xs font-medium">{s.name}</span>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {sessions.length === 1 ? (
+            // ponytail: jika hanya 1 sesi, tampilkan langsung nama sesi tanpa dropdown
+            <div className="flex items-center gap-2 px-2.5 py-1 bg-muted/60 border rounded-lg text-xs">
+              <span
+                className={cn(
+                  "h-2 w-2 rounded-full",
+                  sessions[0].status === "working"
+                    ? "bg-emerald-500"
+                    : sessions[0].status === "starting"
+                      ? "bg-amber-500"
+                      : "bg-rose-500",
+                )}
+              />
+              <span className="text-xs font-semibold text-foreground">{sessions[0].name}</span>
+            </div>
+          ) : (
+            <Select value={sessionId} onValueChange={setSessionId}>
+              <SelectTrigger className="w-[180px] sm:w-[220px] h-7 text-xs bg-muted/50 border-0 gap-1.5">
+                <SelectValue placeholder="Pilih sesi WAHA" />
+              </SelectTrigger>
+              <SelectContent>
+                {sessions.length === 0 && <SelectItem value="none" disabled>Tidak ada sesi aktif</SelectItem>}
+                {sessions.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={cn(
+                          "h-2 w-2 rounded-full",
+                          s.status === "working"
+                            ? "bg-emerald-500"
+                            : s.status === "starting"
+                              ? "bg-amber-500"
+                              : "bg-rose-500",
+                        )}
+                      />
+                      <span className="text-xs font-medium">{s.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         <div className="flex items-center gap-2 shrink-0">

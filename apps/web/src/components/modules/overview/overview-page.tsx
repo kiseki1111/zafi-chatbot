@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import {
   Bot, Brain, MessageCircle, Phone, Smartphone,
   Settings, ArrowRight, CheckCircle2, XCircle,
-  Loader2, RefreshCw, BookOpen, Zap, Activity, Sparkles,
+  Loader2, RefreshCw, BookOpen, Zap, Activity, Sparkles, Users,
 } from "lucide-react";
 
 interface TenantData {
@@ -26,7 +26,8 @@ interface TenantData {
 interface Metrics {
   knowledgeCount: number;
   totalChats: number;
-  botSuccessRate: number;
+  totalContacts?: number;
+  botSuccessRate?: number;
 }
 
 interface WaSession {
@@ -105,6 +106,7 @@ export function OverviewPage() {
     const defaultEmptyMetrics: Metrics = {
       knowledgeCount: 0,
       totalChats: 0,
+      totalContacts: 0,
       botSuccessRate: 100,
     };
 
@@ -325,28 +327,24 @@ export function OverviewPage() {
           </CardContent>
         </Card>
 
-        <Card className="group hover:-translate-y-1 hover:shadow-md hover:border-violet-500/40 transition-all duration-200 ease-out cursor-default">
+        <Card
+          onClick={() => setView("crm")}
+          className="group hover:-translate-y-1 hover:shadow-md hover:border-indigo-500/40 transition-all duration-200 ease-out cursor-pointer"
+        >
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardDescription className="text-xs">AI Success Rate</CardDescription>
-              <div className="h-10 w-10 sm:h-8 sm:w-8 rounded-lg grid place-items-center bg-violet-100 dark:bg-violet-950/40 text-violet-600 group-hover:scale-110 transition-transform duration-200 ease-out">
-                <Zap className="h-5 w-5 sm:h-4 sm:w-4" />
+              <CardDescription className="text-xs">Total Prospek</CardDescription>
+              <div className="h-10 w-10 sm:h-8 sm:w-8 rounded-lg grid place-items-center bg-indigo-100 dark:bg-indigo-950/40 text-indigo-600 group-hover:scale-110 transition-transform duration-200 ease-out">
+                <Users className="h-5 w-5 sm:h-4 sm:w-4" />
               </div>
             </div>
             <CardTitle className="text-3xl sm:text-2xl font-bold tracking-tight mt-1">
-              {metrics?.botSuccessRate != null ? (
-                <>
-                  {metrics.botSuccessRate}
-                  <span className="text-sm font-normal text-muted-foreground ml-0.5">%</span>
-                </>
-              ) : (
-                <span className="text-base font-medium text-muted-foreground">100%</span>
-              )}
+              {metrics?.totalContacts != null ? metrics.totalContacts : (metrics?.totalChats ?? 0)}
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <p className="text-xs text-muted-foreground">akurasi jawaban otomatis</p>
-            <p className="text-[11px] text-muted-foreground/70 mt-0.5">bulan ini</p>
+            <p className="text-xs text-muted-foreground">kontak prospek terdata</p>
+            <p className="text-[11px] text-muted-foreground/70 mt-0.5">pipeline CRM aktif</p>
           </CardContent>
         </Card>
       </div>

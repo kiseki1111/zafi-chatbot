@@ -1091,6 +1091,25 @@ export class TenantService {
     const totalChats = await this.prisma.conversation.count({
       where: instanceFilterConv,
     });
+    // ponytail: hitung total kontak prospek CRM per tenant
+    const totalContacts = await this.prisma.contact.count({
+      where: tenantId
+        ? {
+            OR: [
+              { tenantId },
+              ...(instanceNames.length > 0
+                ? [
+                    {
+                      conversations: {
+                        some: { instanceName: { in: instanceNames } },
+                      },
+                    },
+                  ]
+                : []),
+            ],
+          }
+        : {},
+    });
 
     // Revenue trend (last 7 days — real data)
     const dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
@@ -1130,6 +1149,7 @@ export class TenantService {
         salesCountToday: salesRecords.length,
         totalChats,
         totalMessages,
+        totalContacts,
         botMessages,
         botSuccessRate:
           totalMessages > 0
@@ -1157,6 +1177,7 @@ export class TenantService {
       operatingHours?: string;
       address?: string;
       colorPalette?: { primary?: string; secondary?: string; accent?: string };
+      productGallery?: any[];
     },
   ) {
     let resolvedTenantId: string | null = null;
@@ -1218,17 +1239,18 @@ export class TenantService {
       throw new NotFoundException('Tenant not found');
     }
 
-    const { colorPalette, ...otherData } = data;
+    const { colorPalette, productGallery, ...otherData } = data;
     const updatePayload: any = { ...otherData };
 
-    if (colorPalette) {
+    if (colorPalette !== undefined || productGallery !== undefined) {
       const currentTenant = await this.prisma.tenant.findUnique({
         where: { id: resolvedTenantId },
       });
       const existingMetadata = (currentTenant?.metadata as any) || {};
       updatePayload.metadata = {
         ...existingMetadata,
-        colorPalette,
+        ...(colorPalette !== undefined ? { colorPalette } : {}),
+        ...(productGallery !== undefined ? { productGallery } : {}),
       };
     }
 
@@ -1390,24 +1412,51 @@ Berikan jawaban yang natural seperti CS manusia sungguhan. Jangan menggunakan ba
     };
   }
 
-  async getTenantProducts(userId: string) {
+  // ponytail: resolusi fleksibel tenant ID untuk manajemen katalog produk
+  private async resolveTenantIdForProducts(userId: string): Promise<string> {
     if (userId.includes('@')) {
       const owner = await this.prisma.user.findUnique({
         where: { email: userId },
       });
-      if (owner) userId = owner.id;
-    } else if (userId === 'demo' || userId.startsWith('u-')) {
+      if (owner?.tenantId) return owner.tenantId;
+    }
+    const tenantDirect = await this.prisma.tenant.findUnique({
+      where: { id: userId },
+    });
+    if (tenantDirect) return tenantDirect.id;
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (user?.tenantId) return user.tenantId;
+
+    if (userId === 'demo' || userId.startsWith('u-')) {
       const firstOwner = await this.prisma.user.findFirst({
         where: { role: 'owner' },
       });
-      if (firstOwner) userId = firstOwner.id;
+      if (firstOwner?.tenantId) return firstOwner.tenantId;
     }
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user?.tenantId) throw new NotFoundException('Tenant not found');
-    return this.prisma.product.findMany({
-      where: { tenantId: user.tenantId },
-      orderBy: { createdAt: 'desc' },
-    });
+
+    // ponytail: JANGAN fallback ke tenant pertama — itu celah isolasi data antar tenant.
+    throw new NotFoundException('Tenant not found');
+  }
+
+  async getTenantProducts(userId: string) {
+    try {
+      const tenantId = await this.resolveTenantIdForProducts(userId);
+      const products = await this.prisma.product.findMany({
+        where: { tenantId },
+        orderBy: { createdAt: 'desc' },
+      });
+      // ponytail: map Decimal price ke number agar serialisasi JSON aman
+      return products.map((p) => ({
+        ...p,
+        price: Number(p.price) || 0,
+      }));
+    } catch (err: any) {
+      console.error(`Error getTenantProducts(${userId}): ${err.message}`);
+      return [];
+    }
   }
 
   async addTenantProduct(
@@ -1421,102 +1470,101 @@ Berikan jawaban yang natural seperti CS manusia sungguhan. Jangan menggunakan ba
       attributes?: any;
     },
   ) {
-    if (userId.includes('@')) {
-      const owner = await this.prisma.user.findUnique({
-        where: { email: userId },
-      });
-      if (owner) userId = owner.id;
-    } else if (userId === 'demo' || userId.startsWith('u-')) {
-      const firstOwner = await this.prisma.user.findFirst({
-        where: { role: 'owner' },
-      });
-      if (firstOwner) userId = firstOwner.id;
-    }
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user?.tenantId) throw new NotFoundException('Tenant not found');
-
+    const tenantId = await this.resolveTenantIdForProducts(userId);
     const product = await this.prisma.product.create({
       data: {
-        tenantId: user.tenantId,
-        name: data.name,
-        category: data.category,
-        price: data.price,
-        stock: data.stock,
+        tenantId,
+        name: data.name.slice(0, 100),
+        category: (data.category || 'General').slice(0, 50),
+        price: Math.max(0, Number(data.price) || 0),
+        stock: Math.max(0, Math.trunc(Number(data.stock) || 0)),
         description: data.description || '',
         attributes: data.attributes || {},
       },
     });
 
-    // Trigger sync ke vector db agar agent mengenali produk baru
-    await this.dataAgentService.syncKnowledgeBase(user.tenantId);
+    // ponytail: sync embedding fire-and-forget — JANGAN await, agar PATCH/POST tidak timeout
+    // dan frontend tidak salah menampilkan error padahal DB sudah tersimpan.
+    void this.dataAgentService.syncKnowledgeBase(tenantId).catch(() => null);
 
-    return product;
+    return {
+      ...product,
+      price: Number(product.price) || 0,
+    };
   }
 
   async updateTenantProduct(
     userId: string,
     productId: string,
-    data: Partial<{
+    input: Partial<{
       name: string;
       category: string;
       price: number;
       stock: number;
       description: string;
+      imageUrl: string;
       attributes: any;
     }>,
   ) {
-    if (userId.includes('@')) {
-      const owner = await this.prisma.user.findUnique({
-        where: { email: userId },
-      });
-      if (owner) userId = owner.id;
-    } else if (userId === 'demo' || userId.startsWith('u-')) {
-      const firstOwner = await this.prisma.user.findFirst({
-        where: { role: 'owner' },
-      });
-      if (firstOwner) userId = firstOwner.id;
-    }
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user?.tenantId) throw new NotFoundException('Tenant not found');
-
+    const tenantId = await this.resolveTenantIdForProducts(userId);
     const product = await this.prisma.product.findFirst({
-      where: { id: productId, tenantId: user.tenantId },
+      where: { id: productId, tenantId },
     });
     if (!product) throw new NotFoundException('Product not found');
+
+    // ponytail: WHITELIST field — jangan spread body mentah ke prisma.update.
+    // Mencegah body jahat memindahkan produk antar tenant (tenantId) atau mengubah id/createdAt.
+    const data: Record<string, unknown> = {};
+    if (typeof input.name === 'string') data.name = input.name.slice(0, 100);
+    if (typeof input.category === 'string') data.category = input.category.slice(0, 50);
+    if (input.price !== undefined) data.price = Math.max(0, Number(input.price) || 0);
+    if (input.stock !== undefined) data.stock = Math.max(0, Math.trunc(Number(input.stock) || 0));
+    if (typeof input.description === 'string') data.description = input.description;
+    if (input.imageUrl !== undefined) data.imageUrl = input.imageUrl || null;
+    if (input.attributes !== undefined) data.attributes = input.attributes ?? {};
 
     const updated = await this.prisma.product.update({
       where: { id: productId },
       data,
     });
 
-    await this.dataAgentService.syncKnowledgeBase(user.tenantId);
-    return updated;
+    void this.dataAgentService.syncKnowledgeBase(tenantId).catch(() => null);
+    return {
+      ...updated,
+      price: Number(updated.price) || 0,
+    };
   }
 
   async deleteTenantProduct(userId: string, productId: string) {
-    if (userId.includes('@')) {
-      const owner = await this.prisma.user.findUnique({
-        where: { email: userId },
-      });
-      if (owner) userId = owner.id;
-    } else if (userId === 'demo' || userId.startsWith('u-')) {
-      const firstOwner = await this.prisma.user.findFirst({
-        where: { role: 'owner' },
-      });
-      if (firstOwner) userId = firstOwner.id;
-    }
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user?.tenantId) throw new NotFoundException('Tenant not found');
-
+    const tenantId = await this.resolveTenantIdForProducts(userId);
     const product = await this.prisma.product.findFirst({
-      where: { id: productId, tenantId: user.tenantId },
+      where: { id: productId, tenantId },
     });
     if (!product) throw new NotFoundException('Product not found');
 
     await this.prisma.product.delete({ where: { id: productId } });
 
-    await this.dataAgentService.syncKnowledgeBase(user.tenantId);
+    void this.dataAgentService.syncKnowledgeBase(tenantId).catch(() => null);
     return { success: true };
+  }
+
+  async verifyProductMediaUpload(userId: string, isVideo: boolean) {
+    if (!isVideo) return;
+    const tenantId = await this.resolveTenantIdForProducts(userId);
+    const tenant = await this.prisma.tenant
+      .findUnique({
+        where: { id: tenantId },
+      })
+      .catch(() => null);
+    if (
+      tenant &&
+      (tenant.metadata as any)?.plan &&
+      !isFeatureAllowed(tenant.metadata, 'mediaGallery')
+    ) {
+      throw new BadRequestException(
+        'Fitur upload video produk eksklusif untuk paket Silver ke atas.',
+      );
+    }
   }
 
   async getTenantKnowledge(userId: string) {
@@ -1739,18 +1787,27 @@ Berikan jawaban yang natural seperti CS manusia sungguhan. Jangan menggunakan ba
       Date.now() + trialDays * 24 * 60 * 60 * 1000,
     ).toISOString();
 
+    // ponytail: menu default wajib klien baru: bot whatsapp, products, knowledge, crm, followup
+    const defaultMandatoryMenus = [
+      'overview',
+      'chatbot',
+      'products',
+      'knowledge',
+      'crm',
+      'followup',
+      'settings',
+    ];
+    const categoryExtras =
+      data.category === 'properti'
+        ? ['availability']
+        : data.category === 'transport'
+        ? ['bus_layout']
+        : [];
+
     const enabledMenus =
       Array.isArray(data.enabledMenus) && data.enabledMenus.length > 0
-        ? data.enabledMenus
-        : [
-            'overview',
-            'crm',
-            'chatbot',
-            'knowledge',
-            'availability',
-            'followup',
-            'settings',
-          ];
+        ? Array.from(new Set([...defaultMandatoryMenus, ...data.enabledMenus]))
+        : [...defaultMandatoryMenus, ...categoryExtras];
 
     // ponytail: atomic transaction untuk pembuatan tenant & user awal tanpa orphaned data
     const [tenant, user] = await this.prisma.$transaction(async (tx) => {

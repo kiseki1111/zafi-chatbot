@@ -49,7 +49,36 @@ export class DataAgentService {
 
       for (const product of products) {
         try {
-          const content = `Produk: ${product.name}\nKategori: ${product.category}\nDeskripsi: ${product.description}\nHarga: Rp ${product.price}\nStok: ${product.stock}`;
+          const attrs = product.attributes as any;
+          let varInfo = '';
+          if (attrs?.hasVariations && Array.isArray(attrs?.variations)) {
+            varInfo =
+              '\nVariasi: ' +
+              attrs.variations
+                .map((v: any) => `${v.name} (Rp ${v.price}, Stok: ${v.stock})`)
+                .join(', ');
+          }
+          let imgInfo = '';
+          if (Array.isArray(attrs?.images) && attrs.images.length > 0) {
+            // ponytail: sertakan deskripsi foto agar embedding bisa match permintaan foto spesifik.
+            // Blob URL (upload gagal) difilter — tidak valid untuk embedding maupun pengiriman.
+            const validImgs = attrs.images.filter((img: any) => {
+              const url = typeof img === 'string' ? img : img?.url;
+              return url && !url.startsWith('blob:') && !url.startsWith('data:');
+            });
+            if (validImgs.length > 0) {
+              imgInfo =
+                '\nFoto Produk: ' +
+                validImgs
+                  .map((img: any, i: number) => {
+                    const url = typeof img === 'string' ? img : img?.url;
+                    const desc = typeof img === 'string' ? '' : img?.description || '';
+                    return `${i + 1}. ${url}${desc ? ` (${desc})` : ''}`;
+                  })
+                  .join('; ');
+            }
+          }
+          const content = `Produk: ${product.name}\nKategori: ${product.category}\nDeskripsi: ${product.description}\nHarga: Rp ${product.price}\nStok: ${product.stock}${varInfo}${imgInfo}`;
           const embedding = await this.ragService.generateEmbedding(content);
 
           const vectorString = `[${embedding.join(',')}]`;

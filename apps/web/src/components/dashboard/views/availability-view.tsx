@@ -140,7 +140,8 @@ export function AvailabilityView() {
   const { toast } = useToast();
   const { runSiteplanMediaUpload } = useBackgroundTasksStore();
 
-  const tenantId = user?.tenantId || "t-123";
+  // ponytail: tenantId harus selalu dari session — fallback lokal bisa menembak endpoint salah tenant
+  const tenantId = user?.tenantId || "";
 
   const [groups, setGroups] = useState<ResourceGroup[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);

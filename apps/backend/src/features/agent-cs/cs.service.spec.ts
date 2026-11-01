@@ -521,4 +521,164 @@ describe('CsService', () => {
       );
     });
   });
+
+  // Verifikasi bahwa data katalog di DB benar-benar masuk ke system prompt yang
+  // diterima LLM — jadi chatbot menjawab berdasarkan fakta katalog, bukan halusinasi.
+  describe('akurasi konteks katalog produk di system prompt', () => {
+    const setup = (products: any[]) => {
+      mockAgentShared.getRecentContext.mockResolvedValue([]);
+      mockPrisma.whatsappInstance.findUnique.mockResolvedValue({
+        instanceName: 'main-wa',
+        tenantId: 'tenant-123',
+      });
+      mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue('');
+      mockAgentShared.getAvailabilityContext.mockResolvedValue(null);
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        id: 'tenant-123',
+        name: 'Kedai Kopi Nusantara',
+        agentName: 'Luna',
+        agentTone: 'ramah',
+      });
+      mockPrisma.product.findMany.mockResolvedValue(products);
+      mockAgentShared.callLLM.mockResolvedValue(
+        JSON.stringify({ text: 'Siap Kak.', images: [], videos: [] }),
+      );
+    };
+
+    // systemPrompt adalah argumen ke-2 callLLM(prompt, systemPrompt, requireJson)
+    const getSystemPrompt = () =>
+      String(mockAgentShared.callLLM.mock.calls[0]?.[1] || '');
+
+    const ask = () =>
+      service.handleMessage({
+        senderId: '628123456789@c.us',
+        sessionName: 'main-wa',
+        text: 'Produknya harganya berapa dan stoknya masih ada?',
+      });
+
+    it('menyertakan nama, kategori, harga (Decimal) terformat & stok akurat', async () => {
+      setup([
+        {
+          name: 'Kopi Arabika Gayo 250gr',
+          category: 'Makanan & Minuman',
+          price: '85000.00', // Prisma Decimal diserialisasi sebagai string
+          stock: 15,
+          description: 'Biji kopi single origin Aceh Gayo proses natural.',
+          attributes: {},
+        },
+      ]);
+
+      await ask();
+
+      const prompt = getSystemPrompt();
+      expect(prompt).toContain('KATALOG PRODUK, VARIASI & STOK REAL-TIME');
+      expect(prompt).toContain('Kopi Arabika Gayo 250gr');
+      expect(prompt).toContain('Kategori: Makanan & Minuman');
+      expect(prompt).toContain('Harga Rp 85.000');
+      expect(prompt).toContain('[Total Stok: 15]');
+      expect(prompt).toContain('Biji kopi single origin Aceh Gayo');
+    });
+
+    it('menyertakan rincian variasi: nama, harga per opsi & stok per opsi', async () => {
+      setup([
+        {
+          name: 'Kemeja Flanel',
+          category: 'Pakaian',
+          price: 135000,
+          stock: 42,
+          attributes: {
+            hasVariations: true,
+            variations: [
+              { name: 'Hitam - M', price: 135000, stock: 20 },
+              { name: 'Merah - XL', price: 145000, stock: 7 },
+            ],
+          },
+        },
+      ]);
+
+      await ask();
+
+      const prompt = getSystemPrompt();
+      expect(prompt).toContain('Pilihan Variasi');
+      expect(prompt).toContain('Hitam - M: Rp 135.000 (Stok: 20)');
+      expect(prompt).toContain('Merah - XL: Rp 145.000 (Stok: 7)');
+    });
+
+    it('menyertakan foto + deskripsinya & video, sekaligus membuang URL blob:/data:', async () => {
+      setup([
+        {
+          name: 'Rumah Tipe 36',
+          category: 'Properti',
+          price: 192800000,
+          stock: 3,
+          attributes: {
+            images: [
+              { url: '/uploads/depan.jpg', description: 'Tampak depan rumah' },
+              'blob:http://localhost/abc', // sisa upload gagal — harus difilter
+              { url: '/uploads/dapur.jpg', description: 'Dapur bersih' },
+            ],
+            videoUrl: '/uploads/tour.mp4',
+          },
+        },
+      ]);
+
+      await ask();
+
+      const prompt = getSystemPrompt();
+      expect(prompt).toContain('Harga Rp 192.800.000');
+      expect(prompt).toContain('Foto Produk (2 foto)');
+      expect(prompt).toContain('/uploads/depan.jpg — Tampak depan rumah');
+      expect(prompt).toContain('/uploads/dapur.jpg — Dapur bersih');
+      expect(prompt).toContain('Video Demo Produk: Tersedia (/uploads/tour.mp4)');
+      expect(prompt).not.toContain('blob:');
+    });
+
+    it('produk tanpa kategori & harga tetap dirender aman (Umum, Rp 0)', async () => {
+      setup([
+        {
+          name: 'Produk Tanpa Metadata',
+          price: null,
+          stock: 0,
+          attributes: {},
+        },
+      ]);
+
+      await ask();
+
+      const prompt = getSystemPrompt();
+      expect(prompt).toContain('Kategori: Umum');
+      expect(prompt).toContain('Harga Rp 0');
+      expect(prompt).toContain('[Total Stok: 0]');
+    });
+
+    it('katalog kosong → prompt menandai DATABASE TOKO KOSONG (arahkan ke marketing)', async () => {
+      setup([]);
+
+      await ask();
+
+      const prompt = getSystemPrompt();
+      expect(prompt).toContain('DATABASE TOKO KOSONG');
+      expect(prompt).not.toContain('KATALOG PRODUK, VARIASI & STOK REAL-TIME');
+    });
+
+    it('query katalog selalu ter-scope tenantId (tidak bocor antar tenant)', async () => {
+      setup([
+        {
+          name: 'Produk Tenant Alpha',
+          category: 'Umum',
+          price: 10000,
+          stock: 1,
+          attributes: {},
+        },
+      ]);
+
+      await ask();
+
+      expect(mockPrisma.product.findMany).toHaveBeenCalledWith({
+        where: { tenantId: 'tenant-123' },
+        take: 30,
+      });
+      expect(getSystemPrompt()).toContain('Produk Tenant Alpha');
+    });
+  });
 });

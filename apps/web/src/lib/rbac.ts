@@ -32,6 +32,7 @@ export const MENU_ITEMS: MenuItem[] = [
   // General & Tenant
   { key: "overview",      label: "Dashboard",        icon: "LayoutDashboard" },
   { key: "chatbot",       label: "Bot WhatsApp",     icon: "MessageCircle" },
+  { key: "products",      label: "Katalog Produk",   icon: "Package" },
   { key: "crm",           label: "Pelanggan",        icon: "Users" },
   { key: "bus_layout",    label: "Denah Kursi Bus",  icon: "Bus" },
   { key: "availability",  label: "Siteplan",         icon: "Grid3X3" },
