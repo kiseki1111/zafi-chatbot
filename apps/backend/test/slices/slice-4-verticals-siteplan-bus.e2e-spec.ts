@@ -115,6 +115,24 @@ describe('Potongan 4: Modul Vertikal Siteplan Properti & Denah Kursi Bus (Bounda
         .expect(404);
     });
 
+    it('Menolak generate-siteplan jika grup target bukan milik tenant bersangkutan (404)', async () => {
+      // Grup ada di DB tapi milik tenant lain -> findFirst({id, tenantId}) tidak menemukan apa pun
+      context.mockPrisma.resourceGroup.findFirst.mockResolvedValue(null);
+
+      await request(app.getHttpServer())
+        .post('/api/v1/availability/groups/foreign-group/generate-siteplan')
+        .expect(404);
+    });
+
+    it('Menolak save-layout jika grup target bukan milik tenant bersangkutan (404)', async () => {
+      context.mockPrisma.resourceGroup.findFirst.mockResolvedValue(null);
+
+      await request(app.getHttpServer())
+        .post('/api/v1/availability/groups/foreign-group/save-layout')
+        .send({ layout: { rows: 1 } })
+        .expect(404);
+    });
+
     it('Berhasil membuat batch kursi bus secara berurutan (Seat-01 s/d Seat-10) (201)', async () => {
       context.mockPrisma.resourceGroup.findFirst.mockResolvedValue({
         id: 'group-bus-1',

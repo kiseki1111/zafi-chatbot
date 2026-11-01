@@ -52,4 +52,29 @@ describe('ChatsService', () => {
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
+
+  describe('sendMessage — SSE tenantId propagation (SECURITY)', () => {
+    it('emit SSE harus menyertakan tenantId dari whatsappInstance percakapan, bukan undefined', async () => {
+      mockPrismaService.conversation.findUnique.mockResolvedValue({
+        id: 'conv-1',
+        instanceName: 'wa-tenant-a',
+        contact: { phone: '628111' },
+        whatsappInstance: { tenantId: 'tenant-a' },
+      });
+      mockPrismaService.message.create.mockResolvedValue({
+        id: 'msg-1',
+        content: 'halo dari operator',
+      });
+      mockPrismaService.conversation.update.mockResolvedValue({});
+      mockWahaService.sendMessage.mockResolvedValue({});
+
+      await service.sendMessage('conv-1', undefined, 'halo dari operator', 'tenant-a');
+
+      expect(mockChatStreamService.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ tenantId: 'tenant-a' }),
+        }),
+      );
+    });
+  });
 });

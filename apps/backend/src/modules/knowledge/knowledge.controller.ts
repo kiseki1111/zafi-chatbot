@@ -69,13 +69,17 @@ export class KnowledgeController {
       },
       fileFilter: (req, file, cb) => {
         const ext = extname(file.originalname).toLowerCase().replace('.', '');
-        const allowed = ['pdf', 'docx', 'doc', 'txt', 'xlsx', 'xls', 'csv'];
+        // Harus selaras dengan KnowledgeService.processFile (termasuk gambar untuk OCR)
+        const allowed = [
+          'pdf', 'docx', 'doc', 'txt', 'xlsx', 'xls', 'csv',
+          'jpg', 'jpeg', 'png', 'webp', 'bmp', 'tiff',
+        ];
         if (allowed.includes(ext)) {
           cb(null, true);
         } else {
           cb(
             new BadRequestException(
-              `Format file tidak didukung (.${ext}). Format yang diizinkan: ${allowed.join(', ')}`,
+              `Unsupported file format. Use PDF, DOCX, CSV, XLS, XLSX, TXT, or Image (JPG, JPEG, PNG, WEBP). Diterima: .${ext}`,
             ),
             false,
           );

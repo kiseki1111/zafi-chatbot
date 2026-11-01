@@ -581,14 +581,17 @@ export class AvailabilityService {
     groupId: string,
     tenantId?: string,
   ): Promise<{ url: string; fullUrl: string; filename: string }> {
-    const group = await this.prisma.resourceGroup.findUnique({
-      where: { id: groupId },
-      include: {
-        items: {
-          orderBy: { code: 'asc' },
-        },
-      },
-    });
+    // SECURITY: wajib cek kepemilikan tenant — sebelumnya findUnique by id saja,
+    // user tenant manapun yang login bisa overwrite siteplan tenant lain.
+    const group = tenantId
+      ? await this.prisma.resourceGroup.findFirst({
+          where: { id: groupId, tenantId },
+          include: { items: { orderBy: { code: 'asc' } } },
+        })
+      : await this.prisma.resourceGroup.findUnique({
+          where: { id: groupId },
+          include: { items: { orderBy: { code: 'asc' } } },
+        });
     if (!group) {
       throw new NotFoundException(`Group with id ${groupId} not found`);
     }
@@ -680,9 +683,11 @@ export class AvailabilityService {
     body: { layout?: any; imageBase64?: string },
     tenantId?: string,
   ) {
-    const group = await this.prisma.resourceGroup.findUnique({
-      where: { id: groupId },
-    });
+    // SECURITY: wajib cek kepemilikan tenant — sebelumnya findUnique by id saja,
+    // user tenant manapun yang login bisa overwrite layout/siteplan tenant lain.
+    const group = tenantId
+      ? await this.prisma.resourceGroup.findFirst({ where: { id: groupId, tenantId } })
+      : await this.prisma.resourceGroup.findUnique({ where: { id: groupId } });
     if (!group) {
       throw new NotFoundException(`Group with id ${groupId} not found`);
     }

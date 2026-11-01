@@ -43,8 +43,8 @@ describe('Security Suite D: ChatStreamService Cross-Tenant SSE Isolation', () =>
     setTimeout(() => {
       sub.unsubscribe();
       expect(receivedEvents).toHaveLength(1);
-      expect(receivedEvents[0].tenantId).toBe('tenant-a');
-      expect(receivedEvents[0].message.content).toBe('Halo dari tenant A');
+      expect(receivedEvents[0].data.tenantId).toBe('tenant-a');
+      expect(receivedEvents[0].data.message.content).toBe('Halo dari tenant A');
       done();
     }, 50);
   });

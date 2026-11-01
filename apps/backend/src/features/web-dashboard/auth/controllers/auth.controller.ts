@@ -10,6 +10,7 @@ import {
   Req,
   Res,
   ForbiddenException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
@@ -77,10 +78,10 @@ export class AuthController {
       );
       userId = payload.sub;
     } catch {
-      throw new ForbiddenException('Refresh token tidak valid.');
+      throw new UnauthorizedException('Refresh token tidak valid.');
     }
     if (!userId) {
-      throw new ForbiddenException('Refresh token tidak valid.');
+      throw new UnauthorizedException('Refresh token tidak valid.');
     }
     return this.authService.refreshTokens(userId, body.refreshTokenPlain);
   }

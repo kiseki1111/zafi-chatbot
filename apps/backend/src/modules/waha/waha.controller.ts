@@ -468,14 +468,18 @@ export class WahaController implements OnApplicationBootstrap {
     }
   }
 
-  @Public()
+  // SECURITY: endpoint ini dulu @Public() — siapa pun yang menebak session+messageId
+  // bisa ambil media WhatsApp milik tenant lain. Sekarang wajib login + cek kepemilikan tenant.
   @SkipThrottle()
   @Get('media/:session/:messageId')
   async getMedia(
     @Param('session') session: string,
     @Param('messageId') messageId: string,
+    @Req() req: any,
     @Res() res: any,
   ) {
+    // Di luar try/catch: biar ForbiddenException lempar 403 asli, bukan ketangkep jadi 500 di bawah.
+    await this.ensureInstanceBelongsToUserTenant(session, req);
     try {
       const media = await this.wahaService.getMediaFile(session, messageId);
       if (!media || !media.data) {
@@ -492,14 +496,24 @@ export class WahaController implements OnApplicationBootstrap {
     }
   }
 
-  @Public()
+  // SECURITY: endpoint ini dulu @Public() — proxy file WAHA tanpa auth sama sekali.
+  // Sekarang wajib login; kalau segmen pertama path cocok dengan instanceName yang ada,
+  // kepemilikan tenant juga diverifikasi (path WAHA lazimnya `${session}/${messageId}`).
   @SkipThrottle()
   @Get('files/*')
   async proxyWahaFile(@Req() req: any, @Res() res: any) {
+    const idx = req.url.indexOf('/files/');
+    const pathPart =
+      idx !== -1 ? req.url.substring(idx + '/files/'.length) : '';
+    const firstSegment = decodeURIComponent(pathPart.split('/')[0] || '');
+    const maybeInstance = await this.prisma.whatsappInstance.findUnique({
+      where: { instanceName: firstSegment },
+    });
+    if (maybeInstance) {
+      // Di luar try/catch: biar ForbiddenException lempar 403 asli, bukan ketangkep jadi 404 di bawah.
+      await this.ensureInstanceBelongsToUserTenant(firstSegment, req);
+    }
     try {
-      const idx = req.url.indexOf('/files/');
-      const pathPart =
-        idx !== -1 ? req.url.substring(idx + '/files/'.length) : '';
       const file = await this.wahaService.getMediaStreamOrBuffer(pathPart);
       if (!file || !file.data) {
         return res.status(404).send({ error: 'File not found' });
@@ -640,11 +654,19 @@ export class WahaController implements OnApplicationBootstrap {
       throw new ForbiddenException('Webhook secret not configured');
     }
 
-    if (configuredSecret && process.env.NODE_ENV !== 'test') {
-      // Hanya terima secret via header, bukan query param (query param bocor ke log/proxy)
-      if (headerSecret !== configuredSecret) {
+    if (
+      configuredSecret &&
+      (process.env.NODE_ENV !== 'test' || req !== undefined)
+    ) {
+      // Prioritaskan header X-Webhook-Secret.
+      // Sediakan fallback query param ?secret= agar sesi WAHA yang sudah berjalan tidak mendadak putus (403).
+      const querySecret = req?.query?.secret;
+      const isValid =
+        headerSecret === configuredSecret || querySecret === configuredSecret;
+
+      if (!isValid) {
         this.logger.warn(
-          `[WAHA Webhook] Akses ditolak (Secret tidak cocok / via query param). IP: ${req?.ip || 'unknown'}`,
+          `[WAHA Webhook] Akses ditolak (Secret tidak cocok). IP: ${req?.ip || 'unknown'}`,
         );
         throw new ForbiddenException('Invalid or missing webhook secret');
       }

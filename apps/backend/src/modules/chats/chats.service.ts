@@ -396,11 +396,14 @@ export class ChatsService {
     });
 
     // Broadcast SSE live message
+    // SECURITY: tenantId wajib diisi — tanpa ini, filter isolasi tenant di ChatStreamService
+    // memperlakukan event sebagai "lolos ke semua subscriber" (bocor lintas-tenant).
     this.chatStreamService.emit({
       type: 'message',
       data: {
         conversationId,
         instanceName,
+        tenantId: conversation.whatsappInstance?.tenantId || null,
         message,
       },
     });

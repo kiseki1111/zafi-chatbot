@@ -65,6 +65,18 @@ describe('Security Suite A: Route Guard Inventory & Whitelist Audit', () => {
         .get('/api/v1/waha/cli-poll')
         .expect(401);
     });
+
+    it('GET /api/v1/waha/media/:session/:messageId tanpa token harus 401', async () => {
+      await request(app.getHttpServer())
+        .get('/api/v1/waha/media/mock-session/mock-message-id')
+        .expect(401);
+    });
+
+    it('GET /api/v1/waha/files/* tanpa token harus 401', async () => {
+      await request(app.getHttpServer())
+        .get('/api/v1/waha/files/mock-session/mock-file.jpg')
+        .expect(401);
+    });
   });
 
   describe('2. Negative Control: Endpoint Yang Sah Publik Tetap Terbuka Sesuai Desain', () => {
