@@ -34,7 +34,12 @@ else
   echo "==> Menyinkronkan struktur database (prisma db push)..."
   until [ $RETRY_COUNT -ge $MAX_RETRIES ]
   do
-    if npx prisma db push --accept-data-loss --schema="$SCHEMA_PATH"; then
+    # Di production, hindari --accept-data-loss otomatis kecuali diminta eksplisit
+    DB_PUSH_ARGS=""
+    if [ "$NODE_ENV" != "production" ] || [ "$FORCE_ACCEPT_DATA_LOSS" = "true" ]; then
+      DB_PUSH_ARGS="--accept-data-loss"
+    fi
+    if npx prisma db push $DB_PUSH_ARGS --schema="$SCHEMA_PATH"; then
       echo "==> [Sukses] Database berhasil disinkronkan dengan schema terbaru!"
       DB_SUCCESS=true
       break

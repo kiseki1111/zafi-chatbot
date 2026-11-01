@@ -3,6 +3,12 @@ const fs = require('fs');
 const prisma = new PrismaClient();
 
 async function main() {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_IMPORT_PRODUCTION !== 'true') {
+    console.error('CRITICAL: Script import-db.js DILARANG dijalankan di environment production!');
+    console.error('Jika benar-benar ingin menjalankan, set ALLOW_IMPORT_PRODUCTION=true');
+    process.exit(1);
+  }
+
   if (!fs.existsSync('database-backup.json')) {
     console.error('database-backup.json not found!');
     return;

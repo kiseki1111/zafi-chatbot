@@ -268,13 +268,8 @@ export class WahaService implements OnApplicationBootstrap {
 
         payload.config = {
           webhooks: formattedUrls.map((url) => {
-            const webhookUrlWithSecret =
-              webhookSecret && !url.includes('secret=')
-                ? `${url}${url.includes('?') ? '&' : '?'}secret=${encodeURIComponent(webhookSecret)}`
-                : url;
-
             const webhookItem: any = {
-              url: webhookUrlWithSecret,
+              url: url, // SECURITY: jangan kirim secret via query param (bocor ke log/proxy)
               events: [
                 'message',
                 'message.any',
@@ -290,6 +285,7 @@ export class WahaService implements OnApplicationBootstrap {
             };
 
             if (webhookSecret) {
+              // Kirim secret via custom header saja — tidak pernah via query param
               webhookItem.customHeaders = [
                 { name: 'X-Webhook-Secret', value: webhookSecret },
               ];
@@ -665,11 +661,16 @@ export class WahaService implements OnApplicationBootstrap {
       if (uploadsIdx === -1) return null;
       const relPath = pathPart.substring(uploadsIdx + '/uploads/'.length);
 
-      const localFile = path.join(
+      const uploadsRoot = path.resolve(process.cwd(), 'uploads');
+      const localFile = path.resolve(
         process.cwd(),
         'uploads',
         decodeURIComponent(relPath),
       );
+      // SECURITY: pastikan file resolved masih di dalam folder uploads (cegah path traversal)
+      if (!localFile.startsWith(uploadsRoot + path.sep) && localFile !== uploadsRoot) {
+        return null;
+      }
       if (fs.existsSync(localFile)) {
         return localFile;
       }
@@ -1252,6 +1253,15 @@ export class WahaService implements OnApplicationBootstrap {
   ): Promise<{ data: Buffer; mimetype: string } | null> {
     try {
       const cleanPath = pathPart.replace(/^\/+/, '');
+      // SECURITY: prevent path traversal — hanya izinkan path yang aman
+      if (
+        cleanPath.includes('..') ||
+        cleanPath.startsWith('/') ||
+        cleanPath.includes('\\')
+      ) {
+        this.logger.warn(`Blocked suspicious media path: ${pathPart}`);
+        return null;
+      }
       const targetUrl = `${this.baseUrl}/api/files/${cleanPath}`;
       const res = await axios.get(targetUrl, {
         headers: {
@@ -1289,6 +1299,26 @@ export class WahaService implements OnApplicationBootstrap {
    * agar gambar/video/audio dapat langsung ditampilkan dan diputar di dashboard monitoring.
    * Mengembalikan URL lokal (/uploads/...) atau null jika gagal.
    */
+  private isInternalOrPrivateUrl(url: string): boolean {
+    try {
+      const parsed = new URL(url);
+      const host = parsed.hostname;
+      return (
+        host === 'localhost' ||
+        host === '127.0.0.1' ||
+        host === '0.0.0.0' ||
+        host === '::1' ||
+        host === '169.254.169.254' || // AWS/GCP metadata
+        /^10\./.test(host) ||
+        /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
+        /^192\.168\./.test(host) ||
+        host.endsWith('.internal')
+      );
+    } catch {
+      return true; // invalid URL = treat as internal
+    }
+  }
+
   async downloadAndStoreMedia(
     sessionName: string,
     messageId: string,
@@ -1338,6 +1368,13 @@ export class WahaService implements OnApplicationBootstrap {
           const isWahaInternal =
             targetUrl.startsWith(this.baseUrl) ||
             targetUrl.includes('/api/files/');
+          // SECURITY: block fetch ke alamat internal/private (SSRF protection)
+          if (!isWahaInternal && this.isInternalOrPrivateUrl(targetUrl)) {
+            this.logger.warn(
+              `[MEDIA-DOWNLOAD] Blocked SSRF attempt: ${targetUrl}`,
+            );
+            return null;
+          }
           const res = await axios.get(targetUrl, {
             responseType: 'arraybuffer',
             headers: {

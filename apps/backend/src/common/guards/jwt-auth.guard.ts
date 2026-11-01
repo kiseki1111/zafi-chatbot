@@ -15,7 +15,12 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
   //Metode evaluasi penentuan izin lewat rute
   canActivate(context: ExecutionContext) {
-    if (process.env.SECURITY_BYPASS_MODE === 'true') {
+    // SECURITY: bypass mode hanya boleh aktif di non-production.
+    // Di production, env ini TIDAK PERNAH mematikan auth.
+    if (
+      process.env.SECURITY_BYPASS_MODE === 'true' &&
+      process.env.NODE_ENV !== 'production'
+    ) {
       return true;
     }
 

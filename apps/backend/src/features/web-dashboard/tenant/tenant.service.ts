@@ -1023,16 +1023,10 @@ export class TenantService {
           tenant = user.tenant;
           tenantId = user.tenantId;
         } else {
-          // Fallback ke tenant pertama di database agar demo/superadmin tidak 404
-          const fallbackTenant = await this.prisma.tenant.findFirst();
-          if (fallbackTenant) {
-            tenant = fallbackTenant;
-            tenantId = fallbackTenant.id;
-          } else {
-            throw new NotFoundException(
-              'User tidak terhubung dengan tenant manapun',
-            );
-          }
+          // SECURITY: tidak ada fallback ke tenant pertama — user tanpa tenant harus ditolak
+          throw new NotFoundException(
+            'User tidak terhubung dengan tenant manapun',
+          );
         }
       }
     }
@@ -1226,12 +1220,8 @@ export class TenantService {
         });
         if (user && user.tenantId) {
           resolvedTenantId = user.tenantId;
-        } else {
-          const fallbackTenant = await this.prisma.tenant.findFirst();
-          if (fallbackTenant) {
-            resolvedTenantId = fallbackTenant.id;
-          }
         }
+        // SECURITY: tidak ada fallback ke tenant pertama
       }
     }
 
@@ -1239,18 +1229,27 @@ export class TenantService {
       throw new NotFoundException('Tenant not found');
     }
 
-    const { colorPalette, productGallery, ...otherData } = data;
-    const updatePayload: any = { ...otherData };
+    // SECURITY (K1): Whitelist ketat field yang boleh di-update oleh tenant.
+    // metadata (plan, maxMau, maxAiResponses, dsb) DILARANG keras di-update lewat endpoint settings ini.
+    const updatePayload: any = {};
+    if (data.agentName !== undefined) updatePayload.agentName = data.agentName;
+    if (data.agentTone !== undefined) updatePayload.agentTone = data.agentTone;
+    if (data.phone !== undefined) updatePayload.phone = data.phone;
+    if (data.greetingMsg !== undefined) updatePayload.greetingMsg = data.greetingMsg;
+    if (data.ownerChatId !== undefined) updatePayload.ownerChatId = data.ownerChatId;
+    if (data.systemPrompt !== undefined) updatePayload.systemPrompt = data.systemPrompt;
+    if (data.operatingHours !== undefined) updatePayload.operatingHours = data.operatingHours;
+    if (data.address !== undefined) updatePayload.address = data.address;
 
-    if (colorPalette !== undefined || productGallery !== undefined) {
+    if (data.colorPalette !== undefined || data.productGallery !== undefined) {
       const currentTenant = await this.prisma.tenant.findUnique({
         where: { id: resolvedTenantId },
       });
       const existingMetadata = (currentTenant?.metadata as any) || {};
       updatePayload.metadata = {
         ...existingMetadata,
-        ...(colorPalette !== undefined ? { colorPalette } : {}),
-        ...(productGallery !== undefined ? { productGallery } : {}),
+        ...(data.colorPalette !== undefined ? { colorPalette: data.colorPalette } : {}),
+        ...(data.productGallery !== undefined ? { productGallery: data.productGallery } : {}),
       };
     }
 
@@ -1271,8 +1270,8 @@ export class TenantService {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
       });
-      resolvedTenantId =
-        user?.tenantId || (await this.prisma.tenant.findFirst())?.id || null;
+      // SECURITY: tidak ada fallback ke tenant pertama
+      resolvedTenantId = user?.tenantId || null;
     }
 
     if (!resolvedTenantId) throw new NotFoundException('Tenant not found');
@@ -1556,11 +1555,10 @@ Berikan jawaban yang natural seperti CS manusia sungguhan. Jangan menggunakan ba
         where: { id: tenantId },
       })
       .catch(() => null);
-    if (
-      tenant &&
-      (tenant.metadata as any)?.plan &&
-      !isFeatureAllowed(tenant.metadata, 'mediaGallery')
-    ) {
+
+    // SECURITY (K2): Jika tenant tidak ada atau belum punya plan, atau fitur tidak diizinkan, tolak langsung!
+    // Jangan biarkan short-circuiting meloloskan tenant tanpa plan.
+    if (!tenant || !isFeatureAllowed(tenant.metadata, 'mediaGallery')) {
       throw new BadRequestException(
         'Fitur upload video produk eksklusif untuk paket Silver ke atas.',
       );
@@ -1962,12 +1960,22 @@ Berikan jawaban yang natural seperti CS manusia sungguhan. Jangan menggunakan ba
     const defaultPassword = data.password || 'Staff@123';
     const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 
+    // SECURITY: whitelist role yang boleh di-set oleh tenant manager.
+    // Tanpa ini, tenant manager bisa set role='superadmin' dan escalate privilege.
+    const ALLOWED_TENANT_ROLES = ['manager', 'administrator', 'operator', 'marketing'];
+    const requestedRole = (data.role || 'administrator').toLowerCase();
+    if (!ALLOWED_TENANT_ROLES.includes(requestedRole)) {
+      throw new BadRequestException(
+        `Role "${data.role}" tidak valid. Role yang diizinkan: ${ALLOWED_TENANT_ROLES.join(', ')}.`,
+      );
+    }
+
     const newUser = await this.prisma.user.create({
       data: {
         name: data.name,
         email: data.email,
         password: hashedPassword,
-        role: data.role || 'administrator',
+        role: requestedRole,
         tenantId: tenant.id,
       },
       select: {
@@ -2079,10 +2087,20 @@ Berikan jawaban yang natural seperti CS manusia sungguhan. Jangan menggunakan ba
     if (!user)
       throw new NotFoundException('User tidak ditemukan pada tenant ini');
 
+    // SECURITY: whitelist role — cegah tenant manager set role='superadmin'
+    const ALLOWED_TENANT_ROLES = ['manager', 'administrator', 'operator', 'marketing'];
     const updateData: any = {};
     if (data.name) updateData.name = data.name;
     if (data.email) updateData.email = data.email;
-    if (data.role) updateData.role = data.role;
+    if (data.role) {
+      const requestedRole = data.role.toLowerCase();
+      if (!ALLOWED_TENANT_ROLES.includes(requestedRole)) {
+        throw new BadRequestException(
+          `Role "${data.role}" tidak valid. Role yang diizinkan: ${ALLOWED_TENANT_ROLES.join(', ')}.`,
+        );
+      }
+      updateData.role = requestedRole;
+    }
     if (typeof data.isActive === 'boolean') updateData.isActive = data.isActive;
     if (data.password && data.password.trim()) {
       const bcrypt = await import('bcrypt');

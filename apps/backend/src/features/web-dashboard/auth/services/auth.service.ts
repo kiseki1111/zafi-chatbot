@@ -27,8 +27,10 @@ export class AuthService {
       include: { tenant: true },
     });
 
-    // Cek mode bypass dari env
-    const isSecurityBypass = process.env.SECURITY_BYPASS_MODE === 'true';
+    // Cek mode bypass — hanya boleh aktif di non-production
+    const isSecurityBypass =
+      process.env.SECURITY_BYPASS_MODE === 'true' &&
+      process.env.NODE_ENV !== 'production';
 
     // Mencegah error TS18047 jika user tidak ditemukan
     let passwordMatches = false;
@@ -236,6 +238,18 @@ export class AuthService {
       !(await bcrypt.compare(refreshTokenPlain, refreshTokenRecord.tokenHash))
     ) {
       throw new UnauthorizedException('Sesi tidak valid.');
+    }
+
+    // SECURITY: cek masa berlaku token — row di DB tidak berarti token masih valid
+    if (
+      refreshTokenRecord.expiresAt &&
+      refreshTokenRecord.expiresAt.getTime() < Date.now()
+    ) {
+      // Hapus token expired
+      await this.prisma.refreshToken
+        .delete({ where: { id: refreshTokenRecord.id } })
+        .catch(() => null);
+      throw new UnauthorizedException('Sesi telah kedaluwarsa.');
     }
 
     //Jika valid, hapus token lama (Rotasi Tunggal)

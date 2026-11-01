@@ -72,7 +72,10 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
 
   // 1. Mengaktifkan HTTP Security Headers sesuai panduan halaman 38
-  const isSecurityBypass = process.env.SECURITY_BYPASS_MODE === 'true';
+  // SECURITY: bypass mode hanya boleh aktif di non-production
+  const isSecurityBypass =
+    process.env.SECURITY_BYPASS_MODE === 'true' &&
+    process.env.NODE_ENV !== 'production';
 
   if (isSecurityBypass) {
     console.warn(

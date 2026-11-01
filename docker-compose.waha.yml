@@ -8,14 +8,14 @@ services:
       WAHA_PORT: 3000
       WAHA_PRINT_QR: "false"
       WHATSAPP_HOOK_URL: http://backend:3030/api/v1/waha/webhook
-      WHATSAPP_API_KEY: ${WHATSAPP_API_KEY:-ZafitechDunia12345#}
-      WHATSAPP_SWAGGER_USERNAME: admin
-      WHATSAPP_SWAGGER_PASSWORD: adminpassword123
+      WHATSAPP_API_KEY: ${WHATSAPP_API_KEY:?WHATSAPP_API_KEY is required}
+      WHATSAPP_SWAGGER_USERNAME: ${WHATSAPP_SWAGGER_USERNAME:-admin}
+      WHATSAPP_SWAGGER_PASSWORD: ${WHATSAPP_SWAGGER_PASSWORD:?WHATSAPP_SWAGGER_PASSWORD is required}
       WAHA_WORKER_RESTART_ON_EXIT: "true"
       WHATSAPP_RESTART_ALL_SESSIONS: "true"
       WHATSAPP_START_SESSION: "zafi-cs"
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       - waha_sessions:/.waha/sessions
     networks:

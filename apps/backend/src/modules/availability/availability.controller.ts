@@ -214,7 +214,18 @@ export class AvailabilityController {
   @Public()
   @Get('groups')
   async getGroups(@Query('tenantId') tenantId: string) {
-    return this.availabilityService.getGroups(tenantId);
+    const groups = await this.availabilityService.getGroups(tenantId);
+    // SECURITY: strip PII dari response publik — customerName & customerPhone
+    // tidak boleh terekspos ke publik yang menebak tenantId
+    return groups.map((g: any) => ({
+      ...g,
+      items: (g.items || []).map((item: any) => ({
+        ...item,
+        customerName: undefined,
+        customerPhone: undefined,
+        notes: undefined,
+      })),
+    }));
   }
 
   /**
@@ -265,7 +276,6 @@ export class AvailabilityController {
     return this.availabilityService.updateGroup(id, body, tenantId);
   }
 
-  @Public()
   @Post('groups/:id/generate-siteplan')
   async generateSiteplan(@Param('id') id: string, @Req() req: any) {
     const tenantId = this.resolveTenantId(req);
@@ -287,7 +297,6 @@ export class AvailabilityController {
     }
   }
 
-  @Public()
   @Post('groups/:id/save-layout')
   async saveLayout(
     @Param('id') id: string,

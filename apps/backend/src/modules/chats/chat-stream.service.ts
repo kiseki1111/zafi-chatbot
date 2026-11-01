@@ -7,6 +7,7 @@ export interface ChatStreamEvent {
   data: {
     conversationId: string;
     instanceName?: string;
+    tenantId?: string | null;
     message?: any;
     contact?: any;
   };
@@ -36,13 +37,21 @@ export class ChatStreamService {
     }
   }
 
-  // Subscribe ke stream berdasarkan conversationId atau seluruh instance
+  // Subscribe ke stream: WAJIB isolasi per tenantId (kecuali superadmin)
   subscribe(
     conversationId?: string,
     instanceName?: string,
+    allowedTenantId?: string | null,
+    isSuperadmin = false,
   ): Observable<MessageEvent> {
     return this.events$.asObservable().pipe(
       filter((e) => {
+        // SECURITY (Issue 4): Isolasi broadcast SSE per-tenant
+        if (!isSuperadmin && allowedTenantId) {
+          if (e.data.tenantId && e.data.tenantId !== allowedTenantId) {
+            return false;
+          }
+        }
         if (conversationId && e.data.conversationId !== conversationId) {
           return false;
         }

@@ -111,6 +111,13 @@ describe('Slice-8: WAHA Instance Management (Create, Lifecycle, Delete, Security
   });
 
   describe('2. Lifecycle Sesi (Restart, Stop, Logout)', () => {
+    beforeEach(() => {
+      context.mockPrisma.whatsappInstance.findUnique.mockResolvedValue({
+        instanceName: 'toko-kopi',
+        tenantId: 'tenant-wa',
+      });
+    });
+
     it('Restart instance memanggil wahaService.restartSession (201)', async () => {
       mockWaha.restartSession.mockResolvedValue({ status: 'WORKING' });
 
@@ -187,6 +194,46 @@ describe('Slice-8: WAHA Instance Management (Create, Lifecycle, Delete, Security
 
       expect(res.body).toHaveLength(1);
       expect(res.body[0].tenantId).toBe('tenant-wa');
+    });
+  });
+
+  describe('5. Keamanan Audit Pra-Jual: Isolasi Log, Null-Tenant & CLI Poll', () => {
+    it('Security #12: Menolak akses /instances/:id/logs jika instance milik tenant lain (403)', async () => {
+      context.mockPrisma.whatsappInstance.findUnique.mockResolvedValue({
+        instanceName: 'milik-b',
+        tenantId: 'tenant-b',
+      });
+      currentUser = { ...currentUser, role: 'manager', tenantId: 'tenant-a' };
+
+      await request(app.getHttpServer())
+        .get('/api/v1/waha/instances/milik-b/logs')
+        .expect(403);
+    });
+
+    it('Security #8: Menolak kontrol instance yang tenantId-nya null oleh non-superadmin (403)', async () => {
+      context.mockPrisma.whatsappInstance.findUnique.mockResolvedValue({
+        instanceName: 'unassigned-instance',
+        tenantId: null, // Sesi tak bertuan
+      });
+      currentUser = { ...currentUser, role: 'manager', tenantId: 'tenant-a' };
+
+      await request(app.getHttpServer())
+        .post('/api/v1/waha/instances/unassigned-instance/restart')
+        .expect(403);
+    });
+
+    it('Security #12b: Menolak GET /cli-poll di production oleh user non-superadmin (403)', async () => {
+      const prevEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+      currentUser = { ...currentUser, role: 'manager', roles: ['manager'] };
+
+      try {
+        await request(app.getHttpServer())
+          .get('/api/v1/waha/cli-poll')
+          .expect(403);
+      } finally {
+        process.env.NODE_ENV = prevEnv;
+      }
     });
   });
 });

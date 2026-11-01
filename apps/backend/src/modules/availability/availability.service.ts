@@ -19,15 +19,11 @@ export class AvailabilityService {
 
   async getGroups(tenantId: string) {
     try {
-      let filterWhere: any = {};
-      // ponytail: strict isolation - prevent leaking perumahan across accounts
-      if (tenantId === 'all') {
-        filterWhere = {};
-      } else if (tenantId) {
-        filterWhere = { tenantId };
-      } else {
+      // SECURITY: tolak keras 'all' dari pemanggil umum — wajib spesifik tenantId
+      if (!tenantId || tenantId === 'all') {
         return [];
       }
+      const filterWhere = { tenantId };
 
       return await this.prisma.resourceGroup.findMany({
         where: filterWhere,

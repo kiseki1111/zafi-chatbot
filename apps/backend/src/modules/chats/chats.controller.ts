@@ -27,13 +27,23 @@ export class ChatsController {
     private readonly chatStreamService: ChatStreamService,
   ) {}
 
-  @Public()
   @Sse('stream')
   streamEvents(
     @Query('conversationId') conversationId?: string,
     @Query('instanceName') instanceName?: string,
+    @Req() req?: any,
   ): Observable<MessageEvent> {
-    return this.chatStreamService.subscribe(conversationId, instanceName);
+    const isSuper =
+      req?.user?.roles?.some((r: string) => r?.toLowerCase() === 'superadmin') ||
+      req?.user?.role?.toLowerCase() === 'superadmin';
+    const tenantId = req?.user?.tenantId || null;
+
+    return this.chatStreamService.subscribe(
+      conversationId,
+      instanceName,
+      tenantId,
+      Boolean(isSuper),
+    );
   }
 
   @Get()
@@ -150,7 +160,7 @@ export class ChatsController {
     throw new BadRequestException('imageUrl or (base64 + mimeType) required');
   }
 
-  // Simulation: Mock customer sends message or image
+  // Simulation: Mock customer sends message or image (Hanya Superadmin / Dev)
   @Post('mock-customer-incoming')
   async mockCustomer(
     @Body()
@@ -161,12 +171,21 @@ export class ChatsController {
       imageUrl?: string;
       instanceName?: string;
     },
+    @Req() req: any,
   ) {
+    const isSuper =
+      req?.user?.roles?.some((r: string) => r?.toLowerCase() === 'superadmin') ||
+      req?.user?.role?.toLowerCase() === 'superadmin';
+    if (!isSuper && process.env.NODE_ENV === 'production') {
+      throw new ForbiddenException(
+        'Akses ditolak: Endpoint simulasi mock customer dinonaktifkan di production.',
+      );
+    }
     if (!body.phone) throw new BadRequestException('phone required');
     return this.chatsService.mockIncomingMessage(body);
   }
 
-  // Real WAHA Test: Kirim text/image langsung ke WAHA API dan verifikasi responnya
+  // Real WAHA Test: Kirim text/image langsung ke WAHA API dan verifikasi responnya (Hanya Superadmin / Dev)
   @Post('test-real-waha')
   async testRealWaha(
     @Body()
@@ -178,7 +197,16 @@ export class ChatsController {
       base64?: string;
       mimeType?: string;
     },
+    @Req() req: any,
   ) {
+    const isSuper =
+      req?.user?.roles?.some((r: string) => r?.toLowerCase() === 'superadmin') ||
+      req?.user?.role?.toLowerCase() === 'superadmin';
+    if (!isSuper && process.env.NODE_ENV === 'production') {
+      throw new ForbiddenException(
+        'Akses ditolak: Endpoint test-real-waha dinonaktifkan di production.',
+      );
+    }
     if (!body.sessionName || !body.chatId) {
       throw new BadRequestException('sessionName and chatId required');
     }

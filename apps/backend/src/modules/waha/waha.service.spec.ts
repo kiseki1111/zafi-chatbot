@@ -275,5 +275,23 @@ describe('WahaService - Unit Tests (Features 1, 2, 6)', () => {
       expect(res).toBe('/uploads/incoming/existing-voice.ogg');
       expect(mockedAxios.get).not.toHaveBeenCalled();
     });
+
+    it('Security #6: harus memblokir fetch ke alamat internal / SSRF (169.254.169.254, localhost)', async () => {
+      const cloudMetadataUrl = 'http://169.254.169.254/latest/meta-data/';
+      const res = await service.downloadAndStoreMedia(
+        'zafi-property',
+        'msg-ssrf-1',
+        cloudMetadataUrl,
+      );
+
+      expect(res).toBeNull();
+      expect(mockedAxios.get).not.toHaveBeenCalled();
+    });
+
+    it('Security #5: getMediaStreamOrBuffer harus menolak path traversal (../)', async () => {
+      const res = await service.getMediaStreamOrBuffer('../../../etc/passwd');
+      expect(res).toBeNull();
+      expect(mockedAxios.get).not.toHaveBeenCalled();
+    });
   });
 });

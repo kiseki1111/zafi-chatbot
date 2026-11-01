@@ -374,4 +374,54 @@ describe('TenantService', () => {
       );
     });
   });
+
+  describe('Security & Whitelist Suite (Audit Pra-Jual)', () => {
+    it('Security #1: createTenantStaff harus menolak role yang bukan whitelist (misal superadmin)', async () => {
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        id: 't-1',
+        metadata: { plan: 'silver', maxUsers: 5 },
+      });
+
+      await expect(
+        service.createTenantStaff('t-1', {
+          name: 'Attacker Staff',
+          email: 'hacker@tenant.com',
+          role: 'superadmin',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('Security #2 (K1): updateTenantSettings tidak boleh meloloskan metadata/plan liar', async () => {
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        id: 't-1',
+        metadata: { plan: 'lite', maxMau: 300 },
+      });
+      mockPrisma.tenant.update.mockResolvedValue({ id: 't-1' });
+
+      await service.updateTenantSettings('t-1', {
+        agentName: 'Nama Baru',
+        // Injeksi payload berbahaya dari luar
+        metadata: { plan: 'enterprise', maxMau: 999999 },
+        plan: 'enterprise',
+      } as any);
+
+      expect(mockPrisma.tenant.update).toHaveBeenCalledWith({
+        where: { id: 't-1' },
+        data: {
+          agentName: 'Nama Baru',
+        },
+      });
+    });
+
+    it('Security #3 (K2): verifyProductMediaUpload harus menolak jika tenant belum punya paket/null', async () => {
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        id: 't-unpaid',
+        metadata: null, // belum ada plan
+      });
+
+      await expect(
+        service.verifyProductMediaUpload('t-unpaid', true),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
 });

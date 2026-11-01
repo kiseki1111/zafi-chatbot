@@ -62,7 +62,27 @@ export class KnowledgeController {
   }
 
   @Post('file')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: 50 * 1024 * 1024, // 50MB max untuk dokumen knowledge base
+      },
+      fileFilter: (req, file, cb) => {
+        const ext = extname(file.originalname).toLowerCase().replace('.', '');
+        const allowed = ['pdf', 'docx', 'doc', 'txt', 'xlsx', 'xls', 'csv'];
+        if (allowed.includes(ext)) {
+          cb(null, true);
+        } else {
+          cb(
+            new BadRequestException(
+              `Format file tidak didukung (.${ext}). Format yang diizinkan: ${allowed.join(', ')}`,
+            ),
+            false,
+          );
+        }
+      },
+    }),
+  )
   async createFile(
     @Req() req: any,
     @UploadedFile() file: Express.Multer.File,

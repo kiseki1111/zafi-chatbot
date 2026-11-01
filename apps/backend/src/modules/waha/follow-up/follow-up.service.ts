@@ -46,8 +46,8 @@ export class FollowUpService {
     }>,
     tenantId?: string,
   ) {
-    const targetTenantId =
-      tenantId || (await this.prisma.tenant.findFirst())?.id;
+    // SECURITY: tidak ada fallback ke tenant pertama
+    const targetTenantId = tenantId;
     if (!targetTenantId) {
       throw new BadRequestException('Tenant not found');
     }
@@ -357,6 +357,7 @@ Bahasa: Indonesia. Maksimal 2 emoji. Tanpa markdown.`;
             data: {
               conversationId,
               instanceName,
+              tenantId: contact?.tenantId || null,
               message: messageRecord,
             },
           });

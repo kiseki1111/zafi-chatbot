@@ -160,6 +160,12 @@ export const PRICING_TIERS_CONFIG = [
 ];
 
 async function main() {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_RESET_PRODUCTION !== 'true') {
+    console.error('CRITICAL: Script reset-tiers-and-seed-pricing.ts DILARANG dijalankan di environment production!');
+    console.error('Script ini mereset paket SEMUA tenant ke null. Set ALLOW_RESET_PRODUCTION=true jika disengaja.');
+    process.exit(1);
+  }
+
   console.log('--- 1. Resetting all existing tenant packages to null ---');
   const tenants = await prisma.tenant.findMany({
     select: { id: true, name: true, metadata: true },

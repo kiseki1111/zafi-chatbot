@@ -65,7 +65,23 @@ export class AuthController {
   //mengatur request refresh token untuk mendapatkan token akses baru
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  async refresh(@Body() body: { userId: string; refreshTokenPlain: string }) {
-    return this.authService.refreshTokens(body.userId, body.refreshTokenPlain);
+  async refresh(@Body() body: { refreshTokenPlain: string }) {
+    // SECURITY: extract userId dari JWT refresh token, bukan percaya body.userId dari klien
+    let userId: string;
+    try {
+      const payload = JSON.parse(
+        Buffer.from(
+          body.refreshTokenPlain.split('.')[1],
+          'base64',
+        ).toString(),
+      );
+      userId = payload.sub;
+    } catch {
+      throw new ForbiddenException('Refresh token tidak valid.');
+    }
+    if (!userId) {
+      throw new ForbiddenException('Refresh token tidak valid.');
+    }
+    return this.authService.refreshTokens(userId, body.refreshTokenPlain);
   }
 }

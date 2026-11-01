@@ -7,12 +7,11 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:secret_password@172.17.0.1:5432/rbac_api_db?schema=public}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
       PORT: 3030
-      NODE_TLS_REJECT_UNAUTHORIZED: 0
-      WAHA_API_URL: ${WAHA_API_URL:-https://waha.zafii.tech}
-      WAHA_API_KEY: ${WAHA_API_KEY:-ZafitechDunia12345#}
-      WHATSAPP_API_KEY: ${WHATSAPP_API_KEY:-ZafitechDunia12345#}
+      WAHA_API_URL: ${WAHA_API_URL:-http://waha:3000}
+      WAHA_API_KEY: ${WAHA_API_KEY:?WAHA_API_KEY is required}
+      WHATSAPP_API_KEY: ${WHATSAPP_API_KEY:-${WAHA_API_KEY}}
     volumes:
       - ./uploads:/app/uploads
     ports:

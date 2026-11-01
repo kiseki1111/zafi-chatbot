@@ -144,7 +144,8 @@ async function main() {
       },
     });
 
-    console.log(`✓ Akun ${acc.plan.toUpperCase()} siap: ${user.email} (Password: ${acc.passwordPlain})`);
+    // SECURITY: jangan log password plaintext
+    console.log(`✓ Akun ${acc.plan.toUpperCase()} siap: ${user.email}`);
   }
 
   console.log('Seed dummy accounts for all tiers & trial completed successfully!');

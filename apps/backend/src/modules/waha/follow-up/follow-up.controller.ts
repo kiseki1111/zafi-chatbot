@@ -10,6 +10,7 @@ import {
   UseGuards,
   Req,
   Logger,
+  ForbiddenException,
 } from '@nestjs/common';
 import { FollowUpService } from './follow-up.service';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
@@ -77,7 +78,23 @@ export class FollowUpController {
   async removeFromQueue(
     @Param('contactId') contactId: string,
     @Param('instanceName') instanceName: string,
+    @Req() req: any,
   ) {
+    const tenantId = this.resolveTenantId(req);
+    // SECURITY: superadmin bisa hapus follow-up tenant lain; tenant manager hanya miliknya
+    if (!tenantId) {
+      // superadmin — no scoping needed
+      return this.followUpService.removeFromQueue(contactId, instanceName);
+    }
+    // Non-superadmin: pastikan instanceName milik tenant ini
+    const instance = await this.followUpService['prisma'].whatsappInstance.findUnique({
+      where: { instanceName },
+    });
+    if (!instance || instance.tenantId !== tenantId) {
+      throw new ForbiddenException(
+        'Akses ditolak: Instance ini bukan milik tenant Anda',
+      );
+    }
     return this.followUpService.removeFromQueue(contactId, instanceName);
   }
 
@@ -111,7 +128,17 @@ export class FollowUpController {
   }
 
   @Post('clear-pending')
-  async clearPendingFollowUps(@Body('exceptPhone') exceptPhone?: string) {
+  async clearPendingFollowUps(
+    @Body('exceptPhone') exceptPhone?: string,
+    @Req() req?: any,
+  ) {
+    // SECURITY: clear-pending adalah operasi lintas-tenant — hanya superadmin
+    const isSuper = req?.user?.roles?.includes('superadmin');
+    if (!isSuper) {
+      throw new ForbiddenException(
+        'Akses ditolak: Hanya superadmin yang bisa membersihkan antrean follow-up global',
+      );
+    }
     return this.followUpService.clearPendingFollowUps(exceptPhone);
   }
 }

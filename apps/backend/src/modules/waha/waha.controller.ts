@@ -184,6 +184,7 @@ export class WahaController implements OnApplicationBootstrap {
                 data: {
                   conversationId: conv.id,
                   instanceName: conv.instanceName,
+                  tenantId: conv.contact?.tenantId || null,
                   message: botMsg,
                 },
               });
@@ -324,7 +325,14 @@ export class WahaController implements OnApplicationBootstrap {
     const instance = await this.prisma.whatsappInstance.findUnique({
       where: { instanceName },
     });
-    if (instance && instance.tenantId && instance.tenantId !== tenantId) {
+    // SECURITY: instance tanpa tenantId hanya boleh diakses superadmin.
+    // Sebelumnya, instance null-tenant lolos cek ownership dan bisa diakses tenant mana pun.
+    if (!instance || instance.tenantId === null) {
+      throw new ForbiddenException(
+        'Akses ditolak: Sesi WAHA tidak terikat tenant tertentu',
+      );
+    }
+    if (instance.tenantId !== tenantId) {
       throw new ForbiddenException(
         'Akses ditolak: Sesi WAHA ini milik akun lain',
       );
@@ -583,7 +591,9 @@ export class WahaController implements OnApplicationBootstrap {
 
   @SkipThrottle()
   @Get('instances/:id/logs')
-  async getLogs(@Param('id') id: string) {
+  async getLogs(@Param('id') id: string, @Req() req: any) {
+    // SECURITY (Issue 12): Pastikan instance milik tenant pemanggil (kecuali superadmin)
+    await this.ensureInstanceBelongsToUserTenant(id, req);
     return this.prisma.webhookLog.findMany({
       where: { instanceName: id },
       orderBy: { createdAt: 'desc' },
@@ -592,7 +602,16 @@ export class WahaController implements OnApplicationBootstrap {
   }
 
   @Get('cli-poll')
-  async cliPoll() {
+  async cliPoll(@Req() req: any) {
+    // SECURITY (Issue 12): Hanya superadmin atau development yang boleh membaca/mengosongkan CLI queue
+    const isSuper =
+      req?.user?.roles?.some((r: string) => r?.toLowerCase() === 'superadmin') ||
+      req?.user?.role?.toLowerCase() === 'superadmin';
+    if (!isSuper && process.env.NODE_ENV === 'production') {
+      throw new ForbiddenException(
+        'Akses ditolak: Endpoint CLI poll hanya untuk superadmin/debug',
+      );
+    }
     const messages = [...this.cliOutputQueue];
     this.cliOutputQueue = []; // flush
     return messages;
@@ -612,18 +631,20 @@ export class WahaController implements OnApplicationBootstrap {
       (process.env.NODE_ENV === 'test'
         ? 'rahasia_waha_webhook_super_aman_789!'
         : undefined);
-    const querySecret = req?.query?.secret;
 
-    if (
-      configuredSecret &&
-      (process.env.NODE_ENV !== 'test' || req !== undefined)
-    ) {
-      if (
-        headerSecret !== configuredSecret &&
-        querySecret !== configuredSecret
-      ) {
+    // SECURITY: di non-test, secret WAJIB ada. Jika tidak ada, tolak semua request.
+    if (process.env.NODE_ENV !== 'test' && !configuredSecret) {
+      this.logger.error(
+        '[WAHA Webhook] WAHA_WEBHOOK_SECRET tidak dikonfigurasi — semua request webhook DITOLAK.',
+      );
+      throw new ForbiddenException('Webhook secret not configured');
+    }
+
+    if (configuredSecret && process.env.NODE_ENV !== 'test') {
+      // Hanya terima secret via header, bukan query param (query param bocor ke log/proxy)
+      if (headerSecret !== configuredSecret) {
         this.logger.warn(
-          `[WAHA Webhook] Akses ditolak (Secret tidak cocok). IP: ${req?.ip || 'unknown'}`,
+          `[WAHA Webhook] Akses ditolak (Secret tidak cocok / via query param). IP: ${req?.ip || 'unknown'}`,
         );
         throw new ForbiddenException('Invalid or missing webhook secret');
       }
@@ -1059,6 +1080,7 @@ export class WahaController implements OnApplicationBootstrap {
             data: {
               conversationId: conversation.id,
               instanceName: sessionName,
+              tenantId: sessionTenantId || null,
               message: createdMsg,
             },
           });
@@ -1199,6 +1221,7 @@ export class WahaController implements OnApplicationBootstrap {
                 data: {
                   conversationId: targetConversationId,
                   instanceName: sessionName,
+                  tenantId: sessionTenantId || null,
                   message: botMsg,
                 },
               });

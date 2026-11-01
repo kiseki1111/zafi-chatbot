@@ -3,7 +3,14 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 
-// Ekstraktor token dari cookie 'access_token' atau header Bearer
+// Ekstraktor token dari cookie 'access_token', header Bearer, atau query param ?token= (untuk EventSource SSE)
+const queryTokenExtractor = (req: any): string | null => {
+  if (req?.query?.token && typeof req.query.token === 'string') {
+    return req.query.token;
+  }
+  return null;
+};
+
 const cookieExtractor = (req: any): string | null => {
   if (req?.cookies?.access_token) {
     return req.cookies.access_token;
@@ -19,16 +26,25 @@ const cookieExtractor = (req: any): string | null => {
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(private readonly configService: ConfigService) {
     super({
-      // Ekstraksi ganda: mendukung Header Authorization Bearer maupun HttpOnly Cookie
+      // Ekstraksi tiga lapis: Header Bearer, HttpOnly Cookie, dan Query param (?token=) untuk SSE
       jwtFromRequest: ExtractJwt.fromExtractors([
         ExtractJwt.fromAuthHeaderAsBearerToken(),
         cookieExtractor,
+        queryTokenExtractor,
       ]),
       ignoreExpiration: false,
-      // Membaca kunci rahasia dari env
-      secretOrKey:
-        configService.get<string>('JWT_ACCESS_SECRET') ||
-        'rahasia_akses_sangat_kuat_super_aman_123!',
+      // SECURITY: JWT secret WAJIB dari env. Tidak ada fallback hardcoded —
+      // jika JWT_ACCESS_SECRET kosong, server harus gagal startup, bukan pakai secret prediksi.
+      secretOrKey: (() => {
+        const secret = configService.get<string>('JWT_ACCESS_SECRET');
+        if (!secret) {
+          throw new Error(
+            'JWT_ACCESS_SECRET environment variable wajib diisi. ' +
+              'Tidak ada fallback hardcoded untuk alasan keamanan.',
+          );
+        }
+        return secret;
+      })(),
     });
   }
 
