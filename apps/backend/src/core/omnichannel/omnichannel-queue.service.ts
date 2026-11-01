@@ -174,11 +174,25 @@ export class OmnichannelQueueService implements BeforeApplicationShutdown {
           this.logger.error(
             `[Omnichannel] Error memproses chat ${task.senderId} pada bot ${botKey}: ${error.message}`,
           );
-          // Jangan pernah kirim "Maaf, sistem sibuk" jika AI sudah berhasil merespons atau sedang mengirim
-          if (!isResponseHandled) {
+          // ponytail: self-healing auto retry - jika terjadi error tak terduga (LLM down, timeout, error internal),
+          // jangan telan/hilangkan pesan customer. Jika belum melampaui batas percobaan, masukkan kembali ke antrean
+          const retryCount = (task as any)._retryCount || 0;
+          if (!isResponseHandled && retryCount < 3) {
+            (task as any)._retryCount = retryCount + 1;
+            this.logger.warn(
+              `[Omnichannel Self-Healing] Menjadwalkan ulang pesan dari ${task.senderId} (Percobaan ${retryCount + 1}/3) dalam 5 detik...`,
+            );
+            setTimeout(() => {
+              if (!this.botQueues.has(botKey)) {
+                this.botQueues.set(botKey, []);
+              }
+              this.botQueues.get(botKey)!.unshift(task); // Re-queue di depan
+              this.processBotQueue(botKey);
+            }, 5000);
+          } else if (!isResponseHandled) {
             try {
               await task.replyCallback({
-                text: 'Maaf, sistem sedang sibuk. Mohon coba beberapa saat lagi.',
+                text: 'Maaf, sistem sedang sibuk. Tim kami akan segera menindaklanjuti pesan Kakak ya 🙏',
                 images: [],
               });
             } catch (e) {}

@@ -499,8 +499,9 @@ function MessageBubble({
 }) {
   const isOut = msg.direction === "out";
   const isCall = msg.messageType === "call";
-  const isImage = msg.messageType === "image" && msg.mediaUrl;
-  const isVideo = msg.messageType === "video" && msg.mediaUrl;
+  const isDoc = (msg.messageType === "document" || /\.(pdf|doc|docx|xls|xlsx|csv|txt)($|\?)/i.test(msg.mediaUrl || "")) && Boolean(msg.mediaUrl);
+  const isImage = (msg.messageType === "image" || (!isDoc && /\.(jpg|jpeg|png|webp|gif)($|\?)/i.test(msg.mediaUrl || ""))) && Boolean(msg.mediaUrl);
+  const isVideo = (msg.messageType === "video" || (!isDoc && /\.(mp4|mov|avi|webm|mkv)($|\?)/i.test(msg.mediaUrl || ""))) && Boolean(msg.mediaUrl);
   const isAudio =
     (msg.messageType === "audio" ||
       msg.messageType === "ptt" ||
@@ -584,6 +585,25 @@ function MessageBubble({
             preload="metadata"
             className="rounded-lg max-w-full max-h-64 object-cover mb-1 bg-black"
           />
+        ) : null}
+        {isDoc ? (
+          <a
+            href={msg.mediaUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              "flex items-center gap-2 p-2 rounded-lg border mb-1 text-xs transition-colors",
+              isOut
+                ? "bg-white/10 hover:bg-white/20 border-white/20 text-white"
+                : "bg-muted/60 hover:bg-muted border-border text-foreground",
+            )}
+          >
+            <FileText className="h-5 w-5 shrink-0 text-amber-400" />
+            <div className="overflow-hidden">
+              <p className="font-medium truncate">{msg.text || "Dokumen Lampiran"}</p>
+              <p className="text-[10px] opacity-75">Klik untuk mengunduh / membuka</p>
+            </div>
+          </a>
         ) : null}
         {isAudio ? (
           <WhatsAppVoicePlayer

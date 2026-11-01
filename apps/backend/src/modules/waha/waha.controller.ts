@@ -16,6 +16,7 @@ import {
   UseGuards,
   OnApplicationBootstrap,
 } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { SkipThrottle } from '@nestjs/throttler';
 import * as fs from 'fs';
@@ -126,13 +127,92 @@ export class WahaController implements OnApplicationBootstrap {
     }
   }
 
+  // ponytail: cron worker berjalan setiap 30 detik untuk memastikan chat yang belum terbalas
+  // (karena WAHA offline, LLM timeout, restart container) PASTI terkirim ke customer
+  @Cron('*/30 * * * * *')
+  async handleUnrepliedMessagesRecoveryCron() {
+    if (process.env.NODE_ENV === 'test') return;
+    await this.recoverUnrepliedMessages().catch((e) =>
+      this.logger.debug(`[Recovery Cron] Skip: ${e.message}`),
+    );
+  }
+
   private async recoverUnrepliedMessages() {
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    // 1. Recover pesan berstatus PENDING_RETRY yang sempat gagal dikirim ke WAHA
+    try {
+      const pendingRetryMessages = await this.prisma.message.findMany({
+        where: {
+          status: 'PENDING_RETRY',
+          senderType: 'bot',
+        },
+        include: {
+          conversation: {
+            include: { contact: true },
+          },
+        },
+        take: 10,
+      });
+
+      for (const pMsg of pendingRetryMessages) {
+        const sessionName = pMsg.conversation?.instanceName;
+        const targetPhone = pMsg.conversation?.contact?.phone;
+        if (!sessionName || !targetPhone) continue;
+
+        const targetSender = targetPhone.includes('@')
+          ? targetPhone
+          : `${targetPhone}@c.us`;
+
+        const meta = (pMsg.metadata as any) || {};
+        const mediaUrl = meta.mediaUrl;
+
+        try {
+          if (pMsg.messageType === 'image' && mediaUrl) {
+            await this.wahaService.sendMedia(
+              sessionName,
+              targetSender,
+              mediaUrl,
+              meta.caption || '',
+            );
+          } else if (pMsg.messageType === 'video' && mediaUrl) {
+            await this.wahaService.sendVideo(
+              sessionName,
+              targetSender,
+              mediaUrl,
+              meta.caption || '',
+            );
+          } else if (pMsg.content) {
+            await this.wahaService.sendMessage(
+              sessionName,
+              targetSender,
+              pMsg.content,
+            );
+          }
+
+          await this.prisma.message.update({
+            where: { id: pMsg.id },
+            data: { status: 'SENT' },
+          });
+          this.logger.log(
+            `[Waha Self-Healing] Berhasil mengirimkan ulang pesan tertunda (${pMsg.id}) ke ${targetSender}`,
+          );
+        } catch (e: any) {
+          // Tetap simpan status PENDING_RETRY untuk siklus cron berikutnya
+          this.logger.debug(
+            `[Waha Self-Healing] Retry pesan ${pMsg.id} masih gagal: ${e.message}`,
+          );
+        }
+      }
+    } catch (e: any) {
+      this.logger.debug(`[Waha Recovery] Error scanning retry messages: ${e.message}`);
+    }
+
+    // 2. Cari pesan customer dari 15 menit terakhir yang belum ada balasan bot sama sekali
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
     const unrepliedConversations = await this.prisma.conversation.findMany({
       where: {
         mode: 'bot',
         instanceName: { not: 'CLI_TEST_SESSION' },
-        lastMessageAt: { gte: fiveMinutesAgo },
+        lastMessageAt: { gte: fifteenMinutesAgo },
       },
       include: {
         contact: true,
@@ -161,11 +241,6 @@ export class WahaController implements OnApplicationBootstrap {
           sessionName: conv.instanceName,
           replyCallback: async (reply) => {
             if (reply.text && reply.text.length > 0) {
-              await this.wahaService.sendMessage(
-                conv.instanceName,
-                targetSender,
-                reply.text,
-              );
               const botMsg = await this.prisma.message.create({
                 data: {
                   conversationId: conv.id,
@@ -188,6 +263,21 @@ export class WahaController implements OnApplicationBootstrap {
                   message: botMsg,
                 },
               });
+
+              try {
+                await this.wahaService.sendMessage(
+                  conv.instanceName,
+                  targetSender,
+                  reply.text,
+                );
+              } catch (e: any) {
+                await this.prisma.message
+                  .update({
+                    where: { id: botMsg.id },
+                    data: { status: 'PENDING_RETRY' },
+                  })
+                  .catch(() => null);
+              }
             }
           },
         };
@@ -1255,8 +1345,11 @@ export class WahaController implements OnApplicationBootstrap {
                   message: botMsg,
                 },
               });
+
+              return botMsg;
             } catch (e) {
               this.logger.warn(`Failed to save bot reply: ${e.message}`);
+              return null;
             }
           };
 
@@ -1271,6 +1364,9 @@ export class WahaController implements OnApplicationBootstrap {
               this.logger.log(
                 `[WahaController] AI selesai menyusun balasan (${reply.text?.length || 0} karakter), mengirim ke ${sender}...`,
               );
+              // 1. Simpan pesan teks terlebih dahulu ke DB & dashboard (status PENDING/SENT)
+              // agar jika jaringan WAHA lambat atau sempat terputus, pesan tetap masuk monitoring
+              let savedTextMessage: any = null;
               if (reply.text && reply.text.length > 0) {
                 if (sessionName === 'CLI_TEST_SESSION') {
                   this.cliOutputQueue.push({
@@ -1278,12 +1374,38 @@ export class WahaController implements OnApplicationBootstrap {
                     text: `[Waha Bot]: ${reply.text}`,
                   });
                 } else {
-                  await this.wahaService.sendMessage(
-                    sessionName,
-                    sender,
-                    reply.text,
-                  );
-                  await saveBotReply(reply.text, 'text');
+                  savedTextMessage = await saveBotReply(reply.text, 'text');
+                  try {
+                    const sendRes = await this.wahaService.sendMessage(
+                      sessionName,
+                      sender,
+                      reply.text,
+                    );
+                    if (sendRes?.id && savedTextMessage?.id) {
+                      await this.prisma.message
+                        .update({
+                          where: { id: savedTextMessage.id },
+                          data: {
+                            wahaMessageId:
+                              sendRes.id?._serialized || sendRes.id,
+                            status: 'SENT',
+                          },
+                        })
+                        .catch(() => null);
+                    }
+                  } catch (sendErr: any) {
+                    this.logger.warn(
+                      `[WahaController] Gagal kirim teks ke WAHA (${sendErr.message}), pesan disimpan untuk retry worker.`,
+                    );
+                    if (savedTextMessage?.id) {
+                      await this.prisma.message
+                        .update({
+                          where: { id: savedTextMessage.id },
+                          data: { status: 'PENDING_RETRY' },
+                        })
+                        .catch(() => null);
+                    }
+                  }
                 }
               }
               if (reply.order) {
@@ -1514,18 +1636,50 @@ export class WahaController implements OnApplicationBootstrap {
                   } else {
                     const isDoc =
                       /\.(pdf|doc|docx|xls|xlsx|csv|txt)($|\?)/i.test(img.url);
-                    await this.wahaService.sendMedia(
-                      sessionName,
-                      sender,
-                      img.url,
-                      img.caption || '',
-                    );
-                    await saveBotReply(
+                    const msgType = isDoc ? 'document' : 'image';
+                    const captionText =
                       img.caption ||
-                        (isDoc ? 'Mengirim dokumen' : 'Mengirim gambar'),
-                      isDoc ? 'document' : 'image',
-                      { mediaUrl: img.url },
+                      (isDoc ? 'Mengirim dokumen' : 'Mengirim foto');
+
+                    // Simpan dulu ke monitoring agar langsung muncul di web dashboard
+                    const savedImgMsg = await saveBotReply(
+                      captionText,
+                      msgType,
+                      { mediaUrl: img.url, caption: img.caption },
                     );
+
+                    try {
+                      const sendRes = await this.wahaService.sendMedia(
+                        sessionName,
+                        sender,
+                        img.url,
+                        img.caption || '',
+                      );
+                      if (sendRes?.id && savedImgMsg?.id) {
+                        await this.prisma.message
+                          .update({
+                            where: { id: savedImgMsg.id },
+                            data: {
+                              wahaMessageId:
+                                sendRes.id?._serialized || sendRes.id,
+                              status: 'SENT',
+                            },
+                          })
+                          .catch(() => null);
+                      }
+                    } catch (sendErr: any) {
+                      this.logger.warn(
+                        `[WahaController] Gagal kirim media ke WAHA (${sendErr.message}), pesan disimpan untuk retry worker.`,
+                      );
+                      if (savedImgMsg?.id) {
+                        await this.prisma.message
+                          .update({
+                            where: { id: savedImgMsg.id },
+                            data: { status: 'PENDING_RETRY' },
+                          })
+                          .catch(() => null);
+                      }
+                    }
                   }
                 }
               }
@@ -1537,17 +1691,46 @@ export class WahaController implements OnApplicationBootstrap {
                       text: `[Waha Bot video] URL: ${vid.url}, Caption: ${vid.caption}`,
                     });
                   } else {
-                    await this.wahaService.sendVideo(
-                      sessionName,
-                      sender,
-                      vid.url,
-                      vid.caption || '',
-                    );
-                    await saveBotReply(
-                      vid.caption || 'Mengirim video',
+                    const captionText = vid.caption || 'Mengirim video';
+                    // Simpan dulu ke monitoring agar langsung muncul di web dashboard
+                    const savedVidMsg = await saveBotReply(
+                      captionText,
                       'video',
-                      { mediaUrl: vid.url },
+                      { mediaUrl: vid.url, caption: vid.caption },
                     );
+
+                    try {
+                      const sendRes = await this.wahaService.sendVideo(
+                        sessionName,
+                        sender,
+                        vid.url,
+                        vid.caption || '',
+                      );
+                      if (sendRes?.id && savedVidMsg?.id) {
+                        await this.prisma.message
+                          .update({
+                            where: { id: savedVidMsg.id },
+                            data: {
+                              wahaMessageId:
+                                sendRes.id?._serialized || sendRes.id,
+                              status: 'SENT',
+                            },
+                          })
+                          .catch(() => null);
+                      }
+                    } catch (sendErr: any) {
+                      this.logger.warn(
+                        `[WahaController] Gagal kirim video ke WAHA (${sendErr.message}), pesan disimpan untuk retry worker.`,
+                      );
+                      if (savedVidMsg?.id) {
+                        await this.prisma.message
+                          .update({
+                            where: { id: savedVidMsg.id },
+                            data: { status: 'PENDING_RETRY' },
+                          })
+                          .catch(() => null);
+                      }
+                    }
                   }
                 }
               }
@@ -1587,6 +1770,12 @@ export class WahaController implements OnApplicationBootstrap {
           updateData.lastConnectedAt = null; // or keep it and use disconnectedAt for WhatsappSession
         } else if (status === 'WORKING') {
           updateData.lastConnectedAt = new Date();
+          // ponytail: saat WAHA pulih dan berstatus WORKING, langsung pemicu recovery pesan tertinggal
+          setTimeout(() => {
+            this.recoverUnrepliedMessages().catch((e) =>
+              this.logger.warn(`Failed recovery on status WORKING: ${e.message}`),
+            );
+          }, 1000);
         }
         await this.prisma.whatsappInstance
           .update({
