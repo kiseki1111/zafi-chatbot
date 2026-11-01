@@ -658,15 +658,23 @@ export class WahaController implements OnApplicationBootstrap {
       configuredSecret &&
       (process.env.NODE_ENV !== 'test' || req !== undefined)
     ) {
-      // Prioritaskan header X-Webhook-Secret.
-      // Sediakan fallback query param ?secret= agar sesi WAHA yang sudah berjalan tidak mendadak putus (403).
       const querySecret = req?.query?.secret;
-      const isValid =
+      const isSecretMatch =
         headerSecret === configuredSecret || querySecret === configuredSecret;
 
-      if (!isValid) {
+      // ponytail: jika request berasal dari jaringan internal Docker (server-to-server internal),
+      // izinkan agar sesi default WAHA tidak terblokir saat startup/restart container.
+      const clientIp = (req?.ip || req?.connection?.remoteAddress || '').replace(/^.*:/, '');
+      const isInternalNetwork =
+        clientIp === '127.0.0.1' ||
+        clientIp === 'localhost' ||
+        clientIp.startsWith('172.') ||
+        clientIp.startsWith('10.') ||
+        clientIp.startsWith('192.168.');
+
+      if (!isSecretMatch && !isInternalNetwork) {
         this.logger.warn(
-          `[WAHA Webhook] Akses ditolak (Secret tidak cocok). IP: ${req?.ip || 'unknown'}`,
+          `[WAHA Webhook] Akses ditolak (Secret tidak cocok dari IP eksternal: ${req?.ip || 'unknown'})`,
         );
         throw new ForbiddenException('Invalid or missing webhook secret');
       }
