@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Circle, Smartphone, Package, Users, ArrowRight, X, Sparkles } from "lucide-react";
+import { CheckCircle2, Circle, Smartphone, Package, Users, ArrowRight, X, ListChecks } from "lucide-react";
 import { useAppStore } from "@/lib/app-store";
 import { useAuthStore } from "@/lib/auth-store";
 import { cn } from "@/lib/utils";
@@ -90,16 +90,13 @@ export function GettingStartedChecklist({
   ];
 
   return (
-    <Card className={cn("relative border-emerald-500/30 bg-card overflow-hidden shadow-xs mb-6", className)}>
-      {/* Background Accent */}
-      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600" />
-
+    <Card className={cn("border border-border/80 bg-card overflow-hidden shadow-xs mb-6", className)}>
       <CardHeader className="pb-3 pt-4 sm:pt-5">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <div className="h-6 w-6 rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                <Sparkles className="h-3.5 w-3.5" />
+                <ListChecks className="h-3.5 w-3.5" />
               </div>
               <CardTitle className="text-sm sm:text-base font-bold text-foreground">
                 Checklist Memulai (Getting Started)

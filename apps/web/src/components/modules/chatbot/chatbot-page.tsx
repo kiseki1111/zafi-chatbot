@@ -1291,8 +1291,8 @@ export function ChatbotPage() {
       };
     } catch {}
 
-    // Fallback Poll every 10 seconds (as backup if connection drops)
-    const interval = setInterval(fetchLatest, 10000);
+    // Fallback Poll every 3 seconds (memastikan sinkronisasi pesan baru secepat mungkin)
+    const interval = setInterval(fetchLatest, 3000);
     
     // Fetch immediately when user focuses back on the tab
     const onFocus = () => fetchLatest();

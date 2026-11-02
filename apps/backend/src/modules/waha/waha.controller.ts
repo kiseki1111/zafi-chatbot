@@ -938,8 +938,8 @@ export class WahaController implements OnApplicationBootstrap {
       }
     }
 
-    // ponytail: handle only 'message' event to prevent duplicate contacts/messages from outbound message.any webhooks
-    if (payload?.event === 'message') {
+    // Handle event 'message' (dan 'message.any' untuk sinkronisasi pesan keluar WhatsApp web)
+    if (payload?.event === 'message' || payload?.event === 'message.any') {
       const message = payload.payload;
       const sessionName = payload.session;
       const isDirectPhone = (jid?: string): boolean =>
@@ -952,9 +952,12 @@ export class WahaController implements OnApplicationBootstrap {
         message?._data?.key?.participant;
       const realPhoneJid = rawAlt && !rawAlt.includes('@lid') ? rawAlt : null;
 
+      // ponytail: untuk pesan keluar (message.fromMe === true), lawan bicara (kontak) adalah penerima (message.to atau remoteJid)
       let rawNumber = message?.fromMe
-        ? message.to || message._data?.key?.remoteJid || message.from
-        : realPhoneJid || message?.from;
+        ? (message._data?.key?.remoteJid && !message._data.key.remoteJid.includes('@lid')
+            ? message._data.key.remoteJid
+            : message.to || message._data?.key?.remoteJid || message.from)
+        : (realPhoneJid || message?.from);
 
       // Jika nomor berupa LID (@lid), minta WAHA resolve ke nomor telepon asli (@c.us)
       if (rawNumber && rawNumber.includes('@lid') && sessionName) {
