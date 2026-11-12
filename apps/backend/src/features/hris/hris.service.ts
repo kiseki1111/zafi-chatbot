@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../../core/prisma/prisma.service';
 import axios from 'axios';
 
 @Injectable()
@@ -8,7 +9,10 @@ export class HrisService {
   private readonly baseUrl: string;
   private readonly apiKey: string;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly prisma: PrismaService,
+  ) {
     const rawUrl =
       this.configService.get<string>('HRIS_API_URL') ||
       process.env.HRIS_API_URL ||
@@ -54,6 +58,22 @@ export class HrisService {
         totalKaryawanAktif: 0,
         latencyMs,
         error: err.message,
+      };
+    }
+  }
+
+  async getEmployeesList() {
+    try {
+      const res = await axios.get(`${this.baseUrl}/karyawan/list`, {
+        headers: this.getHeaders(),
+        timeout: 4000,
+      });
+      return res.data;
+    } catch (err) {
+      return {
+        success: false,
+        data: [],
+        message: err.response?.data?.message || err.message,
       };
     }
   }
@@ -144,6 +164,19 @@ export class HrisService {
       return res.data;
     } catch (err) {
       return { success: false, message: err.response?.data?.message || err.message };
+    }
+  }
+
+  async getRecentAuditLogs() {
+    try {
+      const logs = await this.prisma.auditLog.findMany({
+        take: 50,
+        orderBy: { createdAt: 'desc' },
+        include: { user: true },
+      });
+      return { success: true, data: logs };
+    } catch (err) {
+      return { success: false, data: [], message: err.message };
     }
   }
 

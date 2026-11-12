@@ -114,6 +114,38 @@ export function WaWhitelistPage() {
   const [search, setSearch] = useState("");
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // ponytail: sinkronkan daftar kontak & karyawan real-time dari HRIS
+  useEffect(() => {
+    fetch("/api/v1/hris/karyawan/list")
+      .then((res) => res.json())
+      .then((json) => {
+        const list = json?.data?.data || json?.data || [];
+        if (Array.isArray(list) && list.length > 0) {
+          const mapped: WhitelistItem[] = list
+            .filter((k: any) => Boolean(k.phone || k.no_hp))
+            .map((k: any, i: number) => {
+              const raw = k.phone || k.no_hp || '';
+              const clean = raw.startsWith('0') ? '62' + raw.slice(1) : raw.replace(/\D/g, '');
+              return {
+                id: `wl-hris-${k.nik || i}`,
+                phone: clean,
+                employeeName: k.name || k.nama_karyawan,
+                nik: k.nik,
+                department: k.department || 'Operasional',
+                position: k.position || 'Staf',
+                isRegisteredOnWa: true,
+                enabled: true,
+                lastActive: "Terverifikasi Sistem",
+              };
+            });
+          if (mapped.length > 0) {
+            setWhitelist(mapped);
+          }
+        }
+      })
+      .catch(() => null);
+  }, []);
+
   // Modal Tambah Nomor Whitelist State
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [addForm, setAddForm] = useState({

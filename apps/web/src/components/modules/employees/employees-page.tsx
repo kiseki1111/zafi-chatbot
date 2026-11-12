@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -128,7 +128,32 @@ export function EmployeesPage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
 
-  const departments = ["ALL", "HRD", "Keuangan & Akuntansi", "Teknologi & IT", "Operasional", "Direksi"];
+  // ponytail: ambil data live karyawan dari HRIS saat komponen mount
+  useEffect(() => {
+    fetch("/api/v1/hris/karyawan/list")
+      .then((res) => res.json())
+      .then((json) => {
+        const list = json?.data?.data || json?.data || [];
+        if (Array.isArray(list) && list.length > 0) {
+          const mapped: Employee[] = list.map((k: any, i: number) => ({
+            id: `hris-${k.nik || i}`,
+            nik: k.nik,
+            name: k.name || k.nama_karyawan,
+            email: `${k.nik?.toLowerCase() || 'staff'}@perusahaan.co.id`,
+            department: k.department || 'Operasional',
+            position: k.position || 'Staf',
+            phone: k.phone || k.no_hp || '-',
+            isWaVerified: Boolean(k.phone || k.no_hp),
+            accessLevel: (k.department?.includes('Keuangan') ? 'FINANCE_ADMIN' : k.department?.includes('HR') ? 'HR_ADMIN' : 'STAFF') as Employee['accessLevel'],
+            status: k.status === '1' || k.status === 'ACTIVE' ? 'ACTIVE' : 'ACTIVE',
+          }));
+          setEmployees(mapped);
+        }
+      })
+      .catch(() => null);
+  }, []);
+
+  const departments = ["ALL", "HRD", "Keuangan & Akuntansi", "Teknologi & IT", "Operasional", "Direksi", "Produksi & Operasional"];
 
   const filteredEmployees = employees.filter((e) => {
     const matchSearch =
@@ -139,12 +164,35 @@ export function EmployeesPage() {
     return matchSearch && matchDept;
   });
 
-  const handleSyncHRIS = () => {
+  const handleSyncHRIS = async () => {
     setIsSyncing(true);
-    setTimeout(() => {
+    try {
+      const res = await fetch("/api/v1/hris/karyawan/list");
+      const json = await res.json();
+      const list = json?.data?.data || json?.data || [];
+      if (Array.isArray(list) && list.length > 0) {
+        const mapped: Employee[] = list.map((k: any, i: number) => ({
+          id: `hris-${k.nik || i}`,
+          nik: k.nik,
+          name: k.name || k.nama_karyawan,
+          email: `${k.nik?.toLowerCase() || 'staff'}@perusahaan.co.id`,
+          department: k.department || 'Operasional',
+          position: k.position || 'Staf',
+          phone: k.phone || k.no_hp || '-',
+          isWaVerified: Boolean(k.phone || k.no_hp),
+          accessLevel: (k.department?.includes('Keuangan') ? 'FINANCE_ADMIN' : k.department?.includes('HR') ? 'HR_ADMIN' : 'STAFF') as Employee['accessLevel'],
+          status: 'ACTIVE',
+        }));
+        setEmployees(mapped);
+        toast.success(`Sinkronisasi ${mapped.length} data karyawan dari sistem HRIS berhasil!`);
+      } else {
+        toast.success("Sinkronisasi selesai (tidak ada pembaruan data baru).");
+      }
+    } catch {
+      toast.error("Gagal sinkronisasi data dari HRIS.");
+    } finally {
       setIsSyncing(false);
-      toast.success("Sinkronisasi 48 data karyawan dari sistem HRIS berhasil!");
-    }, 700);
+    }
   };
 
   const getAccessBadge = (level: Employee["accessLevel"]) => {

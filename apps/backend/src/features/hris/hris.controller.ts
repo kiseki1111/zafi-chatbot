@@ -12,6 +12,11 @@ export class HrisController {
     return this.hrisService.getHealth();
   }
 
+  @Get('karyawan/list')
+  async getEmployeesList() {
+    return this.hrisService.getEmployeesList();
+  }
+
   @Get('karyawan/lookup')
   async lookup(
     @Query('phone') phone?: string,
@@ -43,6 +48,11 @@ export class HrisController {
   @Get('requests/pending')
   async getPendingRequests() {
     return this.hrisService.getPendingRequests();
+  }
+
+  @Get('audit-logs')
+  async getAuditLogs() {
+    return this.hrisService.getRecentAuditLogs();
   }
 
   @Get('employees/summary')

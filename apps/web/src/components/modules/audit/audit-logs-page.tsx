@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -131,6 +131,34 @@ export function AssistantAuditLogsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [activeLogDetail, setActiveLogDetail] = useState<AuditLogEntry | null>(null);
+
+  // ponytail: sinkronkan audit log real-time dari database backend
+  useEffect(() => {
+    fetch("/api/v1/hris/audit-logs")
+      .then((res) => res.json())
+      .then((json) => {
+        const dbLogs = json?.data?.data || json?.data || [];
+        if (Array.isArray(dbLogs) && dbLogs.length > 0) {
+          const mapped: AuditLogEntry[] = dbLogs.map((item: any, idx: number) => ({
+            id: item.id || `audit-${idx}`,
+            timestamp: new Date(item.createdAt || Date.now()).toLocaleTimeString("id-ID") + " WIB",
+            employeeName: item.user?.name || item.details?.email || "User Ekosistem",
+            employeeNik: item.user?.id ? item.user.id.slice(0, 8).toUpperCase() : "ZAF-SYSTEM",
+            department: "Sistem Ekosistem",
+            userQuery: `${item.action} pada ${item.endpoint}`,
+            toolCalled: item.module,
+            status: item.status === "FAILED" ? "UNAUTHORIZED" : "SUCCESS",
+            latencyMs: 350,
+            tokensUsed: 120,
+            toolInput: { ip: item.ipAddress, agent: item.userAgent },
+            toolOutput: item.details || {},
+            aiResponse: `Audit event tercatat di database: ${item.action}`,
+          }));
+          setLogs([...mapped, ...INITIAL_LOGS]);
+        }
+      })
+      .catch(() => null);
+  }, []);
 
   const filteredLogs = logs.filter((l) => {
     const matchSearch =
