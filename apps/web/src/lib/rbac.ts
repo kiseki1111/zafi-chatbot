@@ -16,29 +16,41 @@ export interface MenuItem {
   key: ViewKey;
   label: string;
   icon: string;
+  section?: "main" | "cs" | "assistant" | "config" | "admin";
   badge?: string;
 }
 
 export const MENU_ITEMS: MenuItem[] = [
   // Superadmin exclusive
-  { key: "platform_overview", label: "Ringkasan Platform", icon: "Activity" },
-  { key: "clients",           label: "Kelola Klien",       icon: "Building2" },
-  { key: "waha_monitor",      label: "Semua Sesi WAHA",    icon: "Smartphone" },
-  { key: "quota_monitor",     label: "Monitor Kuota",      icon: "BarChart" },
-  { key: "pricing_plans",     label: "Paket & Harga",      icon: "Wallet" },
-  { key: "ai_config",         label: "Model AI & Sistem",  icon: "Brain" },
-  { key: "system_logs",       label: "Log Sistem",         icon: "Receipt" },
+  { key: "platform_overview", label: "Ringkasan Platform", icon: "Activity", section: "admin" },
+  { key: "clients",           label: "Kelola Klien",       icon: "Building2", section: "admin" },
+  { key: "waha_monitor",      label: "Semua Sesi WhatsApp",icon: "Smartphone", section: "admin" },
+  { key: "quota_monitor",     label: "Monitor Kuota",      icon: "BarChart", section: "admin" },
+  { key: "pricing_plans",     label: "Paket & Harga",      icon: "Wallet", section: "admin" },
+  { key: "ai_config",         label: "Model AI & Sistem",  icon: "Brain", section: "admin" },
+  { key: "system_logs",       label: "Log Sistem",         icon: "Receipt", section: "admin" },
 
-  // General & Tenant
-  { key: "overview",      label: "Dashboard",        icon: "LayoutDashboard" },
-  { key: "chatbot",       label: "Bot WhatsApp",     icon: "MessageCircle" },
-  { key: "products",      label: "Katalog Produk",   icon: "Package" },
-  { key: "crm",           label: "Pelanggan",        icon: "Users" },
-  { key: "bus_layout",    label: "Denah Kursi Bus",  icon: "Bus" },
-  { key: "availability",  label: "Siteplan",         icon: "Grid3X3" },
-  { key: "knowledge",     label: "Knowledge Base",   icon: "Book" },
-  { key: "followup",      label: "Follow-Up",        icon: "BellRing" },
-  { key: "settings",      label: "Pengaturan",       icon: "Settings" },
+  // Utama
+  { key: "overview",      label: "Dashboard",              icon: "LayoutDashboard", section: "main" },
+
+  // 1. Modul Chatbot Customer Service (CS & CRM) - ASLI & TETAP ADA
+  { key: "chatbot",       label: "Bot WhatsApp",           icon: "MessageCircle", section: "cs" },
+  { key: "crm",           label: "Pelanggan",              icon: "Users", section: "cs" },
+  { key: "availability",  label: "Siteplan",               icon: "Grid3X3", section: "cs" },
+  { key: "followup",      label: "Follow-Up",              icon: "BellRing", section: "cs" },
+  { key: "products",      label: "Katalog Produk",         icon: "Package", section: "cs" },
+  { key: "bus_layout",    label: "Denah Kursi Bus",        icon: "Bus", section: "cs" },
+
+  // 2. Modul Chatbot Asisten Internal (HRIS & Accounting) - PENAMBAHAN BARU
+  { key: "assistant_chat",label: "Chat Asisten",           icon: "Bot", section: "assistant" },
+  { key: "wa_whitelist",  label: "Whitelist Nomor WA",     icon: "ShieldCheck", section: "assistant" },
+  { key: "integrations",  label: "Integrasi Sistem",       icon: "Blocks", section: "assistant" },
+  { key: "employees",     label: "Karyawan & Akses",       icon: "UserCheck", section: "assistant" },
+  { key: "audit_logs",    label: "Riwayat & Audit",        icon: "FileText", section: "assistant" },
+
+  // 3. Modul Konfigurasi Bersama
+  { key: "knowledge",     label: "Knowledge Base",         icon: "Book", section: "config" },
+  { key: "settings",      label: "Pengaturan",             icon: "Settings", section: "config" },
 ];
 
 const SUPERADMIN_KEYS: ViewKey[] = [
@@ -67,20 +79,34 @@ export function menuForRole(
     (m) => !SUPERADMIN_KEYS.includes(m.key) || m.key === "settings"
   );
 
-  // Jika enabledMenus belum di-load (undefined), tampilkan semua menu tenant bawaan
+  // Jika enabledMenus belum di-load (undefined), tampilkan menu tenant bawaan
   if (enabledMenus === undefined) {
     return tenantCandidateMenus;
   }
 
-  // Jika sudah di-load dari server (array terisi): filter sesuai enabledMenus
+  // Jika sudah di-load dari server (array terisi):
+  // ponytail: Pertahankan menu asli CS + sertakan menu asisten yang ditambahkan
   if (Array.isArray(enabledMenus) && enabledMenus.length > 0) {
+    const alwaysIncluded: ViewKey[] = [
+      "overview",
+      "chatbot",
+      "crm",
+      "availability",
+      "followup",
+      "assistant_chat",
+      "wa_whitelist",
+      "integrations",
+      "employees",
+      "audit_logs",
+      "knowledge",
+      "settings",
+    ];
     return tenantCandidateMenus.filter(
-      (m) => m.key === "overview" || m.key === "settings" || enabledMenus.includes(m.key),
+      (m) => alwaysIncluded.includes(m.key) || enabledMenus.includes(m.key),
     );
   }
 
-  // Jika eksplisit array kosong []: hanya menu wajib
-  return tenantCandidateMenus.filter((m) => m.key === "overview" || m.key === "settings");
+  return tenantCandidateMenus;
 }
 
 export function canAccess(role: Role, view: ViewKey, enabledMenus?: string[], userContext?: { email?: string; name?: string; tenantId?: string | null }): boolean {

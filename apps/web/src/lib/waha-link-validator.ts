@@ -39,7 +39,7 @@ export function checkWahaMediaLink(url?: string | null): WahaLinkStatus {
     }
     return {
       isValid: true,
-      statusText: "Siap Kirim WAHA",
+      statusText: "Siap Kirim WhatsApp",
       badgeVariant: "success",
       description:
         "File tersimpan di server lokal dan siap dikirim otomatis oleh bot WhatsApp.",
@@ -61,10 +61,10 @@ export function checkWahaMediaLink(url?: string | null): WahaLinkStatus {
     ) {
       return {
         isValid: false,
-        statusText: "IP Lokal (Tidak Terjangkau WAHA)",
+        statusText: "IP Lokal (Tidak Terjangkau Server)",
         badgeVariant: "destructive",
         description:
-          "Link menggunakan IP privat/localhost. Gateway WAHA tidak bisa mengunduh file ini dari internet.",
+          "Link menggunakan IP privat/localhost. Gateway WhatsApp tidak bisa mengunduh file ini dari internet.",
       };
     }
 
@@ -111,10 +111,10 @@ export function checkWahaMediaLink(url?: string | null): WahaLinkStatus {
 
     return {
       isValid: true,
-      statusText: "Siap Kirim WAHA (Public URL)",
+      statusText: "Siap Kirim WhatsApp (Public URL)",
       badgeVariant: "success",
       description:
-        "URL publik aktif dan dapat diakses gateway WAHA untuk dikirim ke pelanggan.",
+        "URL publik aktif dan dapat diakses gateway WhatsApp untuk dikirim ke pelanggan.",
     };
   } catch {
     return {

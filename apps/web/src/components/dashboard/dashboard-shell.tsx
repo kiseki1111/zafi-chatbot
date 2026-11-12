@@ -11,7 +11,14 @@ import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OnboardingWizardDialog } from "@/components/modules/onboarding/onboarding-wizard-dialog";
 
-// ponytail: Lazy load semua halaman biar Next.js nggak compile semuanya di awal.
+// ponytail: Direct import halaman asisten inti agar navigasi instan 0ms tanpa kompilasi chunk/skeleton delay
+import { AssistantChatPage } from "@/components/modules/assistant/assistant-chat-page";
+import { WaWhitelistPage } from "@/components/modules/whitelist/wa-whitelist-page";
+import { IntegrationsPage } from "@/components/modules/integrations/integrations-page";
+import { EmployeesPage } from "@/components/modules/employees/employees-page";
+import { AssistantAuditLogsPage } from "@/components/modules/audit/audit-logs-page";
+
+// Lazy load modul sekunder / superadmin yang jarang dibuka
 const Loading = () => <div className="p-8 space-y-4"><Skeleton className="h-8 w-64" /><Skeleton className="h-[400px] w-full" /></div>;
 
 const OverviewPage = dynamic(() => import("@/components/modules/overview/overview-page").then(mod => mod.OverviewPage), { loading: Loading });
@@ -48,59 +55,63 @@ export function DashboardShell() {
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [onboardingInitialData, setOnboardingInitialData] = useState<any>({});
 
-  // 1. Sync URL -> State (On Load or Back Button)
+  // 1. One-time Setup: Theme Palette & Initial Status Check (Hanya dijalankan 1x saat user/tenant berubah)
   useEffect(() => {
     if (!user) return;
 
-    // Load custom color palette & cek status isOnboarded
     if (user.role === "superadmin" || !user.tenantId) {
       document.documentElement.style.setProperty("--brand-primary", "#059669");
       document.documentElement.style.setProperty("--brand-secondary", "#0d9488");
       document.documentElement.style.setProperty("--brand-accent", "#3b82f6");
-    } else {
-      fetch(`/api/v1/tenant/${user.tenantId}/dashboard`)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((data) => {
-          if (!data) return;
-          const tenant = data?.data?.tenant || data?.tenant;
-          const palette = tenant?.metadata?.colorPalette;
-          const primary = palette?.primary || "#059669";
-          const secondary = palette?.secondary || "#0d9488";
-          const accent = palette?.accent || "#3b82f6";
-          document.documentElement.style.setProperty("--brand-primary", primary);
-          document.documentElement.style.setProperty("--brand-secondary", secondary);
-          document.documentElement.style.setProperty("--brand-accent", accent);
-
-          // Cek status Onboarding: jika belum onboarded DAN tidak dinonaktifkan secara global oleh superadmin
-          const isGlobalDisabled = Boolean(
-            data?.isGlobalOnboardingDisabled ||
-            data?.data?.isGlobalOnboardingDisabled
-          );
-
-          if (
-            tenant &&
-            tenant.isOnboarded === false &&
-            !isGlobalDisabled &&
-            user.role !== "superadmin"
-          ) {
-            setOnboardingInitialData({
-              storeName: tenant.name || "",
-              category: tenant.category || "general",
-              phone: tenant.phone || "",
-              address: tenant.address || "",
-              agentName: tenant.agentName || "Luna",
-              agentTone: tenant.agentTone || "Santai & Ramah (Kak, Sis, Bro)",
-              instructions: tenant.extraInfo || "",
-            });
-            setOnboardingOpen(true);
-          }
-        })
-        .catch(() => {
-          document.documentElement.style.setProperty("--brand-primary", "#059669");
-          document.documentElement.style.setProperty("--brand-secondary", "#0d9488");
-          document.documentElement.style.setProperty("--brand-accent", "#3b82f6");
-        });
+      return;
     }
+
+    fetch(`/api/v1/tenant/${user.tenantId}/dashboard`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data) return;
+        const tenant = data?.data?.tenant || data?.tenant;
+        const palette = tenant?.metadata?.colorPalette;
+        const primary = palette?.primary || "#059669";
+        const secondary = palette?.secondary || "#0d9488";
+        const accent = palette?.accent || "#3b82f6";
+        document.documentElement.style.setProperty("--brand-primary", primary);
+        document.documentElement.style.setProperty("--brand-secondary", secondary);
+        document.documentElement.style.setProperty("--brand-accent", accent);
+
+        const isGlobalDisabled = Boolean(
+          data?.isGlobalOnboardingDisabled ||
+          data?.data?.isGlobalOnboardingDisabled
+        );
+
+        if (
+          tenant &&
+          tenant.isOnboarded === false &&
+          !isGlobalDisabled &&
+          user.role !== "superadmin"
+        ) {
+          setOnboardingInitialData({
+            storeName: tenant.name || "",
+            category: tenant.category || "general",
+            phone: tenant.phone || "",
+            address: tenant.address || "",
+            agentName: tenant.agentName || "Luna",
+            agentTone: tenant.agentTone || "Santai & Ramah (Kak, Sis, Bro)",
+            instructions: tenant.extraInfo || "",
+          });
+          setOnboardingOpen(true);
+        }
+      })
+      .catch(() => {
+        document.documentElement.style.setProperty("--brand-primary", "#059669");
+        document.documentElement.style.setProperty("--brand-secondary", "#0d9488");
+        document.documentElement.style.setProperty("--brand-accent", "#3b82f6");
+      });
+  }, [user?.id, user?.tenantId]);
+
+  // 2. Pure URL Routing Sync: Navigasi instan 0ms tanpa request network sama sekali
+  useEffect(() => {
+    if (!user) return;
 
     if (viewParam) {
       if (!canAccess(user.role, viewParam as ViewKey, enabledMenus, user)) {
@@ -142,23 +153,31 @@ export function DashboardShell() {
       case "ai_config": return <AiConfigPage />;
       case "system_logs": return <SystemLogsPage />;
       case "overview": return <OverviewPage />;
-      case "bus_layout": return <BusLayoutPage />;
-      case "availability": return <AvailabilityPage />;
+      // Customer Service
       case "chatbot": return <ChatbotPage />;
-      case "products": return <ProductsPage />;
-      case "knowledge": return <KnowledgePage />;
-      case "followup": return <FollowupPage />;
-      case "settings": return <SettingsPage />;
       case "crm": return <CrmPage />;
+      case "availability": return <AvailabilityPage />;
+      case "products": return <ProductsPage />;
+      case "bus_layout": return <BusLayoutPage />;
+      case "followup": return <FollowupPage />;
+      // Asisten HR & Accounting
+      case "assistant_chat": return <AssistantChatPage />;
+      case "wa_whitelist": return <WaWhitelistPage />;
+      case "integrations": return <IntegrationsPage />;
+      case "employees": return <EmployeesPage />;
+      case "audit_logs": return <AssistantAuditLogsPage />;
+      // Bersama
+      case "knowledge": return <KnowledgePage />;
+      case "settings": return <SettingsPage />;
 
       default: return user.role === "superadmin" ? <PlatformOverviewPage /> : <OverviewPage />;
     }
   };
 
   return (
-    <div className="h-[100dvh] flex bg-muted/30 overflow-hidden">
+    <div className="h-full w-full flex bg-muted/30 overflow-hidden">
       {/* Desktop sidebar */}
-      <div className="hidden lg:block w-64 shrink-0 border-r bg-sidebar flex-col">
+      <div className="hidden lg:flex w-64 shrink-0 border-r bg-sidebar flex-col h-full">
         <Sidebar />
       </div>
 
@@ -167,9 +186,9 @@ export function DashboardShell() {
         <Topbar />
         <main className={cn(
           "flex-1 overflow-x-hidden [scrollbar-gutter:stable]",
-          (view === "chatbot" || view === "crm") ? "p-0 lg:p-2 pb-16 lg:pb-2 overflow-hidden flex flex-col" : "p-4 lg:p-6 pb-20 lg:pb-6 overflow-y-scroll"
+          (view === "chatbot" || view === "crm" || view === "assistant_chat") ? "p-0 lg:p-2 pb-16 lg:pb-2 overflow-hidden flex flex-col" : "p-4 lg:p-6 pb-20 lg:pb-6 overflow-y-scroll"
         )}>
-          <div key={view} className={cn("animate-in fade-in-50 slide-in-from-bottom-2 duration-200 ease-out", (view === "chatbot" || view === "crm") && "flex-1 flex flex-col min-h-0")}>
+          <div key={view} className={cn("animate-in fade-in-50 slide-in-from-bottom-2 duration-200 ease-out", (view === "chatbot" || view === "crm" || view === "assistant_chat") && "flex-1 flex flex-col min-h-0")}>
             {render()}
           </div>
         </main>

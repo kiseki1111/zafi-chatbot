@@ -146,8 +146,78 @@ async function main() {
 
     // SECURITY: jangan log password plaintext
     console.log(`✓ Akun ${acc.plan.toUpperCase()} siap: ${user.email}`);
+
+    // Seed Dummy Katalog Produk untuk memudahkan pengujian AI & Dashboard
+    const dummyProducts = [
+      {
+        name: `${acc.companyName} - Paket Properti Subsidi A1`,
+        category: 'Properti',
+        price: 185000000,
+        stock: 5,
+        description: 'Rumah tipe 36/72 dekat akses jalan tol dan pusat perbelanjaan, view asri perbukitan.',
+        attributes: {
+          hasVariations: true,
+          variations: [
+            { name: 'Tipe Standard 36/72', price: 185000000, stock: 3 },
+            { name: 'Tipe Hook 36/90', price: 210000000, stock: 2 },
+          ],
+          images: [
+            { url: '/uploads/dummy-rumah-depan.jpg', description: 'Tampak Depan Rumah' },
+            { url: '/uploads/drone-view-zafi.jpg', description: 'Drone View Kawasan' },
+          ],
+          videoUrl: '/uploads/video-arah-lokasi.mp4',
+        },
+      },
+      {
+        name: `${acc.companyName} - Kavling Siap Bangun Blok B`,
+        category: 'Tanah',
+        price: 75000000,
+        stock: 8,
+        description: 'Kavling tanah ukuran 10x12 meter SHM ready, siap bangun rumah impian.',
+        attributes: {
+          images: [
+            { url: '/uploads/dummy-kavling.jpg', description: 'Foto Patok Kavling' },
+          ],
+        },
+      },
+      {
+        name: `${acc.companyName} - Merchandise Kaos Eksklusif`,
+        category: 'Apparel',
+        price: 125000,
+        stock: 25,
+        description: 'Kaos cotton combed 24s adem dengan sablon plastisol premium.',
+        attributes: {
+          hasVariations: true,
+          variations: [
+            { name: 'Hitam - L', price: 125000, stock: 15 },
+            { name: 'Putih - XL', price: 125000, stock: 10 },
+          ],
+        },
+      },
+    ];
+
+    for (const prod of dummyProducts) {
+      const existingProduct = await prisma.product.findFirst({
+        where: { tenantId: tenant.id, name: prod.name },
+      });
+
+      if (!existingProduct) {
+        await prisma.product.create({
+          data: {
+            tenantId: tenant.id,
+            name: prod.name,
+            category: prod.category,
+            price: prod.price,
+            stock: prod.stock,
+            description: prod.description,
+            attributes: prod.attributes,
+          },
+        });
+      }
+    }
   }
 
+  console.log('✓ Katalog produk dummy lokal berhasil dibuat untuk semua akun!');
   console.log('Seed dummy accounts for all tiers & trial completed successfully!');
 }
 

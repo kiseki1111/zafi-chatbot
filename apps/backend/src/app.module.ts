@@ -20,6 +20,7 @@ import { AvailabilityModule } from './modules/availability/availability.module';
 import { ContactsModule } from './modules/contacts/contacts.module';
 import { PlatformModule } from './modules/platform/platform.module';
 import { SearchModule } from './modules/search/search.module';
+import { HrisModule } from './features/hris/hris.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { SearchModule } from './modules/search/search.module';
     OmnichannelModule,
     KnowledgeModule,
     AvailabilityModule,
+    HrisModule,
   ],
   controllers: [AppController],
   providers: [

@@ -5,6 +5,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   Req,
   Res,
   Logger,
@@ -427,6 +428,44 @@ export class WahaController implements OnApplicationBootstrap {
         'Akses ditolak: Sesi WAHA ini milik akun lain',
       );
     }
+  }
+
+  @Public()
+  @Get('contacts/check-exists')
+  async checkContactExists(
+    @Query('phone') phone: string,
+    @Query('session') session?: string,
+    @Req() req?: any,
+  ) {
+    if (!phone) {
+      throw new BadRequestException('Parameter phone wajib diisi');
+    }
+
+    const clean = (phone || '').replace(/\D/g, '').replace(/^0/, '62');
+    if (clean.length < 8) {
+      return { exists: false, message: 'Nomor telepon terlalu pendek' };
+    }
+
+    // Cari sesi WAHA yang sedang WORKING untuk memeriksa nomor (bisa sesi tenant ini atau sesi aktif gateway)
+    let sessionName = session;
+    if (!sessionName) {
+      const tenantId = req?.user?.tenantId;
+      if (tenantId) {
+        const tenantInst = await this.prisma.whatsappInstance.findFirst({
+          where: { tenantId, status: 'WORKING' },
+        });
+        sessionName = tenantInst?.instanceName;
+      }
+      if (!sessionName) {
+        const anyWorking = await this.prisma.whatsappInstance.findFirst({
+          where: { status: 'WORKING' },
+          orderBy: { updatedAt: 'desc' },
+        });
+        sessionName = anyWorking?.instanceName || 'zafi-property';
+      }
+    }
+
+    return this.wahaService.checkNumberExists(sessionName, clean);
   }
 
   @Post('instances/:id/restart')

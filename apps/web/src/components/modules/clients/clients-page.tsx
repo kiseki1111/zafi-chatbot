@@ -1095,7 +1095,7 @@ export function ClientsPage() {
                     <span>{selectedClient.agentTone || "Ramah & Profesional"}</span>
                   </div>
                   <div>
-                    <span className="text-[11px] font-medium text-foreground block">Sesi WAHA Terhubung:</span>
+                    <span className="text-[11px] font-medium text-foreground block">Sesi WhatsApp Terhubung:</span>
                     <span className="font-mono text-emerald-600 font-semibold">{meta.wahaSessionName || "-"}</span>
                   </div>
                 </div>
@@ -2030,7 +2030,7 @@ export function ClientsPage() {
                   />
                 </div>
                 <div>
-                  <Label>Sesi WAHA (Session Name)</Label>
+                  <Label>Sesi WhatsApp (Session Name)</Label>
                   <Input
                     value={editClientForm.wahaSessionName}
                     onChange={(e) => setEditClientForm({ ...editClientForm, wahaSessionName: e.target.value })}

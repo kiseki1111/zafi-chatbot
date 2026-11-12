@@ -46,7 +46,7 @@ export function WahaMonitorPage() {
       const list = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
       setInstances(list);
     } catch {
-      toast.error("Gagal mengambil daftar sesi WAHA");
+      toast.error("Gagal mengambil daftar sesi WhatsApp");
     } finally {
       setLoading(false);
     }
@@ -163,7 +163,7 @@ export function WahaMonitorPage() {
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold tracking-tight">Kelola Sesi WAHA Terpusat</h2>
+          <h2 className="text-xl font-bold tracking-tight">Kelola Sesi WhatsApp Terpusat</h2>
           <p className="text-xs text-muted-foreground">
             Monitoring, scan QR pairing, dan kontrol koneksi WhatsApp seluruh klien platform
           </p>
@@ -346,7 +346,7 @@ export function WahaMonitorPage() {
                 )}
               </div>
               <p className="text-[11px] text-muted-foreground/80 max-w-xs">
-                Sesi WAHA ini sekarang dalam status WORKING dan siap menerima serta membalas pesan.
+                Sesi WhatsApp ini sekarang dalam status WORKING dan siap menerima serta membalas pesan.
               </p>
               <DialogFooter className="w-full sm:justify-center">
                 <Button
@@ -365,7 +365,7 @@ export function WahaMonitorPage() {
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <Smartphone className="h-5 w-5 text-indigo-600" />
-                  Scan QR Code WAHA
+                  Scan QR Code WhatsApp
                 </DialogTitle>
                 <DialogDescription>
                   Sesi: <span className="font-semibold text-foreground">{qrCodeData?.id}</span>

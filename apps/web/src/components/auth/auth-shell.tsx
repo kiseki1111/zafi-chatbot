@@ -29,7 +29,7 @@ export function AuthShell({
           </div>
           <div>
             <p className="text-lg font-bold leading-tight">ZAF Sales</p>
-            <p className="text-xs text-emerald-100/80">AI Assistant · WhatsApp Waha</p>
+            <p className="text-xs text-emerald-100/80">AI Assistant · WhatsApp CRM</p>
           </div>
         </div>
 
@@ -49,7 +49,7 @@ export function AuthShell({
         </div>
 
         <p className="relative z-10 text-xs text-emerald-100/70">
-          © {new Date().getFullYear()} ZAF Sales. Ditenagai oleh Waha WhatsApp API.
+          © {new Date().getFullYear()} ZAF Sales. Ditenagai oleh WhatsApp Cloud Gateway.
         </p>
       </div>
 

@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Bot, Save, Smartphone, ShieldCheck, Loader2, Plus, Trash2, QrCode, Palette, Wrench, Settings, Users, Sparkles, CheckCircle2, Zap, Compass } from "lucide-react";
+import { Bot, Save, Smartphone, ShieldCheck, ShieldAlert, Loader2, Plus, Trash2, QrCode, Palette, Wrench, Settings, Users, Sparkles, CheckCircle2, Zap, Compass, RefreshCw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthStore } from "@/lib/auth-store";
 import { cn } from "@/lib/utils";
@@ -28,7 +28,7 @@ export function SettingsPage({ defaultTab = "bot" }: { defaultTab?: string }) {
     if (typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search);
       const tabParam = urlParams.get("tab");
-      if (tabParam === "koneksi" || tabParam === "bot") {
+      if (tabParam === "koneksi" || tabParam === "bot" || tabParam === "asisten_wa" || tabParam === "warna") {
         setActiveTab(tabParam);
       }
     }
@@ -47,14 +47,18 @@ export function SettingsPage({ defaultTab = "bot" }: { defaultTab?: string }) {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 h-10 p-1 bg-muted/60 rounded-xl border border-border/50 max-w-lg overflow-x-auto">
+        <TabsList className="grid w-full grid-cols-4 h-10 p-1 bg-muted/60 rounded-xl border border-border/50 max-w-2xl overflow-x-auto">
           <TabsTrigger value="bot" className="text-xs font-semibold gap-1.5 rounded-lg py-1.5 data-[state=active]:bg-card data-[state=active]:shadow-xs whitespace-nowrap">
             <Bot className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
             <span>Bot AI</span>
           </TabsTrigger>
           <TabsTrigger value="koneksi" className="text-xs font-semibold gap-1.5 rounded-lg py-1.5 data-[state=active]:bg-card data-[state=active]:shadow-xs whitespace-nowrap">
             <Smartphone className="h-3.5 w-3.5 shrink-0 text-blue-600" />
-            <span>Koneksi WA</span>
+            <span>WA CS</span>
+          </TabsTrigger>
+          <TabsTrigger value="asisten_wa" className="text-xs font-semibold gap-1.5 rounded-lg py-1.5 data-[state=active]:bg-card data-[state=active]:shadow-xs whitespace-nowrap">
+            <QrCode className="h-3.5 w-3.5 shrink-0 text-purple-600" />
+            <span>WA Asisten Internal</span>
           </TabsTrigger>
           <TabsTrigger value="warna" className="text-xs font-semibold gap-1.5 rounded-lg py-1.5 data-[state=active]:bg-card data-[state=active]:shadow-xs whitespace-nowrap">
             <Palette className="h-3.5 w-3.5 shrink-0 text-amber-600" />
@@ -67,6 +71,9 @@ export function SettingsPage({ defaultTab = "bot" }: { defaultTab?: string }) {
         </TabsContent>
         <TabsContent value="koneksi">
           <KoneksiWATab />
+        </TabsContent>
+        <TabsContent value="asisten_wa">
+          <KoneksiAsistenWATab />
         </TabsContent>
         <TabsContent value="warna">
           <WarnaWebsiteTab />
@@ -961,6 +968,319 @@ function KoneksiWATab() {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function KoneksiAsistenWATab() {
+  const { user } = useAuthStore();
+  const [instances, setInstances] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [qrCodeData, setQrCodeData] = React.useState<{ id: string; url: string } | null>(null);
+  const [connectingSession, setConnectingSession] = React.useState<string | null>(null);
+  const [connectedSession, setConnectedSession] = React.useState<{ id: string; phone?: string; name?: string } | null>(null);
+  const [isCreating, setIsCreating] = React.useState(false);
+  const [isDeleting, setIsDeleting] = React.useState(false);
+
+  const tenantShort = (user?.tenantId || user?.id || "demo").slice(0, 8);
+  const assistantSessionName = `asisten-${tenantShort}`;
+
+  const fetchInstances = async () => {
+    setLoading(true);
+    try {
+      const query = user?.tenantId && user.role !== "superadmin" ? `?tenantId=${user.tenantId}` : "";
+      const res = await fetch(`/api/v1/waha/instances/db${query}`);
+      const data = await res.json();
+      const list = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+      setInstances(list);
+    } catch {
+      toast.error("Gagal mengambil data sesi WhatsApp Asisten");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchInstances();
+  }, [user?.tenantId, user?.role]);
+
+  // Polling status saat QR discan
+  React.useEffect(() => {
+    if (!connectingSession) return;
+    let isMounted = true;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/v1/waha/instances/${connectingSession}/status`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const status = (data?.status || "").toUpperCase();
+
+        if (status === "WORKING" || status === "CONNECTED") {
+          clearInterval(interval);
+          if (!isMounted) return;
+
+          const phone = (data?.me?.id || data?.phone || "").replace(/@(c\.us|s\.whatsapp\.net)$/i, "");
+          const profileName = data?.me?.pushName || data?.profileName || "";
+
+          setConnectedSession({
+            id: connectingSession,
+            phone,
+            name: profileName,
+          });
+
+          if (!qrCodeData) {
+            toast.success("WhatsApp Asisten Berhasil Terhubung!", {
+              description: `Nomor +${phone} siap melayani pertanyaan internal staf (cuti, slip gaji, kas & invoice).`,
+              duration: 7000,
+            });
+          }
+
+          setConnectingSession(null);
+          fetchInstances();
+        }
+      } catch {}
+    }, 2500);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [connectingSession, qrCodeData]);
+
+  // Sesi asisten yang sudah ada
+  const assistantInstance = instances.find(
+    (i) => i.instanceName === assistantSessionName || i.instanceName.startsWith("asisten-")
+  );
+
+  const handleStartConnect = async () => {
+    setIsCreating(true);
+    try {
+      // 1. Buat sesi jika belum ada
+      if (!assistantInstance) {
+        await fetch("/api/v1/waha/instances", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            instanceName: assistantSessionName,
+            tenantId: user?.tenantId,
+          }),
+        });
+      }
+
+      // 2. Minta QR code
+      const targetName = assistantInstance ? assistantInstance.instanceName : assistantSessionName;
+      const qrRes = await fetch(`/api/v1/waha/instances/${targetName}/qr`);
+      const qrData = await qrRes.json();
+
+      const qrUrl =
+        qrData?.url ||
+        qrData?.data?.url ||
+        (qrData?.qr ? `data:image/png;base64,${qrData.qr}` : null) ||
+        (qrData?.data?.qr ? `data:image/png;base64,${qrData.data.qr}` : null);
+
+      if (qrUrl) {
+        setQrCodeData({ id: targetName, url: qrUrl });
+        setConnectingSession(targetName);
+      } else {
+        toast.info("Sesi sedang booting, silakan klik scan ulang dalam beberapa detik.");
+      }
+      fetchInstances();
+    } catch {
+      toast.error("Gagal memulai koneksi WhatsApp Asisten");
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    if (!assistantInstance) return;
+    setIsDeleting(true);
+    try {
+      await fetch(`/api/v1/waha/instances/${assistantInstance.instanceName}/logout`, { method: "POST" }).catch(() => {});
+      const query = user?.tenantId ? `?tenantId=${user.tenantId}` : "";
+      await fetch(`/api/v1/waha/instances/${assistantInstance.instanceName}${query}`, { method: "DELETE" });
+      toast.success("Nomor WhatsApp Asisten berhasil diputuskan.");
+      fetchInstances();
+    } catch {
+      toast.error("Gagal memutuskan sesi WhatsApp");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const isOnline = assistantInstance && (assistantInstance.status === "WORKING" || assistantInstance.status === "CONNECTED");
+
+  return (
+    <div className="space-y-4">
+      <Card className="border border-border/80 shadow-xs">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <CardTitle className="text-base flex items-center gap-2">
+                <QrCode className="h-5 w-5 text-purple-600" />
+                Nomor WhatsApp Khusus Asisten HR & Accounting
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Hubungkan nomor WhatsApp khusus helpdesk internal. Karyawan dapat bertanya langsung via chat WhatsApp pribadi mereka.
+              </CardDescription>
+            </div>
+            {isOnline ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                Asisten Online
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-muted text-muted-foreground border border-border">
+                Belum Terhubung
+              </span>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4 text-xs">
+          {loading ? (
+            <div className="py-6 flex items-center justify-center gap-2 text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin text-purple-600" />
+              <span>Memeriksa status sesi WhatsApp...</span>
+            </div>
+          ) : isOnline ? (
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] text-muted-foreground">Nomor WhatsApp Terhubung:</p>
+                  <p className="text-base font-bold font-mono text-foreground mt-0.5">
+                    +{assistantInstance.phone || "Nomor Aktif"} {assistantInstance.profileName ? `(${assistantInstance.profileName})` : ""}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Nama Sesi: <code className="font-mono bg-muted px-1 rounded">{assistantInstance.instanceName}</code>
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
+                    onClick={handleDisconnect}
+                    disabled={isDeleting}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-1" />
+                    Putuskan Nomor
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-border/80 p-6 flex flex-col items-center justify-center text-center space-y-3 bg-muted/20">
+              <div className="h-12 w-12 rounded-2xl bg-purple-500/10 text-purple-600 flex items-center justify-center">
+                <QrCode className="h-6 w-6" />
+              </div>
+              <div className="max-w-md space-y-1">
+                <p className="font-semibold text-foreground text-sm">Nomor WhatsApp Asisten Belum Dihubungkan</p>
+                <p className="text-xs text-muted-foreground">
+                  Klik tombol di bawah untuk menampilkan QR Code WhatsApp, lalu scan menggunakan ponsel WhatsApp resmi asisten internal kantor.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                className="bg-purple-600 hover:bg-purple-700 text-white gap-2 font-medium"
+                onClick={handleStartConnect}
+                disabled={isCreating}
+              >
+                {isCreating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <QrCode className="h-3.5 w-3.5" />}
+                Tampilkan QR Code WhatsApp Asisten
+              </Button>
+            </div>
+          )}
+
+          {/* Info Keamanan & Proteksi Whitelist Karyawan */}
+          <div className="rounded-lg bg-blue-500/5 border border-blue-500/20 p-3.5 space-y-1.5">
+            <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400 font-semibold text-xs">
+              <ShieldCheck className="h-4 w-4 shrink-0" />
+              Proteksi Whitelist Nomor Karyawan
+            </div>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              Asisten AI hanya akan melayani query dari nomor ponsel yang sudah terdaftar di menu{" "}
+              <strong className="text-foreground">Karyawan & Akses</strong>. Pesan dari nomor yang tidak terdaftar akan otomatis ditolak demi keamanan data gaji dan finansial perusahaan.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Dialog QR Code Asisten */}
+      <Dialog
+        open={!!qrCodeData || !!connectedSession}
+        onOpenChange={(open) => {
+          if (!open) {
+            setQrCodeData(null);
+            setConnectedSession(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[400px]">
+          {connectedSession ? (
+            <div className="flex flex-col items-center justify-center py-5 text-center space-y-4">
+              <div className="h-16 w-16 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center animate-in zoom-in-75 duration-300">
+                <CheckCircle2 className="h-10 w-10 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div className="space-y-1.5">
+                <DialogTitle className="text-lg font-bold text-foreground">WhatsApp Asisten Terhubung!</DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground">
+                  Nomor WhatsApp asisten kini telah aktif dan siap melayani karyawan.
+                </DialogDescription>
+                {connectedSession.phone && (
+                  <div className="pt-1">
+                    <span className="text-xs font-mono font-medium text-foreground bg-muted py-1 px-3 rounded-full border">
+                      +{connectedSession.phone} {connectedSession.name ? `(${connectedSession.name})` : ""}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <DialogFooter className="w-full sm:justify-center">
+                <Button
+                  onClick={() => {
+                    setQrCodeData(null);
+                    setConnectedSession(null);
+                  }}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium"
+                >
+                  Selesai
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <QrCode className="h-5 w-5 text-purple-600" />
+                  Scan QR Code WhatsApp Asisten
+                </DialogTitle>
+                <DialogDescription className="text-xs">
+                  Buka WhatsApp di ponsel &gt; Ketuk Perangkat Tertaut &gt; Tautkan Perangkat.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex flex-col items-center justify-center py-4">
+                {qrCodeData && (
+                  <div className="relative p-2 bg-white rounded-xl shadow-md border-2 border-purple-500">
+                    <img src={qrCodeData.url} alt="QR Code Asisten" className="w-48 h-48 rounded-lg" />
+                  </div>
+                )}
+                <div className="flex items-center gap-2 mt-4 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-purple-600" />
+                  <span>Menunggu pemindaian ponsel...</span>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setQrCodeData(null)}
+                  className="w-full text-xs"
+                >
+                  Tutup
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
 

@@ -1134,12 +1134,9 @@ export class TenantService {
     const quota = await this.getTenantQuota(tenantId, tenant);
 
     // ponytail: hitung status checklist setup lanjutan secara otomatis dari data nyata
-    const [connectedWaCount, teamMemberCount, globalOnboardingConfig] = await Promise.all([
+    const [connectedWaCount, globalOnboardingConfig] = await Promise.all([
       this.prisma.whatsappInstance.count({
         where: { tenantId, status: 'WORKING' },
-      }),
-      this.prisma.user.count({
-        where: { tenantId },
       }),
       this.prisma.platformConfig.findUnique({
         where: { key: 'disable_global_onboarding' },
@@ -1157,7 +1154,8 @@ export class TenantService {
     const setupChecklist = {
       hasWhatsappConnected: connectedWaCount > 0,
       hasProduct: productsCount > 0,
-      hasTeamMember: teamMemberCount > 1, // lebih dari sekadar akun pertama
+      hasKnowledge: knowledgeCount > 0,
+      hasTeamMember: false, // legacy compat
       checklistDismissed: Boolean(tenantMeta.checklistDismissed),
     };
 

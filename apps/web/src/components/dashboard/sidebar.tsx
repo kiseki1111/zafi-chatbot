@@ -14,6 +14,12 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 
+const SECTION_HEADERS: Record<string, string> = {
+  cs: "Customer Service & CRM",
+  assistant: "Asisten HR & Finance",
+  config: "Knowledge & Sistem",
+};
+
 export function Sidebar() {
   const { user, logout } = useAuthStore();
   const { view, setView, setSidebarOpen, enabledMenus, setEnabledMenus } = useAppStore();
@@ -53,19 +59,19 @@ export function Sidebar() {
   const go = (v: ViewKey) => setView(v);
 
   return (
-    <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground">
       {/* Brand */}
       <div className="flex items-center gap-2.5 px-5 h-16 border-b border-sidebar-border shrink-0">
         <div className="relative h-9 w-9 rounded-lg overflow-hidden bg-white/95 dark:bg-card p-0.5 border border-border/40 shadow-xs shrink-0">
           <img
             src="/logo.png"
-            alt="ZAF Sales"
+            alt="ZAF Platform"
             className="h-full w-full object-contain"
           />
         </div>
         <div className="min-w-0">
-          <p className="font-bold text-sm leading-tight truncate">ZAF Sales</p>
-          <p className="text-[10px] text-muted-foreground truncate">Asisten AI WhatsApp</p>
+          <p className="font-bold text-sm leading-tight truncate">ZAF Platform</p>
+          <p className="text-[10px] text-muted-foreground truncate">CS & Asisten Internal AI</p>
         </div>
         <Button
           variant="ghost"
@@ -78,34 +84,45 @@ export function Sidebar() {
       </div>
 
       {/* Nav */}
-      <ScrollArea className="flex-1 px-3 py-3">
+      <ScrollArea className="flex-1 min-h-0 px-3 py-3">
         <nav className="space-y-1">
-          {items.map((item) => {
+          {items.map((item, idx) => {
             const active = view === item.key;
+            const prevSection = idx > 0 ? items[idx - 1].section : null;
+            const showHeader = item.section && item.section !== prevSection && SECTION_HEADERS[item.section];
+
             return (
-              <button
-                key={item.key}
-                onClick={() => {
-                  go(item.key);
-                  setSidebarOpen(false);
-                }}
-                className={cn(
-                  "w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 ease-out active:scale-95 select-none cursor-pointer text-left",
-                  active
-                    ? "bg-emerald-600 text-white shadow-sm hover:translate-x-0"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground hover:translate-x-1",
+              <div key={item.key} className="space-y-1">
+                {showHeader && (
+                  <div className="pt-3 pb-1 px-2.5 first:pt-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                      {SECTION_HEADERS[item.section!]}
+                    </p>
+                  </div>
                 )}
-              >
-                <ViewIcon name={item.icon} className={cn("h-4 w-4 shrink-0", active ? "text-white" : "text-muted-foreground group-hover:text-foreground")} />
-                <span className="truncate">{item.label}</span>
-              </button>
+                <button
+                  onClick={() => {
+                    go(item.key);
+                    setSidebarOpen(false);
+                  }}
+                  className={cn(
+                    "w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 ease-out active:scale-95 select-none cursor-pointer text-left",
+                    active
+                      ? "bg-emerald-600 text-white shadow-sm hover:translate-x-0"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground hover:translate-x-1",
+                  )}
+                >
+                  <ViewIcon name={item.icon} className={cn("h-4 w-4 shrink-0", active ? "text-white" : "text-muted-foreground group-hover:text-foreground")} />
+                  <span className="truncate">{item.label}</span>
+                </button>
+              </div>
             );
           })}
         </nav>
       </ScrollArea>
 
       {/* User card */}
-      <div className="border-t border-sidebar-border p-3 shrink-0">
+      <div className="mt-auto border-t border-sidebar-border p-3 shrink-0">
         <div className="rounded-lg bg-sidebar-accent/60 p-3 flex items-center gap-3">
           <div className={cn("h-9 w-9 rounded-full grid place-items-center text-sm font-bold ring-1", theme.bg, theme.color, theme.ring)}>
             {user.name.charAt(0).toUpperCase()}

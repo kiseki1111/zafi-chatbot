@@ -482,7 +482,7 @@ export const useBackgroundTasksStore = create<BackgroundTasksState>(
             toast.success(`Video "${name}" (${finalSizeMb} MB) berhasil dioptimasi & siap diputar langsung di WhatsApp.`);
           } else {
             finalStatusText = `Video (${finalSizeMb} MB > 16MB). Dikirim sebagai dokumen file (bukan native player).`;
-            toast.warning(`Video "${name}" (${finalSizeMb} MB) melebihi batas native 16MB. WAHA akan mengirimkannya via dokumen file.`);
+            toast.warning(`Video "${name}" (${finalSizeMb} MB) melebihi batas native 16MB. Sistem akan mengirimkannya via dokumen file.`);
           }
         } else {
           toast.success(`Media siteplan "${name}" berhasil diunggah!`);

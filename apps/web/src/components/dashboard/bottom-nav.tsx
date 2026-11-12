@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
   MessageCircle,
+  MessageSquareText,
   Users,
   BookOpen,
   MoreHorizontal,
@@ -26,6 +27,8 @@ import {
   ShieldCheck,
   ChevronRight,
   Package,
+  Blocks,
+  FileText,
   User as UserIcon,
 } from "lucide-react";
 import {
@@ -79,10 +82,10 @@ export function BottomNav() {
         { key: "quota_monitor", label: "Kuota", icon: BarChart },
       ]
     : [
-        { key: "overview", label: "Beranda", icon: LayoutDashboard },
-        { key: "chatbot", label: "Chat Bot", icon: MessageCircle },
-        { key: "crm", label: "Pelanggan", icon: Users },
-        { key: "knowledge", label: "Knowledge", icon: BookOpen },
+        { key: "overview", label: "Dashboard", icon: LayoutDashboard },
+        { key: "chatbot", label: "Bot WA", icon: MessageCircle },
+        { key: "assistant_chat", label: "Asisten", icon: MessageSquareText },
+        { key: "integrations", label: "Integrasi", icon: Blocks },
       ];
 
   const safeRole = (user.role || "operator").toLowerCase() as any;
@@ -99,8 +102,16 @@ export function BottomNav() {
 
   // Icon helper – always renders an icon, falls back to ChevronRight for unknown keys
   const iconMap: Record<string, React.ElementType> = {
+    assistant_chat: MessageSquareText,
+    wa_whitelist: ShieldCheck,
+    integrations: Blocks,
+    employees: Users,
+    audit_logs: FileText,
+    chatbot: MessageCircle,
+    crm: Users,
     products: Package,
     settings: Settings,
+    knowledge: BookOpen,
     followup: BellRing,
     availability: Grid3X3,
     bus_layout: Bus,

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Circle, Smartphone, Package, Users, ArrowRight, X, ListChecks } from "lucide-react";
+import { CheckCircle2, Circle, Smartphone, Package, BookOpen, ArrowRight, X, ListChecks } from "lucide-react";
 import { useAppStore } from "@/lib/app-store";
 import { useAuthStore } from "@/lib/auth-store";
 import { cn } from "@/lib/utils";
@@ -11,7 +11,8 @@ import { cn } from "@/lib/utils";
 export interface SetupChecklistData {
   hasWhatsappConnected: boolean;
   hasProduct: boolean;
-  hasTeamMember: boolean;
+  hasKnowledge?: boolean;
+  hasTeamMember?: boolean;
   checklistDismissed: boolean;
 }
 
@@ -33,8 +34,9 @@ export function GettingStartedChecklist({
   if (!data) return null;
 
   // Auto-hide jika ketiga item sudah selesai atau sudah di-dismiss
+  const isKnowledgeDone = Boolean(data.hasKnowledge ?? data.hasTeamMember);
   const allCompleted =
-    data.hasWhatsappConnected && data.hasProduct && data.hasTeamMember;
+    data.hasWhatsappConnected && data.hasProduct && isKnowledgeDone;
 
   if (allCompleted || data.checklistDismissed || dismissed) {
     return null;
@@ -43,7 +45,7 @@ export function GettingStartedChecklist({
   const completedCount =
     (data.hasWhatsappConnected ? 1 : 0) +
     (data.hasProduct ? 1 : 0) +
-    (data.hasTeamMember ? 1 : 0);
+    (isKnowledgeDone ? 1 : 0);
 
   const progressPercent = Math.round((completedCount / 3) * 100);
 
@@ -79,13 +81,13 @@ export function GettingStartedChecklist({
       actionLabel: "Buka Katalog Produk",
     },
     {
-      id: "team",
-      title: "Undang Anggota Tim / Staf",
-      desc: "Ajak staf atau admin CS untuk ikut memantau percakapan pelanggan.",
-      completed: data.hasTeamMember,
-      icon: Users,
-      action: () => setView("settings"),
-      actionLabel: "Kelola Tim",
+      id: "knowledge",
+      title: "Lengkapi Knowledge Base Bisnis",
+      desc: "Upload dokumen, FAQ, atau materi info usaha agar AI menjawab akurat.",
+      completed: isKnowledgeDone,
+      icon: BookOpen,
+      action: () => setView("knowledge"),
+      actionLabel: "Buka Knowledge Base",
     },
   ];
 

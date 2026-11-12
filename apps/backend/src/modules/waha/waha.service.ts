@@ -128,6 +128,52 @@ export class WahaService implements OnApplicationBootstrap {
     }
   }
 
+  // Memeriksa apakah suatu nomor telepon terdaftar di WhatsApp via WAHA
+  async checkNumberExists(
+    sessionName: string,
+    phone: string,
+  ): Promise<{ exists: boolean; jid?: string; profileName?: string }> {
+    try {
+      const cleanPhone = (phone || '')
+        .replace(/\D/g, '')
+        .replace(/^0/, '62');
+      if (!cleanPhone || cleanPhone.length < 8) {
+        return { exists: false };
+      }
+
+      const contactId = `${cleanPhone}@c.us`;
+
+      // 1. Coba endpoint check-exists langsung ke WAHA (respons instan ~500ms)
+      try {
+        const res = await axios.get(`${this.baseUrl}/api/contacts/check-exists`, {
+          params: { session: sessionName, phone: cleanPhone },
+          headers: this.getHeaders(),
+          timeout: 3000,
+        });
+        if (res.data && typeof res.data.numberExists === 'boolean') {
+          return {
+            exists: res.data.numberExists,
+            jid: res.data.chatId || contactId,
+          };
+        }
+      } catch {}
+
+      // 2. Fallback via /api/contacts info hanya jika check-exists gagal/unsupported
+      const contactData = await this.getContact(sessionName, contactId);
+      if (contactData && (contactData.id || contactData.name || contactData.pushname)) {
+        return {
+          exists: true,
+          jid: contactData.id || contactId,
+          profileName: contactData.pushname || contactData.name,
+        };
+      }
+
+      return { exists: false };
+    } catch {
+      return { exists: false };
+    }
+  }
+
   // Mengambil info kontak lengkap dari WAHA (resolve LID ke nomor asli)
   async getContact(sessionName: string, contactId: string): Promise<any> {
     try {

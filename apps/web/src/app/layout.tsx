@@ -17,7 +17,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "ZAF Sales — Kelola AI Asisten WhatsApp",
   description: "Dasbor pusat untuk mengelola chatbot AI dan operasional WhatsApp Anda.",
-  keywords: ["properti", "AI agent", "WhatsApp", "Waha", "chatbot", "CRM", "real estate", "Indonesia"],
+  keywords: ["properti", "AI agent", "WhatsApp", "chatbot", "CRM", "real estate", "Indonesia"],
   authors: [{ name: "ZAF Sales" }],
   manifest: "/manifest.webmanifest",
   appleWebApp: {
@@ -47,7 +47,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="id" suppressHydrationWarning>
-      <body className="antialiased bg-background text-foreground min-h-screen">
+      <body className="antialiased bg-background text-foreground h-screen h-[100dvh] overflow-hidden">
         {children}
         <PwaRegister />
         <Toaster />

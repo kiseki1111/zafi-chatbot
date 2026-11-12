@@ -185,7 +185,7 @@ export function SystemLogsPage() {
           </TabsTrigger>
           <TabsTrigger value="webhook" className="text-xs font-semibold gap-1.5 rounded-lg">
             <Terminal className="h-3.5 w-3.5 text-emerald-600" />
-            <span>Webhook WAHA</span>
+            <span>Webhook WhatsApp</span>
           </TabsTrigger>
         </TabsList>
 

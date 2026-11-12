@@ -175,6 +175,27 @@ const MOCK_DEMO_PRODUCTS: ProductItem[] = [
       hasVariations: false,
     },
   },
+  {
+    id: "prod-4",
+    name: "Rumah Subsidi Zafi Residence",
+    category: "Properti",
+    price: 185000000,
+    stock: 5,
+    description: "Perumahan asri dekat GAI MALL dengan akses jalan aspal mulus, view pegunungan, dan fasilitas taman bermain anak.",
+    attributes: {
+      hasVariations: true,
+      variationType: "Tipe Rumah",
+      variations: [
+        { id: "v-subsidi-std", name: "Tipe Standard 36/72", price: 185000000, stock: 3 },
+        { id: "v-subsidi-hook", name: "Tipe Hook 36/90", price: 210000000, stock: 2 },
+      ],
+      images: [
+        { url: "/uploads/drone-view-zafi.jpg", description: "Drone View Zafi Residence" },
+        { url: "/uploads/tampak-depan.jpg", description: "Tampak Depan Rumah" },
+      ],
+      videoUrl: "/uploads/video-arah-lokasi.mp4",
+    },
+  },
 ];
 
 export function ProductsPage() {

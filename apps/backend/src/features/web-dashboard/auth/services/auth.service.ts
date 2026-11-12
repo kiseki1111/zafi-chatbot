@@ -10,6 +10,7 @@ import { PrismaService } from '../../../../core/prisma/prisma.service';
 import { LoginDto } from '../dto/login.dto';
 import { RegisterDto } from '../dto/register.dto';
 import * as bcrypt from 'bcrypt';
+import axios from 'axios';
 
 @Injectable()
 export class AuthService {
@@ -19,10 +20,45 @@ export class AuthService {
     private readonly configService: ConfigService,
   ) {}
 
-  //Fungsi Login Utama mematuhi Security Hardening Layer TDD
+  //Fungsi Login Utama mematuhi Security Hardening Layer TDD & Federasi ZAF Console
   async login(dto: LoginDto, ipAddress: string, userAgent: string) {
-    //Cari user beserta status tenant untuk evaluasi masa trial
-    const user = await this.prisma.user.findUnique({
+    // 1. Coba otentikasi federasi via ZAF Console terlebih dahulu (SSO Hub)
+    let isConsoleAuthenticated = false;
+    const consoleApiUrl =
+      this.configService.get<string>('CONSOLE_API_URL') ||
+      process.env.CONSOLE_API_URL ||
+      'http://127.0.0.1:17342';
+
+    try {
+      const [portalRes, staffRes] = await Promise.all([
+        axios
+          .post(
+            `${consoleApiUrl}/api/portal/auth/login`,
+            { email: dto.email, password: dto.passwordPlain },
+            { timeout: 3000 },
+          )
+          .catch(() => null),
+        axios
+          .post(
+            `${consoleApiUrl}/api/auth/login`,
+            { email: dto.email, password: dto.passwordPlain },
+            { timeout: 3000 },
+          )
+          .catch(() => null),
+      ]);
+
+      if (
+        (portalRes && portalRes.status === 200) ||
+        (staffRes && staffRes.status === 200)
+      ) {
+        isConsoleAuthenticated = true;
+      }
+    } catch {
+      // Console offline / unreachable, fallback ke database lokal
+    }
+
+    // 2. Cari user beserta status tenant di database Chatbot
+    let user = await this.prisma.user.findUnique({
       where: { email: dto.email, deletedAt: null },
       include: { tenant: true },
     });
@@ -32,9 +68,40 @@ export class AuthService {
       process.env.SECURITY_BYPASS_MODE === 'true' &&
       process.env.NODE_ENV !== 'production';
 
-    // Mencegah error TS18047 jika user tidak ditemukan
     let passwordMatches = false;
-    if (user) {
+
+    if (isConsoleAuthenticated) {
+      passwordMatches = true;
+      if (user) {
+        // Sinkronkan hash password lokal secara asinkron agar bisa login offline bila Console mati
+        const hashed = await bcrypt.hash(dto.passwordPlain, 10);
+        await this.prisma.user
+          .update({
+            where: { id: user.id },
+            data: { password: hashed },
+          })
+          .catch(() => null);
+      } else {
+        // Auto-provisioning: akun baru terverifikasi dari Console yang belum ada di Chatbot
+        const newTenant = await this.prisma.tenant.create({
+          data: {
+            name: dto.email.split('@')[0],
+            isOnboarded: true,
+          },
+        });
+        user = await this.prisma.user.create({
+          data: {
+            email: dto.email,
+            name: dto.email.split('@')[0],
+            password: await bcrypt.hash(dto.passwordPlain, 10),
+            role: 'manager',
+            tenantId: newTenant.id,
+          },
+          include: { tenant: true },
+        });
+      }
+    } else if (user) {
+      // Fallback lokal jika verifikasi Console gagal / akun lokal legacy
       passwordMatches = isSecurityBypass
         ? true
         : await bcrypt.compare(dto.passwordPlain, user.password);

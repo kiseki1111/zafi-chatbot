@@ -2722,7 +2722,7 @@ export function AvailabilityView() {
                             ) : (
                               <AlertTriangle className="h-2.5 w-2.5" />
                             )}
-                            WAHA
+                            WhatsApp
                           </span>
                         );
                       })()}

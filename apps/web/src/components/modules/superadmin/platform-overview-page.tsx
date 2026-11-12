@@ -99,7 +99,7 @@ export function PlatformOverviewPage() {
                 </Badge>
               </div>
               <p className="text-xs text-slate-300 mt-0.5">
-                Monitoring sistem multi-tenant, infrastruktur WAHA, dan aktivitas platform SaaS secara agregat.
+                Monitoring sistem multi-tenant, infrastruktur WhatsApp Gateway, dan aktivitas platform SaaS secara agregat.
               </p>
             </div>
           </div>
@@ -197,7 +197,7 @@ export function PlatformOverviewPage() {
           <CardContent className="grid sm:grid-cols-2 gap-3">
             {[
               { key: "clients", title: "Kelola Klien", desc: "Tambah perusahaan, atur kuota paket, dan edit staf", icon: Building2, color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40" },
-              { key: "waha_monitor", title: "Semua Sesi WAHA", desc: "Lihat status koneksi & scan QR seluruh nomor klien", icon: Smartphone, color: "text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40" },
+              { key: "waha_monitor", title: "Semua Sesi WhatsApp", desc: "Lihat status koneksi & scan QR seluruh nomor klien", icon: Smartphone, color: "text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40" },
               { key: "quota_monitor", title: "Monitor Kuota", desc: "Pantau penggunaan batas MAU dan AI tiap perusahaan", icon: Activity, color: "text-amber-600 bg-amber-50 dark:bg-amber-950/40" },
               { key: "pricing_plans", title: "Paket & Harga", desc: "Atur batas MAU, kuota respons AI, dan harga paket", icon: Zap, color: "text-rose-600 bg-rose-50 dark:bg-rose-950/40" },
               { key: "ai_config", title: "Model AI & Sistem", desc: "Kelola default model (OpenRouter/DeepSeek), prompt global", icon: Database, color: "text-blue-600 bg-blue-50 dark:bg-blue-950/40" },
@@ -234,7 +234,7 @@ export function PlatformOverviewPage() {
           <CardContent className="space-y-3">
             {[
               { name: "PostgreSQL Database", status: "ONLINE", sub: "Docker Container (5432)" },
-              { name: "WAHA WhatsApp API", status: "ONLINE", sub: "waha.zafii.tech" },
+              { name: "WhatsApp Gateway Engine", status: "ONLINE", sub: "api.zafii.tech" },
               { name: "NestJS Backend API", status: "ONLINE", sub: "Port 3030 (Running)" },
               { name: "Next.js Dashboard", status: "ONLINE", sub: "Port 3001" },
             ].map((svc) => (
