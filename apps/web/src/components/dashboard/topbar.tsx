@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -13,7 +13,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Menu, Bell, Sun, Moon, LogOut, User as UserIcon,
-  Settings as SettingsIcon, ChevronDown, AlertTriangle, QrCode, X, Download, Search,
+  Settings as SettingsIcon, ChevronDown, AlertTriangle, QrCode, X, Search,
+  Flame, MessageCircle,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { useAppStore } from "@/lib/app-store";
@@ -24,30 +25,66 @@ import { GlobalSearchDialog, useGlobalSearchShortcut } from "./global-search-dia
 
 export function Topbar() {
   const { user, logout } = useAuthStore();
-  const { view, setView, sidebarOpen, setSidebarOpen, theme, toggleTheme } = useAppStore();
+  const { view, setView, sidebarOpen, setSidebarOpen, theme, toggleTheme, setActiveContactId } = useAppStore();
   const [offlineInstances, setOfflineInstances] = useState<{ instanceName: string; status: string }[]>([]);
   const [dismissed, setDismissed] = useState(false);
-  const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [hotLeads, setHotLeads] = useState<any[]>([]);
+  const [newHotLead, setNewHotLead] = useState<any | null>(null);
+  const [newHotCount, setNewHotCount] = useState(0);
+  const seenHotIds = useRef<Set<string>>(new Set());
+  const hasLoadedHot = useRef(false);
 
   useGlobalSearchShortcut(searchOpen, setSearchOpen);
 
   useEffect(() => {
-    const handler = (e: any) => {
-      e.preventDefault();
-      setInstallPrompt(e);
-    };
-    window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
-  }, []);
+    if (!user?.tenantId) return;
+    const hotKey = (lead: any) =>
+      `${lead.id}:${lead.hotEpisodeStartedAt || ""}`;
+    const loadHotLeads = async () => {
+      try {
+        const res = await fetch(`/api/v1/contacts/hot-leads?unread=true`);
+        if (res.ok) {
+          const json = await res.json();
+          const items: any[] = Array.isArray(json) ? json : json?.data || [];
+          setHotLeads(items);
 
-  const handleInstallClick = async () => {
-    if (!installPrompt) return;
-    installPrompt.prompt();
-    const { outcome } = await installPrompt.userChoice;
-    if (outcome === "accepted") {
-      setInstallPrompt(null);
-    }
+          if (!hasLoadedHot.current) {
+            // baseline: jangan munculkan card untuk data yang sudah ada saat halaman dibuka
+            items.forEach((l) => seenHotIds.current.add(hotKey(l)));
+            hasLoadedHot.current = true;
+          } else {
+            const fresh = items.filter(
+              (l) => !seenHotIds.current.has(hotKey(l)),
+            );
+            items.forEach((l) => seenHotIds.current.add(hotKey(l)));
+            if (fresh.length > 0) {
+              setNewHotLead(fresh[0]);
+              setNewHotCount(fresh.length);
+            }
+          }
+        }
+      } catch {
+        // silent fail on network
+      }
+    };
+    loadHotLeads();
+    const interval = setInterval(loadHotLeads, 20000);
+    return () => clearInterval(interval);
+  }, [user?.tenantId]);
+
+  const openHotLead = (lead: any) => {
+    const conversationId = lead.conversationId;
+    if (conversationId) setActiveContactId(conversationId);
+    setView("chatbot");
+    setHotLeads((prev) => prev.filter((l) => l.id !== lead.id));
+    setNewHotLead(null);
+    // tandai sudah dibuka agar tidak muncul lagi di notifikasi
+    fetch(`/api/v1/contacts/${lead.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ metadata: { hotAcknowledged: true } }),
+    }).catch(() => null);
   };
 
   useEffect(() => {
@@ -77,11 +114,11 @@ export function Topbar() {
   return (
     <>
       {offlineInstances.length > 0 && !dismissed && (
-        <div className="bg-amber-500 text-amber-950 px-4 py-2 text-xs font-medium flex items-center justify-between border-b border-amber-600/20 shadow-sm transition-all animate-in fade-in">
+        <div className="bg-amber-500 text-amber-950 px-4 py-2 text-xs font-medium flex items-center justify-between border-b border-amber-600/20 shadow-xs shrink-0 transition-all animate-in fade-in">
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 shrink-0 text-amber-950 animate-pulse" />
             <span>
-              Perhatian: Ada <strong>{offlineInstances.length} nomor WhatsApp</strong> (<em>{offlineInstances.map(i => i.instanceName).join(', ')}</em>) yang terputus atau perlu login / scan QR ulang agar fitur bot & follow-up berjalan normal.
+              Perhatian: Ada <strong>{offlineInstances.length} nomor WhatsApp</strong> (<em>{Array.from(new Set(offlineInstances.map(i => i.instanceName))).join(', ')}</em>) yang terputus atau perlu scan QR ulang.
             </span>
           </div>
           <div className="flex items-center gap-2 shrink-0 ml-4">
@@ -94,7 +131,7 @@ export function Topbar() {
                 setView("settings");
               }}
             >
-              <QrCode className="h-3 w-3" /> Hubungkan Sekarang
+              <QrCode className="h-3 w-3" /> Hubungkan
             </Button>
             <Button
               size="icon"
@@ -108,23 +145,23 @@ export function Topbar() {
           </div>
         </div>
       )}
-      <header className="sticky top-0 z-30 h-14 lg:h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex items-center justify-between lg:justify-start gap-3 h-full px-4 lg:px-6">
-        {/* Compact Mobile Brand (No hamburger clutter) */}
-        <div className="flex items-center gap-2">
+      <header className="sticky top-0 z-30 h-14 lg:h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shrink-0">
+      <div className="flex items-center justify-between gap-3 h-full px-4 lg:px-6">
+        {/* Compact Mobile Brand (Hanya tampil di layar HP/Tablet, di desktop sudah ada di Sidebar) */}
+        <div className="flex lg:hidden items-center gap-2">
           <div className="relative h-8 w-8 rounded-lg overflow-hidden bg-white/95 dark:bg-card p-0.5 border border-border/40 shadow-xs shrink-0">
             <img
               src="/logo.png"
-              alt="ZAF Sales"
+              alt="ZAF Platform"
               className="h-full w-full object-contain"
             />
           </div>
           <div className="min-w-0">
             <span className="font-bold text-sm tracking-tight text-foreground truncate block leading-tight">
-              ZAF Sales
+              ZAF Platform
             </span>
-            <span className="text-[10px] text-muted-foreground block lg:hidden leading-none">
-              PWA Mobile
+            <span className="text-[10px] text-muted-foreground block leading-none">
+              CS & Asisten AI
             </span>
           </div>
         </div>
@@ -132,7 +169,7 @@ export function Topbar() {
         {/* Global Omnisearch Trigger (Desktop) */}
         <button
           onClick={() => setSearchOpen(true)}
-          className="hidden md:flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground bg-muted/60 hover:bg-muted border border-border/50 hover:border-border rounded-xl transition-all cursor-pointer w-64 lg:w-80 ml-2"
+          className="hidden md:flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground bg-muted/60 hover:bg-muted border border-border/50 hover:border-border rounded-xl transition-all cursor-pointer w-64 lg:w-80"
         >
           <Search className="h-3.5 w-3.5 shrink-0" />
           <span className="flex-1 text-left truncate">Cari kontak, chat, unit...</span>
@@ -153,19 +190,55 @@ export function Topbar() {
           >
             <Search className="h-4 w-4" />
           </Button>
-          {/* PWA Install Button when available */}
-          {installPrompt && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleInstallClick}
-              className="h-8 text-xs gap-1.5 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 shrink-0 shadow-xs"
-            >
-              <Download className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Install Aplikasi</span>
-              <span className="sm:hidden">Install</span>
-            </Button>
-          )}
+          {/* Hot Lead Notification */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 relative"
+                title="Notifikasi Hot Lead"
+              >
+                <Bell className="h-4 w-4" />
+                {hotLeads.length > 0 && (
+                  <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                    {hotLeads.length > 9 ? "9+" : hotLeads.length}
+                  </span>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-80">
+              <DropdownMenuLabel className="flex items-center gap-1.5">
+                <Flame className="h-3.5 w-3.5 text-red-500" />
+                <span>Hot Lead</span>
+                <span className="text-[10px] font-normal text-muted-foreground">
+                  Tinjau chat sebelum follow-up
+                </span>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {hotLeads.length === 0 ? (
+                <div className="px-2 py-6 text-center text-xs text-muted-foreground">
+                  Belum ada hot lead baru.
+                </div>
+              ) : (
+                hotLeads.map((lead) => (
+                  <DropdownMenuItem
+                    key={lead.id}
+                    onClick={() => openHotLead(lead)}
+                    className="flex flex-col items-start gap-0.5 cursor-pointer"
+                  >
+                    <div className="flex w-full items-center justify-between gap-2">
+                      <span className="text-sm font-semibold truncate">{lead.name}</span>
+                      <span className="text-[10px] text-muted-foreground shrink-0">{lead.phone}</span>
+                    </div>
+                    <span className="text-[11px] text-red-600 dark:text-red-400 truncate w-full">
+                      {lead.hotTriggerReason || "Minat kuat"}
+                    </span>
+                  </DropdownMenuItem>
+                ))
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {/* Theme toggle */}
           <Button variant="ghost" size="icon" className="h-9 w-9" onClick={toggleTheme} title="Ganti tema">
@@ -210,6 +283,59 @@ export function Topbar() {
         </div>
       </div>
     </header>
+
+    {newHotLead && (
+      <div className="fixed bottom-20 sm:bottom-4 right-4 z-[60] w-[min(92vw,360px)] animate-in fade-in slide-in-from-bottom-4">
+        <div className="rounded-xl border border-red-200 dark:border-red-900 bg-card shadow-2xl overflow-hidden">
+          <div className="flex items-start gap-3 p-3.5 bg-red-600 text-white">
+            <div className="h-9 w-9 rounded-full bg-white/15 grid place-items-center shrink-0">
+              <Flame className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold leading-tight">
+                {newHotCount > 1
+                  ? `${newHotCount} Hot Lead baru`
+                  : "Hot Lead baru"}
+              </p>
+              <p className="text-[11px] text-white/85 truncate mt-0.5">
+                {newHotLead.name}
+                {newHotLead.hotTriggerReason
+                  ? ` — ${newHotLead.hotTriggerReason}`
+                  : ""}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setNewHotLead(null)}
+              className="shrink-0 rounded-full p-1 text-white/80 hover:text-white hover:bg-white/15 transition-colors"
+              title="Tutup notifikasi"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="p-3 flex items-center gap-2">
+            <Button
+              size="sm"
+              className="flex-1 h-8 text-xs gap-1.5 bg-red-600 hover:bg-red-700 text-white font-semibold"
+              onClick={() => openHotLead(newHotLead)}
+            >
+              <MessageCircle className="h-3.5 w-3.5" /> Buka Chat
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs"
+              onClick={() => {
+                setView("crm");
+                setNewHotLead(null);
+              }}
+            >
+              Lihat Pelanggan
+            </Button>
+          </div>
+        </div>
+      </div>
+    )}
 
     {/* Global Omnisearch Dialog */}
     <GlobalSearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />

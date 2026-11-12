@@ -211,4 +211,81 @@ describe('Slice-7: CRM Contacts (CRUD + Search Filter + Tenant Isolation)', () =
       expect(res.body).toHaveLength(1);
     });
   });
+
+  describe('5. Hot Leads (Deteksi Minat Kuat)', () => {
+    it('Mengembalikan daftar hot lead milik tenant beserta alasan pemicunya (200)', async () => {
+      context.mockPrisma.contact.findMany.mockResolvedValue([
+        {
+          id: 'hot-1',
+          name: 'Hendra Wijaya',
+          phone: '628123456789',
+          status: 'Survey',
+          notes: 'Minta survey Sabtu',
+          metadata: {
+            leadScore: 'HOT',
+            hotTriggerReason: 'Permintaan Survey Lokasi Fisik',
+            messageCount: 10,
+            hotNotifiedAt: '2026-01-01T00:00:00.000Z',
+            hotAcknowledged: false,
+          },
+          conversations: [{ lastMessageAt: '2026-01-01T01:00:00.000Z' }],
+          updatedAt: '2026-01-01T01:00:00.000Z',
+        },
+      ]);
+
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/contacts/hot-leads')
+        .expect(200);
+
+      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body).toHaveLength(1);
+      expect(res.body[0]).toEqual(
+        expect.objectContaining({
+          id: 'hot-1',
+          leadScore: 'HOT',
+          hotTriggerReason: 'Permintaan Survey Lokasi Fisik',
+          messageCount: 10,
+          hotAcknowledged: false,
+        }),
+      );
+    });
+
+    it('Filter `unread=true` hanya mengembalikan hot lead yang belum di-acknowledge (200)', async () => {
+      context.mockPrisma.contact.findMany.mockResolvedValue([
+        {
+          id: 'hot-unread',
+          name: 'Budi',
+          phone: '628111',
+          status: 'Survey',
+          metadata: { leadScore: 'HOT', hotAcknowledged: false },
+          conversations: [],
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        },
+        {
+          id: 'hot-ack',
+          name: 'Siti',
+          phone: '628222',
+          status: 'Booking',
+          metadata: { leadScore: 'HOT', hotAcknowledged: true },
+          conversations: [],
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ]);
+
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/contacts/hot-leads?unread=true')
+        .expect(200);
+
+      expect(res.body).toHaveLength(1);
+      expect(res.body[0].id).toBe('hot-unread');
+    });
+
+    it('Menolak akses operator tanpa tenant (403)', async () => {
+      currentUser = { sub: 'op-x', roles: ['operator'], tenantId: null };
+
+      await request(app.getHttpServer())
+        .get('/api/v1/contacts/hot-leads')
+        .expect(403);
+    });
+  });
 });

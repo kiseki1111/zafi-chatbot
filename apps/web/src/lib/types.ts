@@ -17,17 +17,25 @@ export interface User {
 
 export type ViewKey =
   | "overview"
-  | "clients"
-  | "products"
-  | "availability"
-  | "bus_layout"
+  // Customer Service (CS)
   | "chatbot"
-  | "knowledge"
-  | "followup"
-  | "settings"
   | "crm"
+  | "availability"
+  | "products"
+  | "bus_layout"
+  | "followup"
+  // Asisten Internal (HRIS & Accounting)
+  | "assistant_chat"
+  | "wa_whitelist"
+  | "integrations"
+  | "employees"
+  | "audit_logs"
+  // Konfigurasi Bersama
+  | "knowledge"
+  | "settings"
   // Superadmin modules
   | "platform_overview"
+  | "clients"
   | "waha_monitor"
   | "quota_monitor"
   | "pricing_plans"
@@ -115,6 +123,8 @@ export interface Contact {
   propertyInterest?: string;
   instanceName?: string;
   mode?: "bot" | "human";
+  contactId?: string;
+  metadata?: Record<string, any>;
 }
 
 export interface WhatsAppSession {

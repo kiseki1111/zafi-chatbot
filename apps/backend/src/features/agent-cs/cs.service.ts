@@ -5,6 +5,7 @@ import {
   AgentResponse,
 } from '../../core/omnichannel/interfaces/incoming-message.interface';
 import { AgentSharedService } from '../../core/agent-shared/agent-shared.service';
+import { evaluateLeadScore } from './lead-intent.evaluator';
 
 @Injectable()
 export class CsService {
@@ -180,7 +181,7 @@ WAJIB MERESPON DALAM FORMAT JSON BERIKUT:
   }
 
   async handleMessage(
-    message: IncomingMessage,
+    message: Partial<IncomingMessage> & { senderId: string; text?: string; sessionName?: string },
     onChunk?: (chunk: string) => void,
   ): Promise<AgentResponse> {
     const {
@@ -591,7 +592,7 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
       const lead = parsed.lead || null;
 
       if (lead) {
-        await this.saveLeadToContact(senderId, effectiveSessionName, lead);
+        await this.saveLeadToContact(senderId, effectiveSessionName, lead, text);
       }
 
       return {
@@ -611,12 +612,45 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
     }
   }
 
+  // ponytail: serialisasi per kontak agar dua pesan paralel tidak saling menimpa metadata.
+  private readonly leadLocks = new Map<string, Promise<void>>();
+
   private async saveLeadToContact(
     senderId: string,
     sessionName: string,
     lead: any,
+    rawUserText?: string,
   ) {
     if (!lead || typeof lead !== 'object') return;
+    const key = `${sessionName}:${senderId}`;
+    const previous = this.leadLocks.get(key) ?? Promise.resolve();
+    let release!: () => void;
+    const current = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const tail = previous.then(() => current);
+    this.leadLocks.set(key, tail);
+
+    await previous;
+    try {
+      await this.saveLeadToContactUnlocked(
+        senderId,
+        sessionName,
+        lead,
+        rawUserText,
+      );
+    } finally {
+      release();
+      if (this.leadLocks.get(key) === tail) this.leadLocks.delete(key);
+    }
+  }
+
+  private async saveLeadToContactUnlocked(
+    senderId: string,
+    sessionName: string,
+    lead: any,
+    rawUserText?: string,
+  ) {
     try {
       const cleanPhone = (senderId || '')
         .replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, '')
@@ -682,6 +716,24 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
             },
           ];
         }
+
+        // ponytail: evaluasi lead score awal (hanya pesan customer)
+        const initialScore = evaluateLeadScore({
+          status: initialStatus,
+          messageCount: 1,
+          userMessage: rawUserText,
+        });
+        updatedMeta.leadScore = initialScore.score;
+        updatedMeta.leadScoreCode = initialScore.code;
+        updatedMeta.hotTriggerReason = initialScore.reason;
+        updatedMeta.messageCount = 1;
+
+        if (initialScore.score === 'HOT') {
+          updatedMeta.hotNotified = true;
+          updatedMeta.hotNotifiedAt = new Date().toISOString();
+          updatedMeta.hotAcknowledged = false;
+        }
+
         contact = await this.prisma.contact.create({
           data: {
             tenantId,
@@ -692,6 +744,27 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
             metadata: updatedMeta,
           },
         });
+
+        if (initialScore.score === 'HOT') {
+          await this.prisma.auditLog
+            .create({
+              data: {
+                action: 'HOT_LEAD_DETECTED',
+                module: 'CRM',
+                endpoint: 'WHATSAPP_AUTO_LEAD',
+                details: {
+                  contactId: contact.id,
+                  phone: cleanPhone,
+                  name: initialName,
+                  reason: initialScore.reason,
+                  triggerType: initialScore.triggerType,
+                  messageCount: 1,
+                },
+                status: 'SUCCESS',
+              },
+            })
+            .catch(() => null);
+        }
 
         if (
           sessionName &&
@@ -717,7 +790,7 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
         }
 
         this.logger.log(
-          `[CS-LEAD] Kontak prospek baru otomatis terdata: ${contact.name} (${contact.phone})`,
+          `[CS-LEAD] Kontak prospek baru otomatis terdata: ${contact.name} (${contact.phone}) [Score: ${initialScore.score}]`,
         );
         return;
       }
@@ -765,6 +838,144 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
         updatedMeta.nameSource = 'self_declared';
       }
 
+      // ponytail: hitung pesan CUSTOMER unik. Jangan double-count pesan terkini:
+      // jika pesan sudah tersimpan, isinya sudah ada di himpunan unik.
+      const normalizeForCount = (value?: string | null) =>
+        (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+      let messageCount = 1;
+      try {
+        const customerMessages = await this.prisma.message.findMany({
+          where: {
+            conversation: { contactId: contact.id },
+            senderType: 'customer',
+          },
+          select: { content: true },
+          orderBy: { createdAt: 'asc' },
+        });
+        const unique = new Set<string>();
+        for (const msg of customerMessages) {
+          const content = normalizeForCount(msg.content);
+          if (content.length >= 3) unique.add(content);
+        }
+        const current = normalizeForCount(rawUserText);
+        messageCount = unique.size;
+        if (current.length >= 3 && !unique.has(current)) {
+          messageCount += 1;
+        }
+        messageCount = Math.max(1, messageCount);
+      } catch {
+        messageCount = (Number(existingMeta.messageCount) || 1) + 1;
+      }
+
+      const rawScore = evaluateLeadScore({
+        status: newStatus,
+        messageCount,
+        userMessage: rawUserText,
+      });
+
+      const now = new Date();
+      const nowIso = now.toISOString();
+      const previousScore = existingMeta.leadScore;
+
+      // ponytail: recompute tiap giliran. HOT sticky, kecuali penolakan eksplisit.
+      let scoreResult = rawScore;
+      if (
+        previousScore === 'HOT' &&
+        rawScore.score !== 'HOT' &&
+        rawScore.code !== 'COLD_EXPLICIT_REJECT'
+      ) {
+        scoreResult = {
+          score: 'HOT',
+          code: existingMeta.leadScoreCode || 'HOT_CRM_STAGE',
+          reason: existingMeta.hotTriggerReason || 'Minat kuat sebelumnya',
+          triggerType: 'STATUS',
+        };
+      }
+
+      updatedMeta.leadScore = scoreResult.score;
+      updatedMeta.leadScoreCode = scoreResult.code;
+      updatedMeta.hotTriggerReason = scoreResult.reason;
+      updatedMeta.messageCount = messageCount;
+      if (scoreResult.matchedKeyword) {
+        updatedMeta.hotMatchedKeyword = scoreResult.matchedKeyword;
+      } else {
+        delete updatedMeta.hotMatchedKeyword;
+      }
+      updatedMeta.leadScoreUpdatedAt = nowIso;
+
+      // Episode HOT untuk evaluasi marketing: dimulai saat transisi non-HOT -> HOT.
+      // Reset hotAcknowledged dan bersihkan leadOutcome episode sebelumnya,
+      // tapi simpan riwayat label lama jika ada.
+      const wasHot = previousScore === 'HOT';
+      const isHotNow = scoreResult.score === 'HOT';
+      const isNewHotEpisode = isHotNow && !wasHot;
+
+      if (isNewHotEpisode) {
+        updatedMeta.hotEpisodeStartedAt = nowIso;
+        updatedMeta.hotAcknowledged = false;
+        // Simpan label episode lama ke riwayat sebelum dibersihkan untuk episode baru
+        if (existingMeta.leadOutcome) {
+          const history = Array.isArray(existingMeta.leadOutcomeHistory)
+            ? [...existingMeta.leadOutcomeHistory]
+            : [];
+          history.push({
+            outcome: existingMeta.leadOutcome,
+            episodeStartedAt: existingMeta.hotEpisodeStartedAt || null,
+            decidedAt: existingMeta.leadOutcomeAt || nowIso,
+            decidedBy: existingMeta.leadOutcomeBy || null,
+            note: existingMeta.leadOutcomeNote || null,
+          });
+          updatedMeta.leadOutcomeHistory = history;
+        }
+        delete updatedMeta.leadOutcome;
+        delete updatedMeta.leadOutcomeAt;
+        delete updatedMeta.leadOutcomeBy;
+        delete updatedMeta.leadOutcomeNote;
+
+        await this.prisma.auditLog
+          .create({
+            data: {
+              action: 'HOT_LEAD_DETECTED',
+              module: 'CRM',
+              endpoint: 'WHATSAPP_AUTO_LEAD',
+              details: {
+                contactId: contact.id,
+                phone: cleanPhone,
+                name: hasSelfDeclaredName
+                  ? lead.customerName.trim()
+                  : contact.name,
+                reason: scoreResult.reason,
+                code: scoreResult.code,
+                triggerType: scoreResult.triggerType,
+                matchedKeyword: scoreResult.matchedKeyword || null,
+                messageCount,
+              },
+              status: 'SUCCESS',
+            },
+          })
+          .catch(() => null);
+
+        this.logger.log(
+          `[CS-HOT-LEAD] Hot Lead Terdeteksi (Episode Baru): ${contact.name} (${cleanPhone}) [${scoreResult.code}] - ${scoreResult.reason}`,
+        );
+      } else if (!isHotNow) {
+        // Jika bukan HOT lagi (karena penolakan eksplisit), tutup episode saat ini
+        if (existingMeta.leadOutcome) {
+          const history = Array.isArray(existingMeta.leadOutcomeHistory)
+            ? [...existingMeta.leadOutcomeHistory]
+            : [];
+          history.push({
+            outcome: existingMeta.leadOutcome,
+            episodeStartedAt: existingMeta.hotEpisodeStartedAt || null,
+            decidedAt: existingMeta.leadOutcomeAt || nowIso,
+            decidedBy: existingMeta.leadOutcomeBy || null,
+            note: existingMeta.leadOutcomeNote || null,
+          });
+          updatedMeta.leadOutcomeHistory = history;
+        }
+        delete updatedMeta.hotEpisodeStartedAt;
+      }
+
       await this.prisma.contact.update({
         where: { id: contact.id },
         data: {
@@ -775,7 +986,16 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
         },
       });
       this.logger.log(
-        `[CS-LEAD] Berhasil update prospek ${contact.phone}: ${lead.customerName || contact.name} [Status: ${lead.status || contact.status}]`,
+        `[CS-LEAD] Berhasil update prospek ${contact.phone}: ${lead.customerName || contact.name} [Status: ${lead.status || contact.status}, Score: ${scoreResult.score}, Code: ${scoreResult.code}]`,
+      );
+      // ponytail: metrik distribusi untuk tuning ambang, bukan untuk keputusan bisnis.
+      this.logger.log(
+        `[CS-LEAD-METRIC] ${JSON.stringify({
+          score: scoreResult.score,
+          code: scoreResult.code,
+          messageCount,
+          status: newStatus || contact.status || null,
+        })}`,
       );
     } catch (err: any) {
       this.logger.warn(`[CS-LEAD] Gagal simpan data prospek: ${err.message}`);

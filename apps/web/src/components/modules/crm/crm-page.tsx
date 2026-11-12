@@ -35,6 +35,7 @@ import {
   History,
   Clock,
   HelpCircle,
+  Flame,
 } from "lucide-react";
 import { useMenuGuide } from "@/lib/use-menu-guide";
 import { MenuGuideBanner } from "@/components/dashboard/menu-guide-banner";
@@ -253,6 +254,9 @@ export function CrmPage() {
     }
     if (statusFilter !== "ALL") {
       list = list.filter((c) => {
+        if (statusFilter === "HOT") {
+          return c.metadata?.leadScore === "HOT";
+        }
         if (statusFilter === "Follow-Up") return ["Follow-Up", "INQUIRY", "NEW"].includes(c.status);
         return c.status === statusFilter;
       });
@@ -515,6 +519,7 @@ export function CrmPage() {
           <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
             {[
               { key: "ALL", label: "Semua" },
+              { key: "HOT", label: "Hot Lead" },
               { key: "Follow-Up", label: "Follow-Up" },
               { key: "Survey", label: "Survey" },
               { key: "SLIK", label: "SLIK" },
@@ -525,12 +530,17 @@ export function CrmPage() {
                 key={tab.key}
                 onClick={() => setStatusFilter(tab.key)}
                 className={cn(
-                  "px-2.5 py-1 rounded-md text-xs font-medium border transition-colors shrink-0",
+                  "px-2.5 py-1 rounded-md text-xs font-medium border transition-colors shrink-0 flex items-center gap-1",
                   statusFilter === tab.key
-                    ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                    ? tab.key === "HOT"
+                      ? "bg-red-600 text-white border-red-600 shadow-xs"
+                      : "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                    : tab.key === "HOT"
+                    ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900 hover:bg-red-100"
                     : "bg-transparent text-muted-foreground border-border hover:bg-muted/70"
                 )}
               >
+                {tab.key === "HOT" && <Flame className="h-3 w-3" />}
                 {tab.label}
               </button>
             ))}
@@ -592,7 +602,7 @@ export function CrmPage() {
                     <col style={{ width: "130px" }} />
                     <col style={{ width: "145px" }} />
                     <col style={{ minWidth: "220px" }} />
-                    <col style={{ width: "64px" }} />
+                    <col style={{ width: "96px" }} />
                   </colgroup>
                   <thead className="sticky top-0 z-10 bg-muted/60 backdrop-blur-xs border-b text-muted-foreground">
                     <tr className="divide-x divide-border font-semibold text-[11px]">
@@ -610,7 +620,7 @@ export function CrmPage() {
                         <div className="flex items-center gap-1">Status <ChevronDown className="h-3 w-3 opacity-50 shrink-0" /></div>
                       </th>
                       <th className="py-2.5 px-3">Catatan</th>
-                      <th style={{ width: "64px" }} className="py-2.5 px-2 text-center shrink-0">Aksi</th>
+                      <th style={{ width: "96px" }} className="py-2.5 px-2 text-center shrink-0">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -628,13 +638,23 @@ export function CrmPage() {
                           <td style={{ width: "48px", maxWidth: "48px" }} className="py-2 px-2 text-center text-muted-foreground align-middle overflow-hidden">{index + 1}</td>
 
                           <td style={{ width: "170px", maxWidth: "170px" }} className="py-1 px-2 overflow-hidden align-middle">
-                            <input
-                              type="text"
-                              value={c.name ?? ""}
-                              onChange={(e) => handleFieldChange(c.id, "name", e.target.value)}
-                              placeholder="Nama pelanggan..."
-                              className="w-full bg-transparent px-2 py-1 rounded text-xs font-medium border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background outline-none transition-colors"
-                            />
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="text"
+                                value={c.name ?? ""}
+                                onChange={(e) => handleFieldChange(c.id, "name", e.target.value)}
+                                placeholder="Nama pelanggan..."
+                                className="w-full bg-transparent px-2 py-1 rounded text-xs font-medium border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background outline-none transition-colors"
+                              />
+                              {c.metadata?.leadScore === "HOT" && (
+                                <span
+                                  title={`Hot Lead: ${c.metadata?.hotTriggerReason || "Minat kuat"}`}
+                                  className="shrink-0 inline-flex items-center justify-center rounded-full bg-red-100 dark:bg-red-950/60 p-1 text-red-600 dark:text-red-400"
+                                >
+                                  <Flame className="h-3 w-3" />
+                                </span>
+                              )}
+                            </div>
                           </td>
 
                           <td style={{ width: "140px", maxWidth: "140px" }} className="py-1 px-2 overflow-hidden align-middle">
@@ -682,28 +702,16 @@ export function CrmPage() {
                           </td>
 
                           <td className="py-1 px-2 align-middle">
-                            <div className="flex items-center gap-1.5">
-                              <textarea
-                                value={getLatestNote(c.notes)}
-                                onChange={(e) => handleFieldChange(c.id, "notes", e.target.value)}
-                                placeholder="Catatan kebutuhan..."
-                                rows={2}
-                                className="w-full min-h-[2.5rem] bg-transparent px-2 py-1 rounded text-xs leading-relaxed border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background outline-none resize-none transition-colors"
-                              />
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                className="h-7 w-7 shrink-0 text-muted-foreground hover:text-emerald-600 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-md transition-colors"
-                                title="Lihat riwayat status & log catatan lengkap"
-                                onClick={() => setSelectedLogContact(c)}
-                              >
-                                <History className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                              </Button>
-                            </div>
+                            <textarea
+                              value={c.notes ?? ""}
+                              onChange={(e) => handleFieldChange(c.id, "notes", e.target.value)}
+                              placeholder="Catatan kebutuhan..."
+                              rows={2}
+                              className="w-full min-h-[2.5rem] bg-transparent px-2 py-1 rounded text-xs leading-relaxed border border-transparent hover:border-border focus:border-emerald-500 focus:bg-background outline-none resize-none transition-colors"
+                            />
                           </td>
 
-                          <td style={{ width: "64px", maxWidth: "64px" }} className="py-1 px-2 text-center align-middle overflow-hidden">
+                          <td style={{ width: "96px", maxWidth: "96px" }} className="py-1 px-1 text-center align-middle overflow-hidden">
                             <div className="flex items-center justify-center gap-1">
                               <Button
                                 variant="ghost" size="icon"
@@ -712,6 +720,14 @@ export function CrmPage() {
                                 onClick={() => { if (c.conversations?.[0]?.id) setActiveContactId(c.conversations[0].id); setView("chatbot"); }}
                               >
                                 <MessageCircle className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost" size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                                title="Lihat riwayat status & log catatan lengkap"
+                                onClick={() => setSelectedLogContact(c)}
+                              >
+                                <History className="h-3.5 w-3.5" />
                               </Button>
                               <Button
                                 variant="ghost" size="icon"

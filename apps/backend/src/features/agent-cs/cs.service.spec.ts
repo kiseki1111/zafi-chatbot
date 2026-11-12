@@ -21,6 +21,12 @@ describe('CsService', () => {
       create: jest.fn(),
       update: jest.fn(),
     },
+    message: {
+      findMany: jest.fn(),
+    },
+    auditLog: {
+      create: jest.fn(),
+    },
   };
 
   const mockAgentShared = {
@@ -36,6 +42,8 @@ describe('CsService', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     mockPrisma.product.findMany.mockResolvedValue([]);
+    mockPrisma.message.findMany.mockResolvedValue([]);
+    mockPrisma.auditLog.create.mockResolvedValue({});
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -61,6 +69,8 @@ describe('CsService', () => {
         senderId: '628123456789@c.us',
         sessionName: 'unknown-instance',
         text: 'Halo',
+        provider: 'WAHA',
+        replyCallback: jest.fn(),
       });
 
       expect(response.text).toContain('belum terhubung');
@@ -324,6 +334,497 @@ describe('CsService', () => {
           data: expect.objectContaining({
             name: 'Hendra Wijaya',
             status: 'Survey',
+          }),
+        }),
+      );
+    });
+
+    it('harus menandai Hot Lead dan membuat audit log saat pelanggan minta survey lokasi', async () => {
+      mockAgentShared.getRecentContext.mockResolvedValue([
+        { senderType: 'customer', content: 'saya mau survey lokasi minggu ini' },
+      ]);
+      mockPrisma.whatsappInstance.findUnique.mockResolvedValue({
+        instanceName: 'wa-property',
+        tenantId: 'tenant-property',
+      });
+      mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-property' });
+      mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue('');
+      mockAgentShared.getAvailabilityContext.mockResolvedValue(null);
+
+      mockPrisma.contact.findFirst.mockResolvedValue({
+        id: 'contact-hot-1',
+        name: 'Anonim',
+        phone: '628123456789',
+        status: 'Follow-Up',
+        tenantId: 'tenant-property',
+        metadata: { messageCount: 2 },
+        notes: null,
+      });
+      mockPrisma.message.findMany.mockResolvedValue([
+        { content: 'saya mau survey lokasi minggu ini' },
+        { content: 'halo kak' },
+        { content: 'lokasinya dimana' },
+        { content: 'jam berapa bisa survey' },
+      ]);
+      mockPrisma.contact.update.mockResolvedValue({ id: 'contact-hot-1' });
+
+      mockAgentShared.callLLM.mockResolvedValue(
+        JSON.stringify({
+          text: 'Siap Kak, kami jadwalkan survey lokasi ya.',
+          images: [],
+          videos: [],
+          lead: {
+            customerName: 'Anonim',
+            perumahan: 'Griya Amanah 2',
+            status: 'Survey',
+            notes: 'Minta jadwal survey lokasi',
+          },
+        }),
+      );
+
+      await service.handleMessage({
+        senderId: '628123456789@c.us',
+        sessionName: 'wa-property',
+        text: 'saya mau survey lokasi minggu ini',
+      });
+
+      expect(mockPrisma.contact.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'contact-hot-1' },
+          data: expect.objectContaining({
+            metadata: expect.objectContaining({
+              leadScore: 'HOT',
+              hotAcknowledged: false,
+              messageCount: 4,
+            }),
+          }),
+        }),
+      );
+      expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            action: 'HOT_LEAD_DETECTED',
+            module: 'CRM',
+            details: expect.objectContaining({
+              contactId: 'contact-hot-1',
+              triggerType: 'KEYWORD',
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('harus tidak membuat notifikasi/audit log ganda jika lead sudah pernah ditandai HOT', async () => {
+      mockAgentShared.getRecentContext.mockResolvedValue([
+        { senderType: 'customer', content: 'oke kak, saya mau survey lokasi' },
+      ]);
+      mockPrisma.whatsappInstance.findUnique.mockResolvedValue({
+        instanceName: 'wa-property',
+        tenantId: 'tenant-property',
+      });
+      mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-property' });
+      mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue('');
+      mockAgentShared.getAvailabilityContext.mockResolvedValue(null);
+
+      mockPrisma.contact.findFirst.mockResolvedValue({
+        id: 'contact-hot-2',
+        name: 'Anonim',
+        phone: '628987654321',
+        status: 'Survey',
+        tenantId: 'tenant-property',
+        metadata: {
+          messageCount: 5,
+          leadScore: 'HOT',
+          hotNotified: true,
+          hotNotifiedAt: '2026-01-01T00:00:00.000Z',
+          hotAcknowledged: false,
+        },
+        notes: null,
+      });
+      mockPrisma.message.findMany.mockResolvedValue([
+        { content: 'halo kak' },
+        { content: 'saya mau survey lokasi' },
+        { content: 'minggu ini bisa' },
+        { content: 'jam berapa' },
+        { content: 'oke siap' },
+      ]);
+      mockPrisma.contact.update.mockResolvedValue({ id: 'contact-hot-2' });
+
+      mockAgentShared.callLLM.mockResolvedValue(
+        JSON.stringify({
+          text: 'Baik Kak, jadwal survey sudah dicatat.',
+          images: [],
+          videos: [],
+          lead: {
+            customerName: 'Anonim',
+            status: 'Survey',
+            notes: 'Konfirmasi survey',
+          },
+        }),
+      );
+
+      await service.handleMessage({
+        senderId: '628987654321@c.us',
+        sessionName: 'wa-property',
+        text: 'oke kak, saya mau survey lokasi',
+      });
+
+      expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+      expect(mockPrisma.contact.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            metadata: expect.objectContaining({
+              leadScore: 'HOT',
+              hotNotified: true,
+              hotNotifiedAt: '2026-01-01T00:00:00.000Z',
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('harus mempertahankan HOT (sticky) saat sinyal turun ke WARM tanpa penolakan eksplisit', async () => {
+      mockAgentShared.getRecentContext.mockResolvedValue([
+        { senderType: 'customer', content: 'oke kak makasih' },
+      ]);
+      mockPrisma.whatsappInstance.findUnique.mockResolvedValue({
+        instanceName: 'wa-property',
+        tenantId: 'tenant-property',
+      });
+      mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-property' });
+      mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue('');
+      mockAgentShared.getAvailabilityContext.mockResolvedValue(null);
+
+      mockPrisma.contact.findFirst.mockResolvedValue({
+        id: 'contact-sticky',
+        name: 'Anonim',
+        phone: '628111111111',
+        status: 'Follow-Up',
+        tenantId: 'tenant-property',
+        metadata: {
+          leadScore: 'HOT',
+          leadScoreCode: 'HOT_SURVEY',
+          hotTriggerReason: 'Permintaan Survey Lokasi Fisik',
+          hotNotified: true,
+          hotNotifiedAt: new Date().toISOString(),
+        },
+        notes: null,
+      });
+      mockPrisma.contact.update.mockResolvedValue({ id: 'contact-sticky' });
+
+      mockAgentShared.callLLM.mockResolvedValue(
+        JSON.stringify({
+          text: 'Sama-sama Kak.',
+          images: [],
+          videos: [],
+          lead: { customerName: 'Anonim', status: 'Follow-Up' },
+        }),
+      );
+
+      await service.handleMessage({
+        senderId: '628111111111@c.us',
+        sessionName: 'wa-property',
+        text: 'oke kak makasih',
+      });
+
+      expect(mockPrisma.contact.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            metadata: expect.objectContaining({
+              leadScore: 'HOT',
+              leadScoreCode: 'HOT_SURVEY',
+              hotTriggerReason: 'Permintaan Survey Lokasi Fisik',
+            }),
+          }),
+        }),
+      );
+      expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+    });
+
+    it('harus menurunkan HOT ke COLD saat ada penolakan eksplisit dan mereset notifikasi', async () => {
+      mockAgentShared.getRecentContext.mockResolvedValue([
+        { senderType: 'customer', content: 'kemahalan kak' },
+      ]);
+      mockPrisma.whatsappInstance.findUnique.mockResolvedValue({
+        instanceName: 'wa-property',
+        tenantId: 'tenant-property',
+      });
+      mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-property' });
+      mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue('');
+      mockAgentShared.getAvailabilityContext.mockResolvedValue(null);
+
+      mockPrisma.contact.findFirst.mockResolvedValue({
+        id: 'contact-reject',
+        name: 'Anonim',
+        phone: '628222222222',
+        status: 'Follow-Up',
+        tenantId: 'tenant-property',
+        metadata: {
+          leadScore: 'HOT',
+          leadScoreCode: 'HOT_SURVEY',
+          hotNotified: true,
+          hotNotifiedAt: '2026-01-01T00:00:00.000Z',
+        },
+        notes: null,
+      });
+      mockPrisma.contact.update.mockResolvedValue({ id: 'contact-reject' });
+
+      mockAgentShared.callLLM.mockResolvedValue(
+        JSON.stringify({
+          text: 'Baik Kak, terima kasih infonya.',
+          images: [],
+          videos: [],
+          lead: { customerName: 'Anonim', status: 'Batal' },
+        }),
+      );
+
+      await service.handleMessage({
+        senderId: '628222222222@c.us',
+        sessionName: 'wa-property',
+        text: 'kemahalan kak',
+      });
+
+      expect(mockPrisma.contact.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            metadata: expect.objectContaining({
+              leadScore: 'COLD',
+              leadScoreCode: 'COLD_EXPLICIT_REJECT',
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('tidak menggandakan pesan terkini jika sudah tersimpan di database', async () => {
+      mockAgentShared.getRecentContext.mockResolvedValue([
+        { senderType: 'customer', content: 'ini pesan keempat saya' },
+      ]);
+      mockPrisma.whatsappInstance.findUnique.mockResolvedValue({
+        instanceName: 'wa-property',
+        tenantId: 'tenant-property',
+      });
+      mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-property' });
+      mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue('');
+      mockAgentShared.getAvailabilityContext.mockResolvedValue(null);
+
+      mockPrisma.contact.findFirst.mockResolvedValue({
+        id: 'contact-count',
+        name: 'Anonim',
+        phone: '628444444444',
+        status: 'Follow-Up',
+        tenantId: 'tenant-property',
+        metadata: { messageCount: 3 },
+        notes: null,
+      });
+      mockPrisma.message.findMany.mockResolvedValue([
+        { content: 'halo kak' },
+        { content: 'saya tanya tanya dulu' },
+        { content: 'lokasinya dimana' },
+        { content: 'ini pesan keempat saya' },
+      ]);
+      mockPrisma.contact.update.mockResolvedValue({ id: 'contact-count' });
+
+      mockAgentShared.callLLM.mockResolvedValue(
+        JSON.stringify({
+          text: 'Baik Kak.',
+          images: [],
+          videos: [],
+          lead: { customerName: 'Anonim', status: 'Follow-Up' },
+        }),
+      );
+
+      await service.handleMessage({
+        senderId: '628444444444@c.us',
+        sessionName: 'wa-property',
+        text: 'ini pesan keempat saya',
+      });
+
+      expect(mockPrisma.contact.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            metadata: expect.objectContaining({
+              messageCount: 4,
+              leadScoreCode: 'WARM_CHAT_VOLUME',
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('harus membuat audit log dan mereset hotAcknowledged saat transisi ke episode HOT baru', async () => {
+      mockAgentShared.getRecentContext.mockResolvedValue([
+        { senderType: 'customer', content: 'oke saya booking unit A' },
+      ]);
+      mockPrisma.whatsappInstance.findUnique.mockResolvedValue({
+        instanceName: 'wa-property',
+        tenantId: 'tenant-property',
+      });
+      mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-property' });
+      mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue('');
+      mockAgentShared.getAvailabilityContext.mockResolvedValue(null);
+
+      mockPrisma.contact.findFirst.mockResolvedValue({
+        id: 'contact-rehot',
+        name: 'Anonim',
+        phone: '628555555555',
+        status: 'Follow-Up',
+        tenantId: 'tenant-property',
+        metadata: {
+          leadScore: 'COLD',
+          leadScoreCode: 'COLD_EXPLICIT_REJECT',
+          hotAcknowledged: true,
+          leadOutcome: 'NOT_WORTH',
+        },
+        notes: null,
+      });
+      mockPrisma.message.findMany.mockResolvedValue([
+        { content: 'oke saya booking unit A' },
+      ]);
+      mockPrisma.contact.update.mockResolvedValue({ id: 'contact-rehot' });
+
+      mockAgentShared.callLLM.mockResolvedValue(
+        JSON.stringify({
+          text: 'Siap Kak, unit A kami tahan.',
+          images: [],
+          videos: [],
+          lead: { customerName: 'Anonim', status: 'Booking' },
+        }),
+      );
+
+      await service.handleMessage({
+        senderId: '628555555555@c.us',
+        sessionName: 'wa-property',
+        text: 'oke saya booking unit A',
+      });
+
+      expect(mockPrisma.contact.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            metadata: expect.objectContaining({
+              leadScore: 'HOT',
+              leadScoreCode: 'HOT_BOOKING',
+              hotAcknowledged: false,
+              leadOutcomeHistory: expect.arrayContaining([
+                expect.objectContaining({ outcome: 'NOT_WORTH' }),
+              ]),
+            }),
+          }),
+        }),
+      );
+      expect(mockPrisma.auditLog.create).toHaveBeenCalled();
+    });
+
+    it('G7 - HOT baru dari HOT lain (HOT_SURVEY -> HOT_KPR) tidak mereset hotAcknowledged jika sudah dilihat', async () => {
+      mockAgentShared.getRecentContext.mockResolvedValue([
+        { senderType: 'customer', content: 'simulasi kpr berapa' },
+      ]);
+      mockPrisma.whatsappInstance.findUnique.mockResolvedValue({
+        instanceName: 'wa-property',
+        tenantId: 'tenant-property',
+      });
+      mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-property' });
+      mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue('');
+      mockAgentShared.getAvailabilityContext.mockResolvedValue(null);
+
+      mockPrisma.contact.findFirst.mockResolvedValue({
+        id: 'contact-hot-transition',
+        name: 'Anonim',
+        phone: '628555123456',
+        status: 'Survey',
+        tenantId: 'tenant-property',
+        metadata: {
+          leadScore: 'HOT',
+          leadScoreCode: 'HOT_SURVEY',
+          hotEpisodeStartedAt: '2026-11-12T00:00:00.000Z',
+          hotAcknowledged: true, // sudah di-review marketing
+        },
+        notes: null,
+      });
+      mockPrisma.message.findMany.mockResolvedValue([
+        { content: 'simulasi kpr berapa' },
+      ]);
+      mockPrisma.contact.update.mockResolvedValue({ id: 'contact-hot-transition' });
+
+      mockAgentShared.callLLM.mockResolvedValue(
+        JSON.stringify({
+          text: 'Simulasi KPR cicilan 2 jutaan ya Kak.',
+          images: [],
+          videos: [],
+          lead: { customerName: 'Anonim', status: 'Survey' },
+        }),
+      );
+
+      await service.handleMessage({
+        senderId: '628555123456@c.us',
+        sessionName: 'wa-property',
+        text: 'simulasi kpr berapa',
+      });
+
+      expect(mockPrisma.contact.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            metadata: expect.objectContaining({
+              leadScore: 'HOT',
+              leadScoreCode: 'HOT_KPR',
+              hotAcknowledged: true, // tetap true, tidak dibolak-balik unread
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('E5 & E6 - Duplikat & pesan pendek (<3 char) tidak menambah messageCount', async () => {
+      mockAgentShared.getRecentContext.mockResolvedValue([
+        { senderType: 'customer', content: 'halo' },
+      ]);
+      mockPrisma.whatsappInstance.findUnique.mockResolvedValue({
+        instanceName: 'wa-property',
+        tenantId: 'tenant-property',
+      });
+      mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-property' });
+      mockAgentShared.retrieveRelevantKnowledge.mockResolvedValue('');
+      mockAgentShared.getAvailabilityContext.mockResolvedValue(null);
+
+      mockPrisma.contact.findFirst.mockResolvedValue({
+        id: 'contact-spam',
+        name: 'Anonim',
+        phone: '628999888777',
+        status: 'Follow-Up',
+        tenantId: 'tenant-property',
+        metadata: {},
+        notes: null,
+      });
+      // spam 'p', 'ok', 'iya' (semua < 3 char)
+      mockPrisma.message.findMany.mockResolvedValue([
+        { content: 'p' },
+        { content: 'ok' },
+        { content: 'iya' },
+      ]);
+      mockPrisma.contact.update.mockResolvedValue({ id: 'contact-spam' });
+
+      mockAgentShared.callLLM.mockResolvedValue(
+        JSON.stringify({
+          text: 'Halo kak.',
+          images: [],
+          videos: [],
+          lead: { customerName: 'Anonim', status: 'Follow-Up' },
+        }),
+      );
+
+      await service.handleMessage({
+        senderId: '628999888777@c.us',
+        sessionName: 'wa-property',
+        text: 'ok', // pesan < 3 karakter
+      });
+
+      expect(mockPrisma.contact.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            metadata: expect.objectContaining({
+              messageCount: 1, // hanya 1 pesan customer unik yang valid
+              leadScoreCode: 'COLD_INQUIRY',
+            }),
           }),
         }),
       );

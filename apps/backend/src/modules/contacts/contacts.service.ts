@@ -151,6 +151,147 @@ export class ContactsService {
     return Array.from(seen.values());
   }
 
+  // ponytail: daftar lead HOT dari metadata contact; tidak perlu tabel/endpoint baru
+  async getHotLeads(tenantId?: string, isSuper?: boolean, unreadOnly?: boolean) {
+    if (!tenantId && !isSuper) {
+      return [];
+    }
+
+    const where: any = {
+      phone: { not: { contains: 'broadcast' } },
+      metadata: { path: ['leadScore'], equals: 'HOT' },
+    };
+
+    if (tenantId) {
+      where.AND = [
+        {
+          OR: [
+            { tenantId },
+            {
+              tenantId: null,
+              conversations: {
+                some: { whatsappInstance: { tenantId } },
+              },
+            },
+          ],
+        },
+      ];
+    }
+
+    const contacts = await this.prisma.contact.findMany({
+      where,
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        conversations: {
+          where: tenantId ? { whatsappInstance: { tenantId } } : undefined,
+          take: 1,
+          orderBy: { lastMessageAt: 'desc' },
+        },
+      },
+    });
+
+    return contacts
+      .map((c) => {
+        const meta = (c.metadata as Record<string, any>) || {};
+        return {
+          id: c.id,
+          name: c.name || 'Anonim',
+          phone: (c.phone || '')
+            .replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, '')
+            .replace(/^\+/, ''),
+          status: c.status,
+          notes: c.notes,
+          leadScore: 'HOT' as const,
+          leadScoreCode: meta.leadScoreCode || null,
+          hotTriggerReason: meta.hotTriggerReason || null,
+          hotMatchedKeyword: meta.hotMatchedKeyword || null,
+          messageCount: meta.messageCount || 0,
+          hotEpisodeStartedAt: meta.hotEpisodeStartedAt || null,
+          hotAcknowledged: meta.hotAcknowledged === true,
+          leadOutcome: meta.leadOutcome || null,
+          leadOutcomeAt: meta.leadOutcomeAt || null,
+          leadOutcomeBy: meta.leadOutcomeBy || null,
+          leadOutcomeNote: meta.leadOutcomeNote || null,
+          leadOutcomeHistory: Array.isArray(meta.leadOutcomeHistory)
+            ? meta.leadOutcomeHistory
+            : [],
+          conversationId: c.conversations?.[0]?.id || null,
+          lastChatAt: c.conversations?.[0]?.lastMessageAt || c.updatedAt,
+        };
+      })
+      .filter((c) => (unreadOnly ? !c.hotAcknowledged : true));
+  }
+
+  // ponytail: marketing mencatat evaluasi hasil tinjauan prospek HOT (layak/tidak/sudah ditangani)
+  async setHotLeadOutcome(
+    contactId: string,
+    outcome: 'WORTH_CONTACTING' | 'NOT_WORTH' | 'HANDLED',
+    user: { id?: string; email?: string; name?: string },
+    note?: string,
+    tenantId?: string,
+  ) {
+    const where: any = { id: contactId };
+    if (tenantId) {
+      where.AND = [
+        {
+          OR: [
+            { tenantId },
+            {
+              tenantId: null,
+              conversations: {
+                some: { whatsappInstance: { tenantId } },
+              },
+            },
+          ],
+        },
+      ];
+    }
+    const contact = await this.prisma.contact.findFirst({ where });
+    if (!contact) throw new NotFoundException('Contact not found');
+
+    const meta = (contact.metadata as Record<string, any>) || {};
+    const nowIso = new Date().toISOString();
+    const decidedBy = user.name || user.email || user.id || 'Marketing';
+
+    // Simpan label episode berjalan
+    const updatedMeta: Record<string, any> = {
+      ...meta,
+      hotAcknowledged: true,
+      leadOutcome: outcome,
+      leadOutcomeAt: nowIso,
+      leadOutcomeBy: decidedBy,
+      ...(note ? { leadOutcomeNote: note } : {}),
+    };
+
+    // Tambahkan juga ke audit log sebagai jejak historis evaluasi dataset
+    await this.prisma.auditLog
+      .create({
+        data: {
+          action: 'HOT_LEAD_OUTCOME_LABELLED',
+          module: 'CRM',
+          endpoint: 'MANUAL_REVIEW',
+          details: {
+            contactId: contact.id,
+            phone: contact.phone,
+            name: contact.name,
+            outcome,
+            note: note || null,
+            decidedBy,
+            leadScoreCode: meta.leadScoreCode || null,
+            messageCount: meta.messageCount || 0,
+            episodeStartedAt: meta.hotEpisodeStartedAt || null,
+          },
+          status: 'SUCCESS',
+        },
+      })
+      .catch(() => null);
+
+    return this.prisma.contact.update({
+      where: { id: contact.id },
+      data: { metadata: updatedMeta },
+    });
+  }
+
   async getContact(id: string, tenantId?: string) {
     const where: any = { id };
     if (tenantId) {

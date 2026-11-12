@@ -12,7 +12,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { ContactsService } from './contacts.service';
-import { CreateContactDto, UpdateContactDto } from './dto/contact.dto';
+import { CreateContactDto, UpdateContactDto, SetLeadOutcomeDto } from './dto/contact.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @Controller('api/v1/contacts')
@@ -48,6 +48,22 @@ export class ContactsController {
     return this.contactsService.listContacts(search, status, tenantId, isSuper);
   }
 
+  @Get('hot-leads')
+  listHotLeads(
+    @Query('unread') unread?: string,
+    @Req() req?: any,
+  ) {
+    const isSuper =
+      req?.user?.roles?.includes('superadmin') ||
+      req?.user?.role === 'superadmin';
+    const tenantId = this.resolveTenantId(req);
+    return this.contactsService.getHotLeads(
+      tenantId,
+      isSuper,
+      unread === 'true',
+    );
+  }
+
   @Get(':id')
   getContact(@Param('id') id: string, @Req() req?: any) {
     const tenantId = this.resolveTenantId(req);
@@ -58,6 +74,22 @@ export class ContactsController {
   createContact(@Body() dto: CreateContactDto, @Req() req?: any) {
     const tenantId = this.resolveTenantId(req);
     return this.contactsService.createContact(dto, tenantId);
+  }
+
+  @Patch(':id/lead-outcome')
+  setLeadOutcome(
+    @Param('id') id: string,
+    @Body() dto: SetLeadOutcomeDto,
+    @Req() req?: any,
+  ) {
+    const tenantId = this.resolveTenantId(req);
+    return this.contactsService.setHotLeadOutcome(
+      id,
+      dto.outcome,
+      req?.user || {},
+      dto.note,
+      tenantId,
+    );
   }
 
   @Patch(':id')

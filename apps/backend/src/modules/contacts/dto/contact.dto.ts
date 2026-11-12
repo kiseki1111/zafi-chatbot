@@ -67,3 +67,14 @@ export class UpdateContactDto {
   @IsOptional()
   metadata?: any;
 }
+
+export type LeadOutcomeType = 'WORTH_CONTACTING' | 'NOT_WORTH' | 'HANDLED';
+
+export class SetLeadOutcomeDto {
+  @IsString()
+  outcome: LeadOutcomeType;
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+}

@@ -67,6 +67,7 @@ import {
   Mic,
   FileText,
   HelpCircle,
+  Flame,
 } from "lucide-react";
 import { useMenuGuide } from "@/lib/use-menu-guide";
 import { MenuGuideBanner } from "@/components/dashboard/menu-guide-banner";
@@ -685,7 +686,17 @@ function ContactListItem({
       </div>
         <div className="min-w-0 flex-1 flex flex-col justify-center">
           <div className="grid grid-cols-[1fr_auto] items-center gap-2">
-            <p className="text-sm font-medium truncate">{contact.name}</p>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <p className="text-sm font-medium truncate">{contact.name}</p>
+              {contact.metadata?.leadScore === "HOT" && (
+                <span
+                  title={`Hot Lead: ${contact.metadata?.hotTriggerReason || "Minat kuat"}`}
+                  className="shrink-0 inline-flex items-center justify-center rounded-full bg-red-100 dark:bg-red-950/60 p-0.5 text-red-600 dark:text-red-400"
+                >
+                  <Flame className="h-3 w-3" />
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] text-muted-foreground">
                 {contact.lastMessageAt}
@@ -974,7 +985,7 @@ export function ChatbotPage() {
   const [wahaTestForm, setWahaTestForm] = useState({
     sessionName: "Zafi-CS",
     chatId: "6281234567890",
-    text: "Halo, ini pesan test simulasi WAHA",
+    text: "Halo, ini pesan test simulasi WhatsApp",
     imageUrl: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&auto=format&fit=crop",
   });
 
@@ -1081,6 +1092,8 @@ export function ChatbotPage() {
           id: c.id,
           name: cleanName,
           phone: cleanPhone,
+          contactId: c.contactId || c.contact?.id,
+          metadata: c.contactMetadata || c.contact?.metadata || {},
           stage: c.status === 'OPEN' ? 'lead' : 'customer',
           tags: [],
           assignedTo: c.assignedTo?.id,
@@ -1368,6 +1381,33 @@ export function ChatbotPage() {
     setMobileShowList(false);
   }
 
+  // Simpan label hasil tinjauan marketing untuk Hot Lead (layak/tidak/sudah ditangani)
+  async function handleSetLeadOutcome(
+    outcome: "WORTH_CONTACTING" | "NOT_WORTH" | "HANDLED",
+  ) {
+    const contactId = activeContact?.contactId;
+    if (!contactId || !activeId) return;
+    setContacts((prev) =>
+      prev.map((c) =>
+        c.id === activeId
+          ? {
+              ...c,
+              metadata: { ...(c.metadata ?? {}), leadOutcome: outcome },
+            }
+          : c,
+      ),
+    );
+    try {
+      await fetch(`/api/v1/contacts/${contactId}/lead-outcome`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ outcome }),
+      });
+    } catch {
+      // silent
+    }
+  }
+
   // Toggle Takeover / Release
   async function toggleTakeover() {
     if (!activeId || !activeContact) return;
@@ -1629,7 +1669,7 @@ export function ChatbotPage() {
           ) : (
             <Select value={sessionId} onValueChange={setSessionId}>
               <SelectTrigger className="w-[180px] sm:w-[220px] h-7 text-xs bg-muted/50 border-0 gap-1.5">
-                <SelectValue placeholder="Pilih sesi WAHA" />
+                <SelectValue placeholder="Pilih sesi WhatsApp" />
               </SelectTrigger>
               <SelectContent>
                 {sessions.length === 0 && <SelectItem value="none" disabled>Tidak ada sesi aktif</SelectItem>}
@@ -1820,6 +1860,14 @@ export function ChatbotPage() {
                         <p className="font-semibold text-xs text-foreground truncate leading-tight">
                           {activeContact.name}
                         </p>
+                        {activeContact.metadata?.leadScore === "HOT" && (
+                          <span
+                            title={`Hot Lead: ${activeContact.metadata?.hotTriggerReason || "Minat kuat"}`}
+                            className="inline-flex items-center justify-center rounded-full bg-red-100 dark:bg-red-950/60 p-0.5 text-red-600 dark:text-red-400 shrink-0"
+                          >
+                            <Flame className="h-3 w-3" />
+                          </span>
+                        )}
                         <Badge
                           variant="secondary"
                           className={cn(
@@ -1878,6 +1926,41 @@ export function ChatbotPage() {
                   </Button>
                 </div>
               </div>
+
+              {activeContact.metadata?.leadScore === "HOT" && (
+                <div className="flex flex-wrap items-center gap-2 border-b border-red-200/60 bg-red-50/70 px-4 py-1.5 shrink-0 dark:border-red-900/40 dark:bg-red-950/20">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-700 dark:text-red-300 shrink-0">
+                    <Flame className="h-3.5 w-3.5" />
+                    Hot Lead
+                  </span>
+                  <span className="min-w-0 truncate text-[11px] text-red-700/80 dark:text-red-300/80">
+                    {activeContact.metadata?.hotTriggerReason || "Minat kuat"}
+                    {" · "}
+                    {Number(activeContact.metadata?.messageCount) || 0} pesan
+                  </span>
+                  <div className="ml-auto flex items-center gap-1">
+                    {([
+                      { key: "WORTH_CONTACTING", label: "Layak dihubungi", active: "bg-emerald-600 text-white border-emerald-600" },
+                      { key: "NOT_WORTH", label: "Tidak layak", active: "bg-rose-600 text-white border-rose-600" },
+                      { key: "HANDLED", label: "Sudah ditangani", active: "bg-blue-600 text-white border-blue-600" },
+                    ] as const).map((o) => (
+                      <button
+                        key={o.key}
+                        type="button"
+                        onClick={() => handleSetLeadOutcome(o.key)}
+                        className={cn(
+                          "rounded px-1.5 py-0.5 text-[10px] font-medium border transition-colors",
+                          activeContact.metadata?.leadOutcome === o.key
+                            ? o.active
+                            : "bg-background/70 text-muted-foreground border-border hover:bg-muted"
+                        )}
+                      >
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Messages */}
               <div className="flex-1 min-h-0 bg-muted/30 relative">
@@ -2038,15 +2121,15 @@ export function ChatbotPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Zap className="h-5 w-5 text-emerald-600" />
-              Test API WAHA Real (Kirim Text &amp; Gambar)
+              Test Pengiriman WhatsApp (Kirim Text &amp; Gambar)
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 text-xs">
             <p className="text-muted-foreground text-[11px]">
-              Tembak langsung ke server WAHA (103.30.195.145:3060) untuk memverifikasi apakah sesi aktif dan pesan/gambar berhasil dikirim.
+              Kirim langsung ke server gateway WhatsApp untuk memverifikasi apakah sesi aktif dan pesan/gambar berhasil dikirim.
             </p>
             <div>
-              <Label className="font-medium">Nama Sesi WAHA</Label>
+              <Label className="font-medium">Nama Sesi WhatsApp</Label>
               <Input
                 value={wahaTestForm.sessionName}
                 onChange={(e) => setWahaTestForm({ ...wahaTestForm, sessionName: e.target.value })}
@@ -2093,12 +2176,12 @@ export function ChatbotPage() {
                   {wahaTestResult.sendSuccess ? (
                     <>
                       <Check className="h-4 w-4 text-emerald-600" />
-                      <span>Berhasil Dikirim ke WAHA</span>
+                      <span>Berhasil Dikirim ke Gateway WhatsApp</span>
                     </>
                   ) : (
                     <>
                       <X className="h-4 w-4 text-rose-600" />
-                      <span>Gagal Dikirim ke WAHA</span>
+                      <span>Gagal Dikirim ke Gateway WhatsApp</span>
                     </>
                   )}
                 </div>
@@ -2129,7 +2212,7 @@ export function ChatbotPage() {
               disabled={wahaTestLoading}
               className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
             >
-              {wahaTestLoading ? "Mengirim..." : "Tembak WAHA API"}
+              {wahaTestLoading ? "Mengirim..." : "Kirim Test Pesan"}
             </Button>
           </DialogFooter>
         </DialogContent>

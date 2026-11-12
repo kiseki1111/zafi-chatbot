@@ -133,6 +133,7 @@ export class ChatsService {
         ...c,
         contactName: displayName,
         contactNumber: cleanPhone,
+        contactMetadata: contactMeta,
       };
     });
 
