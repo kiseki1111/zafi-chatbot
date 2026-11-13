@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/table";
 import {
   BellRing, Clock, Users, Send, Loader2, RefreshCw, History,
-  Settings, Zap, User, Sun, Sunset, Sunrise, Moon, Sparkles, Check, Trash2, Plus, Save, AlertTriangle, Lock, HelpCircle,
+  Settings, Zap, User, Sun, Sunset, Sunrise, Moon, Sparkles, Check, Trash2, Plus, Save, AlertTriangle, Lock, HelpCircle, Search,
 } from "lucide-react";
 import { useMenuGuide } from "@/lib/use-menu-guide";
 import { MenuGuideBanner } from "@/components/dashboard/menu-guide-banner";
@@ -95,6 +95,7 @@ export function FollowupPage() {
   const [inactiveContacts, setInactiveContacts] = useState<InactiveContact[]>([]);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyTotal, setHistoryTotal] = useState(0);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [triggering, setTriggering] = useState(false);
@@ -320,6 +321,24 @@ export function FollowupPage() {
     );
   }
 
+  const q = search.trim().toLowerCase();
+  const filteredInactive = q
+    ? inactiveContacts.filter(
+        (c) =>
+          (c.contactName || "").toLowerCase().includes(q) ||
+          c.contactPhone.includes(q) ||
+          c.instanceName.toLowerCase().includes(q),
+      )
+    : inactiveContacts;
+  const filteredHistory = q
+    ? history.filter(
+        (h) =>
+          (h.contactName || "").toLowerCase().includes(q) ||
+          h.contactPhone.includes(q) ||
+          h.instanceName.toLowerCase().includes(q),
+      )
+    : history;
+
   return (
     <div className="space-y-6">
       {/* Header - Compact & Responsive (No bloated explanation) */}
@@ -375,6 +394,16 @@ export function FollowupPage() {
             )}
           </Button>
         </div>
+      </div>
+
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Cari nama, nomor, atau instance..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-9 text-sm"
+        />
       </div>
 
       {!seen && (
@@ -600,16 +629,16 @@ export function FollowupPage() {
                   Aktifkan follow-up untuk melihat daftar pelanggan
                 </p>
               </div>
-            ) : inactiveContacts.length === 0 ? (
+            ) : filteredInactive.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-center">
                 <Users className="h-10 w-10 text-muted-foreground/40 mb-3" />
                 <p className="text-sm text-muted-foreground">
-                  Tidak ada pelanggan yang perlu di-follow-up saat ini
+                  {q ? "Tidak ada kontak yang cocok dengan pencarian" : "Tidak ada pelanggan yang perlu di-follow-up saat ini"}
                 </p>
               </div>
             ) : (
               <div className="space-y-2 max-h-[360px] overflow-y-auto">
-                {inactiveContacts.map((c) => (
+                {filteredInactive.map((c) => (
                   <div
                     key={`${c.contactId}-${c.instanceName}`}
                     className="flex items-center gap-3 rounded-lg border p-3 hover:bg-muted/30 transition-colors min-h-[48px]"
@@ -657,10 +686,12 @@ export function FollowupPage() {
           <CardDescription>{historyTotal} follow-up sudah dikirim</CardDescription>
         </CardHeader>
         <CardContent>
-          {history.length === 0 ? (
+          {filteredHistory.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-center">
               <History className="h-10 w-10 text-muted-foreground/40 mb-3" />
-              <p className="text-sm text-muted-foreground">Belum ada riwayat follow-up</p>
+              <p className="text-sm text-muted-foreground">
+                {q ? "Tidak ada riwayat yang cocok dengan pencarian" : "Belum ada riwayat follow-up"}
+              </p>
             </div>
           ) : (
             <div className="rounded-lg border overflow-hidden overflow-x-auto -mx-2 sm:mx-0">
@@ -673,7 +704,7 @@ export function FollowupPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {history.map((h) => (
+                  {filteredHistory.map((h) => (
                     <TableRow key={h.id}>
                       <TableCell>
                         <div className="flex items-center gap-2">

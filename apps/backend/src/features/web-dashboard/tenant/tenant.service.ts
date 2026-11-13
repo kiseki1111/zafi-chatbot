@@ -433,8 +433,7 @@ export function isFeatureAllowed(
     | 'mediaGallery'
     | 'ocrExtract'
     | 'customFollowUp'
-    | 'manualFollowUp'
-    | 'autoTopUp',
+    | 'manualFollowUp',
 ): boolean {
   const isTrialExpired = Boolean(
     metadata?.isTrial &&
@@ -652,12 +651,6 @@ export class TenantService {
       whatsappUsed,
       maxWhatsapp: capacity.maxWhatsapp,
       extraWhatsapp: capacity.extraWhatsapp,
-      autoTopUpEnabled: Boolean(meta.autoTopUpEnabled),
-      autoTopUpMonthlyLimit: Number(meta.autoTopUpMonthlyLimit || 3),
-      autoTopUpCount:
-        meta.autoTopUpMonth === new Date().toISOString().slice(0, 7)
-          ? Number(meta.autoTopUpCount) || 0
-          : 0,
       quotaAlerts: Array.isArray(meta.quotaAlerts) ? meta.quotaAlerts : [],
       topups: Array.isArray(meta.topups) ? meta.topups : [],
       tokensUsed:
@@ -818,42 +811,6 @@ export class TenantService {
       extraUsers: (Number(meta.extraUsers) || 0) + addUsers,
       extraProjects: (Number(meta.extraProjects) || 0) + addProj,
       topups: [newRecord, ...existingTopups],
-    };
-
-    const updated = await this.prisma.tenant.update({
-      where: { id: tenantId },
-      data: { metadata: updatedMeta },
-    });
-
-    return this.getTenantQuota(tenantId, updated);
-  }
-
-  // ponytail: pengaturan auto top-up booster s saat kuota 100% (eksklusif Silver ke atas)
-  async updateAutoTopUpSettings(
-    tenantId: string,
-    data: { autoTopUpEnabled: boolean; autoTopUpMonthlyLimit?: number },
-  ) {
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
-    });
-    if (!tenant) throw new NotFoundException('Tenant not found');
-
-    if (
-      data.autoTopUpEnabled &&
-      !isFeatureAllowed(tenant.metadata, 'autoTopUp')
-    ) {
-      throw new BadRequestException(
-        'Fitur Auto Top-Up Booster S eksklusif untuk paket Silver ke atas.',
-      );
-    }
-
-    const meta = (tenant.metadata as any) || {};
-    const updatedMeta = {
-      ...meta,
-      autoTopUpEnabled: Boolean(data.autoTopUpEnabled),
-      autoTopUpMonthlyLimit: Number(
-        data.autoTopUpMonthlyLimit ?? meta.autoTopUpMonthlyLimit ?? 3,
-      ),
     };
 
     const updated = await this.prisma.tenant.update({

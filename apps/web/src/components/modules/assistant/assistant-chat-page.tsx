@@ -42,37 +42,6 @@ interface TestPersona {
   accessLevel: "STAFF" | "HR_ADMIN" | "FINANCE_ADMIN" | "EXECUTIVE";
 }
 
-const TEST_PERSONAS: TestPersona[] = [
-  {
-    id: "p-1",
-    name: "Ahmad Fauzi",
-    role: "Software Engineer",
-    department: "Teknologi & IT",
-    accessLevel: "STAFF",
-  },
-  {
-    id: "p-2",
-    name: "Budi Santoso",
-    role: "Senior Accountant",
-    department: "Keuangan & Akuntansi",
-    accessLevel: "FINANCE_ADMIN",
-  },
-  {
-    id: "p-3",
-    name: "Siti Rahmawati",
-    role: "HR Operations Lead",
-    department: "HRD",
-    accessLevel: "HR_ADMIN",
-  },
-  {
-    id: "p-4",
-    name: "Hendro Wibowo",
-    role: "Managing Director",
-    department: "Direksi",
-    accessLevel: "EXECUTIVE",
-  },
-];
-
 const INITIAL_MESSAGES: ChatMessage[] = [
   {
     id: "m-1",
@@ -85,10 +54,39 @@ const INITIAL_MESSAGES: ChatMessage[] = [
 export function AssistantChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>(INITIAL_MESSAGES);
   const [input, setInput] = useState("");
-  const [activePersona, setActivePersona] = useState<TestPersona>(TEST_PERSONAS[0]);
+  const [personas, setPersonas] = useState<TestPersona[]>([]);
+  const [activePersona, setActivePersona] = useState<TestPersona | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [inspectorData, setInspectorData] = useState<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // ponytail: persona simulasi diambil dari data karyawan nyata, tanpa data dummy
+  useEffect(() => {
+    fetch("/api/v1/hris/karyawan/list")
+      .then((res) => res.json())
+      .then((json) => {
+        const list = json?.data?.data || json?.data || [];
+        if (!Array.isArray(list)) return;
+        const mapped: TestPersona[] = list
+          .filter((k: any) => k.name || k.nama_karyawan)
+          .map((k: any, i: number) => ({
+            id: String(k.nik || k.id || i),
+            name: k.name || k.nama_karyawan,
+            role: k.position || k.jabatan || "Staf",
+            department: k.department || k.departemen || "Operasional",
+            accessLevel: (
+              String(k.department || "").includes("Keuangan")
+                ? "FINANCE_ADMIN"
+                : String(k.department || "").includes("HR")
+                  ? "HR_ADMIN"
+                  : "STAFF"
+            ) as TestPersona["accessLevel"],
+          }));
+        setPersonas(mapped);
+        setActivePersona(mapped[0] || null);
+      })
+      .catch(() => null);
+  }, []);
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -115,83 +113,64 @@ export function AssistantChatPage() {
       let botResponse = "";
       let toolCall: ChatMessage["toolCall"] = undefined;
 
-      if (lower.includes("cuti")) {
+      const nik = activePersona?.id;
+      const nama = activePersona?.name || "Anda";
+
+      if (!nik) {
+        botResponse = "Pilih karyawan terlebih dahulu agar asisten dapat mengambil data dari sistem HRIS.";
+      } else if (lower.includes("cuti")) {
         try {
-          const res = await fetch("/api/v1/hris/karyawan/250100001/cuti");
+          const res = await fetch(`/api/v1/hris/karyawan/${nik}/cuti`);
           const json = await res.json();
           const d = json?.data || json;
-          const sisa = d?.sisa_cuti ?? 12;
-          const terpakai = d?.cuti_terpakai ?? 0;
-          const kuota = d?.kuota_tahunan ?? 12;
+          const sisa = d?.sisa_cuti ?? "-";
+          const terpakai = d?.cuti_terpakai ?? "-";
+          const kuota = d?.kuota_tahunan ?? "-";
           toolCall = {
             name: "hris.cek_sisa_cuti",
-            params: { nik: "250100001", nama: activePersona.name },
+            params: { nik, nama },
             result: d,
             status: "SUCCESS",
           };
-          botResponse = `Halo ${activePersona.name}! Berdasarkan database sistem HRIS, kuota cuti tahunan Anda adalah ${kuota} hari (terpakai: ${terpakai} hari), sehingga sisa kuota cuti Anda tersisa ${sisa} hari kerja.`;
+          botResponse = `Halo ${nama}! Berdasarkan database HRIS, kuota cuti tahunan Anda ${kuota} hari (terpakai ${terpakai} hari), sisa ${sisa} hari kerja.`;
         } catch {
-          botResponse = `Halo ${activePersona.name}, kuota cuti tahunan Anda saat ini tersisa 12 hari kerja.`;
+          botResponse = `Halo ${nama}, data cuti tidak dapat diambil dari sistem HRIS saat ini.`;
         }
       } else if (lower.includes("absen") || lower.includes("presensi") || lower.includes("kehadiran")) {
         try {
-          const res = await fetch("/api/v1/hris/karyawan/250100001/presensi");
+          const res = await fetch(`/api/v1/hris/karyawan/${nik}/presensi`);
           const json = await res.json();
           const d = json?.data || json;
           const rekap = d?.rekap_bulan_ini;
           toolCall = {
             name: "hris.rekap_presensi",
-            params: { nik: "250100001", nama: activePersona.name },
+            params: { nik, nama },
             result: d,
             status: "SUCCESS",
           };
-          botResponse = `Rekap kehadiran Anda di HRIS bulan ini: Hadir ${rekap?.hadir ?? 7} hari, Izin ${rekap?.izin ?? 0} hari, Sakit ${rekap?.sakit ?? 0} hari. Status absensi hari ini: ${d?.hari_ini?.status ?? "Hadir"}.`;
+          botResponse = `Rekap kehadiran Anda bulan ini: Hadir ${rekap?.hadir ?? "-"} hari, Izin ${rekap?.izin ?? "-"} hari, Sakit ${rekap?.sakit ?? "-"} hari. Status hari ini: ${d?.hari_ini?.status ?? "-"}.`;
         } catch {
-          botResponse = `Halo ${activePersona.name}, status absensi Anda hari ini tercatat Hadir.`;
+          botResponse = `Halo ${nama}, data presensi tidak dapat diambil dari sistem HRIS saat ini.`;
         }
       } else if (lower.includes("slip") || lower.includes("gaji")) {
         try {
-          const res = await fetch("/api/v1/hris/karyawan/250100001/slip-gaji");
+          const res = await fetch(`/api/v1/hris/karyawan/${nik}/slip-gaji`);
           const json = await res.json();
           const d = json?.data || json;
           toolCall = {
             name: "hris.info_slip_gaji",
-            params: { nik: "250100001", nama: activePersona.name },
+            params: { nik, nama },
             result: d,
             status: "SUCCESS",
           };
-          botResponse = `Informasi slip gaji untuk ${activePersona.name} (${d?.periode ?? "Periode Terkini"}): Status ${d?.status_slip ?? "Tersedia"}. Rincian slip resmi dapat diunduh via portal presensi HRIS.`;
+          botResponse = `Informasi slip gaji ${nama} (${d?.periode ?? "-"}): status ${d?.status_slip ?? "-"}. Rincian resmi dapat diunduh via portal presensi HRIS.`;
         } catch {
-          botResponse = `Slip gaji periode berjalan sudah diproses.`;
+          botResponse = `Halo ${nama}, data slip gaji tidak dapat diambil dari sistem HRIS saat ini.`;
         }
-      } else if (lower.includes("kas") || lower.includes("saldo")) {
-        if (activePersona.accessLevel === "STAFF") {
-          toolCall = {
-            name: "accounting.ringkasan_saldo_kas",
-            params: { requesterRole: activePersona.accessLevel },
-            result: { error: "FORBIDDEN: Hanya role Finance Admin dan Direksi yang diizinkan." },
-            status: "UNAUTHORIZED",
-          };
-          botResponse = `Maaf ${activePersona.name}, informasi saldo kas operasional perusahaan bersifat rahasia dan dibatasi hanya untuk staf Keuangan dan Direksi.`;
-        } else {
-          toolCall = {
-            name: "accounting.ringkasan_saldo_kas",
-            params: { accounts: ["KAS_OPERASIONAL", "BANK_BCA"] },
-            result: { kasOperasional: 148500000, bcaUtama: 420000000 },
-            status: "SUCCESS",
-          };
-          botResponse = `Posisi saldo kas terkini: Kas Operasional Rp 148.500.000 dan Rekening Bank BCA Rp 420.000.000. Total likuiditas: Rp 568.500.000.`;
-        }
-      } else if (lower.includes("invoice") || lower.includes("tagihan")) {
-        toolCall = {
-          name: "accounting.cek_status_invoice",
-          params: { invoiceNo: "INV-2026-0089" },
-          result: { no: "INV-2026-0089", status: "LUNAS", nominal: 45000000 },
-          status: "SUCCESS",
-        };
-        botResponse = `Invoice INV-2026-0089 tercatat LUNAS per tanggal 5 Maret 2026 sebesar Rp 45.000.000 via transfer Bank Mandiri.`;
+      } else if (lower.includes("kas") || lower.includes("saldo") || lower.includes("invoice") || lower.includes("tagihan")) {
+        botResponse = "Data akuntansi belum terhubung ke integrasi. Hubungkan sistem Accounting terlebih dahulu di menu Integrasi Sistem.";
       } else {
-        botResponse = `Pertanyaan Anda telah dicocokkan dengan dokumen kebijakan internal perusahaan. Silakan ajukan pertanyaan lain seputar hak cuti, absensi, atau invoice.`;
+        botResponse = "Pertanyaan Anda belum dapat dicocokkan dengan data internal. Silakan ajukan pertanyaan seputar cuti, absensi, atau slip gaji.";
       }
 
       const botMsg: ChatMessage = {
@@ -228,9 +207,9 @@ export function AssistantChatPage() {
           <div className="flex items-center gap-2">
             <span className="text-[11px] text-muted-foreground shrink-0">Simulasi Sebagai:</span>
             <select
-              value={activePersona.id}
+              value={activePersona?.id ?? ""}
               onChange={(e) => {
-                const found = TEST_PERSONAS.find((p) => p.id === e.target.value);
+                const found = personas.find((p) => p.id === e.target.value);
                 if (found) {
                   setActivePersona(found);
                   toast.info(`Beralih simulasi ke: ${found.name} (${found.department})`);
@@ -238,7 +217,9 @@ export function AssistantChatPage() {
               }}
               className="text-xs bg-background border border-input rounded-md px-2.5 py-1 font-medium"
             >
-              {TEST_PERSONAS.map((p) => (
+              {personas.length === 0 ? (
+                <option value="">Belum ada data karyawan</option>
+              ) : personas.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name} — {p.department} ({p.accessLevel})
                 </option>
@@ -337,7 +318,7 @@ export function AssistantChatPage() {
             Saldo Kas Perusahaan
           </button>
           <button
-            onClick={() => handleSend("Cek status invoice INV-2026-0089")}
+            onClick={() => handleSend("Cek status invoice terbaru")}
             className="px-2 py-1 bg-background hover:bg-muted rounded-full border border-border/60 text-muted-foreground hover:text-foreground whitespace-nowrap cursor-pointer transition-colors"
           >
             Status Invoice Klien
@@ -350,7 +331,7 @@ export function AssistantChatPage() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
-            placeholder={`Tanya asisten sebagai ${activePersona.name}...`}
+            placeholder={`Tanya asisten sebagai ${activePersona?.name || "Anda"}...`}
             className="text-xs flex-1"
           />
           <Button

@@ -187,7 +187,6 @@
 
 1. **Notifikasi Peringatan Kuota Otomatis via WhatsApp (80% & 100%)** *(Ditunda)*
 2. **Payment Gateway Pembayaran Top-Up Otomatis (QRIS / Virtual Account)** *(Ditunda)*
-3. **Auto Top-Up Booster S saat 100% Kuota** *(Ditunda)*
 4. **Laporan Performa Per Staf Sales & Efektivitas Sumber Leads** *(Roadmap)*
 5. **Laporan Mingguan Owner Otomatis via WhatsApp** *(Roadmap)*
 6. **Koneksi Resmi WhatsApp Cloud API Meta & Broadcast Berbayar** *(Roadmap)*
@@ -256,7 +255,6 @@ Agar pengembangan berjalan teratur, stabil, dan teruji tanpa menimbulkan regresi
 ### 📲 FASE 5: Otomasi Notifikasi WhatsApp Kuota (80% & 100%)
 **Target:** Peringatan proaktif ke nomor WhatsApp pemilik bisnis.
 - [ ] Trigger otomatis pengiriman pesan WhatsApp ke Owner saat pemakaian MAU atau AI menyentuh 80% dan 100%.
-- [ ] Opsi toggle Auto Top-Up Booster S untuk tier Silver & Gold.
 
 ### 🌐 FASE 6: Integrasi Lanjutan & Fitur Masa Depan (Backlog / Roadmap)
 **Target:** Fitur skala enterprise dan ekspansi ekosistem.

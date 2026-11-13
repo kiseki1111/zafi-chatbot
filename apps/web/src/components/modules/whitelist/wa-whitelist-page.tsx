@@ -40,6 +40,27 @@ interface WhitelistItem {
   lastActive: string;
 }
 
+// ponytail: mapping data karyawan HRIS ke format whitelist, dipakai saat mount & sync manual
+function mapHrisToWhitelist(list: any[]): WhitelistItem[] {
+  return list
+    .filter((k: any) => Boolean(k.phone || k.no_hp))
+    .map((k: any, i: number) => {
+      const raw = k.phone || k.no_hp || "";
+      const clean = raw.startsWith("0") ? "62" + raw.slice(1) : raw.replace(/\D/g, "");
+      return {
+        id: `wl-hris-${k.nik || i}`,
+        phone: clean,
+        employeeName: k.name || k.nama_karyawan,
+        nik: k.nik,
+        department: k.department || "Operasional",
+        position: k.position || "Staf",
+        isRegisteredOnWa: true,
+        enabled: true,
+        lastActive: "Terverifikasi Sistem",
+      };
+    });
+}
+
 // ponytail: tanpa data mockup, data diisi via sync API HRIS atau input manual
 export function WaWhitelistPage() {
   const [whitelist, setWhitelist] = useState<WhitelistItem[]>([]);
@@ -53,26 +74,8 @@ export function WaWhitelistPage() {
       .then((json) => {
         const list = json?.data?.data || json?.data || [];
         if (Array.isArray(list) && list.length > 0) {
-          const mapped: WhitelistItem[] = list
-            .filter((k: any) => Boolean(k.phone || k.no_hp))
-            .map((k: any, i: number) => {
-              const raw = k.phone || k.no_hp || '';
-              const clean = raw.startsWith('0') ? '62' + raw.slice(1) : raw.replace(/\D/g, '');
-              return {
-                id: `wl-hris-${k.nik || i}`,
-                phone: clean,
-                employeeName: k.name || k.nama_karyawan,
-                nik: k.nik,
-                department: k.department || 'Operasional',
-                position: k.position || 'Staf',
-                isRegisteredOnWa: true,
-                enabled: true,
-                lastActive: "Terverifikasi Sistem",
-              };
-            });
-          if (mapped.length > 0) {
-            setWhitelist(mapped);
-          }
+          const mapped = mapHrisToWhitelist(list);
+          if (mapped.length > 0) setWhitelist(mapped);
         }
       })
       .catch(() => null);
@@ -255,12 +258,24 @@ export function WaWhitelistPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => {
+            onClick={async () => {
               setIsSyncing(true);
-              setTimeout(() => {
+              try {
+                const res = await fetch("/api/v1/hris/karyawan/list");
+                const json = await res.json();
+                const list = json?.data?.data || json?.data || [];
+                const mapped = Array.isArray(list) ? mapHrisToWhitelist(list) : [];
+                if (mapped.length > 0) {
+                  setWhitelist(mapped);
+                  toast.success(`${mapped.length} nomor karyawan berhasil disinkronkan ke whitelist!`);
+                } else {
+                  toast.error("Tidak ada data karyawan dengan nomor WhatsApp dari HRIS.");
+                }
+              } catch {
+                toast.error("Gagal menyinkronkan data karyawan dari HRIS.");
+              } finally {
                 setIsSyncing(false);
-                toast.success("Semua 48 nomor karyawan berhasil disinkronkan ke whitelist!");
-              }, 600);
+              }
             }}
             disabled={isSyncing}
             className="gap-2 text-xs"

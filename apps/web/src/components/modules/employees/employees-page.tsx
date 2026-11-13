@@ -174,25 +174,25 @@ export function EmployeesPage() {
         <Card className="bg-card/50 shadow-xs">
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground font-medium">Total Karyawan</p>
-            <p className="text-xl font-bold text-foreground mt-1">48 Staf</p>
+            <p className="text-xl font-bold text-foreground mt-1">{employees.length} Staf</p>
           </CardContent>
         </Card>
         <Card className="bg-card/50 shadow-xs">
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground font-medium">Akses Aktif</p>
-            <p className="text-xl font-bold text-emerald-600 mt-1">46 Aktif</p>
+            <p className="text-xl font-bold text-emerald-600 mt-1">{employees.filter((e) => e.status === "ACTIVE").length} Aktif</p>
           </CardContent>
         </Card>
         <Card className="bg-card/50 shadow-xs">
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground font-medium">WhatsApp Terverifikasi</p>
-            <p className="text-xl font-bold text-blue-600 mt-1">45 / 48</p>
+            <p className="text-xl font-bold text-blue-600 mt-1">{employees.filter((e) => e.isWaVerified).length} / {employees.length}</p>
           </CardContent>
         </Card>
         <Card className="bg-card/50 shadow-xs">
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground font-medium">Izin Data Sensitif</p>
-            <p className="text-xl font-bold text-purple-600 mt-1">10 Staf</p>
+            <p className="text-xl font-bold text-purple-600 mt-1">{employees.filter((e) => e.accessLevel !== "STAFF").length} Staf</p>
           </CardContent>
         </Card>
       </div>

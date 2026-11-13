@@ -10,9 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Bot, Save, Smartphone, ShieldCheck, ShieldAlert, Loader2, Plus, Trash2, QrCode, Palette, Wrench, Settings, Users, Sparkles, CheckCircle2, Zap, Compass, RefreshCw } from "lucide-react";
+import { Bot, Save, Smartphone, ShieldCheck, ShieldAlert, Loader2, Plus, Trash2, QrCode, Palette, Wrench, Settings, Users, Sparkles, CheckCircle2, Compass, RefreshCw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthStore } from "@/lib/auth-store";
 import { cn } from "@/lib/utils";
@@ -21,15 +20,22 @@ import { OnboardingWizardDialog } from "@/components/modules/onboarding/onboardi
 import { useMenuGuide } from "@/lib/use-menu-guide";
 import { MenuGuideBanner } from "@/components/dashboard/menu-guide-banner";
 
-export function SettingsPage({ defaultTab = "bot" }: { defaultTab?: string }) {
+export function SettingsPage({ defaultTab = "bot_cs" }: { defaultTab?: string }) {
   const [activeTab, setActiveTab] = React.useState(defaultTab);
 
   React.useEffect(() => {
     if (typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search);
       const tabParam = urlParams.get("tab");
-      if (tabParam === "koneksi" || tabParam === "bot" || tabParam === "asisten_wa" || tabParam === "warna") {
-        setActiveTab(tabParam);
+      // ponytail: terima juga tab lama (bot/koneksi/asisten_wa) agar link lama tetap valid
+      const legacy: Record<string, string> = {
+        bot: "bot_cs",
+        koneksi: "bot_cs",
+        asisten_wa: "bot_asisten",
+      };
+      const resolved = tabParam ? legacy[tabParam] || tabParam : null;
+      if (resolved === "bot_cs" || resolved === "bot_asisten" || resolved === "warna") {
+        setActiveTab(resolved);
       }
     }
   }, []);
@@ -47,18 +53,14 @@ export function SettingsPage({ defaultTab = "bot" }: { defaultTab?: string }) {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4 h-10 p-1 bg-muted/60 rounded-xl border border-border/50 max-w-2xl overflow-x-auto">
-          <TabsTrigger value="bot" className="text-xs font-semibold gap-1.5 rounded-lg py-1.5 data-[state=active]:bg-card data-[state=active]:shadow-xs whitespace-nowrap">
+        <TabsList className="grid w-full grid-cols-3 h-10 p-1 bg-muted/60 rounded-xl border border-border/50 max-w-2xl overflow-x-auto">
+          <TabsTrigger value="bot_cs" className="text-xs font-semibold gap-1.5 rounded-lg py-1.5 data-[state=active]:bg-card data-[state=active]:shadow-xs whitespace-nowrap">
             <Bot className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
-            <span>Bot AI</span>
+            <span>Bot CS</span>
           </TabsTrigger>
-          <TabsTrigger value="koneksi" className="text-xs font-semibold gap-1.5 rounded-lg py-1.5 data-[state=active]:bg-card data-[state=active]:shadow-xs whitespace-nowrap">
-            <Smartphone className="h-3.5 w-3.5 shrink-0 text-blue-600" />
-            <span>WA CS</span>
-          </TabsTrigger>
-          <TabsTrigger value="asisten_wa" className="text-xs font-semibold gap-1.5 rounded-lg py-1.5 data-[state=active]:bg-card data-[state=active]:shadow-xs whitespace-nowrap">
-            <QrCode className="h-3.5 w-3.5 shrink-0 text-purple-600" />
-            <span>WA Asisten Internal</span>
+          <TabsTrigger value="bot_asisten" className="text-xs font-semibold gap-1.5 rounded-lg py-1.5 data-[state=active]:bg-card data-[state=active]:shadow-xs whitespace-nowrap">
+            <QrCode className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+            <span>Bot Asisten</span>
           </TabsTrigger>
           <TabsTrigger value="warna" className="text-xs font-semibold gap-1.5 rounded-lg py-1.5 data-[state=active]:bg-card data-[state=active]:shadow-xs whitespace-nowrap">
             <Palette className="h-3.5 w-3.5 shrink-0 text-amber-600" />
@@ -66,13 +68,11 @@ export function SettingsPage({ defaultTab = "bot" }: { defaultTab?: string }) {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="bot">
+        <TabsContent value="bot_cs" className="space-y-6">
           <BotSettingsTab />
-        </TabsContent>
-        <TabsContent value="koneksi">
           <KoneksiWATab />
         </TabsContent>
-        <TabsContent value="asisten_wa">
+        <TabsContent value="bot_asisten">
           <KoneksiAsistenWATab />
         </TabsContent>
         <TabsContent value="warna">
@@ -325,49 +325,6 @@ function BotSettingsTab() {
             </div>
           </div>
         </Card>
-      )}
-
-      {quota && (
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 rounded-xl border bg-background text-xs">
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-1.5 font-semibold text-foreground">
-              <Zap className="h-4 w-4 text-amber-500" />
-              <span>Auto Top-Up Booster S saat Kuota 100%</span>
-              {!['silver', 'gold', 'enterprise', 'developer'].includes(quota.plan) && (
-                <span className="text-[9px] px-1 py-0 rounded bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 font-bold border border-amber-300">
-                  Silver+
-                </span>
-              )}
-            </div>
-            <p className="text-[11px] text-muted-foreground">
-              Otomatis menambah Booster S (+500 MAU &amp; +2.000 AI) saat kuota habis agar bot tidak terhenti.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Switch
-              checked={Boolean((quota as any).autoTopUpEnabled)}
-              disabled={!['silver', 'gold', 'enterprise', 'developer'].includes(quota.plan)}
-              onCheckedChange={async (enabled) => {
-                const targetId = user?.tenantId || (user?.id && !user.id.startsWith("u-") ? user.id : "demo");
-                if (!targetId) return;
-                try {
-                  const res = await fetch(`/api/v1/tenant/clients/${targetId}/auto-topup`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ autoTopUpEnabled: enabled }),
-                  });
-                  if (res.ok) {
-                    const data = await res.json();
-                    setQuota(data?.data || data);
-                    toast.success(`Auto Top-Up ${enabled ? 'diaktifkan' : 'dinonaktifkan'}`);
-                  }
-                } catch {
-                  toast.error('Gagal memperbarui auto top-up');
-                }
-              }}
-            />
-          </div>
-        </div>
       )}
 
       <Card>
@@ -1116,7 +1073,7 @@ function KoneksiAsistenWATab() {
           <div className="flex items-center justify-between">
             <div className="space-y-1">
               <CardTitle className="text-base flex items-center gap-2">
-                <QrCode className="h-5 w-5 text-purple-600" />
+                <QrCode className="h-5 w-5 text-emerald-600" />
                 Nomor WhatsApp Khusus Asisten HR & Accounting
               </CardTitle>
               <CardDescription className="text-xs">
@@ -1138,7 +1095,7 @@ function KoneksiAsistenWATab() {
         <CardContent className="space-y-4 text-xs">
           {loading ? (
             <div className="py-6 flex items-center justify-center gap-2 text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin text-purple-600" />
+              <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />
               <span>Memeriksa status sesi WhatsApp...</span>
             </div>
           ) : isOnline ? (
@@ -1169,7 +1126,7 @@ function KoneksiAsistenWATab() {
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-border/80 p-6 flex flex-col items-center justify-center text-center space-y-3 bg-muted/20">
-              <div className="h-12 w-12 rounded-2xl bg-purple-500/10 text-purple-600 flex items-center justify-center">
+              <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
                 <QrCode className="h-6 w-6" />
               </div>
               <div className="max-w-md space-y-1">
@@ -1180,7 +1137,7 @@ function KoneksiAsistenWATab() {
               </div>
               <Button
                 size="sm"
-                className="bg-purple-600 hover:bg-purple-700 text-white gap-2 font-medium"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 font-medium"
                 onClick={handleStartConnect}
                 disabled={isCreating}
               >
@@ -1239,7 +1196,7 @@ function KoneksiAsistenWATab() {
                     setQrCodeData(null);
                     setConnectedSession(null);
                   }}
-                  className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
                 >
                   Selesai
                 </Button>
@@ -1249,7 +1206,7 @@ function KoneksiAsistenWATab() {
             <>
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
-                  <QrCode className="h-5 w-5 text-purple-600" />
+                  <QrCode className="h-5 w-5 text-emerald-600" />
                   Scan QR Code WhatsApp Asisten
                 </DialogTitle>
                 <DialogDescription className="text-xs">
@@ -1258,12 +1215,12 @@ function KoneksiAsistenWATab() {
               </DialogHeader>
               <div className="flex flex-col items-center justify-center py-4">
                 {qrCodeData && (
-                  <div className="relative p-2 bg-white rounded-xl shadow-md border-2 border-purple-500">
+                  <div className="relative p-2 bg-white rounded-xl shadow-md border-2 border-emerald-500">
                     <img src={qrCodeData.url} alt="QR Code Asisten" className="w-48 h-48 rounded-lg" />
                   </div>
                 )}
                 <div className="flex items-center gap-2 mt-4 text-xs text-muted-foreground">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-purple-600" />
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-600" />
                   <span>Menunggu pemindaian ponsel...</span>
                 </div>
               </div>

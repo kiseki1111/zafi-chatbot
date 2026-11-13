@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
@@ -11,7 +12,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   Activity, RefreshCw, AlertTriangle, CheckCircle2,
-  TrendingUp, Users, Zap, Building2, ArrowRight,
+  TrendingUp, Users, Zap, Building2, ArrowRight, Search,
 } from "lucide-react";
 
 interface QuotaClient {
@@ -31,6 +32,7 @@ export function QuotaMonitorPage() {
   const { setView } = useAppStore();
   const [clients, setClients] = useState<QuotaClient[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
   const fetchQuotaOverview = async () => {
     setLoading(true);
@@ -55,6 +57,11 @@ export function QuotaMonitorPage() {
     (c) => (c.maxMau > 0 && c.mauPercent >= 80) || (c.maxAiResponses > 0 && c.aiPercent >= 80)
   );
 
+  const q = search.trim().toLowerCase();
+  const filteredClients = q
+    ? clients.filter((c) => c.name.toLowerCase().includes(q) || c.plan.toLowerCase().includes(q))
+    : clients;
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -67,6 +74,16 @@ export function QuotaMonitorPage() {
         <Button onClick={fetchQuotaOverview} variant="outline" size="sm" className="h-8 text-xs gap-1.5">
           <RefreshCw className="h-3.5 w-3.5" /> Refresh
         </Button>
+      </div>
+
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Cari nama klien atau paket..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-9 text-xs"
+        />
       </div>
 
       {/* Warning banner jika ada klien hampir over-quota */}
@@ -97,13 +114,13 @@ export function QuotaMonitorPage() {
             </Card>
           ))}
         </div>
-      ) : clients.length === 0 ? (
+      ) : filteredClients.length === 0 ? (
         <Card className="p-12 text-center text-xs text-muted-foreground">
-          Belum ada perusahaan klien yang terdaftar.
+          {q ? "Tidak ada klien yang cocok dengan pencarian." : "Belum ada perusahaan klien yang terdaftar."}
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
-          {clients.map((c) => {
+          {filteredClients.map((c) => {
             const isNearMau = c.maxMau > 0 && c.mauPercent >= 80;
             const isNearAi = c.maxAiResponses > 0 && c.aiPercent >= 80;
 

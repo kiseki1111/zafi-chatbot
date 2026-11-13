@@ -328,39 +328,7 @@ describe('TenantService', () => {
     });
   });
 
-  describe('Auto Top-Up & Quota Notifications (Phase 5)', () => {
-    it('harus menolak toggle Auto Top-Up jika tenant berada di paket Lite / Bronze (400)', async () => {
-      mockPrisma.tenant.findUnique.mockResolvedValue({
-        id: 't-bronze',
-        metadata: { plan: 'bronze' },
-      });
-
-      await expect(
-        service.updateAutoTopUpSettings('t-bronze', { autoTopUpEnabled: true }),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('harus mengizinkan toggle Auto Top-Up jika tenant berada di paket Silver', async () => {
-      const initialTenant = {
-        id: 't-silver',
-        metadata: { plan: 'silver', autoTopUpEnabled: false },
-        whatsappInstances: [],
-      };
-      mockPrisma.tenant.findUnique.mockResolvedValue(initialTenant);
-      mockPrisma.tenant.update.mockImplementation(async ({ data }) => ({
-        ...initialTenant,
-        metadata: data.metadata,
-      }));
-
-      const res = await service.updateAutoTopUpSettings('t-silver', {
-        autoTopUpEnabled: true,
-        autoTopUpMonthlyLimit: 5,
-      });
-
-      expect(res.autoTopUpEnabled).toBe(true);
-      expect(res.autoTopUpMonthlyLimit).toBe(5);
-    });
-
+  describe('Quota Notifications (Phase 5)', () => {
     it('harus mencatat notifikasi peringatan kuota 80% saat penggunaan menyentuh 80%', async () => {
       const tenant80 = {
         id: 't-silver-80',

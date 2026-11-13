@@ -127,7 +127,8 @@ export function Topbar() {
               variant="outline"
               className="h-7 text-[11px] bg-white hover:bg-amber-50 border-amber-600/30 text-amber-950 font-semibold gap-1.5 shadow-none"
               onClick={() => {
-                window.history.pushState({}, '', '?view=settings&tab=koneksi');
+                const onlyAssistant = offlineInstances.length > 0 && offlineInstances.every(i => i.instanceName.startsWith('asisten-'));
+                window.history.pushState({}, '', `?view=settings&tab=${onlyAssistant ? 'bot_asisten' : 'bot_cs'}`);
                 setView("settings");
               }}
             >

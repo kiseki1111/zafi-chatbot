@@ -242,8 +242,7 @@ export class OmnichannelQueueService implements BeforeApplicationShutdown {
             }),
           ).catch(() => 0)) ?? 0;
         if (aiUsed >= capacity.maxAiResponses) {
-          const autoApplied = await this.tryAutoTopUp(tenant);
-          if (!autoApplied) return true;
+          return true;
         }
       }
 
@@ -261,65 +260,11 @@ export class OmnichannelQueueService implements BeforeApplicationShutdown {
           }),
         ).catch(() => []);
         if (conversations.length > softLimitMau) {
-          const autoApplied = await this.tryAutoTopUp(tenant);
-          if (!autoApplied) return true;
+          return true;
         }
       }
 
       return false;
-    } catch {
-      return false;
-    }
-  }
-
-  // ponytail: aktivasi otomatis paket booster s saat kuota 100% jika diaktifkan tenant
-  private async tryAutoTopUp(tenant: any): Promise<boolean> {
-    try {
-      const meta = tenant.metadata || {};
-      if (!meta.autoTopUpEnabled) return false;
-
-      const monthlyLimit = Number(meta.autoTopUpMonthlyLimit) || 3;
-      const currentMonth = new Date().toISOString().slice(0, 7);
-      const autoCount =
-        meta.autoTopUpMonth === currentMonth
-          ? Number(meta.autoTopUpCount) || 0
-          : 0;
-
-      if (autoCount >= monthlyLimit) return false;
-
-      // Booster S: +500 MAU, +2000 AI
-      const updatedMeta = {
-        ...meta,
-        extraMau: (Number(meta.extraMau) || 0) + 500,
-        extraAiResponses: (Number(meta.extraAiResponses) || 0) + 2000,
-        autoTopUpCount: autoCount + 1,
-        autoTopUpMonth: currentMonth,
-        topups: [
-          {
-            id: `auto-booster-${Date.now()}`,
-            itemKey: 'BOOSTER_S',
-            name: 'Auto Top-Up Booster S',
-            price: 160000,
-            mau: 500,
-            ai: 2000,
-            notes: `Auto top-up #${autoCount + 1} kuota 100%`,
-            createdAt: new Date().toISOString(),
-          },
-          ...(Array.isArray(meta.topups) ? meta.topups : []),
-        ],
-      };
-
-      await Promise.resolve(
-        this.prisma.tenant?.update?.({
-          where: { id: tenant.id },
-          data: { metadata: updatedMeta },
-        }),
-      ).catch(() => null);
-
-      this.logger.log(
-        `[Omnichannel] Auto Top-Up Booster S berhasil diterapkan untuk tenant ${tenant.id} (${autoCount + 1}/${monthlyLimit})`,
-      );
-      return true;
     } catch {
       return false;
     }

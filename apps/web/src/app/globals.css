@@ -164,6 +164,22 @@
   background-color: var(--brand-primary) !important;
 }
 
+/* ponytail: transisi halus saat ganti tema, hanya aktif sesaat lewat class .theme-transition */
+@media (prefers-reduced-motion: no-preference) {
+  .theme-transition,
+  .theme-transition *,
+  .theme-transition *::before,
+  .theme-transition *::after {
+    transition:
+      background-color 0.3s ease,
+      border-color 0.3s ease,
+      color 0.3s ease,
+      fill 0.3s ease,
+      stroke 0.3s ease,
+      box-shadow 0.3s ease !important;
+  }
+}
+
 @keyframes indeterminate-bar {
   0% { transform: translateX(-100%); width: 35%; }
   50% { width: 60%; }

@@ -382,17 +382,6 @@ export class TenantController {
     return this.tenantService.applyTenantTopUp(tenantId, body);
   }
 
-  // Tenant / Superadmin: Update Pengaturan Auto Top-Up Booster S
-  @Patch('clients/:tenantId/auto-topup')
-  async updateAutoTopUpSettings(
-    @Param('tenantId') tenantId: string,
-    @Req() req: any,
-    @Body() body: { autoTopUpEnabled: boolean; autoTopUpMonthlyLimit?: number },
-  ) {
-    this.ensureTenantAccess(tenantId, req);
-    return this.tenantService.updateAutoTopUpSettings(tenantId, body);
-  }
-
   // Tenant / Superadmin: Evaluasi & Pemicu Notifikasi Kuota WhatsApp (80% & 100%)
   @Post('clients/:tenantId/notify-quota')
   async triggerQuotaNotification(

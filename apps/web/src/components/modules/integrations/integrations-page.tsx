@@ -32,6 +32,7 @@ import {
   Building,
   Coins,
   ArrowRight,
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -63,88 +64,7 @@ interface ToolDefinition {
 // ponytail: array kosong sebagai default, koneksi diisi lewat form/tidak ada mockup
 const INITIAL_CONNECTORS: SystemConnector[] = [];
 
-const INITIAL_TOOLS: ToolDefinition[] = [
-  {
-    id: "tool-1",
-    name: "cek_sisa_cuti",
-    system: "HRIS",
-    description: "Mengambil data sisa cuti tahunan, cuti bersama, dan riwayat pengajuan cuti terakhir staf.",
-    endpoint: "/karyawan/:userId/cuti-balance",
-    method: "GET",
-    minRole: "STAFF",
-    enabled: true,
-  },
-  {
-    id: "tool-2",
-    name: "info_slip_gaji",
-    system: "HRIS",
-    description: "Mengambil ringkasan take-home pay, tunjangan, dan potongan periode berjalan karyawan bersangkutan.",
-    endpoint: "/karyawan/:userId/slip-gaji/latest",
-    method: "GET",
-    minRole: "STAFF",
-    enabled: true,
-  },
-  {
-    id: "tool-3",
-    name: "ajukan_izin_cuti",
-    system: "HRIS",
-    description: "Membuat draft tiket pengajuan cuti atau izin sakit ke atasan langsung.",
-    endpoint: "/karyawan/:userId/ajukan-cuti",
-    method: "POST",
-    minRole: "STAFF",
-    enabled: true,
-  },
-  {
-    id: "tool-4",
-    name: "rekap_absensi_departemen",
-    system: "HRIS",
-    description: "Melihat rekapitulasi kehadiran dan keterlambatan staf satu departemen dalam 30 hari terakhir.",
-    endpoint: "/departemen/:deptId/absensi-summary",
-    method: "GET",
-    minRole: "HR_ADMIN",
-    enabled: true,
-  },
-  {
-    id: "tool-5",
-    name: "cek_status_invoice",
-    system: "ACCOUNTING",
-    description: "Memeriksa status pembayaran invoice (LUNAS, PENDING, OVERDUE) berdasarkan nomor tagihan.",
-    endpoint: "/invoices/:invoiceNumber",
-    method: "GET",
-    minRole: "STAFF",
-    enabled: true,
-  },
-  {
-    id: "tool-6",
-    name: "cek_status_reimbursement",
-    system: "ACCOUNTING",
-    description: "Mengecek status klaim pengeluaran atau perjalanan dinas yang diajukan staf.",
-    endpoint: "/karyawan/:userId/reimbursements",
-    method: "GET",
-    minRole: "STAFF",
-    enabled: true,
-  },
-  {
-    id: "tool-7",
-    name: "ringkasan_saldo_kas",
-    system: "ACCOUNTING",
-    description: "Melihat saldo kas operasional, rekening bank utama, dan arus kas masuk-keluar minggu ini.",
-    endpoint: "/finance/cashflow-summary",
-    method: "GET",
-    minRole: "FINANCE_ADMIN",
-    enabled: true,
-  },
-  {
-    id: "tool-8",
-    name: "cek_sisa_budget_dept",
-    system: "ACCOUNTING",
-    description: "Mengecek realisasi vs sisa anggaran biaya operasional departemen kuartal ini.",
-    endpoint: "/finance/budget/:deptId",
-    method: "GET",
-    minRole: "FINANCE_ADMIN",
-    enabled: true,
-  },
-];
+const INITIAL_TOOLS: ToolDefinition[] = [];
 
 export function IntegrationsPage() {
   const [connectors, setConnectors] = useState<SystemConnector[]>(INITIAL_CONNECTORS);
@@ -154,6 +74,28 @@ export function IntegrationsPage() {
   const [testingTool, setTestingTool] = useState<ToolDefinition | null>(null);
   const [testResult, setTestResult] = useState<string | null>(null);
   const [isExecutingTest, setIsExecutingTest] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const q = search.trim().toLowerCase();
+  const filteredConnectors = q
+    ? connectors.filter(
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          c.description.toLowerCase().includes(q) ||
+          c.baseUrl.toLowerCase().includes(q),
+      )
+    : connectors;
+  const avgLatency = connectors.length
+    ? Math.round(connectors.reduce((sum, c) => sum + c.latencyMs, 0) / connectors.length)
+    : 0;
+  const filteredTools = q
+    ? tools.filter(
+        (t) =>
+          t.name.toLowerCase().includes(q) ||
+          t.description.toLowerCase().includes(q) ||
+          t.endpoint.toLowerCase().includes(q),
+      )
+    : tools;
 
   const handlePingAll = async () => {
     setIsPinging(true);
@@ -161,7 +103,7 @@ export function IntegrationsPage() {
       const res = await fetch("/api/v1/hris/health", { signal: AbortSignal.timeout(4000) });
       const json = await res.json();
       const payload = json?.data !== undefined ? json.data : json;
-      const hrisLatency = payload?.latencyMs || 35;
+      const hrisLatency = payload?.latencyMs || 0;
       const isOk = payload?.status === "CONNECTED";
 
       setConnectors((prev) =>
@@ -174,29 +116,26 @@ export function IntegrationsPage() {
                 lastPing: "Baru saja",
                 description: `Pintu data profil karyawan, sisa kuota cuti tahunan, rekap absensi, dan slip gaji. (${payload?.totalKaryawanAktif ?? 0} Karyawan Aktif Terhubung)`,
               }
-            : {
-                ...c,
-                status: "CONNECTED",
-                latencyMs: 58,
-                lastPing: "Baru saja",
-              }
+            : c
+
         )
       );
-      toast.success(
-        isOk
-          ? `Koneksi HRIS terhubung! Latensi: ${hrisLatency}ms (${payload?.totalKaryawanAktif ?? 0} Karyawan Aktif)`
-          : "HRIS Offline. Pastikan service Laravel berjalan di port 8000."
-      );
+      if (isOk) {
+        toast.success(
+          `Koneksi HRIS terhubung! Latensi: ${hrisLatency}ms (${payload?.totalKaryawanAktif ?? 0} Karyawan Aktif)`,
+        );
+      } else {
+        toast.error("HRIS Offline. Pastikan service Laravel berjalan di port 8000.");
+      }
     } catch {
       setConnectors((prev) =>
         prev.map((c) => ({
           ...c,
-          status: "CONNECTED",
-          latencyMs: 38,
-          lastPing: "Baru saja",
+          status: "OFFLINE",
+          lastPing: "Gagal terhubung",
         }))
       );
-      toast.success("Koneksi HRIS & Accounting terverifikasi aktif!");
+      toast.error("Gagal menghubungi layanan HRIS.");
     } finally {
       setIsPinging(false);
     }
@@ -216,71 +155,17 @@ export function IntegrationsPage() {
 
   const executeTest = async () => {
     setIsExecutingTest(true);
-    const start = Date.now();
     try {
-      if (testingTool?.system === "CONSOLE") {
-        setTestResult(
-          JSON.stringify(
-            {
-              status: "success",
-              target: "ZAF Console Hub (http://localhost:17341)",
-              api: "http://127.0.0.1:17342/api/health",
-              result: {
-                status: "ok",
-                database: "up",
-                customer: "ZAF Enterprise Solution (slug: zafi)",
-                activePlan: "HRIS + Chatbot + Accounting",
-                whitelistedPhone: "6281649433281",
-              },
-              latency: `${Date.now() - start}ms`,
-            },
-            null,
-            2
-          )
-        );
-      } else if (testingTool?.system === "HRIS") {
-        let endpoint = "/api/v1/hris/karyawan/lookup?phone=081234567890";
-        if (testingTool.name.includes("cuti")) {
-          endpoint = "/api/v1/hris/karyawan/250100001/cuti";
-        } else if (testingTool.name.includes("slip") || testingTool.name.includes("gaji")) {
-          endpoint = "/api/v1/hris/karyawan/250100001/slip-gaji";
-        } else if (testingTool.name.includes("absen") || testingTool.name.includes("presensi")) {
-          endpoint = "/api/v1/hris/karyawan/250100001/presensi";
-        }
-
-        const res = await fetch(endpoint, { signal: AbortSignal.timeout(4000) });
-        const json = await res.json();
-        const latency = `${Date.now() - start}ms`;
-        setTestResult(JSON.stringify({ ...json, latency }, null, 2));
-      } else {
-        setTestResult(
-          JSON.stringify(
-            {
-              status: "success",
-              code: 200,
-              data: {
-                saldoKasOperasional: "Rp 148.500.000",
-                rekeningBCA: "Rp 420.000.000",
-                piutangJatuhTempo: "Rp 35.000.000",
-                periode: "Maret 2026",
-              },
-              latency: `${Date.now() - start}ms`,
-            },
-            null,
-            2
-          )
-        );
-      }
-    } catch (err: any) {
       setTestResult(
         JSON.stringify(
           {
             status: "error",
-            message: err.message || "Gagal memanggil endpoint HRIS",
+            message:
+              "Belum ada tool yang terhubung. Tambahkan konfigurasi integrasi terlebih dahulu.",
           },
           null,
-          2
-        )
+          2,
+        ),
       );
     } finally {
       setIsExecutingTest(false);
@@ -314,6 +199,17 @@ export function IntegrationsPage() {
         </div>
       </div>
 
+      {/* Search */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Cari sistem, endpoint, atau nama tool..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-9 text-xs"
+        />
+      </div>
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="bg-card/50 shadow-xs">
@@ -323,7 +219,7 @@ export function IntegrationsPage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground font-medium">Layanan Terhubung</p>
-              <p className="text-xl font-bold text-foreground">2 Sistem</p>
+              <p className="text-xl font-bold text-foreground">{connectors.length} Sistem</p>
             </div>
           </CardContent>
         </Card>
@@ -347,7 +243,7 @@ export function IntegrationsPage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground font-medium">Rata-rata Latensi</p>
-              <p className="text-xl font-bold text-foreground">53 ms</p>
+              <p className="text-xl font-bold text-foreground">{avgLatency} ms</p>
             </div>
           </CardContent>
         </Card>
@@ -375,8 +271,13 @@ export function IntegrationsPage() {
 
         {/* Tab 1: Pintu Koneksi */}
         <TabsContent value="connectors" className="space-y-4">
+          {filteredConnectors.length === 0 ? (
+            <p className="py-10 text-center text-xs text-muted-foreground">
+              {q ? "Tidak ada koneksi yang cocok dengan pencarian" : "Belum ada pintu koneksi sistem yang terdaftar"}
+            </p>
+          ) : (
           <div className="grid md:grid-cols-2 gap-4">
-            {connectors.map((c) => (
+            {filteredConnectors.map((c) => (
               <Card key={c.id} className="relative overflow-hidden border border-border/80 shadow-xs">
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between gap-2">
@@ -463,6 +364,7 @@ export function IntegrationsPage() {
               </Card>
             ))}
           </div>
+          )}
         </TabsContent>
 
         {/* Tab 2: Tools AI */}
@@ -481,7 +383,11 @@ export function IntegrationsPage() {
             </CardHeader>
             <CardContent>
               <div className="divide-y divide-border/60">
-                {tools.map((tool) => (
+                {filteredTools.length === 0 ? (
+                  <p className="py-10 text-center text-xs text-muted-foreground">
+                    {q ? "Tidak ada tool yang cocok dengan pencarian" : "Belum ada tool AI terdaftar"}
+                  </p>
+                ) : filteredTools.map((tool) => (
                   <div key={tool.id} className="py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">

@@ -18,8 +18,12 @@ export default function Home() {
 
   useEffect(() => {
     const root = document.documentElement;
+    root.classList.add("theme-transition");
     if (theme === "dark") root.classList.add("dark");
     else root.classList.remove("dark");
+    // ponytail: lepas class setelah animasi selesai agar transisi lain tidak ikut terkunci
+    const timer = window.setTimeout(() => root.classList.remove("theme-transition"), 350);
+    return () => window.clearTimeout(timer);
   }, [theme]);
 
   if (!mounted) {
