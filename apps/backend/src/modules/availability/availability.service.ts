@@ -527,7 +527,7 @@ export class AvailabilityService {
 
           <!-- Watermark Update -->
           <text x="${width - 190}" y="95" font-family="Arial, sans-serif" font-size="11" font-style="italic" fill="#94A3B8" text-anchor="end">
-            *Diperbarui Real-time Otomatis oleh Sistem ZAF Sales AI
+            *Diperbarui Real-time Otomatis oleh Sistem ZAF SAPA AI
           </text>
         </g>
       </svg>

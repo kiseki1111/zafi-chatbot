@@ -149,16 +149,14 @@ export function Topbar() {
       <div className="flex items-center justify-between gap-3 h-full px-4 lg:px-6">
         {/* Compact Mobile Brand (Hanya tampil di layar HP/Tablet, di desktop sudah ada di Sidebar) */}
         <div className="flex lg:hidden items-center gap-2">
-          <div className="relative h-8 w-8 rounded-lg overflow-hidden bg-white/95 dark:bg-card p-0.5 border border-border/40 shadow-xs shrink-0">
-            <img
-              src="/logo.png"
-              alt="ZAF Platform"
-              className="h-full w-full object-contain"
-            />
-          </div>
+          <img
+            src="/logo-icon.svg"
+            alt="ZAF SAPA"
+            className="h-6 w-6 shrink-0 object-contain dark:brightness-0 dark:invert"
+          />
           <div className="min-w-0">
             <span className="font-bold text-sm tracking-tight text-foreground truncate block leading-tight">
-              ZAF Platform
+              ZAF SAPA
             </span>
             <span className="text-[10px] text-muted-foreground block leading-none">
               CS & Asisten AI

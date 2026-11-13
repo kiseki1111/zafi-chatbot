@@ -20,15 +20,13 @@ export function AuthShell({
       <div className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-gradient-to-br from-emerald-700 via-teal-700 to-emerald-900 p-12 text-white">
         <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "radial-gradient(circle at 20% 30%, white 1px, transparent 1px), radial-gradient(circle at 70% 60%, white 1px, transparent 1px)", backgroundSize: "48px 48px" }} />
         <div className="relative z-10 flex items-center gap-3">
-          <div className="relative h-11 w-11 rounded-xl overflow-hidden bg-white/95 p-1 shadow-sm ring-1 ring-white/30 shrink-0">
-            <img
-              src="/logo.png"
-              alt="ZAF Sales"
-              className="h-full w-full object-contain"
-            />
-          </div>
+          <img
+            src="/logo-icon.svg"
+            alt="ZAF SAPA"
+            className="h-8 w-8 shrink-0 object-contain brightness-0 invert"
+          />
           <div>
-            <p className="text-lg font-bold leading-tight">ZAF Sales</p>
+            <p className="text-lg font-bold leading-tight">ZAF SAPA</p>
             <p className="text-xs text-emerald-100/80">AI Assistant · WhatsApp CRM</p>
           </div>
         </div>
@@ -49,22 +47,20 @@ export function AuthShell({
         </div>
 
         <p className="relative z-10 text-xs text-emerald-100/70">
-          © {new Date().getFullYear()} ZAF Sales. Ditenagai oleh WhatsApp Cloud Gateway.
+          © {new Date().getFullYear()} ZAF SAPA. Ditenagai oleh WhatsApp Cloud Gateway.
         </p>
       </div>
 
       {/* Form panel */}
       <div className="flex flex-col min-h-screen">
         <div className="lg:hidden flex items-center gap-2.5 p-4 border-b bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30">
-          <div className="relative h-9 w-9 rounded-lg overflow-hidden bg-white/95 p-0.5 border border-border/40 shadow-xs shrink-0">
-            <img
-              src="/logo.png"
-              alt="ZAF Sales"
-              className="h-full w-full object-contain"
-            />
-          </div>
+          <img
+            src="/logo-icon.svg"
+            alt="ZAF SAPA"
+            className="h-6 w-6 shrink-0 object-contain dark:brightness-0 dark:invert"
+          />
           <div>
-            <p className="font-bold leading-tight">ZAF Sales</p>
+            <p className="font-bold leading-tight">ZAF SAPA</p>
             <p className="text-xs text-muted-foreground">AI Assistant untuk WhatsApp</p>
           </div>
         </div>

@@ -60,47 +60,8 @@ interface ToolDefinition {
   enabled: boolean;
 }
 
-const INITIAL_CONNECTORS: SystemConnector[] = [
-  {
-    id: "conn-console",
-    name: "ZAF Console (Pusat Akun & Hub)",
-    category: "CONSOLE",
-    description: "Portal konfigurasi akun utama (D:\\Semester 7\\Zafi\\zafi-console), manajemen 1 akun untuk 3 aplikasi (HRIS, Accounting, Chatbot), dan whitelist asisten WhatsApp.",
-    baseUrl: "http://localhost:17341 (API: 17342)",
-    authType: "BEARER",
-    tokenMasked: "dev-only-assistant-channel-key••••••••",
-    status: "CONNECTED",
-    latencyMs: 14,
-    lastPing: "Baru saja",
-    toolsCount: 2,
-  },
-  {
-    id: "conn-hris",
-    name: "Sistem HRIS Terpadu (Laravel 10)",
-    category: "HRIS",
-    description: "Pintu data profil karyawan, sisa kuota cuti tahunan, rekap absensi, dan slip gaji (D:\\Semester 7\\Zafi\\presensi-app). (108 Karyawan Aktif Terhubung)",
-    baseUrl: "http://127.0.0.1:8000/api/assistant",
-    authType: "BEARER",
-    tokenMasked: "hris_sec_live_948f2••••••••",
-    status: "CONNECTED",
-    latencyMs: 38,
-    lastPing: "Baru saja",
-    toolsCount: 4,
-  },
-  {
-    id: "conn-acc",
-    name: "Sistem Akuntansi & Finance",
-    category: "ACCOUNTING",
-    description: "Pintu data kas, status tagihan invoice klien, pengajuan reimbursement, dan budget departemen.",
-    baseUrl: "http://accounting-service.internal:9000/api/v1/internal",
-    authType: "BEARER",
-    tokenMasked: "acc_sec_live_732a1••••••••",
-    status: "CONNECTED",
-    latencyMs: 65,
-    lastPing: "1 menit lalu",
-    toolsCount: 4,
-  },
-];
+// ponytail: array kosong sebagai default, koneksi diisi lewat form/tidak ada mockup
+const INITIAL_CONNECTORS: SystemConnector[] = [];
 
 const INITIAL_TOOLS: ToolDefinition[] = [
   {
@@ -211,7 +172,7 @@ export function IntegrationsPage() {
                 status: isOk ? "CONNECTED" : "OFFLINE",
                 latencyMs: hrisLatency,
                 lastPing: "Baru saja",
-                description: `Pintu data profil karyawan, sisa kuota cuti tahunan, rekap absensi, dan slip gaji. (${payload?.totalKaryawanAktif ?? 108} Karyawan Aktif Terhubung)`,
+                description: `Pintu data profil karyawan, sisa kuota cuti tahunan, rekap absensi, dan slip gaji. (${payload?.totalKaryawanAktif ?? 0} Karyawan Aktif Terhubung)`,
               }
             : {
                 ...c,
@@ -223,7 +184,7 @@ export function IntegrationsPage() {
       );
       toast.success(
         isOk
-          ? `Koneksi HRIS terhubung! Latensi: ${hrisLatency}ms (${payload?.totalKaryawanAktif ?? 108} Karyawan Aktif)`
+          ? `Koneksi HRIS terhubung! Latensi: ${hrisLatency}ms (${payload?.totalKaryawanAktif ?? 0} Karyawan Aktif)`
           : "HRIS Offline. Pastikan service Laravel berjalan di port 8000."
       );
     } catch {

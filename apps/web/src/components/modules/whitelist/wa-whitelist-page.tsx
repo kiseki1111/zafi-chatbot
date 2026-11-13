@@ -40,77 +40,9 @@ interface WhitelistItem {
   lastActive: string;
 }
 
-const INITIAL_WHITELIST: WhitelistItem[] = [
-  {
-    id: "wl-1",
-    phone: "6281234567890",
-    employeeName: "Siti Rahmawati",
-    nik: "HR-2023-01",
-    department: "HRD",
-    position: "HR Operations Lead",
-    isRegisteredOnWa: true,
-    enabled: true,
-    lastActive: "10 menit lalu",
-  },
-  {
-    id: "wl-2",
-    phone: "6281298765432",
-    employeeName: "Budi Santoso",
-    nik: "FIN-2022-04",
-    department: "Keuangan & Akuntansi",
-    position: "Senior Accountant",
-    isRegisteredOnWa: true,
-    enabled: true,
-    lastActive: "1 jam lalu",
-  },
-  {
-    id: "wl-3",
-    phone: "6281122334455",
-    employeeName: "Hendro Wibowo",
-    nik: "DIR-2021-01",
-    department: "Direksi",
-    position: "Managing Director",
-    isRegisteredOnWa: true,
-    enabled: true,
-    lastActive: "Kemarin",
-  },
-  {
-    id: "wl-4",
-    phone: "6285678901234",
-    employeeName: "Ahmad Fauzi",
-    nik: "IT-2024-12",
-    department: "Teknologi & IT",
-    position: "Software Engineer",
-    isRegisteredOnWa: true,
-    enabled: true,
-    lastActive: "Baru saja",
-  },
-  {
-    id: "wl-5",
-    phone: "6287711223344",
-    employeeName: "Dewi Lestari",
-    nik: "OPS-2024-08",
-    department: "Operasional",
-    position: "Logistics Officer",
-    isRegisteredOnWa: true,
-    enabled: true,
-    lastActive: "3 jam lalu",
-  },
-  {
-    id: "wl-6",
-    phone: "6289876543210",
-    employeeName: "Mega Pertiwi",
-    nik: "FIN-2025-02",
-    department: "Keuangan & Akuntansi",
-    position: "Finance Staff",
-    isRegisteredOnWa: false,
-    enabled: false,
-    lastActive: "Belum pernah",
-  },
-];
-
+// ponytail: tanpa data mockup, data diisi via sync API HRIS atau input manual
 export function WaWhitelistPage() {
-  const [whitelist, setWhitelist] = useState<WhitelistItem[]>(INITIAL_WHITELIST);
+  const [whitelist, setWhitelist] = useState<WhitelistItem[]>([]);
   const [search, setSearch] = useState("");
   const [isSyncing, setIsSyncing] = useState(false);
 

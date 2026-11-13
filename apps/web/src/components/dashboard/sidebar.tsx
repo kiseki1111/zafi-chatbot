@@ -62,15 +62,13 @@ export function Sidebar() {
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground">
       {/* Brand */}
       <div className="flex items-center gap-2.5 px-5 h-16 border-b border-sidebar-border shrink-0">
-        <div className="relative h-9 w-9 rounded-lg overflow-hidden bg-white/95 dark:bg-card p-0.5 border border-border/40 shadow-xs shrink-0">
-          <img
-            src="/logo.png"
-            alt="ZAF Platform"
-            className="h-full w-full object-contain"
-          />
-        </div>
+        <img
+          src="/logo-icon.svg"
+          alt="ZAF SAPA"
+          className="h-6 w-6 shrink-0 object-contain dark:brightness-0 dark:invert"
+        />
         <div className="min-w-0">
-          <p className="font-bold text-sm leading-tight truncate">ZAF Platform</p>
+          <p className="font-bold text-sm leading-tight truncate">ZAF SAPA</p>
           <p className="text-[10px] text-muted-foreground truncate">CS & Asisten Internal AI</p>
         </div>
         <Button

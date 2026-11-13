@@ -906,7 +906,7 @@ export class TenantService {
       shouldUpdateMeta = true;
 
       if (ownerPhone && activeInstance) {
-        const text = `⚠️ *Peringatan Kuota Platform ZAF (80%)*\nHalo ${tenant.name}, pemakaian kuota chatbot Anda telah mencapai ${Math.round(maxRatio * 100)}%.\nSilakan lakukan top-up di dashboard agar auto-reply tetap berjalan lancar.`;
+        const text = `⚠️ *Peringatan Kuota ZAF SAPA (80%)*\nHalo ${tenant.name}, pemakaian kuota chatbot Anda telah mencapai ${Math.round(maxRatio * 100)}%.\nSilakan lakukan top-up di dashboard agar auto-reply tetap berjalan lancar.`;
         this.sendWahaDirect(activeInstance, ownerPhone, text).catch(() => null);
       }
     }
@@ -922,7 +922,7 @@ export class TenantService {
       shouldUpdateMeta = true;
 
       if (ownerPhone && activeInstance) {
-        const text = `🚨 *Peringatan Kuota Platform ZAF (100% Habis)*\nHalo ${tenant.name}, kuota chatbot Anda telah habis. Sesuai aturan, percakapan pelanggan baru otomatis dialihkan ke admin manusia di dashboard. Beli booster kuota untuk mengaktifkan kembali bot AI.`;
+        const text = `🚨 *Peringatan Kuota ZAF SAPA (100% Habis)*\nHalo ${tenant.name}, kuota chatbot Anda telah habis. Sesuai aturan, percakapan pelanggan baru otomatis dialihkan ke admin manusia di dashboard. Beli booster kuota untuk mengaktifkan kembali bot AI.`;
         this.sendWahaDirect(activeInstance, ownerPhone, text).catch(() => null);
       }
     }

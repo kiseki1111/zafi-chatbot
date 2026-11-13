@@ -83,7 +83,7 @@ async function run() {
   console.log('1️⃣ SKENARIO 1: Live Chat Admin / Human Takeover (Pesan Teks Manual)');
   console.log('----------------------------------------------------------------');
   const nowStr = new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' });
-  const msgTakeover = `👋 Halo Kak Ardito! Ini pesan uji coba *Live Chat Admin* dari Web Dashboard ZAF Sales pada ${nowStr} WIB. (Mode Human Takeover berjalan normal).`;
+  const msgTakeover = `👋 Halo Kak Ardito! Ini pesan uji coba *Live Chat Admin* dari Web Dashboard ZAF SAPA pada ${nowStr} WIB. (Mode Human Takeover berjalan normal).`;
 
   try {
     const res = await fetch(`${WAHA_URL}/api/sendText`, {

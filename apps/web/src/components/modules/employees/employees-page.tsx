@@ -45,84 +45,10 @@ interface Employee {
   status: "ACTIVE" | "SUSPENDED";
 }
 
-const INITIAL_EMPLOYEES: Employee[] = [
-  {
-    id: "emp-1",
-    nik: "HR-2023-01",
-    name: "Siti Rahmawati",
-    email: "siti.rahma@perusahaan.co.id",
-    department: "HRD",
-    position: "HR Operations Lead",
-    phone: "6281234567890",
-    isWaVerified: true,
-    accessLevel: "HR_ADMIN",
-    status: "ACTIVE",
-  },
-  {
-    id: "emp-2",
-    nik: "FIN-2022-04",
-    name: "Budi Santoso",
-    email: "budi.santoso@perusahaan.co.id",
-    department: "Keuangan & Akuntansi",
-    position: "Senior Accountant",
-    phone: "6281298765432",
-    isWaVerified: true,
-    accessLevel: "FINANCE_ADMIN",
-    status: "ACTIVE",
-  },
-  {
-    id: "emp-3",
-    nik: "DIR-2021-01",
-    name: "Hendro Wibowo",
-    email: "hendro.wibowo@perusahaan.co.id",
-    department: "Direksi",
-    position: "Managing Director",
-    phone: "6281122334455",
-    isWaVerified: true,
-    accessLevel: "EXECUTIVE",
-    status: "ACTIVE",
-  },
-  {
-    id: "emp-4",
-    nik: "IT-2024-12",
-    name: "Ahmad Fauzi",
-    email: "ahmad.fauzi@perusahaan.co.id",
-    department: "Teknologi & IT",
-    position: "Software Engineer",
-    phone: "6285678901234",
-    isWaVerified: true,
-    accessLevel: "STAFF",
-    status: "ACTIVE",
-  },
-  {
-    id: "emp-5",
-    nik: "OPS-2024-08",
-    name: "Dewi Lestari",
-    email: "dewi.lestari@perusahaan.co.id",
-    department: "Operasional",
-    position: "Logistics Officer",
-    phone: "6287711223344",
-    isWaVerified: true,
-    accessLevel: "STAFF",
-    status: "ACTIVE",
-  },
-  {
-    id: "emp-6",
-    nik: "FIN-2025-02",
-    name: "Mega Pertiwi",
-    email: "mega.pertiwi@perusahaan.co.id",
-    department: "Keuangan & Akuntansi",
-    position: "Finance Staff",
-    phone: "6289876543210",
-    isWaVerified: false,
-    accessLevel: "STAFF",
-    status: "ACTIVE",
-  },
-];
-
+// ponytail: tanpa data mockup, data diisi via sync API HRIS
 export function EmployeesPage() {
   const { setView } = useAppStore();
-  const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [search, setSearch] = useState("");
   const [selectedDept, setSelectedDept] = useState("ALL");
   const [isSyncing, setIsSyncing] = useState(false);

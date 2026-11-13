@@ -85,13 +85,12 @@ export function menuForRole(
   }
 
   // Jika sudah di-load dari server (array terisi):
-  // ponytail: Pertahankan menu asli CS + sertakan menu asisten yang ditambahkan
+  // ponytail: Pertahankan menu dasar operasional + menu yang aktif di tenant
   if (Array.isArray(enabledMenus) && enabledMenus.length > 0) {
     const alwaysIncluded: ViewKey[] = [
       "overview",
       "chatbot",
       "crm",
-      "availability",
       "followup",
       "assistant_chat",
       "wa_whitelist",

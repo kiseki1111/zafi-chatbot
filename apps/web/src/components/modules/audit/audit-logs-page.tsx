@@ -48,86 +48,9 @@ interface AuditLogEntry {
   aiResponse: string;
 }
 
-const INITIAL_LOGS: AuditLogEntry[] = [
-  {
-    id: "log-1",
-    timestamp: "10:42:15 WIB",
-    employeeName: "Ahmad Fauzi",
-    employeeNik: "IT-2024-12",
-    department: "Teknologi & IT",
-    userQuery: "Halo asisten, berapa sisa kuota cuti tahunan saya untuk tahun ini?",
-    toolCalled: "hris.cek_sisa_cuti",
-    status: "SUCCESS",
-    latencyMs: 1120,
-    tokensUsed: 384,
-    toolInput: { userId: "emp-4", tahun: 2026 },
-    toolOutput: { kuota: 12, terpakai: 3, sisa: 9 },
-    aiResponse: "Halo Mas Ahmad Fauzi! Sisa kuota cuti tahunan Anda saat ini adalah 9 hari kerja (dari total hak cuti 12 hari, telah digunakan 3 hari).",
-  },
-  {
-    id: "log-2",
-    timestamp: "10:38:02 WIB",
-    employeeName: "Dewi Lestari",
-    employeeNik: "OPS-2024-08",
-    department: "Operasional",
-    userQuery: "Berapa gaji dan tunjangan yang diterima manajer saya bulan lalu?",
-    toolCalled: "hris.info_slip_gaji",
-    status: "UNAUTHORIZED",
-    latencyMs: 410,
-    tokensUsed: 210,
-    toolInput: { targetUser: "mgr-ops", requestedBy: "emp-5" },
-    toolOutput: { error: "FORBIDDEN: Scope level staf tidak diizinkan mengakses slip gaji pihak lain." },
-    aiResponse: "Maaf Mbak Dewi, sesuai kebijakan privasi dan keamanan perusahaan, informasi kompensasi dan gaji hanya dapat diakses oleh karyawan bersangkutan dan manajemen yang berwenang.",
-  },
-  {
-    id: "log-3",
-    timestamp: "10:15:30 WIB",
-    employeeName: "Budi Santoso",
-    employeeNik: "FIN-2022-04",
-    department: "Keuangan & Akuntansi",
-    userQuery: "Tolong rangkum posisi saldo kas operasional dan rekening BCA utama kita hari ini.",
-    toolCalled: "accounting.ringkasan_saldo_kas",
-    status: "SUCCESS",
-    latencyMs: 1450,
-    tokensUsed: 512,
-    toolInput: { accounts: ["KAS_OPERASIONAL", "BANK_BCA"] },
-    toolOutput: { kas: 148500000, bca: 420000000, updated: "2026-03-07T10:00:00Z" },
-    aiResponse: "Selamat pagi Pak Budi. Berikut ringkasan posisi kas per hari ini: Kas Operasional tercatat Rp 148.500.000 dan Rekening Bank BCA Utama tercatat Rp 420.000.000. Total likuiditas siap pakai: Rp 568.500.000.",
-  },
-  {
-    id: "log-4",
-    timestamp: "09:55:10 WIB",
-    employeeName: "Siti Rahmawati",
-    employeeNik: "HR-2023-01",
-    department: "HRD",
-    userQuery: "Bagaimana alur dan batas maksimal klaim kacamata sesuai peraturan perusahaan terbaru?",
-    toolCalled: null, // Menggunakan RAG Dokumen Knowledge Base
-    status: "SUCCESS",
-    latencyMs: 890,
-    tokensUsed: 420,
-    toolInput: undefined,
-    toolOutput: undefined,
-    aiResponse: "Berdasarkan Dokumen Kebijakan Medis & Benefit Karyawan (SOP-HR-04 Pasal 7): Plafon penggantian kacamata staf adalah Rp 1.500.000 per 2 tahun sekali, dengan melampirkan resep dokter mata dan kuitansi optik resmi.",
-  },
-  {
-    id: "log-5",
-    timestamp: "09:20:44 WIB",
-    employeeName: "Mega Pertiwi",
-    employeeNik: "FIN-2025-02",
-    department: "Keuangan & Akuntansi",
-    userQuery: "Apakah invoice INV-2026-0089 dari Klien PT Cahaya sudah dilunasi?",
-    toolCalled: "accounting.cek_status_invoice",
-    status: "SUCCESS",
-    latencyMs: 980,
-    tokensUsed: 340,
-    toolInput: { invoiceNo: "INV-2026-0089" },
-    toolOutput: { status: "LUNAS", tanggalBayar: "2026-03-05", nominal: 45000000 },
-    aiResponse: "Invoice INV-2026-0089 atas nama PT Cahaya sudah terkonfirmasi LUNAS pada tanggal 5 Maret 2026 sebesar Rp 45.000.000 via transfer Bank Mandiri.",
-  },
-];
-
+// ponytail: tanpa data mockup, hanya menampilkan riwayat log nyata dari database backend
 export function AssistantAuditLogsPage() {
-  const [logs, setLogs] = useState<AuditLogEntry[]>(INITIAL_LOGS);
+  const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [activeLogDetail, setActiveLogDetail] = useState<AuditLogEntry | null>(null);
@@ -154,7 +77,7 @@ export function AssistantAuditLogsPage() {
             toolOutput: item.details || {},
             aiResponse: `Audit event tercatat di database: ${item.action}`,
           }));
-          setLogs([...mapped, ...INITIAL_LOGS]);
+          setLogs(mapped);
         }
       })
       .catch(() => null);
@@ -199,25 +122,25 @@ export function AssistantAuditLogsPage() {
         <Card className="bg-card/50 shadow-xs">
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground font-medium">Total Query Hari Ini</p>
-            <p className="text-xl font-bold text-foreground mt-1">142 Query</p>
+            <p className="text-xl font-bold text-foreground mt-1">{logs.length} Query</p>
           </CardContent>
         </Card>
         <Card className="bg-card/50 shadow-xs">
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground font-medium">Tool Calls Dijalankan</p>
-            <p className="text-xl font-bold text-blue-600 mt-1">98 Eksekusi</p>
+            <p className="text-xl font-bold text-blue-600 mt-1">{logs.filter((l) => l.toolCalled).length} Eksekusi</p>
           </CardContent>
         </Card>
         <Card className="bg-card/50 shadow-xs">
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground font-medium">Percobaan Unauthorized</p>
-            <p className="text-xl font-bold text-rose-600 mt-1">2 Dicegah</p>
+            <p className="text-xl font-bold text-rose-600 mt-1">{logs.filter((l) => l.status === "UNAUTHORIZED").length} Dicegah</p>
           </CardContent>
         </Card>
         <Card className="bg-card/50 shadow-xs">
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground font-medium">Rata-rata Durasi AI</p>
-            <p className="text-xl font-bold text-emerald-600 mt-1">1.1 detik</p>
+            <p className="text-xl font-bold text-emerald-600 mt-1">{(logs.length ? logs.reduce((s, l) => s + l.latencyMs, 0) / logs.length / 1000 : 0).toFixed(1)} detik</p>
           </CardContent>
         </Card>
       </div>

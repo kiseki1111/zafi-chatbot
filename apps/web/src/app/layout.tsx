@@ -15,21 +15,22 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "ZAF Sales — Kelola AI Asisten WhatsApp",
+  title: "ZAF SAPA — Kelola AI Asisten WhatsApp",
   description: "Dasbor pusat untuk mengelola chatbot AI dan operasional WhatsApp Anda.",
   keywords: ["properti", "AI agent", "WhatsApp", "chatbot", "CRM", "real estate", "Indonesia"],
-  authors: [{ name: "ZAF Sales" }],
+  authors: [{ name: "ZAF SAPA" }],
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "ZAF Sales",
+    title: "ZAF SAPA",
   },
   formatDetection: {
     telephone: false,
   },
   icons: {
     icon: [
+      { url: "/logo-icon.svg", type: "image/svg+xml" },
       { url: "/favicon.png", sizes: "48x48", type: "image/png" },
       { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
       { url: "/icons/icon-512x512.png", sizes: "512x512", type: "image/png" },
