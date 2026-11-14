@@ -40,6 +40,20 @@ export class WahaController implements OnApplicationBootstrap {
   // Queue for CLI Mock output
   private cliOutputQueue: any[] = [];
 
+  // ponytail: dedupe webhook retry / recovery agar satu pesan customer tidak diproses AI dua kali
+  private processedInbound = new Map<string, number>();
+  private claimInboundMessage(sessionName: string, msgId?: string): boolean {
+    if (!msgId || msgId === 'unknown') return true;
+    const key = `${sessionName}:${msgId}`;
+    const now = Date.now();
+    for (const [k, ts] of this.processedInbound) {
+      if (now - ts > 10 * 60 * 1000) this.processedInbound.delete(k);
+    }
+    if (this.processedInbound.has(key)) return false;
+    this.processedInbound.set(key, now);
+    return true;
+  }
+
   constructor(
     private readonly wahaService: WahaService,
     private readonly prisma: PrismaService,
@@ -68,15 +82,16 @@ export class WahaController implements OnApplicationBootstrap {
   // ponytail: self-healing cleanup for duplicate blank contacts (0 messages/notes) caused by outbound webhooks
   private async cleanDuplicateContacts() {
     try {
+      // ponytail: scope per tenant agar tidak menghapus kontak tenant lain dengan nomor sama
       const duplicates = await this.prisma.contact.groupBy({
-        by: ['phone'],
+        by: ['phone', 'tenantId'],
         _count: { phone: true },
         having: { phone: { _count: { gt: 1 } } },
       });
 
       for (const dup of duplicates) {
         const contacts = await this.prisma.contact.findMany({
-          where: { phone: dup.phone },
+          where: { phone: dup.phone, tenantId: dup.tenantId },
           include: {
             conversations: {
               include: {
@@ -227,6 +242,15 @@ export class WahaController implements OnApplicationBootstrap {
     for (const conv of unrepliedConversations) {
       const lastMsg = conv.messages[0];
       if (lastMsg && lastMsg.senderType === 'customer' && conv.contact?.phone) {
+        // ponytail: jangan proses ulang pesan yang sudah pernah masuk antrean
+        if (
+          !this.claimInboundMessage(
+            conv.instanceName,
+            lastMsg.wahaMessageId || lastMsg.id,
+          )
+        ) {
+          continue;
+        }
         this.logger.log(
           `[Waha Startup Recovery] Memulihkan chat customer belum terbalas di sesi ${conv.instanceName} (${conv.contact.phone}): "${lastMsg.content}"`,
         );
@@ -266,11 +290,27 @@ export class WahaController implements OnApplicationBootstrap {
               });
 
               try {
-                await this.wahaService.sendMessage(
+                const sendRes = await this.wahaService.sendMessage(
                   conv.instanceName,
                   targetSender,
                   reply.text,
                 );
+                const sentId = sendRes?.id?._serialized || sendRes?.id;
+                if (sentId) {
+                  try {
+                    await this.prisma.message.update({
+                      where: { id: botMsg.id },
+                      data: { wahaMessageId: sentId, status: 'SENT' },
+                    });
+                  } catch (e: any) {
+                    // webhook message.any mungkin sudah membuat row dengan id yang sama
+                    if (e.code === 'P2002') {
+                      await this.prisma.message
+                        .delete({ where: { id: botMsg.id } })
+                        .catch(() => null);
+                    }
+                  }
+                }
               } catch (e: any) {
                 await this.prisma.message
                   .update({
@@ -514,6 +554,8 @@ export class WahaController implements OnApplicationBootstrap {
         ? req.query.tenantId
         : req.user?.tenantId
       : req.user?.tenantId;
+    // SECURITY: non-superadmin tanpa tenant tidak boleh melihat semua sesi
+    if (!isSuper && !tenantId) return [];
     return this.wahaService.getSessions(tenantId);
   }
 
@@ -530,6 +572,9 @@ export class WahaController implements OnApplicationBootstrap {
         ? req.query.tenantId
         : req.user?.tenantId
       : req.user?.tenantId;
+
+    // SECURITY: non-superadmin tanpa tenant tidak boleh melihat semua instance
+    if (!isSuper && !tenantId) return [];
 
     // Jika non-superadmin atau ada tenantId, filter hanya instance untuk tenant tersebut
     const where: any = tenantId ? { tenantId } : {};
@@ -1020,7 +1065,11 @@ export class WahaController implements OnApplicationBootstrap {
       let currentConversationId: string | null = null;
       let activeContactId: string | null = null;
       let storedMediaUrl: string | null = null;
-      const msgId = message?.id?._serialized || message?.id || 'unknown';
+      // ponytail: fallback harus unik, 'unknown' akan saling menimpa karena wahaMessageId unik
+      const msgId =
+        message?.id?._serialized ||
+        message?.id ||
+        `unknown-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
       const isAudioMsg = Boolean(
         message.type === 'ptt' ||
@@ -1081,21 +1130,22 @@ export class WahaController implements OnApplicationBootstrap {
             ...(message?.from ? [{ phone: message.from }] : []),
           ];
 
+          // ponytail: JANGAN menaruh dua key OR (yang kedua menimpa filter phone).
+          // Pakai AND agar pencarian tetap berdasarkan nomor DAN tenant.
+          const contactWhere: any = { OR: phoneConditions };
+          if (sessionTenantId) {
+            contactWhere.AND = [
+              { OR: [{ tenantId: sessionTenantId }, { tenantId: null }] },
+            ];
+          }
           let contact = await this.prisma.contact.findFirst({
-            where: {
-              OR: phoneConditions,
-              ...(sessionTenantId
-                ? {
-                    OR: [{ tenantId: sessionTenantId }, { tenantId: null }],
-                  }
-                : {}),
-            },
+            where: contactWhere,
           });
 
-          // ponytail: fallback to phone match if tenantId was null on initial creation
+          // ponytail: fallback hanya ke kontak legacy tanpa tenant, jangan ke kontak tenant lain
           if (!contact) {
             contact = await this.prisma.contact.findFirst({
-              where: { OR: phoneConditions },
+              where: { OR: phoneConditions, tenantId: null },
             });
           }
           let contactId;
@@ -1268,7 +1318,11 @@ export class WahaController implements OnApplicationBootstrap {
         !isTestSession &&
         payload.event === 'message' &&
         !message.fromMe &&
-        isDirectPhone(message.from)
+        isDirectPhone(message.from) &&
+        this.claimInboundMessage(
+          sessionName,
+          message.id?._serialized || message.id,
+        )
       ) {
         let text = message.body?.trim() || '';
 
@@ -1342,6 +1396,7 @@ export class WahaController implements OnApplicationBootstrap {
                 );
                 const contact = await this.prisma.contact.findFirst({
                   where: {
+                    ...(sessionTenantId ? { tenantId: sessionTenantId } : {}),
                     OR: [
                       { phone: contactNumber },
                       { phone: rawNumber },
@@ -1395,6 +1450,25 @@ export class WahaController implements OnApplicationBootstrap {
             }
           };
 
+          // ponytail: webhook message.any bisa menyimpan pesan keluar lebih dulu.
+          // Jika update wahaMessageId bentrok (P2002), hapus row sementara agar tidak dobel.
+          const linkSentMessage = async (savedId: string, sendRes: any) => {
+            const wahaMessageId = sendRes?.id?._serialized || sendRes?.id;
+            if (!wahaMessageId || !savedId) return;
+            try {
+              await this.prisma.message.update({
+                where: { id: savedId },
+                data: { wahaMessageId, status: 'SENT' },
+              });
+            } catch (e: any) {
+              if (e.code === 'P2002') {
+                await this.prisma.message
+                  .delete({ where: { id: savedId } })
+                  .catch(() => null);
+              }
+            }
+          };
+
           const incomingMessage: IncomingMessage = {
             senderId: sender,
             text: text,
@@ -1424,16 +1498,7 @@ export class WahaController implements OnApplicationBootstrap {
                       reply.text,
                     );
                     if (sendRes?.id && savedTextMessage?.id) {
-                      await this.prisma.message
-                        .update({
-                          where: { id: savedTextMessage.id },
-                          data: {
-                            wahaMessageId:
-                              sendRes.id?._serialized || sendRes.id,
-                            status: 'SENT',
-                          },
-                        })
-                        .catch(() => null);
+                      await linkSentMessage(savedTextMessage.id, sendRes);
                     }
                   } catch (sendErr: any) {
                     this.logger.warn(
@@ -1698,16 +1763,7 @@ export class WahaController implements OnApplicationBootstrap {
                         img.caption || '',
                       );
                       if (sendRes?.id && savedImgMsg?.id) {
-                        await this.prisma.message
-                          .update({
-                            where: { id: savedImgMsg.id },
-                            data: {
-                              wahaMessageId:
-                                sendRes.id?._serialized || sendRes.id,
-                              status: 'SENT',
-                            },
-                          })
-                          .catch(() => null);
+                        await linkSentMessage(savedImgMsg.id, sendRes);
                       }
                     } catch (sendErr: any) {
                       this.logger.warn(
@@ -1749,16 +1805,7 @@ export class WahaController implements OnApplicationBootstrap {
                         vid.caption || '',
                       );
                       if (sendRes?.id && savedVidMsg?.id) {
-                        await this.prisma.message
-                          .update({
-                            where: { id: savedVidMsg.id },
-                            data: {
-                              wahaMessageId:
-                                sendRes.id?._serialized || sendRes.id,
-                              status: 'SENT',
-                            },
-                          })
-                          .catch(() => null);
+                        await linkSentMessage(savedVidMsg.id, sendRes);
                       }
                     } catch (sendErr: any) {
                       this.logger.warn(

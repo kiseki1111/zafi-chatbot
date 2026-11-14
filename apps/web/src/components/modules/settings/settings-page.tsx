@@ -708,6 +708,11 @@ function KoneksiWATab() {
   };
 
   const handleScanQR = (sessionName: string) => {
+    const inst = instances.find((i) => i.instanceName === sessionName);
+    // ponytail: sesi FAILED/STOPPED tidak punya QR aktif, restart dulu agar WAHA masuk mode SCAN_QR
+    if (inst && inst.status !== "WORKING") {
+      fetch(`/api/v1/waha/instances/${sessionName}/restart`, { method: "POST" }).catch(() => null);
+    }
     setConnectingSession(sessionName);
     setConnectedSession(null);
     setQrCodeData(null);
@@ -799,7 +804,7 @@ function KoneksiWATab() {
                         {instance.status === 'WORKING' ? 'Online' : instance.status === 'STOPPED' ? 'Offline' : (instance.status || 'Offline')}
                       </span>
                     </div>
-                    {instance.phone && <p className="text-xs text-muted-foreground mt-0.5">{instance.phone}</p>}
+                    {instance.phone && <p className="text-xs text-muted-foreground mt-0.5">{String(instance.phone).replace(/@(c\.us|s\.whatsapp\.net)$/i, "")}</p>}
                   </div>
                 </div>
 
@@ -1115,6 +1120,9 @@ function KoneksiAsistenWATab() {
 
       // 2. Minta QR code (endpoint mengembalikan PNG, bukan JSON)
       const targetName = assistantInstance ? assistantInstance.instanceName : assistantSessionName;
+      if (assistantInstance && assistantInstance.status !== "WORKING") {
+        await fetch(`/api/v1/waha/instances/${targetName}/restart`, { method: "POST" }).catch(() => null);
+      }
       const qrRes = await fetch(`/api/v1/waha/instances/${targetName}/qr`);
 
       if (qrRes.ok) {

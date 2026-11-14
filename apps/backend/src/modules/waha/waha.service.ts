@@ -31,9 +31,7 @@ export class WahaService implements OnApplicationBootstrap {
       process.env.WHATSAPP_API_KEY ||
       '';
     this.apiKey = key;
-    this.logger.log(
-      `[WAHA SERVICE] Initialized with baseUrl: ${this.baseUrl} and apiKey: ${this.apiKey}`,
-    );
+    this.logger.log(`[WAHA SERVICE] Initialized with baseUrl: ${this.baseUrl}`);
   }
 
   private getHeaders() {
@@ -380,27 +378,32 @@ export class WahaService implements OnApplicationBootstrap {
   async getSessions(tenantId?: string): Promise<any> {
     try {
       let wahaSessions: any[] = [];
+      let wahaReachable = false;
       try {
         const response = await axios.get(`${this.baseUrl}/api/sessions`, {
           headers: this.getHeaders(),
           timeout: 5000,
         });
         wahaSessions = response.data || [];
+        wahaReachable = true;
       } catch (httpErr) {
         this.logger.warn(
           `WAHA API is unreachable: ${httpErr.message}. Falling back to database records.`,
         );
       }
 
-      // If WAHA API unreachable or returned empty, sync DB statuses with WAHA reality
-      if (wahaSessions.length === 0) {
-        // Jika WAHA merespons list kosong (sesi tidak ada lagi di WAHA), tandai status di DB sebagai STOPPED
-        await this.prisma.whatsappInstance
-          .updateMany({
-            where: { status: 'WORKING' },
-            data: { status: 'STOPPED' },
-          })
-          .catch(() => null);
+      // If WAHA API unreachable or returned empty, fall back to database records
+      if (!wahaReachable || wahaSessions.length === 0) {
+        // ponytail: hanya tandai STOPPED jika WAHA benar-benar merespons kosong,
+        // bukan saat WAHA sedang down/network error (hindari false offline massal).
+        if (wahaReachable) {
+          await this.prisma.whatsappInstance
+            .updateMany({
+              where: { status: 'WORKING' },
+              data: { status: 'STOPPED' },
+            })
+            .catch(() => null);
+        }
 
         const dbInstances = await this.prisma.whatsappInstance.findMany({
           where: tenantId ? { tenantId } : {},
@@ -463,17 +466,21 @@ export class WahaService implements OnApplicationBootstrap {
 
       const mergedSessions = await Promise.all(
         wahaSessions.map(async (ws) => {
+          // ponytail: simpan nomor bersih tanpa suffix @c.us agar UI tidak menampilkan JID mentah
+          const storedPhone = ws.me?.id
+            ? String(ws.me.id).replace(/@(c\.us|s\.whatsapp\.net)$/i, '')
+            : null;
           const instance = await this.prisma.whatsappInstance.upsert({
             where: { instanceName: ws.name },
             update: {
               status: ws.status,
-              phone: ws.me?.id,
+              phone: storedPhone,
               profileName: ws.me?.pushName,
             },
             create: {
               instanceName: ws.name,
               status: ws.status,
-              phone: ws.me?.id,
+              phone: storedPhone,
               profileName: ws.me?.pushName,
             },
           });
@@ -1487,9 +1494,7 @@ export class WahaService implements OnApplicationBootstrap {
 
   async getQrCode(sessionName: string): Promise<any> {
     const url = `${this.baseUrl}/api/${sessionName}/auth/qr`;
-    this.logger.debug(
-      `[WAHA QR] Fetching QR: ${url} with apiKey: ${this.apiKey}`,
-    );
+    this.logger.debug(`[WAHA QR] Fetching QR: ${url}`);
     try {
       const response = await axios.get(url, {
         headers: { ...this.getHeaders(), Accept: 'image/png' },
