@@ -15,8 +15,8 @@ export interface AlertPayload {
 @Injectable()
 export class AlertService {
   private readonly logger = new Logger(AlertService.name);
-  private readonly token: string;
-  private readonly chatId: string;
+  private readonly token?: string;
+  private readonly chatId?: string;
   private lastAlertTime = new Map<string, number>();
   private readonly ALERT_COOLDOWN_MS = 60_000; // 1 menit cooldown per alert type
 

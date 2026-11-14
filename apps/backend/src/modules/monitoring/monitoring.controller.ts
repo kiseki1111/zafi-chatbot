@@ -1,4 +1,4 @@
-import { Controller, Get, Logger, SkipThrottle } from '@nestjs/common';
+import { Controller, Get, Logger } from '@nestjs/common';
 import { MetricsService } from './metrics.service';
 import { Public } from '../../common/decorators/public.decorator';
 
@@ -6,7 +6,6 @@ import { Public } from '../../common/decorators/public.decorator';
  * Monitoring API Controller
  * Exposes health metrics untuk monitoring dan debugging
  */
-@SkipThrottle()
 @Controller('api/v1/monitoring')
 export class MonitoringController {
   private readonly logger = new Logger(MonitoringController.name);
