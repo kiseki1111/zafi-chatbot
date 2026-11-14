@@ -73,6 +73,13 @@ export class ChatsController {
     return this.chatsService.getMessages(id, skip, take, tenantId);
   }
 
+  // Admin membuka percakapan -- nol-kan badge unread
+  @Post(':id/read')
+  markAsRead(@Param('id') id: string, @Req() req: any) {
+    const tenantId = this.getTenantIdFromReq(req);
+    return this.chatsService.markAsRead(id, tenantId);
+  }
+
   // Get Contact Profile (Avatar, About/Bio) from WAHA
   @Get(':id/profile')
   getContactProfile(@Param('id') id: string, @Req() req?: any) {

@@ -215,6 +215,23 @@ export class ChatsService {
     return messages.reverse(); // Return oldest first for chat UI
   }
 
+  // Admin membuka percakapan -- nol-kan badge unread di monitoring
+  async markAsRead(conversationId: string, tenantId?: string) {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: { whatsappInstance: true },
+    });
+    if (!conversation) throw new NotFoundException('Conversation not found');
+    this.assertConversationTenant(conversation, tenantId);
+
+    if (conversation.unreadCount === 0) return conversation;
+
+    return this.prisma.conversation.update({
+      where: { id: conversationId },
+      data: { unreadCount: 0 },
+    });
+  }
+
   async getContactProfile(conversationId: string, tenantId?: string) {
     const conversation = await this.prisma.conversation.findUnique({
       where: { id: conversationId },

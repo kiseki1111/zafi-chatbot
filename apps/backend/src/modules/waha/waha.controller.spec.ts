@@ -163,6 +163,76 @@ describe('WahaController - Unit Tests (Feature 6 Call Reject & Webhooks)', () =>
       );
     });
 
+    it('harus mengabaikan echo message.any (fromMe) dengan LID tak teresolusi, tanpa membuat kontak/percakapan hantu', async () => {
+      // Reproduksi bug produksi: bot mengirim balasan, WAHA meng-echo kembali pesan
+      // keluar itu sebagai message.any dengan fromMe=true, tapi remoteJid/to masih
+      // berupa @lid (gagal diresolusi WAHA ke nomor asli). Sebelum fix, ini membuat
+      // kontak baru dengan "nomor" = digit LID, lalu conversation.upsert membuat
+      // kontak itu naik ke atas daftar monitoring tanpa ada chat baru yang terlihat.
+      mockWahaService.getContact = jest.fn().mockResolvedValue({ id: '34304725926129@lid' });
+
+      const payload = {
+        session: 'zafi-cs',
+        event: 'message.any',
+        payload: {
+          id: { _serialized: 'true_6262112710705@lid_3EB038D075231F98532602' },
+          fromMe: true,
+          from: '34304725926129@lid',
+          to: '34304725926129@lid',
+          _data: {
+            key: { remoteJid: '34304725926129@lid' },
+          },
+          body: 'Halo kak! Terima kasih sudah nanya soal free trial ZAF SAPA.',
+        },
+      };
+
+      const result = await controller.handleWebhook(payload);
+
+      expect(result).toEqual({ status: 'ignored_unresolved_lid_echo' });
+      expect(mockPrismaService.contact.create).not.toHaveBeenCalled();
+      expect(mockPrismaService.contact.update).not.toHaveBeenCalled();
+      expect(mockPrismaService.conversation.upsert).not.toHaveBeenCalled();
+      expect(mockPrismaService.message.upsert).not.toHaveBeenCalled();
+    });
+
+    it('harus tetap memproses echo message.any (fromMe) saat LID berhasil diresolusi ke nomor asli', async () => {
+      // Kebalikan dari test di atas: kalau WAHA BERHASIL resolve @lid ke nomor asli,
+      // alur normal (simpan/update pesan di percakapan yang benar) harus tetap jalan.
+      mockWahaService.getContact = jest
+        .fn()
+        .mockResolvedValue({ id: '628999888777@c.us' });
+      mockPrismaService.conversation.upsert.mockResolvedValueOnce({
+        id: 'conv-resolved',
+      });
+
+      const payload = {
+        session: 'zafi-cs',
+        event: 'message.any',
+        payload: {
+          id: { _serialized: 'true_abc123' },
+          fromMe: true,
+          from: '34304725926129@lid',
+          to: '34304725926129@lid',
+          _data: {
+            key: { remoteJid: '34304725926129@lid' },
+          },
+          body: 'Balasan bot berhasil terkirim',
+        },
+      };
+
+      const result = await controller.handleWebhook(payload);
+
+      expect(result).toEqual({ status: 'success' });
+      expect(mockPrismaService.message.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({
+            senderType: 'bot',
+            content: 'Balasan bot berhasil terkirim',
+          }),
+        }),
+      );
+    });
+
     it('harus menolak request dengan ForbiddenException jika webhook secret salah', async () => {
       const payload = { session: 'zafi-cs', event: 'message' };
       // Must be a genuinely external IP — controller trusts internal ranges

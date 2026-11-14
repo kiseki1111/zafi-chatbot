@@ -1118,7 +1118,8 @@ export function ChatbotPage() {
         });
       });
       if (!activeId && mappedContacts.length > 0) {
-         setActiveId(mappedContacts.find((c) => c.unread > 0)?.id ?? mappedContacts[0].id);
+         const autoId = mappedContacts.find((c) => c.unread > 0)?.id ?? mappedContacts[0].id;
+         selectContact(autoId);
       }
     } catch (e) {
       console.error(e);
@@ -1387,6 +1388,10 @@ export function ChatbotPage() {
   function selectContact(id: string) {
     setActiveId(id);
     setMobileShowList(false);
+    setContacts((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, unread: 0 } : c)),
+    );
+    fetch(`/api/v1/chats/${id}/read`, { method: "POST" }).catch(() => {});
   }
 
   // Simpan label hasil tinjauan marketing untuk Hot Lead (layak/tidak/sudah ditangani)

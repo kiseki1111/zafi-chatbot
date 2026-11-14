@@ -34,6 +34,7 @@ describe('ChatsService', () => {
   };
 
   beforeEach(async () => {
+    jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ChatsService,
@@ -51,6 +52,61 @@ describe('ChatsService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  describe('markAsRead', () => {
+    it('menolkan unreadCount percakapan saat dibuka admin', async () => {
+      mockPrismaService.conversation.findUnique.mockResolvedValue({
+        id: 'conv-1',
+        unreadCount: 3,
+        whatsappInstance: { tenantId: 'tenant-a' },
+      });
+      mockPrismaService.conversation.update.mockResolvedValue({
+        id: 'conv-1',
+        unreadCount: 0,
+      });
+
+      const result = await service.markAsRead('conv-1', 'tenant-a');
+
+      expect(mockPrismaService.conversation.update).toHaveBeenCalledWith({
+        where: { id: 'conv-1' },
+        data: { unreadCount: 0 },
+      });
+      expect(result.unreadCount).toBe(0);
+    });
+
+    it('tidak menulis ke DB jika unreadCount sudah 0 (hindari write sia-sia)', async () => {
+      mockPrismaService.conversation.findUnique.mockResolvedValue({
+        id: 'conv-1',
+        unreadCount: 0,
+        whatsappInstance: { tenantId: 'tenant-a' },
+      });
+
+      await service.markAsRead('conv-1', 'tenant-a');
+
+      expect(mockPrismaService.conversation.update).not.toHaveBeenCalled();
+    });
+
+    it('menolak akses lintas tenant (SECURITY)', async () => {
+      mockPrismaService.conversation.findUnique.mockResolvedValue({
+        id: 'conv-1',
+        unreadCount: 3,
+        whatsappInstance: { tenantId: 'tenant-b' },
+      });
+
+      await expect(
+        service.markAsRead('conv-1', 'tenant-a'),
+      ).rejects.toThrow('Akses ditolak');
+      expect(mockPrismaService.conversation.update).not.toHaveBeenCalled();
+    });
+
+    it('melempar NotFoundException jika percakapan tidak ada', async () => {
+      mockPrismaService.conversation.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.markAsRead('conv-missing', 'tenant-a'),
+      ).rejects.toThrow('Conversation not found');
+    });
   });
 
   describe('sendMessage — SSE tenantId propagation (SECURITY)', () => {

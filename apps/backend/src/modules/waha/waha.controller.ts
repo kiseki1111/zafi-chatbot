@@ -1093,6 +1093,18 @@ export class WahaController implements OnApplicationBootstrap {
         } catch {}
       }
 
+      // ponytail: echo "message.any" dari pesan keluar (fromMe) kadang membawa remoteJid/to
+      // berupa @lid yang gagal diresolusi WAHA ke nomor asli. Pesan asli sudah tersimpan lewat
+      // alur balasan bot (saveBotReply + linkSentMessage) di percakapan yang benar -- jangan
+      // bikin kontak/percakapan baru dari LID abal-abal ini, itu yang menyebabkan kontak hantu
+      // naik ke atas daftar monitoring tanpa ada chat baru.
+      if (message.fromMe && rawNumber && rawNumber.includes('@lid')) {
+        this.logger.debug(
+          `[WAHA] Abaikan echo fromMe dengan LID tak teresolusi (${rawNumber}) sesi ${sessionName}`,
+        );
+        return { status: 'ignored_unresolved_lid_echo' };
+      }
+
       const cleanNumber = (rawNumber || '')
         .replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, '')
         .replace(/:\d+$/, '')
