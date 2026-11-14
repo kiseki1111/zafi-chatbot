@@ -371,7 +371,7 @@ export function CrmPage() {
   };
 
   const handleExportCsv = () => {
-    const headers = ["No.", "Nama Pelanggan", "No. WhatsApp", "Perumahan", "Tipe Unit", "Harga Unit (Rp)", "Status", "Catatan"];
+    const headers = ["No.", "Nama Pelanggan", "No. WhatsApp", "Produk Diminati", "Varian", "Harga (Rp)", "Status", "Catatan"];
     const rows = filteredContacts.map((c, idx) => {
       const cleanPhone = (c.phone || "").replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, "").replace(/^\+/, "");
       const selectedPerumahan = c.metadata?.perumahan || "-";
@@ -512,7 +512,7 @@ export function CrmPage() {
             <Input
               value={searchInput}
               onChange={(e) => handleSearchChange(e.target.value)}
-              placeholder="Cari nama, nomor, perumahan, atau catatan..."
+              placeholder="Cari nama, nomor, produk, atau catatan..."
               className="pl-8 h-8 text-xs bg-background border rounded-lg"
             />
           </div>
@@ -610,12 +610,12 @@ export function CrmPage() {
                       <th style={{ width: "170px" }} className="py-2.5 px-3 shrink-0">Nama Pelanggan</th>
                       <th style={{ width: "140px" }} className="py-2.5 px-3 shrink-0">No. WhatsApp</th>
                       <th style={{ width: "170px" }} className="py-2.5 px-3 shrink-0">
-                        <div className="flex items-center gap-1">Perumahan <ChevronDown className="h-3 w-3 opacity-50 shrink-0" /></div>
+                        <div className="flex items-center gap-1">Produk Diminati <ChevronDown className="h-3 w-3 opacity-50 shrink-0" /></div>
                       </th>
                       <th style={{ width: "120px" }} className="py-2.5 px-3 shrink-0">
-                        <div className="flex items-center gap-1">Tipe Unit <ChevronDown className="h-3 w-3 opacity-50 shrink-0" /></div>
+                        <div className="flex items-center gap-1">Varian <ChevronDown className="h-3 w-3 opacity-50 shrink-0" /></div>
                       </th>
-                      <th style={{ width: "130px" }} className="py-2.5 px-3 text-right shrink-0">Harga Unit (Rp)</th>
+                      <th style={{ width: "130px" }} className="py-2.5 px-3 text-right shrink-0">Harga (Rp)</th>
                       <th style={{ width: "145px" }} className="py-2.5 px-3 shrink-0">
                         <div className="flex items-center gap-1">Status <ChevronDown className="h-3 w-3 opacity-50 shrink-0" /></div>
                       </th>
@@ -797,7 +797,7 @@ export function CrmPage() {
                       </div>
 
                       <MobileCellSelect
-                        label="Perumahan"
+                        label="Produk Diminati"
                         value={selectedPerumahan}
                         options={perumahanCatalog.map((p) => ({ value: p.name, label: p.name }))}
                         onValueChange={(v) => handlePerumahanSelect(c.id, v)}
@@ -805,7 +805,7 @@ export function CrmPage() {
 
                       <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-1">
-                          <span className="text-[10px] text-muted-foreground font-medium">Tipe Unit:</span>
+                          <span className="text-[10px] text-muted-foreground font-medium">Varian:</span>
                           <Select
                             value={c.metadata?.tipeUnit ?? unitTypes[0]?.name ?? ""}
                             onValueChange={(v) => handleTipeUnitSelect(c.id, selectedPerumahan, v)}
@@ -821,7 +821,7 @@ export function CrmPage() {
                           </Select>
                         </div>
                         <div className="space-y-1">
-                          <span className="text-[10px] text-muted-foreground font-medium">Harga Unit (Rp):</span>
+                          <span className="text-[10px] text-muted-foreground font-medium">Harga (Rp):</span>
                           <input
                             type="text"
                             value={formatRupiah(c.metadata?.hargaUnit)}
