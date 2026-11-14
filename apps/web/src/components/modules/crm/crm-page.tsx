@@ -175,6 +175,13 @@ export function CrmPage() {
 
   const { seen, markSeen, reset } = useMenuGuide("crm");
 
+  // Hanya akun demo (tanpa tenant nyata) yang boleh melihat katalog contoh —
+  // tenant asli tanpa katalog sendiri harus melihat daftar kosong, bukan data tenant demo lain.
+  const isDemoAccount =
+    user?.id?.startsWith("u-") ||
+    user?.email?.includes("demo") ||
+    (process.env.NODE_ENV !== "production" && !user?.tenantId);
+
   // Debounce search — hanya filter setelah user berhenti mengetik 400ms
   const handleSearchChange = (val: string) => {
     setSearchInput(val);
@@ -208,14 +215,9 @@ export function CrmPage() {
       }
     } catch { /* fall through to mock */ }
 
-    const isDemoAccount =
-      user?.id?.startsWith("u-") ||
-      user?.email?.includes("demo") ||
-      (process.env.NODE_ENV !== "production" && !user?.tenantId);
-
     setAllContacts(list.length === 0 && isDemoAccount ? (MOCK_CRM_CONTACTS as ContactData[]) : list);
     setLoading(false);
-  }, [user]);
+  }, [user, isDemoAccount]);
 
   useEffect(() => {
     fetchPropertyGroups();
@@ -236,8 +238,9 @@ export function CrmPage() {
         return { name: g.name, types: types.length > 0 ? types : [{ name: "Tipe Standar", price: 0 }] };
       });
     }
-    return DEFAULT_PERUMAHAN_CATALOG;
-  }, [propertyGroups]);
+    // Tenant asli tanpa katalog sendiri: jangan tampilkan nama properti tenant demo lain.
+    return isDemoAccount ? DEFAULT_PERUMAHAN_CATALOG : [];
+  }, [propertyGroups, isDemoAccount]);
 
   // Filter client-side: search (debounced) + status
   const filteredContacts = useMemo(() => {

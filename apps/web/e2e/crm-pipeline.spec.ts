@@ -160,4 +160,27 @@ test.describe('E2E CRM Pelanggan & Pipeline Leads', () => {
       expect(download.suggestedFilename()).toContain('.csv');
     }
   });
+
+  test('6. Tidak membocorkan katalog produk tenant demo lain ke tenant tanpa katalog sendiri', async ({ page }) => {
+    // Tenant ini (preset "Demo Manajer") tidak punya availability groups sendiri
+    // (dimock kosong di beforeEach) -- dropdown "Produk Diminati" wajib kosong,
+    // bukan menampilkan katalog hardcode tenant demo properti lain.
+    await expect(page.locator('input[value="Ummi Ruhama"]').first()).toBeVisible({ timeout: 10000 });
+
+    const addBtn = page.locator('button:has-text("Tambah Pelanggan")').first();
+    await addBtn.click();
+    await expect(page.locator('input[value="Anonim"]').first()).toBeVisible({ timeout: 5000 });
+
+    const newRow = page
+      .locator('table tbody tr')
+      .filter({ has: page.locator('input[value="Anonim"]') })
+      .first();
+    const productSelectTrigger = newRow.locator('td').nth(3).locator('[role="combobox"]');
+    await productSelectTrigger.click();
+
+    const leakedNames = ['Griya Amanah 2', 'Zafi Residence', 'Kahyana Residence'];
+    for (const name of leakedNames) {
+      await expect(page.locator(`[role="option"]:has-text("${name}")`)).toHaveCount(0);
+    }
+  });
 });
