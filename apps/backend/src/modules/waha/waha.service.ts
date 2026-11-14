@@ -280,7 +280,9 @@ export class WahaService implements OnApplicationBootstrap {
         where: { instanceName: sessionName },
         update: {
           channelAccountId: channelAccountId || null,
-          tenantId: validTenantId || null,
+          // ponytail: jangan set tenantId ke null saat update tanpa tenant (mis. restart),
+          // karena bisa melepas ikatan tenant dari sesi yang sudah valid.
+          ...(validTenantId ? { tenantId: validTenantId } : {}),
         },
         create: {
           instanceName: sessionName,

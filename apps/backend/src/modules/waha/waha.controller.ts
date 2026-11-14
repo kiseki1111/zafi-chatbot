@@ -1807,6 +1807,11 @@ export class WahaController implements OnApplicationBootstrap {
       const sessionName = payload.session;
       const status = payload.payload?.status;
       if (sessionName && status) {
+        if (status === 'STOPPED' || status === 'FAILED') {
+          this.logger.warn(
+            `[WAHA] Sesi ${sessionName} ${status}: ${payload.payload?.reason || payload.payload?.engine?.reason || payload.payload?.error || 'tanpa reason'}`,
+          );
+        }
         const updateData: any = { status: status };
         if (status === 'STOPPED') {
           updateData.lastConnectedAt = null; // or keep it and use disconnectedAt for WhatsappSession
@@ -1827,9 +1832,83 @@ export class WahaController implements OnApplicationBootstrap {
           .catch((e) =>
             this.logger.warn(`Failed to update status for ${sessionName}`),
           );
+
+        // ponytail: notifikasi telegram jika sesi WA putus (STOPPED/FAILED), cooldown per session agar anti-spam
+        if (status === 'STOPPED' || status === 'FAILED') {
+          const reason =
+            payload.payload?.reason ||
+            payload.payload?.engine?.reason ||
+            payload.payload?.error ||
+            'Koneksi perangkat terputus atau sesi di-logout';
+          this.notifyTelegramSessionDisconnected(sessionName, status, String(reason)).catch(
+            () => null,
+          );
+        }
       }
     }
 
     return { status: 'success' };
+  }
+
+  // ponytail: map last notification timestamp per session untuk cooldown 3 menit
+  private sessionAlertCooldown = new Map<string, number>();
+
+  private async notifyTelegramSessionDisconnected(
+    sessionName: string,
+    status: string,
+    reason: string,
+  ) {
+    const token =
+      process.env.TELEGRAM_ALERT_BOT_TOKEN ||
+      process.env.TELEGRAM_BOT_TOKEN ||
+      process.env.TELEGRAM_BOT_CS_DEV_API;
+    const chatId =
+      process.env.TELEGRAM_ALERT_CHAT_ID ||
+      process.env.TELEGRAM_ADMIN_CHAT_ID;
+
+    if (!token || !chatId) return;
+
+    // Cooldown 3 menit per session agar tidak membanjiri chat saat reconnecting loop
+    const now = Date.now();
+    const lastSent = this.sessionAlertCooldown.get(sessionName) || 0;
+    if (now - lastSent < 180_000) return;
+    this.sessionAlertCooldown.set(sessionName, now);
+
+    // Ambil data tenant & nomor instance untuk pesan yang actionable
+    const inst = await this.prisma.whatsappInstance
+      .findUnique({
+        where: { instanceName: sessionName },
+        include: { tenant: { select: { name: true } } },
+      })
+      .catch(() => null);
+
+    const tenantName = inst?.tenant?.name || 'Tanpa Tenant (Global)';
+    const phone = inst?.phone ? `+${inst.phone}` : '-';
+    const timestamp = new Date().toLocaleString('id-ID', {
+      timeZone: 'Asia/Jakarta',
+    });
+
+    const text =
+      `🚨 <b>[SESI WHATSAPP TERPUTUS]</b>\n\n` +
+      `🏢 <b>Tenant:</b> ${tenantName}\n` +
+      `📱 <b>Nomor / Sesi:</b> ${phone} (<code>${sessionName}</code>)\n` +
+      `⚠️ <b>Status:</b> ${status}\n` +
+      `🔍 <b>Penyebab:</b> <code>${reason}</code>\n` +
+      `⏰ <b>Waktu:</b> ${timestamp} WIB\n\n` +
+      `👉 <i>Buka Dashboard ZAF SAPA &gt; Pengaturan &gt; Scan QR ulang.</i>`;
+
+    try {
+      await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text,
+          parse_mode: 'HTML',
+        }),
+      });
+    } catch (e: any) {
+      this.logger.warn(`Failed to send Telegram disconnection alert: ${e.message}`);
+    }
   }
 }

@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Bot, Save, Smartphone, ShieldCheck, ShieldAlert, Loader2, Plus, Trash2, QrCode, Palette, Wrench, Settings, Users, Sparkles, CheckCircle2, Compass, RefreshCw } from "lucide-react";
+import { Bot, Save, Smartphone, ShieldCheck, ShieldAlert, Loader2, Plus, Trash2, QrCode, Palette, Wrench, Settings, Users, Sparkles, CheckCircle2, Compass, RefreshCw, Clock } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthStore } from "@/lib/auth-store";
 import { cn } from "@/lib/utils";
@@ -522,6 +522,11 @@ function KoneksiWATab() {
   const [instances, setInstances] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [qrCodeData, setQrCodeData] = React.useState<{id: string, url: string} | null>(null);
+  const [qrSession, setQrSession] = React.useState<string | null>(null);
+  const [qrLoading, setQrLoading] = React.useState(false);
+  const [qrError, setQrError] = React.useState<string | null>(null);
+  const [qrExpiresAt, setQrExpiresAt] = React.useState<number | null>(null);
+  const [qrCountdown, setQrCountdown] = React.useState(0);
   const [connectingSession, setConnectingSession] = React.useState<string | null>(null);
   const [connectedSession, setConnectedSession] = React.useState<{id: string, phone?: string, name?: string} | null>(null);
 
@@ -563,6 +568,7 @@ function KoneksiWATab() {
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`/api/v1/waha/instances/${connectingSession}/status`);
+        if (res.status === 403) { clearInterval(interval); return; }
         if (!res.ok) return;
         const data = await res.json();
         const status = (data?.status || "").toUpperCase();
@@ -604,16 +610,60 @@ function KoneksiWATab() {
     };
   }, [connectingSession, qrCodeData]);
 
+  // ponytail: QR WAHA butuh waktu boot, jadi poll beberapa kali hingga siap (bukan minta user klik 2x)
+  const fetchQrWithRetry = async (sessionName: string, attempts = 15, delayMs = 1500) => {
+    setQrLoading(true);
+    setQrError(null);
+    for (let i = 0; i < attempts; i++) {
+      try {
+        const res = await fetch(`/api/v1/waha/instances/${sessionName}/qr`);
+        if (res.ok) {
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          setQrCodeData((prev) => {
+            if (prev?.url) URL.revokeObjectURL(prev.url);
+            return { id: sessionName, url };
+          });
+          setQrExpiresAt(Date.now() + 60_000);
+          setQrLoading(false);
+          return;
+        }
+      } catch {
+        // teruskan retry
+      }
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+    setQrLoading(false);
+    setQrError("QR belum tersedia. Pastikan server WAHA aktif, lalu coba muat ulang.");
+  };
+
+  // ponytail: countdown QR 60 detik, otomatis minta QR baru saat kedaluwarsa
+  React.useEffect(() => {
+    if (!qrExpiresAt || !qrSession) return;
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((qrExpiresAt - Date.now()) / 1000));
+      setQrCountdown(remaining);
+      if (remaining === 0) {
+        setQrExpiresAt(null);
+        fetchQrWithRetry(qrSession, 5, 1200);
+      }
+    };
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [qrExpiresAt, qrSession]);
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim()) return;
     setIsAddLoading(true);
     try {
+      const sessionName = newName.trim().replace(/\s+/g, '-').toLowerCase();
       const res = await fetch('/api/v1/waha/instances', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: newName.trim().replace(/\s+/g, '-'),
+          name: sessionName,
           tenantId: user?.tenantId,
         })
       });
@@ -621,12 +671,17 @@ function KoneksiWATab() {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.message || 'Gagal');
       }
-      toast.success("Chatbot baru berhasil dibuat!", {
-        description: "Silakan klik Scan QR untuk menghubungkan nomor WhatsApp."
-      });
       setIsAddOpen(false);
       setNewName("");
       fetchInstances();
+      // ponytail: langsung buka modal QR dalam mode loading, QR diisi otomatis saat ready
+      setConnectedSession(null);
+      setQrCodeData(null);
+      setQrExpiresAt(null);
+      setQrError(null);
+      setQrSession(sessionName);
+      setConnectingSession(sessionName);
+      fetchQrWithRetry(sessionName);
     } catch (err: any) {
       toast.error("Gagal membuat chatbot: " + (err.message || 'Unknown error'));
     } finally {
@@ -652,20 +707,14 @@ function KoneksiWATab() {
     }
   };
 
-  const handleScanQR = async (sessionName: string) => {
-    try {
-      setConnectingSession(sessionName);
-      setConnectedSession(null);
-      const res = await fetch(`/api/v1/waha/instances/${sessionName}/qr`);
-      if (res.ok) {
-        const blob = await res.blob();
-        setQrCodeData({ id: sessionName, url: URL.createObjectURL(blob) });
-      } else {
-        toast.info("QR Code belum tersedia. Sesi sedang dimulai, coba lagi dalam beberapa detik.");
-      }
-    } catch (e) {
-      toast.error("Gagal mengambil QR Code");
-    }
+  const handleScanQR = (sessionName: string) => {
+    setConnectingSession(sessionName);
+    setConnectedSession(null);
+    setQrCodeData(null);
+    setQrExpiresAt(null);
+    setQrError(null);
+    setQrSession(sessionName);
+    fetchQrWithRetry(sessionName);
   };
 
   if (loading) {
@@ -841,10 +890,13 @@ function KoneksiWATab() {
 
       {/* Dialog: Scan QR Code & Status Terhubung */}
       <Dialog
-        open={!!qrCodeData || !!connectedSession}
+        open={!!qrSession || !!connectedSession}
         onOpenChange={(open) => {
           if (!open) {
+            setQrSession(null);
             setQrCodeData(null);
+            setQrExpiresAt(null);
+            setQrError(null);
             setConnectedSession(null);
           }
         }}
@@ -891,19 +943,53 @@ function KoneksiWATab() {
                   Scan QR Code WhatsApp
                 </DialogTitle>
                 <DialogDescription>
-                  Hubungkan sesi <span className="font-semibold text-foreground">{qrCodeData?.id}</span> ke WhatsApp Anda.
+                  Hubungkan sesi <span className="font-semibold text-foreground">{qrSession}</span> ke WhatsApp Anda.
                 </DialogDescription>
               </DialogHeader>
               <div className="flex flex-col items-center justify-center py-4">
-                {qrCodeData && (
+                {qrCodeData ? (
                   <div className="relative p-2 bg-white rounded-xl shadow-md border-2 border-emerald-500">
                     <img src={qrCodeData.url} alt="QR Code" className="w-48 h-48 rounded-lg" />
                   </div>
+                ) : (
+                  <div className="w-48 h-48 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-2 text-center px-3">
+                    {qrLoading ? (
+                      <>
+                        <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+                        <span className="text-[11px] text-muted-foreground">Menyiapkan QR Code...</span>
+                      </>
+                    ) : (
+                      <>
+                        <QrCode className="h-6 w-6 text-muted-foreground/50" />
+                        <span className="text-[11px] text-muted-foreground">{qrError || "QR belum tersedia"}</span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-[11px]"
+                          onClick={() => qrSession && fetchQrWithRetry(qrSession)}
+                        >
+                          Muat Ulang QR
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 )}
                 <div className="flex items-center gap-2 mt-4 text-xs text-muted-foreground">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-600" />
-                  <span>Menunggu pemindaian ponsel...</span>
+                  {qrCodeData && qrCountdown > 0 ? (
+                    <>
+                      <Clock className="h-3.5 w-3.5 text-emerald-600" />
+                      <span>QR berlaku <strong className="text-foreground">{qrCountdown} detik</strong> lagi</span>
+                    </>
+                  ) : (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-600" />
+                      <span>{qrCodeData ? "Memuat ulang QR..." : "Menunggu QR siap..."}</span>
+                    </>
+                  )}
                 </div>
+                {qrCodeData && (
+                  <p className="mt-1 text-[11px] text-muted-foreground">Sudah discan? Menunggu konfirmasi dari WhatsApp...</p>
+                )}
               </div>
               <p className="text-[11px] text-muted-foreground text-center">
                 Buka WhatsApp di ponsel &gt; Ketuk Perangkat Tertaut &gt; Tautkan Perangkat, lalu arahkan kamera ke kode QR di atas.
@@ -912,7 +998,10 @@ function KoneksiWATab() {
                 <Button
                   variant="outline"
                   onClick={() => {
+                    setQrSession(null);
                     setQrCodeData(null);
+                    setQrExpiresAt(null);
+                    setQrError(null);
                     toast.info("Pemindaian ditutup. Notifikasi akan muncul otomatis saat nomor terhubung.");
                   }}
                   className="w-full text-xs"
@@ -967,6 +1056,7 @@ function KoneksiAsistenWATab() {
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`/api/v1/waha/instances/${connectingSession}/status`);
+        if (res.status === 403) { clearInterval(interval); return; }
         if (!res.ok) return;
         const data = await res.json();
         const status = (data?.status || "").toUpperCase();
@@ -1011,31 +1101,25 @@ function KoneksiAsistenWATab() {
   const handleStartConnect = async () => {
     setIsCreating(true);
     try {
-      // 1. Buat sesi jika belum ada
+      // 1. Buat sesi jika belum ada (backend memakai field `name`)
       if (!assistantInstance) {
         await fetch("/api/v1/waha/instances", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            instanceName: assistantSessionName,
+            name: assistantSessionName,
             tenantId: user?.tenantId,
           }),
         });
       }
 
-      // 2. Minta QR code
+      // 2. Minta QR code (endpoint mengembalikan PNG, bukan JSON)
       const targetName = assistantInstance ? assistantInstance.instanceName : assistantSessionName;
       const qrRes = await fetch(`/api/v1/waha/instances/${targetName}/qr`);
-      const qrData = await qrRes.json();
 
-      const qrUrl =
-        qrData?.url ||
-        qrData?.data?.url ||
-        (qrData?.qr ? `data:image/png;base64,${qrData.qr}` : null) ||
-        (qrData?.data?.qr ? `data:image/png;base64,${qrData.data.qr}` : null);
-
-      if (qrUrl) {
-        setQrCodeData({ id: targetName, url: qrUrl });
+      if (qrRes.ok) {
+        const blob = await qrRes.blob();
+        setQrCodeData({ id: targetName, url: URL.createObjectURL(blob) });
         setConnectingSession(targetName);
       } else {
         toast.info("Sesi sedang booting, silakan klik scan ulang dalam beberapa detik.");
