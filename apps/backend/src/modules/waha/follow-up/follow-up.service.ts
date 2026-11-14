@@ -22,15 +22,15 @@ export class FollowUpService {
   ) {}
 
   async getConfig(tenantId?: string) {
-    let config: any = null;
-    if (tenantId) {
-      config = await this.prisma.followUpConfig.findUnique({
-        where: { tenantId },
-      });
-    }
-    if (!config) {
-      config = await this.prisma.followUpConfig.findFirst();
-    }
+    // SECURITY: config.followUpPrompt is fed straight into the LLM that messages
+    // real customers (see generateFollowUpMessage below) -- a tenant with no
+    // config row of their own must NEVER fall back to another tenant's row.
+    // findFirst() with no filter is only safe for the tenant-less (superadmin)
+    // global-settings path.
+    const config = tenantId
+      ? await this.prisma.followUpConfig.findUnique({ where: { tenantId } })
+      : await this.prisma.followUpConfig.findFirst();
+
     if (!config) {
       return {
         isEnabled: false,

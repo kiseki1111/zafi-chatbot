@@ -115,6 +115,30 @@ describe('FollowUpService', () => {
       expect(config.isEnabled).toBe(true);
       expect(config.scheduleTime).toBe('11:00');
     });
+
+    it('SECURITY: tidak boleh bocor ke config tenant lain jika tenant ini belum punya config sendiri', async () => {
+      // tenant-1 belum punya FollowUpConfig sendiri...
+      mockPrisma.followUpConfig.findUnique.mockResolvedValue(null);
+      // ...tapi tenant lain (misal tenant demo) sudah, dan findFirst() tanpa
+      // filter akan mengembalikannya jika tidak di-guard dengan benar.
+      mockPrisma.followUpConfig.findFirst.mockResolvedValue({
+        id: 'cfg-other-tenant',
+        tenantId: 'tenant-ZAFI-DEMO',
+        isEnabled: true,
+        scheduleTime: '03:00',
+        inactivityHours: 1,
+        followUpPrompt: 'Prompt rahasia bisnis tenant lain',
+      });
+
+      const config = await service.getConfig('tenant-1');
+
+      // Harus default aman, BUKAN config tenant-ZAFI-DEMO
+      expect(config.followUpPrompt).not.toBe('Prompt rahasia bisnis tenant lain');
+      expect(config.isEnabled).toBe(false);
+      expect(config.inactivityHours).toBe(24);
+      // findFirst() tanpa filter tidak boleh dipanggil sama sekali saat tenantId ada
+      expect(mockPrisma.followUpConfig.findFirst).not.toHaveBeenCalled();
+    });
   });
 
   describe('updateConfig', () => {

@@ -907,6 +907,12 @@ export function ChatbotPage() {
   const { user } = useAuthStore();
   const { activeContactId, setActiveContactId, activeSessionId, setActiveSessionId, setView } = useAppStore();
   const me = user?.name ?? "Saya";
+  // Hanya akun demo (tanpa tenant nyata) yang boleh melihat percakapan contoh —
+  // tenant asli dengan chat kosong/fetch gagal harus melihat state kosong, bukan chat palsu.
+  const isDemoAccount =
+    user?.id?.startsWith('u-') ||
+    user?.email?.includes('demo') ||
+    (process.env.NODE_ENV !== 'production' && !user?.tenantId);
   const [sessions, setSessions] = useState<{id: string, name: string, status: string, battery?: number}[]>([]);
   const sessionId = activeSessionId || "";
   const setSessionId = setActiveSessionId;
@@ -1047,10 +1053,6 @@ export function ChatbotPage() {
   // Fetch Conversations
   const fetchConversations = async () => {
     if (!sessionId) return;
-    const isDemo =
-      user?.id?.startsWith('u-') ||
-      user?.email?.includes('demo') ||
-      (process.env.NODE_ENV !== 'production' && !user?.tenantId);
 
     try {
       const tenantQuery = user?.tenantId && user.role !== 'superadmin' ? `&tenantId=${user.tenantId}` : '';
@@ -1061,7 +1063,7 @@ export function ChatbotPage() {
         chatsData = data.data;
       }
       if (!Array.isArray(chatsData) || chatsData.length === 0) {
-        if (isDemo) {
+        if (isDemoAccount) {
           setContacts(MOCK_CHATS);
           if (!activeId) setActiveId(MOCK_CHATS[0].id);
         } else {
@@ -1120,7 +1122,7 @@ export function ChatbotPage() {
       }
     } catch (e) {
       console.error(e);
-      if (isDemo) {
+      if (isDemoAccount) {
         setContacts(MOCK_CHATS);
         if (!activeId) setActiveId(MOCK_CHATS[0].id);
       } else {
@@ -1143,8 +1145,11 @@ export function ChatbotPage() {
         msgsData = data.data;
       }
       if (!Array.isArray(msgsData) || (reset && msgsData.length === 0)) {
-        const mockMsgs = MOCK_CHAT_MESSAGES[activeId] || DEFAULT_MOCK_MESSAGES;
-        setMessages(mockMsgs);
+        if (isDemoAccount) {
+          setMessages(MOCK_CHAT_MESSAGES[activeId] || DEFAULT_MOCK_MESSAGES);
+        } else {
+          setMessages([]);
+        }
         setHasMore(false);
         return;
       }
@@ -1183,8 +1188,11 @@ export function ChatbotPage() {
       }
     } catch (e) {
       console.error(e);
-      const mockMsgs = MOCK_CHAT_MESSAGES[activeId] || DEFAULT_MOCK_MESSAGES;
-      setMessages(mockMsgs);
+      if (isDemoAccount) {
+        setMessages(MOCK_CHAT_MESSAGES[activeId] || DEFAULT_MOCK_MESSAGES);
+      } else if (reset) {
+        setMessages([]);
+      }
       setHasMore(false);
     } finally {
       if (reset) setLoadingMore(false);
