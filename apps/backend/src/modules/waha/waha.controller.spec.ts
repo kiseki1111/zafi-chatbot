@@ -25,6 +25,7 @@ describe('WahaController - Unit Tests (Feature 6 Call Reject & Webhooks)', () =>
   const mockPrismaService = {
     whatsappInstance: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       findMany: jest.fn(),
       delete: jest.fn(),
       upsert: jest.fn().mockResolvedValue({}),
@@ -57,6 +58,14 @@ describe('WahaController - Unit Tests (Feature 6 Call Reject & Webhooks)', () =>
 
   beforeEach(async () => {
     jest.clearAllMocks();
+
+    // Controller only processes sessions registered in DB; default to "known"
+    // so webhook tests reach their actual assertions instead of the
+    // ignored_unknown_session early-return.
+    mockPrismaService.whatsappInstance.findUnique.mockResolvedValue({
+      instanceName: 'zafi-cs',
+      tenantId: 'tenant-1',
+    });
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [WahaController],
@@ -156,7 +165,9 @@ describe('WahaController - Unit Tests (Feature 6 Call Reject & Webhooks)', () =>
 
     it('harus menolak request dengan ForbiddenException jika webhook secret salah', async () => {
       const payload = { session: 'zafi-cs', event: 'message' };
-      const req = { ip: '192.168.1.100', query: {} };
+      // Must be a genuinely external IP — controller trusts internal ranges
+      // (127.*, 10.*, 172.*, 192.168.*) and would bypass the secret check.
+      const req = { ip: '8.8.8.8', query: {} };
 
       await expect(
         controller.handleWebhook(payload, 'wrong-secret', req),

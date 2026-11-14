@@ -1,4 +1,4 @@
-import { Injectable, Logger, BeforeApplicationShutdown } from '@nestjs/common';
+import { Injectable, Logger, Optional, BeforeApplicationShutdown } from '@nestjs/common';
 import { IncomingMessage } from './interfaces/incoming-message.interface';
 import { CsService } from '../../features/agent-cs/cs.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -32,7 +32,7 @@ export class OmnichannelQueueService implements BeforeApplicationShutdown {
   constructor(
     private readonly csService: CsService,
     private readonly prisma: PrismaService,
-    private readonly alertService?: AlertService,
+    @Optional() private readonly alertService?: AlertService,
   ) {}
 
   // ponytail: flush all pending debounce buffers on graceful shutdown to prevent message drop in RAM

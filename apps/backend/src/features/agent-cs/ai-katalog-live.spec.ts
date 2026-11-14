@@ -4,6 +4,7 @@ import { AgentSharedService } from '../../core/agent-shared/agent-shared.service
 import { CsService } from './cs.service';
 import { OpenAiModule } from '../../core/openai/openai.module';
 import { PrismaService } from '../../core/prisma/prisma.service';
+import { HrisService } from '../hris/hris.service';
 
 /**
  * Live E2E Integration Test: Menembak langsung LLM DeepSeek di OpenRouter
@@ -63,6 +64,13 @@ describe('Live AI Integration: Katalog Produk -> OpenRouter DeepSeek -> WAHA Rea
         CsService,
         AgentSharedService,
         { provide: PrismaService, useValue: mockPrisma },
+        {
+          provide: HrisService,
+          useValue: {
+            getDailyAttendance: jest.fn().mockResolvedValue(null),
+            getEmployeesSummary: jest.fn().mockResolvedValue(null),
+          },
+        },
       ],
     }).compile();
 

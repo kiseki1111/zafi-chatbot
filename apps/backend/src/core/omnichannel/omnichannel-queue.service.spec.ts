@@ -5,13 +5,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AlertService } from '../../modules/monitoring/alert.service';
 import { IncomingMessage } from './interfaces/incoming-message.interface';
 
+const DEBOUNCE_MS = 10_000;
+const MAX_RETRY_DURATION_MS = 30 * 60 * 1000;
+
 describe('OmnichannelQueueService - Aggressive Retry Strategy (100x, 30min max)', () => {
   let service: OmnichannelQueueService;
   let csService: CsService;
-  let prisma: PrismaService;
-
-  // Increase Jest timeout for async tests with delays
-  jest.setTimeout(20000);
 
   const mockCsService = {
     handleMessage: jest.fn(),
@@ -34,94 +33,89 @@ describe('OmnichannelQueueService - Aggressive Retry Strategy (100x, 30min max)'
     alertHardFailMessage: jest.fn(),
   };
 
+  // Advances fake time and flushes microtasks so prisma/LLM promise chains settle
+  // between timer ticks (Jest's modern fake timers don't do this automatically).
+  async function advance(ms: number) {
+    await jest.advanceTimersByTimeAsync(ms);
+  }
+
+  function makeMessage(overrides: Partial<IncomingMessage> = {}): IncomingMessage {
+    return {
+      senderId: '62812345678@c.us',
+      text: 'Test message',
+      provider: 'WAHA',
+      sessionName: 'test-session',
+      replyCallback: jest.fn(),
+      ...overrides,
+    };
+  }
+
   beforeEach(async () => {
+    jest.useFakeTimers();
+    jest.resetAllMocks();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OmnichannelQueueService,
-        {
-          provide: CsService,
-          useValue: mockCsService,
-        },
-        {
-          provide: PrismaService,
-          useValue: mockPrismaService,
-        },
-        {
-          provide: AlertService,
-          useValue: mockAlertService,
-        },
+        { provide: CsService, useValue: mockCsService },
+        { provide: PrismaService, useValue: mockPrismaService },
+        { provide: AlertService, useValue: mockAlertService },
       ],
     }).compile();
 
     service = module.get<OmnichannelQueueService>(OmnichannelQueueService);
     csService = module.get<CsService>(CsService);
-    prisma = module.get<PrismaService>(PrismaService);
 
-    jest.clearAllMocks();
+    // Default: conversation in bot mode, no tenant quota concerns.
+    mockPrismaService.conversation.findFirst.mockResolvedValue({
+      mode: 'bot',
+      id: 'conv-123',
+      whatsappInstance: { tenantId: 'tenant-123' },
+    });
+  });
+
+  afterEach(() => {
+    jest.clearAllTimers();
+    jest.useRealTimers();
   });
 
   describe('Basic Message Queuing', () => {
     it('should enqueue message successfully', () => {
-      const message: IncomingMessage = {
-        senderId: '62812345678@c.us',
-        text: 'Test message',
-        provider: 'WAHA',
-        sessionName: 'test-session',
-        replyCallback: jest.fn(),
-      };
-
-      service.enqueue(message);
-
-      expect(message).toBeDefined();
+      service.enqueue(makeMessage());
+      // Buffer is internal; reaching here without throwing is the contract.
+      expect(mockCsService.handleMessage).not.toHaveBeenCalled();
     });
 
-    it('should debounce multiple messages from same customer (10s)', (done) => {
+    it('should debounce multiple messages from the same customer into one call', async () => {
       const replyCallback = jest.fn();
-      const message1: IncomingMessage = {
-        senderId: '62812345678@c.us',
-        text: 'Message 1',
-        provider: 'WAHA',
-        sessionName: 'test-session',
-        replyCallback,
-      };
+      mockCsService.handleMessage.mockResolvedValue({
+        text: 'Reply',
+        images: [],
+        videos: [],
+      });
 
-      const message2: IncomingMessage = {
-        senderId: '62812345678@c.us',
-        text: 'Message 2',
-        provider: 'WAHA',
-        sessionName: 'test-session',
-        replyCallback,
-      };
+      service.enqueue(makeMessage({ text: 'Message 1', replyCallback }));
+      await advance(2000);
+      service.enqueue(makeMessage({ text: 'Message 2', replyCallback }));
 
-      service.enqueue(message1);
-      setTimeout(() => {
-        service.enqueue(message2);
-      }, 2000);
+      // Debounce timer resets on the 2nd message, so flush happens 10s after it.
+      await advance(DEBOUNCE_MS);
 
-      setTimeout(() => {
-        expect(replyCallback).toHaveBeenCalled();
-        done();
-      }, 12000);
+      expect(mockCsService.handleMessage).toHaveBeenCalledTimes(1);
+      expect(mockCsService.handleMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ text: 'Message 1\nMessage 2' }),
+      );
+      expect(replyCallback).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('Retry Mechanism (100x, 30min max)', () => {
-    it('should retry up to 100 times on error', async () => {
-      mockPrismaService.conversation.findFirst.mockResolvedValue({
-        mode: 'bot',
-        id: 'conv-123',
-        whatsappInstance: { tenantId: 'tenant-123' },
-      });
-
-      mockPrismaService.tenant.findUnique.mockResolvedValue({
-        metadata: { plan: 'basic' },
-      });
-
+    it('should retry on failure and succeed once the dependency recovers', async () => {
       let attemptCount = 0;
       mockCsService.handleMessage.mockImplementation(() => {
         attemptCount++;
-        if (attemptCount < 5) {
-          throw new Error('Simulated service error');
+        if (attemptCount < 4) {
+          return Promise.reject(new Error('Simulated service error'));
         }
         return Promise.resolve({
           text: 'Success after retries',
@@ -131,160 +125,77 @@ describe('OmnichannelQueueService - Aggressive Retry Strategy (100x, 30min max)'
       });
 
       const replyCallback = jest.fn();
-      const message: IncomingMessage = {
-        senderId: '62812345678@c.us',
-        text: 'Test message for retry',
-        provider: 'WAHA',
-        sessionName: 'test-session',
-        replyCallback,
-      };
+      service.enqueue(makeMessage({ replyCallback }));
 
-      service.enqueue(message);
+      await advance(DEBOUNCE_MS); // flush -> attempt 1 (fails)
+      await advance(1_100); // backoff #1 (~1s + jitter) -> attempt 2 (fails)
+      await advance(2_100); // backoff #2 (~2s + jitter) -> attempt 3 (fails)
+      await advance(4_100); // backoff #3 (~4s + jitter) -> attempt 4 (succeeds)
 
-      await new Promise((resolve) => setTimeout(resolve, 15000));
-
-      expect(replyCallback).toHaveBeenCalled();
-      expect(attemptCount).toBeGreaterThanOrEqual(4);
+      expect(attemptCount).toBe(4);
+      expect(replyCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ text: 'Success after retries' }),
+      );
     });
 
-    it('should NOT send error message after retry exhaustion', async () => {
-      mockPrismaService.conversation.findFirst.mockResolvedValue({
-        mode: 'bot',
-        id: 'conv-123',
-        whatsappInstance: { tenantId: 'tenant-123' },
-      });
+    it('should back off exponentially instead of retrying immediately', async () => {
+      mockCsService.handleMessage.mockRejectedValue(new Error('Service error'));
 
+      service.enqueue(makeMessage());
+      await advance(DEBOUNCE_MS); // attempt 1 fails, schedules backoff #1 (~1s)
+
+      expect(mockCsService.handleMessage).toHaveBeenCalledTimes(1);
+
+      await advance(500); // well under the ~1s backoff
+      expect(mockCsService.handleMessage).toHaveBeenCalledTimes(1);
+
+      await advance(600); // crosses the ~1s (+-10% jitter) backoff window
+      expect(mockCsService.handleMessage).toHaveBeenCalledTimes(2);
+    });
+
+    it('should stop retrying after the 30-minute ceiling and alert instead of replying with an error', async () => {
       mockCsService.handleMessage.mockRejectedValue(
         new Error('Persistent service failure'),
       );
 
       const replyCallback = jest.fn();
-      const message: IncomingMessage = {
-        senderId: '62812345678@c.us',
-        text: 'Test message for hard fail',
-        provider: 'WAHA',
-        sessionName: 'test-session',
-        replyCallback,
-      };
+      service.enqueue(makeMessage({ replyCallback }));
 
-      service.enqueue(message);
+      await advance(DEBOUNCE_MS);
+      await advance(MAX_RETRY_DURATION_MS + 60_000);
 
-      await new Promise((resolve) => setTimeout(resolve, 3000));
+      // Never falls back to an apology message to the customer.
+      for (const call of replyCallback.mock.calls) {
+        expect(call[0]?.text).not.toMatch(/sistem sedang sibuk/i);
+      }
 
-      // Verify that error message "Maaf, sistem sedang sibuk" is NEVER sent
-      const errorMessageCalls = replyCallback.mock.calls.filter((call) =>
-        call[0]?.text?.includes('Maaf, sistem sedang sibuk'),
+      expect(mockAlertService.alertHardFailMessage).toHaveBeenCalledTimes(1);
+      expect(mockAlertService.alertHardFailMessage).toHaveBeenCalledWith(
+        '62812345678@c.us',
+        'test-session',
+        expect.any(Number),
+        expect.any(Number),
       );
-
-      expect(errorMessageCalls).toHaveLength(0);
-    });
-
-    it('should use exponential backoff (1s, 2s, 4s, 8s, ... max 60s)', async () => {
-      const delays: number[] = [];
-      const originalSetTimeout = global.setTimeout;
-
-      global.setTimeout = jest.fn((callback, delay) => {
-        delays.push(delay);
-        return originalSetTimeout(callback, Math.min(delay, 100));
-      }) as any;
-
-      mockPrismaService.conversation.findFirst.mockResolvedValue({
-        mode: 'bot',
-        id: 'conv-123',
-        whatsappInstance: { tenantId: 'tenant-123' },
-      });
-
-      mockCsService.handleMessage.mockRejectedValue(new Error('Service error'));
-
-      const replyCallback = jest.fn();
-      const message: IncomingMessage = {
-        senderId: '62812345678@c.us',
-        text: 'Test exponential backoff',
-        provider: 'WAHA',
-        sessionName: 'test-session',
-        replyCallback,
-      };
-
-      service.enqueue(message);
-
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // Verify exponential backoff pattern exists in delays
-      const retryDelays = delays.filter((d) => d > 900 && d < 1100);
-      expect(retryDelays.length).toBeGreaterThan(0);
-
-      global.setTimeout = originalSetTimeout;
-    });
-
-    it('should enforce 30-minute max retry duration', async () => {
-      mockPrismaService.conversation.findFirst.mockResolvedValue({
-        mode: 'bot',
-        id: 'conv-123',
-        whatsappInstance: { tenantId: 'tenant-123' },
-      });
-
-      mockCsService.handleMessage.mockRejectedValue(new Error('Service error'));
-
-      const replyCallback = jest.fn();
-      const message: IncomingMessage = {
-        senderId: '62812345678@c.us',
-        text: 'Test 30min timeout',
-        provider: 'WAHA',
-        sessionName: 'test-session',
-        replyCallback,
-      };
-
-      service.enqueue(message);
-
-      // Simulate passing 30+ minutes
-      jest.useFakeTimers();
-      jest.advanceTimersByTime(31 * 60 * 1000);
-
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      expect(replyCallback).not.toHaveBeenCalledWith(
-        expect.objectContaining({
-          text: expect.stringContaining('Maaf, sistem sedang sibuk'),
-        }),
-      );
-
-      jest.useRealTimers();
     });
   });
 
   describe('Human Mode Bypass', () => {
-    it('should skip AI and not retry when conversation is in human mode', async () => {
+    it('should skip AI and never call handleMessage when conversation is in human mode', async () => {
       mockPrismaService.conversation.findFirst.mockResolvedValue({
         mode: 'human',
         id: 'conv-123',
         whatsappInstance: { tenantId: 'tenant-123' },
       });
 
-      const replyCallback = jest.fn();
-      const message: IncomingMessage = {
-        senderId: '62812345678@c.us',
-        text: 'Test human mode',
-        provider: 'WAHA',
-        sessionName: 'test-session',
-        replyCallback,
-      };
-
-      service.enqueue(message);
-
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      service.enqueue(makeMessage());
+      await advance(DEBOUNCE_MS);
 
       expect(csService.handleMessage).not.toHaveBeenCalled();
     });
   });
 
   describe('Anti-Duplication', () => {
-    it('should only send reply once, never duplicate', async () => {
-      mockPrismaService.conversation.findFirst.mockResolvedValue({
-        mode: 'bot',
-        id: 'conv-123',
-        whatsappInstance: { tenantId: 'tenant-123' },
-      });
-
+    it('should only send one reply, never duplicate it', async () => {
       mockCsService.handleMessage.mockResolvedValue({
         text: 'Reply message',
         images: [],
@@ -292,131 +203,85 @@ describe('OmnichannelQueueService - Aggressive Retry Strategy (100x, 30min max)'
       });
 
       const replyCallback = jest.fn();
-      const message: IncomingMessage = {
-        senderId: '62812345678@c.us',
-        text: 'Test anti-duplication',
-        provider: 'WAHA',
-        sessionName: 'test-session',
-        replyCallback,
-      };
-
-      service.enqueue(message);
-
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      service.enqueue(makeMessage({ replyCallback }));
+      await advance(DEBOUNCE_MS);
 
       expect(replyCallback).toHaveBeenCalledTimes(1);
       expect(replyCallback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          text: 'Reply message',
-        }),
+        expect.objectContaining({ text: 'Reply message' }),
       );
     });
   });
 
   describe('Error Message Policy', () => {
-    it('CRITICAL: should NEVER send "Maaf, sistem sedang sibuk" message', async () => {
-      mockPrismaService.conversation.findFirst.mockResolvedValue({
-        mode: 'bot',
-        id: 'conv-123',
-        whatsappInstance: { tenantId: 'tenant-123' },
-      });
-
+    it('CRITICAL: should never send "Maaf, sistem sedang sibuk" while retries are in flight', async () => {
       mockCsService.handleMessage.mockRejectedValue(
         new Error('LLM service timeout'),
       );
 
       const replyCallback = jest.fn();
-      const message: IncomingMessage = {
-        senderId: '62812345678@c.us',
-        text: 'Test critical: never show error',
-        provider: 'WAHA',
-        sessionName: 'test-session',
-        replyCallback,
-      };
+      service.enqueue(makeMessage({ replyCallback }));
 
-      service.enqueue(message);
+      await advance(DEBOUNCE_MS);
+      await advance(1_100);
+      await advance(2_100);
+      await advance(4_100);
 
-      // Wait for several retry attempts
-      await new Promise((resolve) => setTimeout(resolve, 5000));
-
-      // Assert that NO reply containing error message was sent
-      replyCallback.mock.calls.forEach((call) => {
+      expect(mockCsService.handleMessage.mock.calls.length).toBeGreaterThan(1);
+      for (const call of replyCallback.mock.calls) {
         expect(call[0]?.text).not.toMatch(/sistem sedang sibuk/i);
         expect(call[0]?.text).not.toMatch(/mohon coba lagi/i);
-      });
+      }
     });
   });
 
   describe('Timeout Handling', () => {
-    it('should have 120s per-attempt timeout (not 60s)', async () => {
-      const timeouts: number[] = [];
-
-      mockPrismaService.conversation.findFirst.mockResolvedValue({
-        mode: 'bot',
-        id: 'conv-123',
-        whatsappInstance: { tenantId: 'tenant-123' },
-      });
-
+    it('should allow a response up to 120s per attempt (not fail at 60s)', async () => {
       mockCsService.handleMessage.mockImplementation(
         () =>
           new Promise((resolve) =>
             setTimeout(
-              () =>
-                resolve({
-                  text: 'Delayed response',
-                  images: [],
-                  videos: [],
-                }),
-              100,
+              () => resolve({ text: 'Delayed response', images: [], videos: [] }),
+              70_000, // Between 60s and 120s: only valid if the per-attempt timeout is 120s.
             ),
           ),
       );
 
       const replyCallback = jest.fn();
-      const message: IncomingMessage = {
-        senderId: '62812345678@c.us',
-        text: 'Test timeout value',
-        provider: 'WAHA',
-        sessionName: 'test-session',
-        replyCallback,
-      };
+      service.enqueue(makeMessage({ replyCallback }));
 
-      service.enqueue(message);
+      await advance(DEBOUNCE_MS);
+      await advance(70_000);
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      expect(replyCallback).toHaveBeenCalled();
+      expect(replyCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ text: 'Delayed response' }),
+      );
     });
   });
 
   describe('Memory Cleanup', () => {
-    it('should cleanup taskStartTimes after successful response', async () => {
-      mockPrismaService.conversation.findFirst.mockResolvedValue({
-        mode: 'bot',
-        id: 'conv-123',
-        whatsappInstance: { tenantId: 'tenant-123' },
-      });
-
+    it('should remove taskStartTimes tracking after a successful response', async () => {
       mockCsService.handleMessage.mockResolvedValue({
         text: 'Success',
         images: [],
         videos: [],
       });
 
-      const replyCallback = jest.fn();
-      const message: IncomingMessage = {
-        senderId: '62812345678@c.us',
-        text: 'Test memory cleanup',
-        provider: 'WAHA',
-        sessionName: 'test-session',
-        replyCallback,
-      };
+      service.enqueue(makeMessage());
+      await advance(DEBOUNCE_MS);
 
-      service.enqueue(message);
+      const taskStartTimes = (service as any).taskStartTimes as Map<string, number>;
+      expect(taskStartTimes.size).toBe(0);
+    });
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+    it('should keep taskStartTimes tracking while a retry is pending', async () => {
+      mockCsService.handleMessage.mockRejectedValue(new Error('Service error'));
 
-      expect(replyCallback).toHaveBeenCalled();
+      service.enqueue(makeMessage());
+      await advance(DEBOUNCE_MS);
+
+      const taskStartTimes = (service as any).taskStartTimes as Map<string, number>;
+      expect(taskStartTimes.size).toBe(1);
     });
   });
 });
