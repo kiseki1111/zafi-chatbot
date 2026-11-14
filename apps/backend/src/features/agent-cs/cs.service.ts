@@ -1,10 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import {
   IncomingMessage,
   AgentResponse,
 } from '../../core/omnichannel/interfaces/incoming-message.interface';
 import { AgentSharedService } from '../../core/agent-shared/agent-shared.service';
+import { AlertService } from '../../modules/monitoring/alert.service';
 import { HrisService } from '../hris/hris.service';
 import { evaluateLeadScore } from './lead-intent.evaluator';
 
@@ -121,10 +122,15 @@ WAJIB MERESPON DALAM FORMAT JSON BERIKUT:
   } // opsional, sertakan jika ada info prospek yang terdeteksi
 }`;
 
+  // ponytail: tracking consecutive LLM failures untuk health alert
+  private consecutiveLLMFailures = 0;
+  private readonly LLM_FAILURE_ALERT_THRESHOLD = 5;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly agentSharedService: AgentSharedService,
     private readonly hrisService: HrisService,
+    @Optional() private readonly alertService?: AlertService,
   ) {}
 
   private resolvePrompt(
@@ -625,6 +631,9 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
       const order = parsed.order || null;
       const lead = parsed.lead || null;
 
+      // ✅ Reset LLM failure counter on success
+      this.consecutiveLLMFailures = 0;
+
       if (lead) {
         await this.saveLeadToContact(senderId, effectiveSessionName, lead, text);
       }
@@ -638,11 +647,27 @@ Balas pesan saat ini berdasarkan konteks dan database di atas menggunakan format
       };
     } catch (e) {
       this.logger.error(`Error parsing LLM JSON: ${e.message}`);
-      return {
-        text: 'Maaf, sistem sedang sibuk. Silakan coba lagi nanti.',
-        images: [],
-        videos: [],
-      };
+
+      // 🚨 TRACK LLM FAILURES untuk health check
+      this.consecutiveLLMFailures++;
+      if (
+        this.consecutiveLLMFailures >= this.LLM_FAILURE_ALERT_THRESHOLD &&
+        this.alertService
+      ) {
+        try {
+          await this.alertService.alertLLMHealthIssue(
+            'JSON_PARSE',
+            this.consecutiveLLMFailures,
+            e.message?.substring(0, 150),
+          );
+        } catch (alertError) {
+          this.logger.warn(`Failed to send LLM health alert: ${alertError.message}`);
+        }
+      }
+
+      // ponytail: throw error untuk di-retry di omnichannel-queue.
+      // JANGAN return fallback message "sistem sedang sibuk" — biarkan omnichannel handle retry.
+      throw new Error(`LLM JSON parsing failed: ${e.message}`);
     }
   }
 

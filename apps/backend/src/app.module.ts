@@ -21,6 +21,7 @@ import { ContactsModule } from './modules/contacts/contacts.module';
 import { PlatformModule } from './modules/platform/platform.module';
 import { SearchModule } from './modules/search/search.module';
 import { HrisModule } from './features/hris/hris.module';
+import { MonitoringModule } from './modules/monitoring/monitoring.module';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { HrisModule } from './features/hris/hris.module';
     KnowledgeModule,
     AvailabilityModule,
     HrisModule,
+    MonitoringModule,
   ],
   controllers: [AppController],
   providers: [

@@ -2,6 +2,7 @@ import { Injectable, Logger, BeforeApplicationShutdown } from '@nestjs/common';
 import { IncomingMessage } from './interfaces/incoming-message.interface';
 import { CsService } from '../../features/agent-cs/cs.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { AlertService } from '../../modules/monitoring/alert.service';
 import { resolveTenantCapacity } from '../../features/web-dashboard/tenant/tenant.service';
 
 @Injectable()
@@ -24,9 +25,14 @@ export class OmnichannelQueueService implements BeforeApplicationShutdown {
   private botQueues = new Map<string, IncomingMessage[]>();
   private activeProcessingBots = new Set<string>();
 
+  // ponytail: tracking retry timestamp untuk 30 menit max timeout strategy
+  private taskStartTimes = new Map<string, number>();
+  private readonly MAX_RETRY_DURATION_MS = 30 * 60 * 1000; // 30 menit
+
   constructor(
     private readonly csService: CsService,
     private readonly prisma: PrismaService,
+    private readonly alertService?: AlertService,
   ) {}
 
   // ponytail: flush all pending debounce buffers on graceful shutdown to prevent message drop in RAM
@@ -98,6 +104,7 @@ export class OmnichannelQueueService implements BeforeApplicationShutdown {
         if (!task) continue;
 
         let isResponseHandled = false;
+        const taskKey = `${botKey}:${task.senderId}`;
         try {
           this.logger.log(
             `[Omnichannel] Chatbot "${botKey}" memproses pesan dari ${task.senderId} (Sisa antrean bot ini: ${queue.length})`,
@@ -130,6 +137,7 @@ export class OmnichannelQueueService implements BeforeApplicationShutdown {
             this.logger.log(
               `[Omnichannel] Chat ${task.senderId} (ID: ${conversation.id}) dalam mode human, AI 100% BYPASS/SKIP.`,
             );
+            this.taskStartTimes.delete(taskKey);
             continue; // Skip reply AI
           }
 
@@ -147,6 +155,7 @@ export class OmnichannelQueueService implements BeforeApplicationShutdown {
             this.logger.log(
               `[Omnichannel] Kuota tenant ${tenantId} telah habis. Chat ${task.senderId} dialihkan otomatis ke mode human (admin takeover).`,
             );
+            this.taskStartTimes.delete(taskKey);
             continue; // Skip reply AI, admin manusia mengambil alih di web dashboard
           }
 
@@ -157,15 +166,16 @@ export class OmnichannelQueueService implements BeforeApplicationShutdown {
             }
             await task.replyCallback(response);
             isResponseHandled = true;
+            this.taskStartTimes.delete(taskKey); // Cleanup tracking setelah sukses
           })();
 
           const timeoutPromise = new Promise((_, reject) =>
             setTimeout(
               () =>
                 reject(
-                  new Error('Batas waktu pemrosesan pesan habis (Timeout 60s)'),
+                  new Error('Batas waktu pemrosesan pesan habis (Timeout 120s)'),
                 ),
-              60000,
+              120000, // 2 menit per attempt — cukup waktu untuk server yang sibuk
             ),
           );
 
@@ -174,29 +184,77 @@ export class OmnichannelQueueService implements BeforeApplicationShutdown {
           this.logger.error(
             `[Omnichannel] Error memproses chat ${task.senderId} pada bot ${botKey}: ${error.message}`,
           );
-          // ponytail: timeout TIDAK di-retry — proses aslinya masih berjalan dan bisa
-          // mengirim balasan, retry akan menyebabkan balasan ganda.
-          const isTimeout = /Timeout 60s/.test(error?.message || '');
+
           const retryCount = (task as any)._retryCount || 0;
-          if (!isResponseHandled && !isTimeout && retryCount < 3) {
+          const maxRetries = 100;
+
+          // ponytail: track start time untuk enforce 30 menit max retry duration
+          if (!this.taskStartTimes.has(taskKey)) {
+            this.taskStartTimes.set(taskKey, Date.now());
+          }
+
+          const startTime = this.taskStartTimes.get(taskKey)!;
+          const elapsedMs = Date.now() - startTime;
+          const remainingDurationMs =
+            this.MAX_RETRY_DURATION_MS - elapsedMs;
+
+          // ponytail: jangan pernah kirim pesan "sistem sedang sibuk" ke customer.
+          // Terus retry selama ada waktu & retry count belum habis.
+          if (!isResponseHandled && retryCount < maxRetries && remainingDurationMs > 0) {
             (task as any)._retryCount = retryCount + 1;
+
+            // Exponential backoff: 1s, 2s, 4s, 8s, ... max 60s
+            const baseDelay = Math.min(1000 * Math.pow(2, retryCount), 60000);
+            // Random jitter ±10% untuk mencegah thundering herd
+            const jitter = baseDelay * 0.1 * (Math.random() - 0.5);
+            const delayMs = Math.max(1000, Math.min(baseDelay + jitter, 60000));
+
             this.logger.warn(
-              `[Omnichannel Self-Healing] Menjadwalkan ulang pesan dari ${task.senderId} (Percobaan ${retryCount + 1}/3) dalam 5 detik...`,
+              `[Omnichannel Aggressive-Retry] Pesan ${task.senderId} di-retry (Attempt ${retryCount + 1}/${maxRetries}) dalam ${delayMs}ms. Durasi elapsed: ${Math.round(elapsedMs / 1000)}s/${Math.round(this.MAX_RETRY_DURATION_MS / 1000)}s...`,
             );
+
             setTimeout(() => {
               if (!this.botQueues.has(botKey)) {
                 this.botQueues.set(botKey, []);
               }
-              this.botQueues.get(botKey)!.unshift(task); // Re-queue di depan
+              this.botQueues.get(botKey)!.unshift(task);
               this.processBotQueue(botKey);
-            }, 5000);
-          } else if (!isResponseHandled && !isTimeout) {
-            try {
-              await task.replyCallback({
-                text: 'Maaf, sistem sedang sibuk. Tim kami akan segera menindaklanjuti pesan Kakak ya 🙏',
-                images: [],
-              });
-            } catch (e) {}
+            }, delayMs);
+          } else if (!isResponseHandled) {
+            // ponytail: JANGAN kirim "sistem sedang sibuk" — customer sudah menunggu 30 menit.
+            // Log saja untuk debugging. Admin/monitoring akan lihat di log bahwa pesan gagal diproses.
+            const elapsedSeconds = Math.round(elapsedMs / 1000);
+            this.logger.error(
+              `[Omnichannel HARD-FAIL] Pesan dari ${task.senderId} gagal diproses setelah ${retryCount + 1} retry dalam ${elapsedSeconds}s. TIDAK MENGIRIM PESAN ERROR KE CUSTOMER (sesuai instruksi untuk never show error message).`,
+            );
+
+            // 🚨 SEND TELEGRAM ALERT untuk admin/monitoring
+            if (this.alertService) {
+              try {
+                await this.alertService.alertHardFailMessage(
+                  task.senderId,
+                  task.sessionName || 'unknown',
+                  retryCount + 1,
+                  elapsedSeconds,
+                );
+              } catch (alertError) {
+                this.logger.warn(
+                  `Failed to send hard-fail alert: ${alertError.message}`,
+                );
+              }
+            }
+
+            // Bersihkan tracking
+            this.taskStartTimes.delete(taskKey);
+
+            // ponytail: OPSI: Jika perlu silent fallback, bisa uncomment ini:
+            // Tapi untuk sekarang, kami tidak kirim apapun agar customer tidak kecewa
+            // try {
+            //   await task.replyCallback({
+            //     text: 'Maaf, nomor ini sedang tidak responsif. Silakan coba hubungi tim support kami.',
+            //     images: [],
+            //   });
+            // } catch (e) {}
           }
         }
       }
