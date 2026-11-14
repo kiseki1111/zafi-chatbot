@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { WahaController } from './waha.controller';
 import { WahaService } from './waha.service';
@@ -28,6 +29,7 @@ describe('WahaController - Unit Tests (Feature 6 Call Reject & Webhooks)', () =>
       findFirst: jest.fn(),
       findMany: jest.fn(),
       delete: jest.fn(),
+      update: jest.fn().mockResolvedValue({}),
       upsert: jest.fn().mockResolvedValue({}),
     },
     contact: {
@@ -231,6 +233,99 @@ describe('WahaController - Unit Tests (Feature 6 Call Reject & Webhooks)', () =>
           }),
         }),
       );
+    });
+
+    it('harus mencatat detail lengkap (engine/browser/versi/jumlah transisi) saat sesi FAILED, bukan cuma reason', async () => {
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn');
+
+      // Struktur nyata WAHA: id/engine/environment ada di level atas event,
+      // payload.payload adalah detail status itu sendiri (lihat webhook_logs produksi).
+      const realPayload = {
+        session: 'zaf-tech',
+        event: 'session.status',
+        id: 'evt_01m7d8r25z0chrmd90emb5tfqj',
+        engine: 'WEBJS',
+        environment: {
+          tier: 'CORE',
+          engine: 'WEBJS',
+          browser: '/usr/bin/google-chrome',
+          version: '2026.9.1',
+          platform: 'linux/x64',
+        },
+        payload: {
+          data: null,
+          name: 'zaf-tech',
+          status: 'FAILED',
+          statuses: [
+            { status: 'FAILED', timestamp: 1794667971909 },
+            { status: 'FAILED', timestamp: 1794667972799 },
+            { status: 'FAILED', timestamp: 1794667972799 },
+          ],
+        },
+      };
+
+      await controller.handleWebhook(realPayload);
+
+      const failedLog = warnSpy.mock.calls.find((call) =>
+        String(call[0]).includes('Sesi zaf-tech FAILED'),
+      );
+      expect(failedLog).toBeDefined();
+      const logLine = String(failedLog![0]);
+      expect(logLine).toContain('engine=WEBJS');
+      expect(logLine).toContain('browser=/usr/bin/google-chrome');
+      expect(logLine).toContain('waVersion=2026.9.1');
+      expect(logLine).toContain('transitions=3');
+
+      warnSpy.mockRestore();
+    });
+
+    it('harus dedupe log & notifikasi saat event session.status yang sama terkirim dobel (dua webhook URL)', async () => {
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn');
+
+      const realPayload = {
+        session: 'zaf-tech',
+        event: 'session.status',
+        id: 'evt_duplicate_test_001',
+        engine: 'WEBJS',
+        environment: { browser: '/usr/bin/google-chrome', version: '2026.9.1' },
+        payload: { status: 'FAILED' },
+      };
+
+      // Simulasikan WAHA mengirim event yang sama dua kali (satu per webhook URL terdaftar)
+      await controller.handleWebhook(realPayload);
+      await controller.handleWebhook({ ...realPayload });
+
+      const failedLogs = warnSpy.mock.calls.filter((call) =>
+        String(call[0]).includes('Sesi zaf-tech FAILED'),
+      );
+      expect(failedLogs).toHaveLength(1);
+
+      warnSpy.mockRestore();
+    });
+
+    it('tetap mencatat log untuk sesi berbeda meski event.id sama (dedupe harus per-sesi)', async () => {
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn');
+      mockPrismaService.whatsappInstance.findUnique.mockResolvedValue({
+        instanceName: 'zaf-tech-2',
+        tenantId: 'tenant-2',
+      });
+
+      const basePayload = {
+        event: 'session.status',
+        id: 'evt_shared_id',
+        payload: { status: 'FAILED' },
+      };
+
+      await controller.handleWebhook({ ...basePayload, session: 'zaf-tech' });
+      await controller.handleWebhook({ ...basePayload, session: 'zaf-tech-2' });
+
+      const failedLogs = warnSpy.mock.calls.filter(
+        (call) =>
+          String(call[0]).includes('FAILED') && String(call[0]).includes('Sesi'),
+      );
+      expect(failedLogs.length).toBeGreaterThanOrEqual(2);
+
+      warnSpy.mockRestore();
     });
 
     it('harus menolak request dengan ForbiddenException jika webhook secret salah', async () => {

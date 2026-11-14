@@ -1919,9 +1919,30 @@ export class WahaController implements OnApplicationBootstrap {
       const sessionName = payload.session;
       const status = payload.payload?.status;
       if (sessionName && status) {
-        if (status === 'STOPPED' || status === 'FAILED') {
+        const isDisconnectEvent = status === 'STOPPED' || status === 'FAILED';
+        // ponytail: WAHA didaftarkan di 2 webhook URL (eksternal + internal docker), jadi satu
+        // event session.status yang sama terkirim dobel. Dedupe pakai id unik event dari WAHA
+        // sendiri (payload.id) biar log warning & notifikasi Telegram tidak dobel per insiden.
+        const isFirstDelivery =
+          !payload.id || this.claimInboundMessage(sessionName, `status-${payload.id}`);
+        const reason =
+          payload.payload?.reason ||
+          payload.payload?.engine?.reason ||
+          payload.payload?.error ||
+          'tanpa reason';
+
+        if (isFirstDelivery && isDisconnectEvent) {
+          // ponytail: sebelumnya cuma print "reason" yang sering kosong dari WAHA.
+          // engine/browser/versi/jumlah transisi status ada di payload tapi tidak pernah
+          // ditampilkan -- harus digali manual lewat query webhook_logs untuk tahu akar masalah.
+          const engine = payload.engine || payload.environment?.engine || 'unknown';
+          const browser = payload.environment?.browser || '-';
+          const waVersion = payload.environment?.version || '-';
+          const transitions = Array.isArray(payload.payload?.statuses)
+            ? payload.payload.statuses.length
+            : 0;
           this.logger.warn(
-            `[WAHA] Sesi ${sessionName} ${status}: ${payload.payload?.reason || payload.payload?.engine?.reason || payload.payload?.error || 'tanpa reason'}`,
+            `[WAHA] Sesi ${sessionName} ${status}: ${reason} | engine=${engine} browser=${browser} waVersion=${waVersion} transitions=${transitions}`,
           );
         }
         const updateData: any = { status: status };
@@ -1946,12 +1967,7 @@ export class WahaController implements OnApplicationBootstrap {
           );
 
         // ponytail: notifikasi telegram jika sesi WA putus (STOPPED/FAILED), cooldown per session agar anti-spam
-        if (status === 'STOPPED' || status === 'FAILED') {
-          const reason =
-            payload.payload?.reason ||
-            payload.payload?.engine?.reason ||
-            payload.payload?.error ||
-            'Koneksi perangkat terputus atau sesi di-logout';
+        if (isFirstDelivery && isDisconnectEvent) {
           this.notifyTelegramSessionDisconnected(sessionName, status, String(reason)).catch(
             () => null,
           );
