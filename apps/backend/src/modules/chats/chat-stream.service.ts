@@ -46,9 +46,10 @@ export class ChatStreamService {
   ): Observable<MessageEvent> {
     return this.events$.asObservable().pipe(
       filter((e) => {
-        // SECURITY (Issue 4): Isolasi broadcast SSE per-tenant
-        if (!isSuperadmin && allowedTenantId) {
-          if (e.data.tenantId && e.data.tenantId !== allowedTenantId) {
+        // SECURITY: fail-closed — non-superadmin wajib punya tenant dan hanya
+        // menerima event milik tenant tersebut (event tenant null juga ditolak).
+        if (!isSuperadmin) {
+          if (!allowedTenantId || e.data.tenantId !== allowedTenantId) {
             return false;
           }
         }

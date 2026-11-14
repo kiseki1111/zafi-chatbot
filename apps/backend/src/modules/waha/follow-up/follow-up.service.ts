@@ -1,4 +1,9 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../../core/prisma/prisma.service';
 import { WahaService } from '../waha.service';
@@ -581,25 +586,44 @@ Bahasa: Indonesia. Maksimal 2 emoji. Tanpa markdown.`;
 
     let instanceName = data.instanceName;
     if (!instanceName) {
-      const firstInst = await this.prisma.whatsappInstance.findFirst();
+      // ponytail: pilih instance milik tenant ini, bukan instance tenant lain
+      const firstInst = await this.prisma.whatsappInstance.findFirst({
+        where: tenantId ? { tenantId } : {},
+      });
       instanceName = firstInst?.instanceName || 'default';
+    } else if (tenantId) {
+      const owned = await this.prisma.whatsappInstance.findFirst({
+        where: { instanceName, tenantId },
+      });
+      if (!owned) {
+        throw new ForbiddenException(
+          'Akses ditolak: Instance ini bukan milik tenant Anda',
+        );
+      }
     }
 
     await this.prisma.whatsappInstance.upsert({
       where: { instanceName },
       update: {},
-      create: { instanceName, status: 'WORKING' },
+      create: { instanceName, status: 'WORKING', tenantId: tenantId || null },
     });
 
-    let contact = await this.prisma.contact.findFirst({
-      where: {
-        OR: [
-          { phone: cleanPhone },
-          { phone: `+${cleanPhone}` },
-          { phone: `${cleanPhone}@c.us` },
-        ],
-      },
-    });
+    const phoneWhere: any = {
+      OR: [
+        { phone: cleanPhone },
+        { phone: `+${cleanPhone}` },
+        { phone: `${cleanPhone}@c.us` },
+      ],
+    };
+    const contactWhere: any = tenantId
+      ? {
+          AND: [
+            phoneWhere,
+            { OR: [{ tenantId }, { tenantId: null }] },
+          ],
+        }
+      : phoneWhere;
+    let contact = await this.prisma.contact.findFirst({ where: contactWhere });
     if (!contact) {
       contact = await this.prisma.contact.create({
         data: { phone: cleanPhone, name, tenantId },
@@ -607,7 +631,10 @@ Bahasa: Indonesia. Maksimal 2 emoji. Tanpa markdown.`;
     } else if (data.name) {
       contact = await this.prisma.contact.update({
         where: { id: contact.id },
-        data: { name: data.name },
+        data: {
+          name: data.name,
+          ...(tenantId && !contact.tenantId ? { tenantId } : {}),
+        },
       });
     }
 

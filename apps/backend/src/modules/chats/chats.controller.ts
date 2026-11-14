@@ -57,7 +57,7 @@ export class ChatsController {
       ? tenantId && tenantId !== 'undefined' && tenantId !== 'null'
         ? tenantId
         : req?.user?.tenantId
-      : req?.user?.tenantId;
+      : this.getTenantIdFromReq(req);
 
     return this.chatsService.getConversations(instanceName, effectiveTenantId);
   }
@@ -69,28 +69,28 @@ export class ChatsController {
     @Query('take', new DefaultValuePipe(20), ParseIntPipe) take: number,
     @Req() req?: any,
   ) {
-    const isSuperadmin = req?.user?.roles?.includes('superadmin');
-    const tenantId = isSuperadmin ? undefined : req?.user?.tenantId;
-    return tenantId
-      ? this.chatsService.getMessages(id, skip, take, tenantId)
-      : this.chatsService.getMessages(id, skip, take);
+    const tenantId = this.getTenantIdFromReq(req);
+    return this.chatsService.getMessages(id, skip, take, tenantId);
   }
 
   // Get Contact Profile (Avatar, About/Bio) from WAHA
   @Get(':id/profile')
   getContactProfile(@Param('id') id: string, @Req() req?: any) {
-    const isSuperadmin = req?.user?.roles?.includes('superadmin');
-    const tenantId = isSuperadmin ? undefined : req?.user?.tenantId;
-    return tenantId
-      ? this.chatsService.getContactProfile(id, tenantId)
-      : this.chatsService.getContactProfile(id);
+    const tenantId = this.getTenantIdFromReq(req);
+    return this.chatsService.getContactProfile(id, tenantId);
   }
 
   private getTenantIdFromReq(req: any): string | undefined {
     const isSuper =
       req?.user?.roles?.some((r: string) => r?.toLowerCase() === 'superadmin') ||
       req?.user?.role?.toLowerCase() === 'superadmin';
-    return isSuper ? undefined : req?.user?.tenantId;
+    if (isSuper) return undefined;
+    if (!req?.user?.tenantId) {
+      throw new ForbiddenException(
+        'Akses ditolak: Akun Anda tidak terhubung dengan tenant manapun',
+      );
+    }
+    return req.user.tenantId;
   }
 
   // Admin takeover conversation

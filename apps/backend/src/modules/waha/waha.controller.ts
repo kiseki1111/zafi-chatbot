@@ -182,32 +182,44 @@ export class WahaController implements OnApplicationBootstrap {
         const mediaUrl = meta.mediaUrl;
 
         try {
+          let sendRes: any = null;
           if (pMsg.messageType === 'image' && mediaUrl) {
-            await this.wahaService.sendMedia(
+            sendRes = await this.wahaService.sendMedia(
               sessionName,
               targetSender,
               mediaUrl,
               meta.caption || '',
             );
           } else if (pMsg.messageType === 'video' && mediaUrl) {
-            await this.wahaService.sendVideo(
+            sendRes = await this.wahaService.sendVideo(
               sessionName,
               targetSender,
               mediaUrl,
               meta.caption || '',
             );
           } else if (pMsg.content) {
-            await this.wahaService.sendMessage(
+            sendRes = await this.wahaService.sendMessage(
               sessionName,
               targetSender,
               pMsg.content,
             );
           }
 
-          await this.prisma.message.update({
-            where: { id: pMsg.id },
-            data: { status: 'SENT' },
-          });
+          const sentId = sendRes?.id?._serialized || sendRes?.id;
+          try {
+            await this.prisma.message.update({
+              where: { id: pMsg.id },
+              data: sentId
+                ? { wahaMessageId: sentId, status: 'SENT' }
+                : { status: 'SENT' },
+            });
+          } catch (e: any) {
+            if (e.code === 'P2002') {
+              await this.prisma.message
+                .delete({ where: { id: pMsg.id } })
+                .catch(() => null);
+            }
+          }
           this.logger.log(
             `[Waha Self-Healing] Berhasil mengirimkan ulang pesan tertunda (${pMsg.id}) ke ${targetSender}`,
           );
@@ -537,6 +549,8 @@ export class WahaController implements OnApplicationBootstrap {
         `Failed to logout session ${id} from WAHA, ignoring: ${e.message}`,
       );
     }
+    // ponytail: hapus juga dari WAHA supaya sesi tidak reconnect & membuat row orphan
+    await this.wahaService.deleteSession(id).catch(() => null);
     await this.prisma.whatsappInstance
       .delete({ where: { instanceName: id } })
       .catch(() => null);
@@ -856,7 +870,15 @@ export class WahaController implements OnApplicationBootstrap {
 
     if (!payload) return { status: 'ignored' };
 
-    const sessionName = payload.session || 'unknown';
+    let sessionName = payload.session || 'unknown';
+
+    // ponytail: log awal untuk semua event pesan supaya event yang di-drop tetap terlihat
+    if (payload?.event === 'message' || payload?.event === 'message.any') {
+      const m = payload.payload;
+      this.logger.log(
+        `[WAHA INBOUND] Event=${payload.event} Sesi=${sessionName} Dari=${m?.from || '-'} FromMe=${Boolean(m?.fromMe)} Tipe=${m?.type || '-'}`,
+      );
+    }
 
     // Perlindungan Sesi Pengujian Pribadi (Silent/No-Bot/Test-Video):
     // Jangan tanggapi pesan apa pun, jangan simpan kontak/chat pribadi, jangan tolak panggilan pribadi.
@@ -884,15 +906,28 @@ export class WahaController implements OnApplicationBootstrap {
       return { status: 'ignored_test_session' };
     }
 
-    // Defensively create WhatsappInstance if it doesn't exist to prevent foreign key errors
+    // SECURITY: hanya proses sesi yang terdaftar di DB (punya tenant).
+    // Jangan buat row baru dari webhook — itu sumber sesi orphan tenantId NULL.
+    let sessionInstance: any = null;
     if (sessionName !== 'unknown') {
-      await this.prisma.whatsappInstance
-        .upsert({
-          where: { instanceName: sessionName },
-          update: {},
-          create: { instanceName: sessionName, status: 'WORKING' },
-        })
-        .catch(() => null);
+      // jangan telan error DB — biarkan WAHA retry, jangan drop pesan karena DB hiccup
+      let knownInstance = await this.prisma.whatsappInstance.findUnique({
+        where: { instanceName: sessionName },
+      });
+      if (!knownInstance) {
+        // fallback: cocokkan tanpa peduli besar/kecil huruf
+        knownInstance = await this.prisma.whatsappInstance.findFirst({
+          where: { instanceName: { equals: sessionName, mode: 'insensitive' } },
+        });
+        if (knownInstance) sessionName = knownInstance.instanceName;
+      }
+      sessionInstance = knownInstance;
+      if (!knownInstance) {
+        this.logger.warn(
+          `[WAHA Webhook] Sesi "${sessionName}" tidak terdaftar di DB, event ${payload?.event} diabaikan. Pastikan sesi dibuat dari dashboard (POST /instances).`,
+        );
+        return { status: 'ignored_unknown_session' };
+      }
     }
 
     if (payload?.event === 'message') {
@@ -1026,8 +1061,10 @@ export class WahaController implements OnApplicationBootstrap {
     if (payload?.event === 'message' || payload?.event === 'message.any') {
       const message = payload.payload;
       const sessionName = payload.session;
+      // ponytail: terima semua JID personal (termasuk LID baru), tolak grup/broadcast/newsletter saja.
+      // Regex nomor ketat sebelumnya membuat pesan dari nomor/LID baru ikut terbuang.
       const isDirectPhone = (jid?: string): boolean =>
-        Boolean(jid && /^\+?\d+(@(c\.us|s\.whatsapp\.net|lid))?$/.test(jid));
+        Boolean(jid && !/@(g\.us|broadcast|newsletter)$/i.test(jid));
 
       const rawAlt =
         message?._data?.key?.remoteJidAlt ||
@@ -1040,7 +1077,7 @@ export class WahaController implements OnApplicationBootstrap {
       let rawNumber = message?.fromMe
         ? (message._data?.key?.remoteJid && !message._data.key.remoteJid.includes('@lid')
             ? message._data.key.remoteJid
-            : message.to || message._data?.key?.remoteJid || message.from)
+            : message.to || message._data?.key?.remoteJid || null)
         : (realPhoneJid || message?.from);
 
       // Jika nomor berupa LID (@lid), minta WAHA resolve ke nomor telepon asli (@c.us)
@@ -1058,6 +1095,7 @@ export class WahaController implements OnApplicationBootstrap {
 
       const cleanNumber = (rawNumber || '')
         .replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, '')
+        .replace(/:\d+$/, '')
         .replace(/^\+/, '');
 
       const contactNumber = cleanNumber || rawNumber;
@@ -1113,9 +1151,24 @@ export class WahaController implements OnApplicationBootstrap {
       }
 
       let sessionTenantId: string | null = null;
+      // ponytail: outbound tidak boleh memakai pushname pengirim (nama bot) sebagai nama kontak,
+      // dan self-chat (bot mengirim ke nomornya sendiri) tidak perlu dibuat jadi percakapan.
+      if (
+        message.fromMe &&
+        sessionInstance?.phone &&
+        contactNumber &&
+        contactNumber === String(sessionInstance.phone).replace(/\D/g, '')
+      ) {
+        this.logger.debug(
+          `[WAHA] Abaikan self-chat sesi ${sessionName} (${contactNumber})`,
+        );
+        return { status: 'ignored_self_chat' };
+      }
+
       if (sessionName && isDirectPhone(rawNumber)) {
-        const contactName =
-          message._data?.notifyName || message.sender?.pushname || null;
+        const contactName = message.fromMe
+          ? null
+          : message._data?.notifyName || message.sender?.pushname || null;
 
         try {
           const inst = await this.prisma.whatsappInstance.findUnique({
@@ -1316,7 +1369,7 @@ export class WahaController implements OnApplicationBootstrap {
 
       if (
         !isTestSession &&
-        payload.event === 'message' &&
+        (payload.event === 'message' || payload.event === 'message.any') &&
         !message.fromMe &&
         isDirectPhone(message.from) &&
         this.claimInboundMessage(

@@ -51,10 +51,13 @@ describe('ChatsController - Unit Tests (Feature 1 Profile & Bio)', () => {
 
       mockChatsService.getContactProfile.mockResolvedValueOnce(mockResult);
 
-      const res = await controller.getContactProfile('conv-abc');
+      const res = await controller.getContactProfile('conv-abc', {
+        user: { tenantId: 'tenant-1', roles: ['manager'] },
+      });
 
       expect(mockChatsService.getContactProfile).toHaveBeenCalledWith(
         'conv-abc',
+        'tenant-1',
       );
       expect(res).toEqual(mockResult);
     });

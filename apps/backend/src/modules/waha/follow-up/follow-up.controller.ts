@@ -27,7 +27,12 @@ export class FollowUpController {
     if (isSuper) {
       return req?.query?.tenantId;
     }
-    return req?.user?.tenantId;
+    if (!req?.user?.tenantId) {
+      throw new ForbiddenException(
+        'Akses ditolak: Akun Anda tidak terhubung dengan tenant manapun',
+      );
+    }
+    return req.user.tenantId;
   }
 
   @Get('config')

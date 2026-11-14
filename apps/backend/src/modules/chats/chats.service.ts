@@ -19,6 +19,37 @@ export class ChatsService {
     private readonly chatStreamService: ChatStreamService,
   ) {}
 
+  // ponytail: samakan dengan webhook — hindari row ganda saat message.any ikut menyimpan
+  private async linkSentMessage(savedId: string, sendRes: any) {
+    const wahaMessageId = sendRes?.id?._serialized || sendRes?.id;
+    if (!wahaMessageId || !savedId) return;
+    try {
+      await this.prisma.message.update({
+        where: { id: savedId },
+        data: { wahaMessageId, status: 'SENT' },
+      });
+    } catch (e: any) {
+      if (e.code === 'P2002') {
+        await this.prisma.message
+          .delete({ where: { id: savedId } })
+          .catch(() => null);
+      }
+    }
+  }
+
+  // ponytail: fail-closed — instance tanpa tenant tidak boleh diakses tenant mana pun
+  private assertConversationTenant(
+    conversation: { whatsappInstance?: { tenantId: string | null } | null },
+    tenantId?: string,
+  ) {
+    if (!tenantId) return;
+    if (conversation.whatsappInstance?.tenantId !== tenantId) {
+      throw new ForbiddenException(
+        'Akses ditolak: Percakapan bukan milik tenant Anda',
+      );
+    }
+  }
+
   async getConversations(instanceName?: string, tenantId?: string) {
     const where: any = {};
     if (instanceName && instanceName !== 'all') {
@@ -165,15 +196,7 @@ export class ChatsService {
     });
     if (!conversation) throw new NotFoundException('Conversation not found');
 
-    if (
-      tenantId &&
-      conversation.whatsappInstance?.tenantId &&
-      conversation.whatsappInstance.tenantId !== tenantId
-    ) {
-      throw new ForbiddenException(
-        'Akses ditolak: Percakapan bukan milik tenant Anda',
-      );
-    }
+    this.assertConversationTenant(conversation, tenantId);
 
     const safeTake = Math.min(Math.max(1, Number(take) || 20), 100);
 
@@ -199,15 +222,7 @@ export class ChatsService {
     });
     if (!conversation) throw new NotFoundException('Conversation not found');
 
-    if (
-      tenantId &&
-      conversation.whatsappInstance?.tenantId &&
-      conversation.whatsappInstance.tenantId !== tenantId
-    ) {
-      throw new ForbiddenException(
-        'Akses ditolak: Kontak bukan milik tenant Anda',
-      );
-    }
+    this.assertConversationTenant(conversation, tenantId);
 
     let phone = conversation.contact?.phone || '';
     const instanceName = conversation.instanceName;
@@ -270,15 +285,7 @@ export class ChatsService {
       include: { whatsappInstance: true },
     });
     if (!conversation) throw new NotFoundException('Conversation not found');
-    if (
-      tenantId &&
-      conversation.whatsappInstance?.tenantId &&
-      conversation.whatsappInstance.tenantId !== tenantId
-    ) {
-      throw new ForbiddenException(
-        'Akses ditolak: Percakapan bukan milik tenant Anda',
-      );
-    }
+    this.assertConversationTenant(conversation, tenantId);
 
     let validAgentId: string | null = null;
     if (agentId) {
@@ -323,15 +330,7 @@ export class ChatsService {
       include: { whatsappInstance: true },
     });
     if (!conversation) throw new NotFoundException('Conversation not found');
-    if (
-      tenantId &&
-      conversation.whatsappInstance?.tenantId &&
-      conversation.whatsappInstance.tenantId !== tenantId
-    ) {
-      throw new ForbiddenException(
-        'Akses ditolak: Percakapan bukan milik tenant Anda',
-      );
-    }
+    this.assertConversationTenant(conversation, tenantId);
 
     return this.prisma.conversation.update({
       where: { id: conversationId },
@@ -351,15 +350,7 @@ export class ChatsService {
       include: { contact: true, whatsappInstance: true },
     });
     if (!conversation) throw new NotFoundException('Conversation not found');
-    if (
-      tenantId &&
-      conversation.whatsappInstance?.tenantId &&
-      conversation.whatsappInstance.tenantId !== tenantId
-    ) {
-      throw new ForbiddenException(
-        'Akses ditolak: Percakapan bukan milik tenant Anda',
-      );
-    }
+    this.assertConversationTenant(conversation, tenantId);
 
     const chatId = conversation.contact.phone;
     const instanceName = conversation.instanceName;
@@ -386,9 +377,13 @@ export class ChatsService {
 
     // Try sending via WAHA (fails gracefully in dev/mock)
     try {
-      await this.wahaService.sendMessage(instanceName, chatId, text);
-    } catch (e) {
+      const sendRes = await this.wahaService.sendMessage(instanceName, chatId, text);
+      await this.linkSentMessage(message.id, sendRes);
+    } catch (e: any) {
       this.logger.warn(`WAHA kirim gagal (Mode Offline/Mock): ${e.message}`);
+      await this.prisma.message
+        .update({ where: { id: message.id }, data: { status: 'ERROR' } })
+        .catch(() => null);
     }
 
     await this.prisma.conversation.update({
@@ -425,15 +420,7 @@ export class ChatsService {
       include: { contact: true, whatsappInstance: true },
     });
     if (!conversation) throw new NotFoundException('Conversation not found');
-    if (
-      tenantId &&
-      conversation.whatsappInstance?.tenantId &&
-      conversation.whatsappInstance.tenantId !== tenantId
-    ) {
-      throw new ForbiddenException(
-        'Akses ditolak: Percakapan bukan milik tenant Anda',
-      );
-    }
+    this.assertConversationTenant(conversation, tenantId);
 
     const chatId = conversation.contact.phone;
     const instanceName = conversation.instanceName;
@@ -459,11 +446,20 @@ export class ChatsService {
     });
 
     try {
-      await this.wahaService.sendImage(instanceName, chatId, imageUrl, caption);
-    } catch (e) {
+      const sendRes = await this.wahaService.sendImage(
+        instanceName,
+        chatId,
+        imageUrl,
+        caption,
+      );
+      await this.linkSentMessage(message.id, sendRes);
+    } catch (e: any) {
       this.logger.warn(
         `WAHA sendImage gagal (Mode Offline/Mock): ${e.message}`,
       );
+      await this.prisma.message
+        .update({ where: { id: message.id }, data: { status: 'ERROR' } })
+        .catch(() => null);
     }
 
     await this.prisma.conversation.update({
@@ -487,15 +483,7 @@ export class ChatsService {
       include: { contact: true, whatsappInstance: true },
     });
     if (!conversation) throw new NotFoundException('Conversation not found');
-    if (
-      tenantId &&
-      conversation.whatsappInstance?.tenantId &&
-      conversation.whatsappInstance.tenantId !== tenantId
-    ) {
-      throw new ForbiddenException(
-        'Akses ditolak: Percakapan bukan milik tenant Anda',
-      );
-    }
+    this.assertConversationTenant(conversation, tenantId);
 
     const chatId = conversation.contact.phone;
     const instanceName = conversation.instanceName;
@@ -528,7 +516,7 @@ export class ChatsService {
       const apiKey =
         process.env.WAHA_API_KEY || process.env.WHATSAPP_API_KEY || '';
 
-      await axios.post(
+      const sendRes = await axios.post(
         `${wahaUrl}/api/sendImage`,
         {
           session: instanceName,
@@ -538,10 +526,14 @@ export class ChatsService {
         },
         { headers: { 'X-Api-Key': apiKey } },
       );
-    } catch (e) {
+      await this.linkSentMessage(message.id, sendRes.data);
+    } catch (e: any) {
       this.logger.warn(
         `WAHA sendImage base64 gagal (Mode Offline/Mock): ${e.message}`,
       );
+      await this.prisma.message
+        .update({ where: { id: message.id }, data: { status: 'ERROR' } })
+        .catch(() => null);
     }
 
     await this.prisma.conversation.update({

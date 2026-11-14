@@ -11,6 +11,8 @@ export class WahaService implements OnApplicationBootstrap {
   private readonly baseUrl: string;
   private readonly apiKey: string;
   private isAutoRestoring = false;
+  // ponytail: endpoint /contacts/about rusak di WEBJS engine tertentu; cooldown agar tidak spam 500
+  private contactAboutDisabledUntil = 0;
 
   constructor(
     private readonly configService: ConfigService,
@@ -218,6 +220,7 @@ export class WahaService implements OnApplicationBootstrap {
     sessionName: string,
     contactPhone: string,
   ): Promise<string | null> {
+    if (Date.now() < this.contactAboutDisabledUntil) return null;
     try {
       const cleanPhone = (contactPhone || '')
         .replace(/@(c\.us|s\.whatsapp\.net|lid|broadcast)$/i, '')
@@ -233,6 +236,8 @@ export class WahaService implements OnApplicationBootstrap {
       });
       return response.data?.about || response.data?.status || null;
     } catch {
+      // fitur bio opsional; kalau WAHA menolak, jangan spam request yang sama tiap buka chat
+      this.contactAboutDisabledUntil = Date.now() + 10 * 60 * 1000;
       return null;
     }
   }
@@ -277,9 +282,9 @@ export class WahaService implements OnApplicationBootstrap {
       await this.prisma.whatsappInstance.upsert({
         where: { instanceName: sessionName },
         update: {
-          channelAccountId: channelAccountId || null,
-          // ponytail: jangan set tenantId ke null saat update tanpa tenant (mis. restart),
-          // karena bisa melepas ikatan tenant dari sesi yang sudah valid.
+          ...(channelAccountId ? { channelAccountId } : {}),
+          // ponytail: jangan set tenantId/channelAccountId ke null saat update tanpa nilai
+          // (mis. restart), karena bisa melepas ikatan tenant dari sesi yang sudah valid.
           ...(validTenantId ? { tenantId: validTenantId } : {}),
         },
         create: {
@@ -470,20 +475,30 @@ export class WahaService implements OnApplicationBootstrap {
           const storedPhone = ws.me?.id
             ? String(ws.me.id).replace(/@(c\.us|s\.whatsapp\.net)$/i, '')
             : null;
-          const instance = await this.prisma.whatsappInstance.upsert({
+          // ponytail: hanya update sesi yang memang terdaftar. Jangan buat row baru
+          // dari daftar WAHA — itu sumber sesi orphan tenantId NULL.
+          let instance: any = await this.prisma.whatsappInstance.findUnique({
             where: { instanceName: ws.name },
-            update: {
-              status: ws.status,
-              phone: storedPhone,
-              profileName: ws.me?.pushName,
-            },
-            create: {
-              instanceName: ws.name,
-              status: ws.status,
-              phone: storedPhone,
-              profileName: ws.me?.pushName,
-            },
           });
+          if (instance) {
+            instance = await this.prisma.whatsappInstance.update({
+              where: { instanceName: ws.name },
+              data: {
+                status: ws.status,
+                phone: storedPhone,
+                profileName: ws.me?.pushName,
+              },
+            });
+          } else {
+            instance = {
+              id: `waha-${ws.name}`,
+              instanceName: ws.name,
+              tenantId: null,
+              status: ws.status,
+              phone: storedPhone,
+              profileName: ws.me?.pushName,
+            };
+          }
 
           // ponytail: hitung akumulasi pesan bot & token yang terpakai pada sesi WAHA ini
           const botMessages = await Promise.resolve(
@@ -567,6 +582,8 @@ export class WahaService implements OnApplicationBootstrap {
   // ponytail: dev safety guard: if WAHA_DEV_TEST_PHONE is set, allow sending real messages ONLY to this specified number.
   private isAllowedDevTarget(chatId: string): boolean {
     if (process.env.NODE_ENV === 'test') return true;
+    // ponytail: guard ini hanya untuk dev. Di production jangan pernah mem-mock pengiriman.
+    if (process.env.NODE_ENV === 'production') return true;
     const devAllowedPhone =
       process.env.WAHA_DEV_TEST_PHONE ||
       this.configService?.get<string>('WAHA_DEV_TEST_PHONE');
@@ -1532,7 +1549,16 @@ export class WahaService implements OnApplicationBootstrap {
       return response.data;
     } catch {
       await this.stopSession(sessionName).catch(() => null);
-      return this.startSession(sessionName);
+      // ponytail: start ulang harus tetap mendaftarkan webhook, kalau tidak pesan masuk tidak terkirim
+      const inst = await this.prisma.whatsappInstance
+        .findUnique({ where: { instanceName: sessionName } })
+        .catch(() => null);
+      const urls = [
+        inst?.webhookUrl,
+        process.env.WEBHOOK_URL,
+        'http://backend:3030/api/v1/waha/webhook',
+      ].filter(Boolean) as string[];
+      return this.startSession(sessionName, urls);
     }
   }
 
@@ -1564,6 +1590,22 @@ export class WahaService implements OnApplicationBootstrap {
         error.message,
       );
       throw error;
+    }
+  }
+
+  // ponytail: hapus sesi dari WAHA agar tidak hidup lagi & membuat row orphan via webhook
+  async deleteSession(sessionName: string): Promise<any> {
+    try {
+      const response = await axios.delete(
+        `${this.baseUrl}/api/sessions/${sessionName}`,
+        { headers: this.getHeaders(), timeout: 10000 },
+      );
+      return response.data;
+    } catch (error) {
+      this.logger.warn(
+        `Failed to delete WAHA session ${sessionName}: ${error.message}`,
+      );
+      return null;
     }
   }
 }
