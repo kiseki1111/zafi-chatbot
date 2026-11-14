@@ -22,42 +22,7 @@ export class AuthService {
 
   //Fungsi Login Utama mematuhi Security Hardening Layer TDD & Federasi ZAF Console
   async login(dto: LoginDto, ipAddress: string, userAgent: string) {
-    // 1. Coba otentikasi federasi via ZAF Console terlebih dahulu (SSO Hub)
-    let isConsoleAuthenticated = false;
-    const consoleApiUrl =
-      this.configService.get<string>('CONSOLE_API_URL') ||
-      process.env.CONSOLE_API_URL ||
-      'http://127.0.0.1:17342';
-
-    try {
-      const [portalRes, staffRes] = await Promise.all([
-        axios
-          .post(
-            `${consoleApiUrl}/api/portal/auth/login`,
-            { email: dto.email, password: dto.passwordPlain },
-            { timeout: 3000 },
-          )
-          .catch(() => null),
-        axios
-          .post(
-            `${consoleApiUrl}/api/auth/login`,
-            { email: dto.email, password: dto.passwordPlain },
-            { timeout: 3000 },
-          )
-          .catch(() => null),
-      ]);
-
-      if (
-        (portalRes && portalRes.status === 200) ||
-        (staffRes && staffRes.status === 200)
-      ) {
-        isConsoleAuthenticated = true;
-      }
-    } catch {
-      // Console offline / unreachable, fallback ke database lokal
-    }
-
-    // 2. Cari user beserta status tenant di database Chatbot
+    // 1. Cari user lokal dulu (dipakai baik untuk tenant yang sudah ditautkan SSO maupun akun lokal lama)
     let user = await this.prisma.user.findUnique({
       where: { email: dto.email, deletedAt: null },
       include: { tenant: true },
@@ -70,38 +35,53 @@ export class AuthService {
 
     let passwordMatches = false;
 
-    if (isConsoleAuthenticated) {
+    // 2. Verifikasi federasi via ZAF Console (SSO). Console HANYA dipercaya untuk tenant yang sudah
+    // ditautkan staf secara eksplisit (Customer.chatbotTenantId) -- bukan sekadar "email yang sama
+    // kebetulan authenticated di Console", karena Console adalah database terpisah tempat siapa pun
+    // bisa mendaftar sendiri dengan email apa saja. Tanpa tautan itu, chatbot jatuh ke cabang lokal.
+    const chatbotTenantId = await this.verifyWithConsole(
+      dto.email,
+      dto.passwordPlain,
+      ipAddress,
+    );
+
+    if (chatbotTenantId) {
       passwordMatches = true;
-      if (user) {
-        // Sinkronkan hash password lokal secara asinkron agar bisa login offline bila Console mati
+      if (user && user.tenantId === chatbotTenantId) {
+        // Sinkronkan hash password lokal agar bisa login offline bila Console mati
         const hashed = await bcrypt.hash(dto.passwordPlain, 10);
         await this.prisma.user
-          .update({
-            where: { id: user.id },
-            data: { password: hashed },
-          })
+          .update({ where: { id: user.id }, data: { password: hashed } })
           .catch(() => null);
       } else {
-        // Auto-provisioning: akun baru terverifikasi dari Console yang belum ada di Chatbot
-        const newTenant = await this.prisma.tenant.create({
-          data: {
-            name: dto.email.split('@')[0],
-            isOnboarded: true,
-          },
+        // Pertama kali login setelah staf menautkan pelanggan ini: pasang user di tenant yang sudah
+        // ada (dibuat staf/onboarding), jangan buat tenant baru sembarangan dari email.
+        const tenant = await this.prisma.tenant.findUnique({
+          where: { id: chatbotTenantId },
         });
-        user = await this.prisma.user.create({
-          data: {
-            email: dto.email,
-            name: dto.email.split('@')[0],
-            password: await bcrypt.hash(dto.passwordPlain, 10),
-            role: 'manager',
-            tenantId: newTenant.id,
-          },
-          include: { tenant: true },
-        });
+        if (!tenant) {
+          // Tautan menunjuk tenant yang belum ada di database chatbot ini — jangan auto-provision,
+          // anggap federasi tidak berlaku dan jatuh ke cabang lokal di bawah.
+          passwordMatches = false;
+        } else {
+          user = await this.prisma.user.upsert({
+            where: { email: dto.email },
+            update: { password: await bcrypt.hash(dto.passwordPlain, 10), tenantId: chatbotTenantId },
+            create: {
+              email: dto.email,
+              name: dto.email.split('@')[0],
+              password: await bcrypt.hash(dto.passwordPlain, 10),
+              role: 'manager',
+              tenantId: chatbotTenantId,
+            },
+            include: { tenant: true },
+          });
+        }
       }
-    } else if (user) {
-      // Fallback lokal jika verifikasi Console gagal / akun lokal legacy
+    }
+
+    if (!passwordMatches && user) {
+      // Fallback lokal jika verifikasi Console gagal / tidak ditautkan / akun lokal lama
       passwordMatches = isSecurityBypass
         ? true
         : await bcrypt.compare(dto.passwordPlain, user.password);
@@ -200,6 +180,40 @@ export class AuthService {
         tenantId: user.tenantId,
       },
     };
+  }
+
+  /**
+   * Tanya Console apakah email+password ini valid, dan kalau ya, tenant chatbot mana yang sudah
+   * ditautkan staf untuk pelanggan tersebut. Null berarti "jangan percaya Console" (kredensial
+   * salah, belum ditautkan, kunci SSO belum diisi, atau Console tidak terjangkau) -- caller jatuh
+   * ke pengecekan password lokal seperti biasa.
+   */
+  private async verifyWithConsole(
+    email: string,
+    passwordPlain: string,
+    ipAddress: string,
+  ): Promise<string | null> {
+    const ssoKey = this.configService.get<string>('CONSOLE_SSO_KEY');
+    if (!ssoKey) return null;
+
+    const consoleApiUrl =
+      this.configService.get<string>('CONSOLE_API_URL') ||
+      'http://127.0.0.1:17342';
+
+    try {
+      const res = await axios.post<{ valid: boolean; chatbotTenantId: string | null }>(
+        `${consoleApiUrl}/api/integration/v1/sso/verify`,
+        { email, password: passwordPlain },
+        {
+          timeout: 3000,
+          headers: { Authorization: `Bearer ${ssoKey}`, 'CF-Connecting-IP': ipAddress },
+        },
+      );
+      return res.data.valid ? (res.data.chatbotTenantId ?? null) : null;
+    } catch {
+      // Console offline/tidak terjangkau/kredensial ditolak: fallback ke database lokal.
+      return null;
+    }
   }
 
   // Fungsi Pendaftaran (Dev)
