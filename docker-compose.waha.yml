@@ -3,6 +3,9 @@ services:
     image: devlikeapro/waha:chrome
     container_name: waha-core
     restart: unless-stopped
+    # ponytail: engine WEBJS pakai Chrome asli; default Docker shm 64MB kehabisan kuota
+    # dan Chrome crash diam-diam (FAILED tanpa reason), bukan dibunuh OOM-killer kernel.
+    shm_size: "2gb"
     environment:
       PORT: 3000
       WAHA_PORT: 3000
