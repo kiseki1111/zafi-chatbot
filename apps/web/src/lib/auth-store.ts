@@ -58,6 +58,7 @@ export const useAuthStore = create<AuthState>()(
           return { ok: false, message: "Terjadi kesalahan jaringan." };
         }
       },
+
       loginAs: (role: Role) => {
         let name = "Demo Administrator";
         let email = "admin@demo.id";

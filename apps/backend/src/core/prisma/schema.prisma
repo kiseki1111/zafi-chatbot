@@ -440,6 +440,10 @@ model Tenant {
   closingTime String  @default("21:00") @db.VarChar(10) // Jam berapa bot harus nagih laporan
 
   isOnboarded Boolean  @default(false)
+  // Id pelanggan di ZAF Console, diisi otomatis saat tenant ini pertama kali dibuat lewat login
+  // SSO ala Google (lihat auth.service.ts autoProvisionTenant). Tenant lokal lama (dibuat manual
+  // sebelum SSO) tetap null -- tidak bisa SSO sampai ditautkan manual lewat kolom ini.
+  consoleCustomerId String? @unique @map("console_customer_id")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 

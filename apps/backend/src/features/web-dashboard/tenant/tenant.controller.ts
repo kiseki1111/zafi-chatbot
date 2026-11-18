@@ -323,7 +323,6 @@ export class TenantController {
       category?: string;
       managerName: string;
       managerEmail: string;
-      managerPassword?: string;
       enabledMenus: string[];
     },
   ) {

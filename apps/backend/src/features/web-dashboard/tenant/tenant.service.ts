@@ -1829,17 +1829,16 @@ Berikan jawaban yang natural seperti CS manusia sungguhan. Jangan menggunakan ba
   }
 
   // Superadmin: Create new tenant + manager account (Auto-Trial 14 Hari)
+  // Login hanya lewat kredensial ZAF Console (source of truth) -- tidak ada password lokal di sini.
+  // Staf harus: (1) pastikan manager punya akun di ZAF Console dengan email yang sama, (2) link
+  // Customer.chatbotTenantId di Console ke tenant.id yang dihasilkan fungsi ini.
   async createClient(data: {
     companyName: string;
     category?: string;
     managerName: string;
     managerEmail: string;
-    managerPassword?: string;
     enabledMenus?: string[];
   }) {
-    const defaultPassword = data.managerPassword || 'Trial@123';
-    const hashedPassword = await bcrypt.hash(defaultPassword, 10);
-
     const trialDays = 14;
     const trialExpiresAt = new Date(
       Date.now() + trialDays * 24 * 60 * 60 * 1000,
@@ -1892,7 +1891,7 @@ Berikan jawaban yang natural seperti CS manusia sungguhan. Jangan menggunakan ba
         data: {
           name: data.managerName,
           email: data.managerEmail,
-          password: hashedPassword,
+          password: '', // ponytail: login hanya via ZAF Console, tidak ada password lokal
           role: 'manager',
           tenantId: newTenant.id,
         },
@@ -1907,7 +1906,7 @@ Berikan jawaban yang natural seperti CS manusia sungguhan. Jangan menggunakan ba
       year: 'numeric',
     });
 
-    const welcomeMessage = `Halo ${data.managerName || 'Bapak/Ibu'}, akun trial 14 hari ${data.companyName} Anda sudah aktif!\n\n🔗 Dashboard: https://app.zafii.tech\n📧 Email: ${data.managerEmail}\n🔑 Password: ${defaultPassword}\n⏳ Masa Berlaku: 14 Hari (s/d ${expDateStr})\n\nSilakan login ke dashboard untuk mencoba bot AI WhatsApp dan fitur CRM kami. Bila ada kendala, tim kami siap membantu!`;
+    const welcomeMessage = `Halo ${data.managerName || 'Bapak/Ibu'}, akun trial 14 hari ${data.companyName} Anda sudah aktif!\n\n🔗 Dashboard: https://app.zafii.tech\n📧 Login memakai akun ZAF Console Anda (email: ${data.managerEmail})\n⏳ Masa Berlaku: 14 Hari (s/d ${expDateStr})\n\nSilakan login ke dashboard untuk mencoba bot AI WhatsApp dan fitur CRM kami. Bila ada kendala, tim kami siap membantu!`;
 
     return {
       tenant,
@@ -1917,7 +1916,6 @@ Berikan jawaban yang natural seperti CS manusia sungguhan. Jangan menggunakan ba
         email: user.email,
         role: user.role,
       },
-      rawPassword: defaultPassword,
       isTrial: true,
       trialExpiresAt,
       welcomeMessage,

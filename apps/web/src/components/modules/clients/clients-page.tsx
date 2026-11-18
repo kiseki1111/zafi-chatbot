@@ -233,7 +233,6 @@ export function ClientsPage() {
     open: boolean;
     companyName: string;
     email: string;
-    passwordPlain: string;
     expiresAt: string;
     welcomeMessage: string;
   } | null>(null);
@@ -242,7 +241,6 @@ export function ClientsPage() {
     category: "general",
     managerName: "",
     managerEmail: "",
-    managerPassword: "Trial@123",
     customFeatureNotes: "",
     // ponytail: menu default wajib klien baru: bot whatsapp, products, knowledge, pelanggan, follow up otomatis
     enabledMenus: ["chatbot", "products", "knowledge", "crm", "followup", "overview", "settings"],
@@ -451,11 +449,10 @@ export function ClientsPage() {
           open: true,
           companyName: addForm.companyName,
           email: addForm.managerEmail,
-          passwordPlain: addForm.managerPassword || "Trial@123",
           expiresAt: expDate,
           welcomeMessage:
             data.welcomeMessage ||
-            `Halo ${addForm.managerName || "Bapak/Ibu"}, akun trial 14 hari ${addForm.companyName} Anda sudah aktif!\n\n🔗 Dashboard: https://app.zafii.tech\n📧 Email: ${addForm.managerEmail}\n🔑 Password: ${addForm.managerPassword || "Trial@123"}\n⏳ Masa Berlaku: 14 Hari (s/d ${expDate})\n\nSilakan login ke dashboard untuk mencoba bot AI WhatsApp dan fitur CRM kami. Bila ada kendala, tim kami siap membantu!`,
+            `Halo ${addForm.managerName || "Bapak/Ibu"}, akun trial 14 hari ${addForm.companyName} Anda sudah aktif!\n\n🔗 Dashboard: https://app.zafii.tech\n📧 Login memakai akun ZAF Console Anda (email: ${addForm.managerEmail})\n⏳ Masa Berlaku: 14 Hari (s/d ${expDate})\n\nSilakan login ke dashboard untuk mencoba bot AI WhatsApp dan fitur CRM kami. Bila ada kendala, tim kami siap membantu!`,
         });
 
         setAddForm({
@@ -463,7 +460,6 @@ export function ClientsPage() {
           category: "general",
           managerName: "",
           managerEmail: "",
-          managerPassword: "Trial@123",
           customFeatureNotes: "",
           enabledMenus: ["chatbot", "products", "knowledge", "crm", "followup", "overview", "settings"],
         });
@@ -2370,14 +2366,9 @@ export function ClientsPage() {
                 />
               </div>
 
-              <div>
-                <Label>Password Login</Label>
-                <Input
-                  type="password"
-                  value={addForm.managerPassword}
-                  onChange={(e) => setAddForm({ ...addForm, managerPassword: e.target.value })}
-                  className="h-8 mt-1 font-mono"
-                />
+              <div className="rounded-md border border-border/60 bg-muted/30 p-2.5 text-[11px] text-muted-foreground">
+                Login memakai akun ZAF Console (email yang sama). Tidak ada password lokal —
+                pastikan manager sudah punya akun di ZAF Console sebelum mengaktifkan trial ini.
               </div>
             </div>
           </div>
@@ -2419,8 +2410,8 @@ export function ClientsPage() {
                   <span className="font-mono font-semibold text-foreground">{createdTrialInfo.email}</span>
                 </div>
                 <div className="flex justify-between items-center text-muted-foreground">
-                  <span>Password:</span>
-                  <span className="font-mono font-semibold text-foreground">{createdTrialInfo.passwordPlain}</span>
+                  <span>Login:</span>
+                  <span className="font-semibold text-foreground">Akun ZAF Console (email sama)</span>
                 </div>
                 <div className="flex justify-between items-center text-muted-foreground">
                   <span>Masa Berlaku:</span>

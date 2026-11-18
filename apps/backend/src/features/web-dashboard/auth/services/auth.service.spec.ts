@@ -3,29 +3,23 @@ import { AuthService } from './auth.service';
 import { PrismaService } from '../../../../core/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { UnauthorizedException } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
+import { UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import axios from 'axios';
-
-jest.mock('bcrypt', () => ({
-  compare: jest.fn(),
-  hash: jest.fn().mockResolvedValue('mock_hash'),
-}));
 
 jest.mock('axios');
 
-describe('AuthService', () => {
+// Lihat juga auth.service.federation.spec.ts untuk kasus Console-as-source-of-truth yang lebih rinci.
+describe('AuthService.login (Console adalah satu-satunya sumber kredensial, auto-provisioning ala Google)', () => {
   let service: AuthService;
-  const originalEnv = process.env.SECURITY_BYPASS_MODE;
 
   const mockPrisma = {
     user: {
       findUnique: jest.fn(),
-      update: jest.fn(),
       upsert: jest.fn(),
     },
     tenant: {
       findUnique: jest.fn(),
+      create: jest.fn(),
     },
     auditLog: {
       create: jest.fn(),
@@ -40,9 +34,13 @@ describe('AuthService', () => {
   };
 
   const baseConfigGet = (key: string, defaultValue?: string) => {
-    if (key === 'JWT_ACCESS_SECRET') return 'secret';
-    if (key === 'JWT_REFRESH_SECRET') return 'refresh_secret';
-    return defaultValue ?? null;
+    const defaults: Record<string, string> = {
+      JWT_ACCESS_SECRET: 'secret',
+      JWT_REFRESH_SECRET: 'refresh_secret',
+      CONSOLE_SSO_KEY: 'k'.repeat(40),
+      CONSOLE_API_URL: 'http://console.local',
+    };
+    return defaults[key] ?? defaultValue ?? null;
   };
 
   const mockConfigService = {
@@ -52,7 +50,7 @@ describe('AuthService', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     (axios.post as jest.Mock).mockReset();
-    process.env.SECURITY_BYPASS_MODE = 'false';
+    (mockConfigService.get as jest.Mock).mockImplementation(baseConfigGet);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -66,178 +64,223 @@ describe('AuthService', () => {
     service = module.get<AuthService>(AuthService);
   });
 
-  afterAll(() => {
-    process.env.SECURITY_BYPASS_MODE = originalEnv;
-  });
-
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
 
-  describe('login', () => {
-    it('should throw UnauthorizedException when user not found', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(null);
-      mockPrisma.auditLog.create.mockResolvedValue({});
-
-      await expect(
-        service.login(
-          { email: 'notfound@example.com', passwordPlain: 'password123' },
-          '127.0.0.1',
-          'jest-agent',
-        ),
-      ).rejects.toThrow(UnauthorizedException);
-
-      expect(mockPrisma.auditLog.create).toHaveBeenCalled();
+  it('Console menolak kredensial (valid=false) -> UnauthorizedException, tidak pernah upsert user', async () => {
+    (axios.post as jest.Mock).mockResolvedValue({
+      data: { valid: false, entitled: false, customerId: null, customerName: null, chatbotTenantId: null },
     });
+    mockPrisma.auditLog.create.mockResolvedValue({});
 
-    it('should throw UnauthorizedException when password does not match', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 'u1',
-        email: 'user@example.com',
-        password: 'hashed_password',
-        role: 'USER',
-        deletedAt: null,
-      });
-      mockPrisma.auditLog.create.mockResolvedValue({});
-      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
-
-      await expect(
-        service.login(
-          { email: 'user@example.com', passwordPlain: 'wrongpassword' },
-          '127.0.0.1',
-          'jest-agent',
-        ),
-      ).rejects.toThrow(UnauthorizedException);
-    });
-
-    it('should return tokens and user payload on successful login', async () => {
-      const dummyUser = {
-        id: 'u1',
-        email: 'user@example.com',
-        name: 'Test User',
-        password: 'hashed_password',
-        role: 'ADMIN',
-        tenantId: 'tenant-123',
-        deletedAt: null,
-      };
-
-      mockPrisma.user.findUnique.mockResolvedValue(dummyUser);
-      mockPrisma.user.update.mockResolvedValue(dummyUser);
-      mockPrisma.refreshToken.create.mockResolvedValue({});
-      mockPrisma.auditLog.create.mockResolvedValue({});
-      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
-      (bcrypt.hash as jest.Mock).mockResolvedValue('mock_hash');
-
-      const result = await service.login(
-        { email: 'user@example.com', passwordPlain: 'correctpassword' },
+    await expect(
+      service.login(
+        { email: 'notfound@example.com', passwordPlain: 'password123' },
         '127.0.0.1',
         'jest-agent',
-      );
+      ),
+    ).rejects.toThrow(UnauthorizedException);
 
-      expect(result).toBeDefined();
-      expect(result.accessToken).toBe('jwt_token_sample');
-      expect(result.user.email).toBe('user@example.com');
-      expect(result.user.tenantId).toBe('tenant-123');
-    });
+    expect(mockPrisma.auditLog.create).toHaveBeenCalled();
+    expect(mockPrisma.user.upsert).not.toHaveBeenCalled();
   });
 
-  describe('login via SSO Console (CONSOLE_SSO_KEY diisi)', () => {
-    const SSO_KEY = 'k'.repeat(40);
-
-    beforeEach(() => {
-      (mockConfigService.get as jest.Mock).mockImplementation(
-        (key: string, defaultValue?: string) => {
-          if (key === 'CONSOLE_SSO_KEY') return SSO_KEY;
-          if (key === 'CONSOLE_API_URL') return 'http://console.local';
-          return baseConfigGet(key, defaultValue);
-        },
-      );
+  it('Console: valid tapi tidak entitled (belum subscribe) -> ditolak, tidak auto-provisioning apapun', async () => {
+    (axios.post as jest.Mock).mockResolvedValue({
+      data: { valid: true, entitled: false, customerId: 'cust-1', customerName: 'PT Belum Bayar', chatbotTenantId: null },
     });
+    mockPrisma.auditLog.create.mockResolvedValue({});
 
-    afterEach(() => {
-      (mockConfigService.get as jest.Mock).mockImplementation(baseConfigGet);
-    });
-
-    it('REGRESSI: Console valid tapi pelanggan belum ditautkan (chatbotTenantId null) tidak boleh membajak user lokal dengan email sama di tenant lain', async () => {
-      (axios.post as jest.Mock).mockResolvedValue({
-        data: { valid: true, chatbotTenantId: null },
-      });
-      // User lokal ini milik tenant lain, dibuat sebelum SSO ada; password Console tidak dikenalnya.
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 'victim-1',
-        email: 'owner@tokoA.com',
-        password: 'hashed_password_asli_victim',
-        role: 'manager',
-        tenantId: 'tenant-victim',
-        deletedAt: null,
-      });
-      (bcrypt.compare as jest.Mock).mockResolvedValue(false); // password attacker != password lokal victim
-      mockPrisma.auditLog.create.mockResolvedValue({});
-
-      await expect(
-        service.login(
-          { email: 'owner@tokoA.com', passwordPlain: 'password-attacker' },
-          '127.0.0.1',
-          'jest-agent',
-        ),
-      ).rejects.toThrow(UnauthorizedException);
-
-      expect(mockPrisma.user.upsert).not.toHaveBeenCalled();
-    });
-
-    it('Console valid dan pelanggan sudah ditautkan ke tenant yang ada: login berhasil memakai tenant itu', async () => {
-      (axios.post as jest.Mock).mockResolvedValue({
-        data: { valid: true, chatbotTenantId: 'tenant-linked' },
-      });
-      mockPrisma.user.findUnique.mockResolvedValue(null); // belum pernah login lewat chatbot ini
-      mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-linked' });
-      mockPrisma.user.upsert.mockResolvedValue({
-        id: 'u-new',
-        email: 'owner@linked.com',
-        name: 'owner',
-        role: 'manager',
-        tenantId: 'tenant-linked',
-        tenant: { id: 'tenant-linked', metadata: {} },
-      });
-      mockPrisma.refreshToken.create.mockResolvedValue({});
-      mockPrisma.auditLog.create.mockResolvedValue({});
-
-      const result = await service.login(
-        { email: 'owner@linked.com', passwordPlain: 'apapun' },
+    await expect(
+      service.login(
+        { email: 'belum-bayar@example.com', passwordPlain: 'apapun' },
         '127.0.0.1',
         'jest-agent',
-      );
+      ),
+    ).rejects.toThrow(UnauthorizedException);
 
-      expect(result.user.tenantId).toBe('tenant-linked');
-      expect(mockPrisma.user.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { email: 'owner@linked.com' },
-        }),
-      );
-    });
+    expect(mockPrisma.tenant.create).not.toHaveBeenCalled();
+    expect(mockPrisma.user.upsert).not.toHaveBeenCalled();
+  });
 
-    it('Console tidak terjangkau: jatuh ke pengecekan password lokal seperti biasa', async () => {
-      (axios.post as jest.Mock).mockRejectedValue(new Error('ECONNREFUSED'));
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 'u1',
-        email: 'user@example.com',
-        password: 'hashed_password',
-        role: 'manager',
-        tenantId: 'tenant-123',
-        deletedAt: null,
-      });
-      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
-      mockPrisma.refreshToken.create.mockResolvedValue({});
-      mockPrisma.auditLog.create.mockResolvedValue({});
+  it('Console tidak terjangkau (timeout/ECONNREFUSED) -> login gagal, TIDAK ADA fallback lokal', async () => {
+    (axios.post as jest.Mock).mockRejectedValue(new Error('ECONNREFUSED'));
+    mockPrisma.auditLog.create.mockResolvedValue({});
 
-      const result = await service.login(
+    await expect(
+      service.login(
         { email: 'user@example.com', passwordPlain: 'correctpassword' },
         '127.0.0.1',
         'jest-agent',
-      );
+      ),
+    ).rejects.toThrow(UnauthorizedException);
 
-      expect(result.user.tenantId).toBe('tenant-123');
-      expect(mockPrisma.user.upsert).not.toHaveBeenCalled();
+    expect(mockPrisma.tenant.findUnique).not.toHaveBeenCalled();
+    expect(mockPrisma.user.upsert).not.toHaveBeenCalled();
+  });
+
+  it('CONSOLE_SSO_KEY tidak diset -> login selalu gagal (fitur federasi mati)', async () => {
+    (mockConfigService.get as jest.Mock).mockImplementation((key: string) =>
+      key === 'CONSOLE_SSO_KEY' ? null : baseConfigGet(key),
+    );
+    mockPrisma.auditLog.create.mockResolvedValue({});
+
+    await expect(
+      service.login(
+        { email: 'user@example.com', passwordPlain: 'apapun' },
+        '127.0.0.1',
+        'jest-agent',
+      ),
+    ).rejects.toThrow(UnauthorizedException);
+
+    expect(axios.post).not.toHaveBeenCalled();
+  });
+
+  it('entitled dan sudah pernah tertaut (chatbotTenantId ada): langsung pakai tenant itu, tidak auto-provisioning', async () => {
+    (axios.post as jest.Mock).mockResolvedValue({
+      data: { valid: true, entitled: true, customerId: 'cust-1', customerName: 'PT Lama', chatbotTenantId: 'tenant-linked' },
     });
+    mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-linked' });
+    mockPrisma.user.findUnique.mockResolvedValue(null);
+    mockPrisma.user.upsert.mockResolvedValue({
+      id: 'u-new',
+      email: 'owner@linked.com',
+      name: 'owner',
+      role: 'manager',
+      tenantId: 'tenant-linked',
+      tenant: { id: 'tenant-linked', metadata: {} },
+    });
+    mockPrisma.refreshToken.create.mockResolvedValue({});
+    mockPrisma.auditLog.create.mockResolvedValue({});
+
+    const result = await service.login(
+      { email: 'owner@linked.com', passwordPlain: 'apapun' },
+      '127.0.0.1',
+      'jest-agent',
+    );
+
+    expect(result.user.tenantId).toBe('tenant-linked');
+    expect(mockPrisma.tenant.create).not.toHaveBeenCalled();
+    // Hanya 1 panggilan axios (verify) -- tidak ada link-tenant karena sudah tertaut sebelumnya.
+    expect(axios.post).toHaveBeenCalledTimes(1);
+  });
+
+  it('entitled TAPI belum pernah tertaut (login pertama ala Google): auto-create tenant + lapor ke Console', async () => {
+    (axios.post as jest.Mock)
+      .mockResolvedValueOnce({
+        data: { valid: true, entitled: true, customerId: 'cust-baru', customerName: 'PT Baru', chatbotTenantId: null },
+      })
+      .mockResolvedValueOnce({}); // POST link-tenant
+
+    mockPrisma.tenant.findUnique
+      .mockResolvedValueOnce(null) // autoProvisionTenant: belum ada tenant dgn consoleCustomerId ini
+      .mockResolvedValueOnce({ id: 'tenant-auto', metadata: {} }); // login(): cek tenant hasil provisioning
+    mockPrisma.tenant.create.mockResolvedValue({ id: 'tenant-auto', name: 'PT Baru' });
+    mockPrisma.user.findUnique.mockResolvedValue(null);
+    mockPrisma.user.upsert.mockResolvedValue({
+      id: 'u-baru',
+      email: 'owner@baru.com',
+      name: 'owner',
+      role: 'manager',
+      tenantId: 'tenant-auto',
+      tenant: { id: 'tenant-auto', metadata: {} },
+    });
+    mockPrisma.refreshToken.create.mockResolvedValue({});
+    mockPrisma.auditLog.create.mockResolvedValue({});
+
+    const result = await service.login(
+      { email: 'owner@baru.com', passwordPlain: 'apapun' },
+      '127.0.0.1',
+      'jest-agent',
+    );
+
+    expect(result.user.tenantId).toBe('tenant-auto');
+    expect(mockPrisma.tenant.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { name: 'PT Baru', consoleCustomerId: 'cust-baru' } }),
+    );
+    expect(axios.post).toHaveBeenCalledWith(
+      'http://console.local/api/integration/v1/sso/link-tenant',
+      { customerId: 'cust-baru', chatbotTenantId: 'tenant-auto' },
+      expect.anything(),
+    );
+  });
+
+  it('entitled, belum tertaut, TAPI tenant sudah pernah dibuat sebelumnya (idempotent, laporan ke Console gagal sebelumnya): dipakai ulang, tidak membuat tenant dobel', async () => {
+    (axios.post as jest.Mock)
+      .mockResolvedValueOnce({
+        data: { valid: true, entitled: true, customerId: 'cust-retry', customerName: 'PT Retry', chatbotTenantId: null },
+      })
+      .mockRejectedValueOnce(new Error('masih gagal lapor')); // link-tenant gagal lagi, tidak boleh membatalkan login
+
+    mockPrisma.tenant.findUnique
+      .mockResolvedValueOnce({ id: 'tenant-sudah-ada' }) // autoProvisionTenant: ketemu by consoleCustomerId
+      .mockResolvedValueOnce({ id: 'tenant-sudah-ada', metadata: {} });
+    mockPrisma.user.findUnique.mockResolvedValue(null);
+    mockPrisma.user.upsert.mockResolvedValue({
+      id: 'u-retry',
+      email: 'owner@retry.com',
+      name: 'owner',
+      role: 'manager',
+      tenantId: 'tenant-sudah-ada',
+      tenant: { id: 'tenant-sudah-ada', metadata: {} },
+    });
+    mockPrisma.refreshToken.create.mockResolvedValue({});
+    mockPrisma.auditLog.create.mockResolvedValue({});
+
+    const result = await service.login(
+      { email: 'owner@retry.com', passwordPlain: 'apapun' },
+      '127.0.0.1',
+      'jest-agent',
+    );
+
+    expect(result.user.tenantId).toBe('tenant-sudah-ada');
+    expect(mockPrisma.tenant.create).not.toHaveBeenCalled();
+  });
+
+  it('REGRESSI anti-hijack: email sudah dipakai user lokal di tenant LAIN tidak pernah dipindahkan diam-diam', async () => {
+    (axios.post as jest.Mock).mockResolvedValue({
+      data: { valid: true, entitled: true, customerId: 'cust-2', customerName: 'PT Dua', chatbotTenantId: 'tenant-2' },
+    });
+    mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-2' });
+    // User ini sudah ada di tenant LAIN (data lama / kebetulan email sama di Console customer lain).
+    mockPrisma.user.findUnique.mockResolvedValue({
+      id: 'victim-1',
+      email: 'owner@tokoA.com',
+      tenantId: 'tenant-victim-lama',
+    });
+    mockPrisma.auditLog.create.mockResolvedValue({});
+
+    await expect(
+      service.login(
+        { email: 'owner@tokoA.com', passwordPlain: 'apapun' },
+        '127.0.0.1',
+        'jest-agent',
+      ),
+    ).rejects.toThrow(UnauthorizedException);
+
+    expect(mockPrisma.user.upsert).not.toHaveBeenCalled();
+  });
+
+  it('tenant hasil auto-provisioning hilang sebelum dipakai (race/data hilang): ForbiddenException', async () => {
+    (axios.post as jest.Mock)
+      .mockResolvedValueOnce({
+        data: { valid: true, entitled: true, customerId: 'cust-x', customerName: 'PT X', chatbotTenantId: null },
+      })
+      .mockResolvedValueOnce({});
+
+    mockPrisma.tenant.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null); // seharusnya ada, tapi tidak -- harus gagal aman
+    mockPrisma.tenant.create.mockResolvedValue({ id: 'tenant-hilang' });
+    mockPrisma.auditLog.create.mockResolvedValue({});
+
+    await expect(
+      service.login(
+        { email: 'owner@x.com', passwordPlain: 'apapun' },
+        '127.0.0.1',
+        'jest-agent',
+      ),
+    ).rejects.toThrow(ForbiddenException);
   });
 });

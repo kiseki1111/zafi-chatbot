@@ -17,7 +17,7 @@ async function bootstrap() {
       );
     }
     process.env.DATABASE_URL =
-      'postgresql://postgres:secret_password@127.0.0.1:5432/rbac_api_db?schema=public';
+      'postgresql://postgres:secret_password@localhost:5432/rbac_api_db?schema=public';
   }
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger:
