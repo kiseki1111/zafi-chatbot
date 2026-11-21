@@ -2,14 +2,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { CsService } from './cs.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { AgentSharedService } from '../../core/agent-shared/agent-shared.service';
-import { HrisService } from '../hris/hris.service';
 import { AlertService } from '../../modules/monitoring/alert.service';
 
 describe('CsService - Error Handling for Retry Mechanism', () => {
   let service: CsService;
   let prismaService: PrismaService;
   let agentSharedService: AgentSharedService;
-  let hrisService: HrisService;
 
   const mockPrismaService = {
     whatsappInstance: {
@@ -33,11 +31,6 @@ describe('CsService - Error Handling for Retry Mechanism', () => {
     transcribeAudio: jest.fn(),
   };
 
-  const mockHrisService = {
-    getDailyAttendance: jest.fn(),
-    getEmployeesSummary: jest.fn(),
-  };
-
   const mockAlertService = {
     alertLLMHealthIssue: jest.fn(),
   };
@@ -55,10 +48,6 @@ describe('CsService - Error Handling for Retry Mechanism', () => {
           useValue: mockAgentSharedService,
         },
         {
-          provide: HrisService,
-          useValue: mockHrisService,
-        },
-        {
           provide: AlertService,
           useValue: mockAlertService,
         },
@@ -68,7 +57,6 @@ describe('CsService - Error Handling for Retry Mechanism', () => {
     service = module.get<CsService>(CsService);
     prismaService = module.get<PrismaService>(PrismaService);
     agentSharedService = module.get<AgentSharedService>(AgentSharedService);
-    hrisService = module.get<HrisService>(HrisService);
 
     jest.clearAllMocks();
 

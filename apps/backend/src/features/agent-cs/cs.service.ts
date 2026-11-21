@@ -6,7 +6,6 @@ import {
 } from '../../core/omnichannel/interfaces/incoming-message.interface';
 import { AgentSharedService } from '../../core/agent-shared/agent-shared.service';
 import { AlertService } from '../../modules/monitoring/alert.service';
-import { HrisService } from '../hris/hris.service';
 import { evaluateLeadScore } from './lead-intent.evaluator';
 
 @Injectable()
@@ -129,7 +128,6 @@ WAJIB MERESPON DALAM FORMAT JSON BERIKUT:
   constructor(
     private readonly prisma: PrismaService,
     private readonly agentSharedService: AgentSharedService,
-    private readonly hrisService: HrisService,
     @Optional() private readonly alertService?: AlertService,
   ) {}
 
@@ -264,38 +262,6 @@ WAJIB MERESPON DALAM FORMAT JSON BERIKUT:
       await this.agentSharedService.getAvailabilityContext(tenantId);
     if (availabilityContext) {
       context += `\n\n=== DATA PLANSITE & KETERSEDIAAN UNIT PERUMAHAN (REAL-TIME DATABASE) ===\n${availabilityContext}\n===================================================================`;
-    }
-
-    // HRIS INTEGRASI: Jika user menanyakan data presensi/karyawan, inject data live dari HRIS
-    const textLower = text.toLowerCase();
-    if (
-      textLower.includes('karyawan') ||
-      textLower.includes('presensi') ||
-      textLower.includes('absen') ||
-      textLower.includes('hadir') ||
-      textLower.includes('cuti') ||
-      textLower.includes('pegawai') ||
-      textLower.includes('staf')
-    ) {
-      try {
-        const [dailyAtt, empSummary] = await Promise.all([
-          this.hrisService.getDailyAttendance().catch(() => null),
-          this.hrisService.getEmployeesSummary().catch(() => null),
-        ]);
-        if (dailyAtt?.ringkasan || empSummary?.total_karyawan_aktif) {
-          context += `\n\n=== DATA REAL-TIME HRIS & PRESENSI KARYAWAN ===\n` +
-            `- Total Karyawan Aktif: ${empSummary?.total_karyawan_aktif || dailyAtt?.total_karyawan || 0} orang\n` +
-            `- Rekap Kehadiran Hari Ini (${dailyAtt?.tanggal || 'Hari ini'}):\n` +
-            `  * Hadir: ${dailyAtt?.ringkasan?.hadir ?? 0} orang\n` +
-            `  * Izin: ${dailyAtt?.ringkasan?.izin ?? 0} orang\n` +
-            `  * Sakit: ${dailyAtt?.ringkasan?.sakit ?? 0} orang\n` +
-            `  * Cuti: ${dailyAtt?.ringkasan?.cuti ?? 0} orang\n` +
-            `  * Belum Absen: ${dailyAtt?.ringkasan?.belum_absen ?? 0} orang\n` +
-            `==================================================`;
-        }
-      } catch (e) {
-        this.logger.warn(`Gagal mengambil konteks HRIS live: ${e.message}`);
-      }
     }
 
     // HYBRID DUAL-CONTEXT: Katalog produk aktif selalu disertakan ke konteks

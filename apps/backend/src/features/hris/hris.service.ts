@@ -18,12 +18,19 @@ export class HrisService {
       process.env.HRIS_API_URL ||
       'http://127.0.0.1:8000/api/assistant';
     this.baseUrl = rawUrl.replace(/\/$/, '');
+    // ponytail: tidak ada fallback hardcoded -- kosong = integrasi dianggap mati (fail-closed),
+    // bukan diam-diam memakai secret bawaan yang sudah ada di git history kedua repo.
     this.apiKey =
-      this.configService.get<string>('HRIS_API_KEY') ||
-      process.env.HRIS_API_KEY ||
-      'hris_bot_sec_live_948f2a';
+      this.configService.get<string>('HRIS_API_KEY') || process.env.HRIS_API_KEY || '';
 
+    if (!this.apiKey) {
+      this.logger.warn('[HrisService] HRIS_API_KEY belum diset -- integrasi HRIS dianggap mati.');
+    }
     this.logger.log(`[HrisService] Initialized with baseUrl: ${this.baseUrl}`);
+  }
+
+  private isConfigured(): boolean {
+    return this.apiKey.length > 0;
   }
 
   private getHeaders() {
@@ -34,6 +41,9 @@ export class HrisService {
   }
 
   async getHealth() {
+    if (!this.isConfigured()) {
+      return { success: false, status: 'DISABLED', system: 'HRIS (belum dikonfigurasi)', totalKaryawanAktif: 0, latencyMs: 0 };
+    }
     const start = Date.now();
     try {
       const res = await axios.get(`${this.baseUrl}/health`, {
@@ -63,6 +73,9 @@ export class HrisService {
   }
 
   async getEmployeesList() {
+    if (!this.isConfigured()) {
+      return { success: false, data: [], message: 'Integrasi HRIS belum dikonfigurasi.' };
+    }
     try {
       const res = await axios.get(`${this.baseUrl}/karyawan/list`, {
         headers: this.getHeaders(),
@@ -79,6 +92,9 @@ export class HrisService {
   }
 
   async lookupKaryawan(phone?: string, nik?: string) {
+    if (!this.isConfigured()) {
+      return { success: false, message: 'Integrasi HRIS belum dikonfigurasi.' };
+    }
     try {
       const res = await axios.get(`${this.baseUrl}/karyawan/lookup`, {
         params: { phone, nik },
@@ -95,6 +111,9 @@ export class HrisService {
   }
 
   async getCutiBalance(nik: string) {
+    if (!this.isConfigured()) {
+      return { success: false, message: 'Integrasi HRIS belum dikonfigurasi.' };
+    }
     try {
       const res = await axios.get(`${this.baseUrl}/karyawan/${nik}/cuti`, {
         headers: this.getHeaders(),
@@ -110,6 +129,9 @@ export class HrisService {
   }
 
   async getPresensiSummary(nik: string) {
+    if (!this.isConfigured()) {
+      return { success: false, message: 'Integrasi HRIS belum dikonfigurasi.' };
+    }
     try {
       const res = await axios.get(`${this.baseUrl}/karyawan/${nik}/presensi`, {
         headers: this.getHeaders(),
@@ -125,6 +147,9 @@ export class HrisService {
   }
 
   async getSlipGaji(nik: string) {
+    if (!this.isConfigured()) {
+      return { success: false, message: 'Integrasi HRIS belum dikonfigurasi.' };
+    }
     try {
       const res = await axios.get(`${this.baseUrl}/karyawan/${nik}/slip-gaji`, {
         headers: this.getHeaders(),
@@ -141,6 +166,9 @@ export class HrisService {
 
   // ponytail: endpoints integrasi konsol / hub HRD (daily, monthly, requests, employees)
   async getDailyAttendance(date?: string) {
+    if (!this.isConfigured()) {
+      return { success: false, message: 'Integrasi HRIS belum dikonfigurasi.' };
+    }
     try {
       const integrationUrl = this.baseUrl.replace(/\/assistant$/, '') + '/integration/v1/assistant';
       const res = await axios.get(`${integrationUrl}/attendance/daily`, {
@@ -155,6 +183,9 @@ export class HrisService {
   }
 
   async getPendingRequests() {
+    if (!this.isConfigured()) {
+      return { success: false, message: 'Integrasi HRIS belum dikonfigurasi.' };
+    }
     try {
       const integrationUrl = this.baseUrl.replace(/\/assistant$/, '') + '/integration/v1/assistant';
       const res = await axios.get(`${integrationUrl}/requests`, {
@@ -181,6 +212,9 @@ export class HrisService {
   }
 
   async getEmployeesSummary() {
+    if (!this.isConfigured()) {
+      return { success: false, message: 'Integrasi HRIS belum dikonfigurasi.' };
+    }
     try {
       const integrationUrl = this.baseUrl.replace(/\/assistant$/, '') + '/integration/v1/assistant';
       const res = await axios.get(`${integrationUrl}/employees`, {

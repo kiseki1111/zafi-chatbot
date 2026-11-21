@@ -58,14 +58,42 @@ export class AuthService {
       throw new UnauthorizedException('Alamat email atau password keliru.');
     }
 
-    // Ala Google: begitu Console bilang entitled, tenant dibuat otomatis kalau ini login pertama
-    // kali -- tidak perlu staf menautkan manual (lihat linkTenant di Console).
-    const tenantId =
-      consoleResult.chatbotTenantId ??
-      (await this.autoProvisionTenant(
+    // Anti-hijack: resolve user lokal SEBELUM membuat efek samping apapun (auto-provisioning tenant
+    // baru + lapor ke Console) -- supaya percobaan yang akhirnya ditolak tidak sempat mengubah state
+    // Console/chatbot sama sekali.
+    const existingUser = await this.prisma.user.findUnique({ where: { email: dto.email } });
+
+    let tenantId = consoleResult.chatbotTenantId;
+    if (!tenantId) {
+      if (existingUser) {
+        // Console belum pernah menautkan customer ini KE tenant chatbot apapun, TAPI email ini
+        // sudah dipakai user lokal (tenant lain, atau tenant lama pra-SSO) -- auto-provisioning
+        // tenant baru di sini pasti akan bertentangan dengan tenant yang sudah ada. Staf harus
+        // menautkan manual lewat Console (linkTenant) ke tenant yang benar; jangan pernah membuat
+        // tenant baru lalu melaporkannya ke Console di sini, baru menolak login setelahnya.
+        await this.prisma.auditLog.create({
+          data: {
+            action: 'AUTH_LOGIN_FAILED',
+            module: 'AUTHENTICATION',
+            endpoint: 'POST /auth/login',
+            ipAddress,
+            userAgent,
+            status: 'FAILED',
+            details: {
+              emailAttempt: dto.email,
+              reason: 'Email sudah dipakai user lokal di tenant lain; perlu tautan manual staf',
+            },
+          },
+        });
+        throw new UnauthorizedException('Email ini sudah dipakai akun chatbot lain. Hubungi tim ZAF.');
+      }
+      // Ala Google: begitu Console bilang entitled, tenant dibuat otomatis kalau ini login pertama
+      // kali -- tidak perlu staf menautkan manual (lihat linkTenant di Console).
+      tenantId = await this.autoProvisionTenant(
         consoleResult.customerId!,
         consoleResult.customerName,
-      ));
+      );
+    }
 
     const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
     if (!tenant) {
@@ -74,9 +102,8 @@ export class AuthService {
       );
     }
 
-    // Anti-hijack: email ini tidak boleh sudah dipakai user lokal di tenant LAIN (data lama
-    // pra-SSO, atau dua konsumen Console kebetulan punya email sama) -- jangan pernah dipindah diam-diam.
-    const existingUser = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    // Anti-hijack (jalur chatbotTenantId sudah tertaut): email ini tidak boleh dipakai user lokal
+    // di tenant LAIN dari yang ditautkan Console -- jangan pernah dipindah diam-diam.
     if (existingUser && existingUser.tenantId !== tenantId) {
       throw new UnauthorizedException('Email ini sudah dipakai akun chatbot lain. Hubungi tim ZAF.');
     }

@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { CsService } from './cs.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { AgentSharedService } from '../../core/agent-shared/agent-shared.service';
-import { HrisService } from '../hris/hris.service';
 
 describe('CsService', () => {
   let service: CsService;
@@ -40,25 +39,17 @@ describe('CsService', () => {
     callLLMStream: jest.fn(),
   };
 
-  const mockHris = {
-    getDailyAttendance: jest.fn().mockResolvedValue(null),
-    getEmployeesSummary: jest.fn().mockResolvedValue(null),
-  };
-
   beforeEach(async () => {
     jest.clearAllMocks();
     mockPrisma.product.findMany.mockResolvedValue([]);
     mockPrisma.message.findMany.mockResolvedValue([]);
     mockPrisma.auditLog.create.mockResolvedValue({});
-    mockHris.getDailyAttendance.mockResolvedValue(null);
-    mockHris.getEmployeesSummary.mockResolvedValue(null);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CsService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: AgentSharedService, useValue: mockAgentShared },
-        { provide: HrisService, useValue: mockHris },
       ],
     }).compile();
 

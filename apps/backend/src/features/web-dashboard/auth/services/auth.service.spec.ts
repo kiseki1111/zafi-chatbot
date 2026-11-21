@@ -262,6 +262,35 @@ describe('AuthService.login (Console adalah satu-satunya sumber kredensial, auto
     expect(mockPrisma.user.upsert).not.toHaveBeenCalled();
   });
 
+  it('REGRESSI (bug ditemukan saat simulasi audit): belum tertaut + email sudah dipakai tenant lain -> ditolak TANPA membuat tenant baru atau lapor ke Console', async () => {
+    (axios.post as jest.Mock).mockResolvedValueOnce({
+      data: { valid: true, entitled: true, customerId: 'cust-collision', customerName: 'PT Collision', chatbotTenantId: null },
+    });
+    // Email ini sudah dipakai user lokal di tenant lain (data lama pra-SSO) -- Console BELUM pernah
+    // menautkan customer ini (chatbotTenantId null), jadi tanpa fix ini auto-provisioning akan
+    // membuat tenant baru + melapor ke Console SEBELUM baru ketahuan harus ditolak.
+    mockPrisma.user.findUnique.mockResolvedValue({
+      id: 'victim-legacy',
+      email: 'owner@legacy.com',
+      tenantId: 'tenant-legacy-lama',
+    });
+    mockPrisma.auditLog.create.mockResolvedValue({});
+
+    await expect(
+      service.login(
+        { email: 'owner@legacy.com', passwordPlain: 'apapun' },
+        '127.0.0.1',
+        'jest-agent',
+      ),
+    ).rejects.toThrow(UnauthorizedException);
+
+    // Efek samping yang TIDAK BOLEH terjadi: tidak ada tenant baru dibuat, tidak ada panggilan
+    // link-tenant ke Console (hanya 1 panggilan axios -- verify saja), tidak ada upsert user.
+    expect(mockPrisma.tenant.create).not.toHaveBeenCalled();
+    expect(axios.post).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.user.upsert).not.toHaveBeenCalled();
+  });
+
   it('tenant hasil auto-provisioning hilang sebelum dipakai (race/data hilang): ForbiddenException', async () => {
     (axios.post as jest.Mock)
       .mockResolvedValueOnce({
@@ -273,6 +302,7 @@ describe('AuthService.login (Console adalah satu-satunya sumber kredensial, auto
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null); // seharusnya ada, tapi tidak -- harus gagal aman
     mockPrisma.tenant.create.mockResolvedValue({ id: 'tenant-hilang' });
+    mockPrisma.user.findUnique.mockResolvedValue(null); // belum ada user lokal -- bukan ini yang diuji
     mockPrisma.auditLog.create.mockResolvedValue({});
 
     await expect(
