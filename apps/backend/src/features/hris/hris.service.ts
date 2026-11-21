@@ -56,6 +56,11 @@ export class HrisService {
   }
 
   private async fetchTenantConfig(tenantId: string): Promise<TenantHrisConfig | null> {
+    const devBypass = this.devBypassConfig(tenantId);
+    if (devBypass) {
+      return devBypass;
+    }
+
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
       select: { consoleCustomerId: true },
@@ -90,6 +95,34 @@ export class HrisService {
       this.logger.warn(`[HrisService] Gagal resolusi HRIS untuk tenant ${tenantId}: ${err.message}`);
       return null;
     }
+  }
+
+  /**
+   * ponytail: jalan pintas SATU tenant saja untuk masa testing -- kantor yang belum punya akun
+   * Console (belum bisa ditautkan lewat SSO) tetap bisa diuji lewat HRIS_API_URL/HRIS_API_KEY
+   * langsung, tanpa menyentuh tenant lain mana pun (HRIS_DEV_BYPASS_TENANT_ID harus cocok PERSIS
+   * dengan tenant yang login). Hapus tiga env ini begitu tenant itu ditautkan sungguhan lewat
+   * Console (lihat docs SSO-HRIS-SPEC / hris-access) -- jangan biarkan aktif di production umum.
+   */
+  private devBypassConfig(tenantId: string): TenantHrisConfig | null {
+    const bypassTenantId = this.configService.get<string>('HRIS_DEV_BYPASS_TENANT_ID')?.trim();
+    if (!bypassTenantId || bypassTenantId !== tenantId) {
+      return null;
+    }
+    const rawUrl = this.configService.get<string>('HRIS_API_URL')?.trim();
+    const apiKey = this.configService.get<string>('HRIS_API_KEY')?.trim();
+    if (!rawUrl || !apiKey) {
+      return null;
+    }
+    const baseUrl = rawUrl.replace(/\/$/, '');
+    this.logger.warn(
+      `[HrisService] DEV BYPASS aktif untuk tenant ${tenantId} -- memakai HRIS_API_URL langsung, bukan resolusi SSO Console.`,
+    );
+    return {
+      baseUrl: `${baseUrl}/api/assistant`,
+      integrationUrl: `${baseUrl}/api/integration/v1/assistant`,
+      apiKey,
+    };
   }
 
   private headers(apiKey: string) {

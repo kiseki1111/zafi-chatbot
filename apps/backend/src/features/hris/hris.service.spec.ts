@@ -224,6 +224,51 @@ describe('HrisService - resolusi per-tenant lewat SSO Console, fail-closed', () 
     });
   });
 
+  describe('HRIS_DEV_BYPASS_TENANT_ID (jalan pintas testing satu tenant, tanpa Console)', () => {
+    it('tenantId cocok PERSIS dengan env: memanggil HRIS langsung, tidak pernah menghubungi Console', async () => {
+      service = await build({
+        HRIS_DEV_BYPASS_TENANT_ID: 'tenant-kantor-saya',
+        HRIS_API_URL: 'http://hris-kantor-saya.local',
+        HRIS_API_KEY: 'kunci-dev-kantor-saya',
+      });
+      (axios.get as jest.Mock).mockResolvedValue({ data: { success: true, data: [] } });
+
+      await service.getEmployeesList('tenant-kantor-saya');
+
+      expect(prisma.tenant.findUnique).not.toHaveBeenCalled();
+      expect(axios.get).toHaveBeenCalledWith(
+        'http://hris-kantor-saya.local/api/assistant/karyawan/list',
+        expect.objectContaining({ headers: expect.objectContaining({ 'X-Assistant-Key': 'kunci-dev-kantor-saya' }) }),
+      );
+    });
+
+    it('tenant LAIN (tidak cocok dengan env): tetap lewat jalur SSO biasa, bypass tidak ikut bocor', async () => {
+      service = await build({
+        HRIS_DEV_BYPASS_TENANT_ID: 'tenant-kantor-saya',
+        HRIS_API_URL: 'http://hris-kantor-saya.local',
+        HRIS_API_KEY: 'kunci-dev-kantor-saya',
+      });
+      prisma.tenant.findUnique.mockResolvedValue({ consoleCustomerId: null });
+
+      const result = await service.getEmployeesList('tenant-lain');
+
+      expect(axios.get).not.toHaveBeenCalled();
+      expect(prisma.tenant.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'tenant-lain' } }),
+      );
+      expect(result.success).toBe(false);
+    });
+
+    it('env bypass tidak diset: perilaku sama seperti sebelumnya (lewat Console)', async () => {
+      service = await build();
+      prisma.tenant.findUnique.mockResolvedValue({ consoleCustomerId: null });
+
+      await service.getEmployeesList('tenant-kantor-saya');
+
+      expect(prisma.tenant.findUnique).toHaveBeenCalled();
+    });
+  });
+
   describe('getRecentAuditLogs() tidak terpengaruh resolusi tenant (query Prisma lokal)', () => {
     beforeEach(async () => {
       service = await build();
