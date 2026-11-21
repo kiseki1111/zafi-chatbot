@@ -23,6 +23,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 import * as fs from 'fs';
 import * as path from 'path';
 import { WahaService } from './waha.service';
+import { HrisAssistantRelayService } from './hris-assistant-relay.service';
 import { AvailabilityService } from '../availability/availability.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { OmnichannelQueueService } from '../../core/omnichannel/omnichannel-queue.service';
@@ -60,6 +61,7 @@ export class WahaController implements OnApplicationBootstrap {
     private readonly omnichannelQueue: OmnichannelQueueService,
     @Optional() private readonly availabilityService?: AvailabilityService,
     @Optional() private readonly configService?: ConfigService,
+    @Optional() private readonly hrisAssistantRelay?: HrisAssistantRelayService,
   ) {}
 
   async onApplicationBootstrap() {
@@ -1890,7 +1892,15 @@ export class WahaController implements OnApplicationBootstrap {
               }
             },
           };
-          this.omnichannelQueue.enqueue(incomingMessage);
+
+          // Nomor khusus Asisten HRD (lihat HrisAssistantRelayService): relay ke Console,
+          // jangan masuk antrean bot CS jualan sama sekali.
+          const hrdSession = this.hrisAssistantRelay?.dedicatedSession();
+          if (hrdSession && sessionName === hrdSession) {
+            await this.hrisAssistantRelay!.relay(sessionName, sender, text);
+          } else {
+            this.omnichannelQueue.enqueue(incomingMessage);
+          }
         }
       }
     } else if (payload?.event === 'message.ack') {
