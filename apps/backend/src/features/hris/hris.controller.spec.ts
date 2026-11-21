@@ -3,12 +3,14 @@ import { ForbiddenException } from '@nestjs/common';
 import { HrisController } from './hris.controller';
 import { HrisService } from './hris.service';
 
-describe('HrisController - akses dikunci Superadmin', () => {
+describe('HrisController - akses manager/administrator/superadmin, per-tenant', () => {
   let controller: HrisController;
   let service: { [key: string]: jest.Mock };
 
   const superadminReq = (req: any = {}) => ({ user: { sub: 'u1', roles: ['superadmin'] }, ...req });
   const managerReq = (req: any = {}) => ({ user: { sub: 'u2', roles: ['manager'], tenantId: 'tenant-a' }, ...req });
+  const adminReq = (req: any = {}) => ({ user: { sub: 'u4', roles: ['administrator'], tenantId: 'tenant-b' }, ...req });
+  const operatorReq = (req: any = {}) => ({ user: { sub: 'u5', roles: ['operator'], tenantId: 'tenant-c' }, ...req });
   const noUserReq = () => ({});
 
   beforeEach(async () => {
@@ -34,19 +36,19 @@ describe('HrisController - akses dikunci Superadmin', () => {
   });
 
   describe.each([
-    ['health', () => controller.health(managerReq())],
-    ['karyawan/list', () => controller.getEmployeesList(managerReq())],
-    ['karyawan/lookup', () => controller.lookup(managerReq(), '0812', undefined)],
-    ['karyawan/:nik/cuti', () => controller.getCuti(managerReq(), 'NIK001')],
-    ['karyawan/:nik/presensi', () => controller.getPresensi(managerReq(), 'NIK001')],
-    ['karyawan/:nik/slip-gaji', () => controller.getSlipGaji(managerReq(), 'NIK001')],
-    ['attendance/daily', () => controller.getDailyAttendance(managerReq(), undefined)],
-    ['requests/pending', () => controller.getPendingRequests(managerReq())],
-    ['audit-logs', () => controller.getAuditLogs(managerReq())],
-    ['employees/summary', () => controller.getEmployeesSummary(managerReq())],
-  ])('Rute %s', (_name, callWithManager) => {
-    it('ditolak 403 untuk role manager (bukan superadmin)', async () => {
-      await expect(callWithManager()).rejects.toThrow(ForbiddenException);
+    ['health', () => controller.health(operatorReq())],
+    ['karyawan/list', () => controller.getEmployeesList(operatorReq())],
+    ['karyawan/lookup', () => controller.lookup(operatorReq(), '0812', undefined)],
+    ['karyawan/:nik/cuti', () => controller.getCuti(operatorReq(), 'NIK001')],
+    ['karyawan/:nik/presensi', () => controller.getPresensi(operatorReq(), 'NIK001')],
+    ['karyawan/:nik/slip-gaji', () => controller.getSlipGaji(operatorReq(), 'NIK001')],
+    ['attendance/daily', () => controller.getDailyAttendance(operatorReq(), undefined)],
+    ['requests/pending', () => controller.getPendingRequests(operatorReq())],
+    ['audit-logs', () => controller.getAuditLogs(operatorReq())],
+    ['employees/summary', () => controller.getEmployeesSummary(operatorReq())],
+  ])('Rute %s', (_name, callWithOperator) => {
+    it('ditolak 403 untuk role operator (bukan manager/administrator/superadmin)', async () => {
+      await expect(callWithOperator()).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -54,10 +56,23 @@ describe('HrisController - akses dikunci Superadmin', () => {
     await expect(controller.getEmployeesList(noUserReq())).rejects.toThrow(ForbiddenException);
   });
 
-  it('karyawan/list: diizinkan untuk superadmin, meneruskan ke service', async () => {
+  it.each([
+    ['manager', () => managerReq(), 'tenant-a'],
+    ['administrator', () => adminReq(), 'tenant-b'],
+  ])('karyawan/list: diizinkan untuk role %s, meneruskan tenantId-nya sendiri ke service', async (_role, buildReq, tenantId) => {
+    const result = await controller.getEmployeesList(buildReq());
+    expect(result).toEqual({ success: true, data: [] });
+    expect(service.getEmployeesList).toHaveBeenCalledWith(tenantId);
+  });
+
+  it('karyawan/list: diizinkan untuk superadmin, tenantId null (tidak terikat satu tenant)', async () => {
     const result = await controller.getEmployeesList(superadminReq());
     expect(result).toEqual({ success: true, data: [] });
-    expect(service.getEmployeesList).toHaveBeenCalledTimes(1);
+    expect(service.getEmployeesList).toHaveBeenCalledWith(null);
+  });
+
+  it('audit-logs: ditolak 403 untuk manager (tetap superadmin-only, beda dari data HRIS)', async () => {
+    await expect(controller.getAuditLogs(managerReq())).rejects.toThrow(ForbiddenException);
   });
 
   it('audit-logs: diizinkan untuk superadmin', async () => {
@@ -65,14 +80,22 @@ describe('HrisController - akses dikunci Superadmin', () => {
     expect(result).toEqual({ success: true, data: [] });
   });
 
-  it('karyawan/:nik/slip-gaji: parameter nik diteruskan persis ke service', async () => {
-    await controller.getSlipGaji(superadminReq(), 'NIK-777');
-    expect(service.getSlipGaji).toHaveBeenCalledWith('NIK-777');
+  it('karyawan/:nik/slip-gaji: nik dan tenantId manager diteruskan persis ke service', async () => {
+    await controller.getSlipGaji(managerReq(), 'NIK-777');
+    expect(service.getSlipGaji).toHaveBeenCalledWith('tenant-a', 'NIK-777');
   });
 
   it('role dicek case-insensitive & lewat field "role" tunggal (bukan hanya array "roles")', async () => {
-    const singleRoleReq = { user: { sub: 'u3', role: 'SUPERADMIN' } };
+    const singleRoleReq = { user: { sub: 'u3', role: 'ADMINISTRATOR', tenantId: 'tenant-z' } };
     const result = await controller.getEmployeesList(singleRoleReq);
     expect(result).toEqual({ success: true, data: [] });
+    expect(service.getEmployeesList).toHaveBeenCalledWith('tenant-z');
+  });
+
+  it('dua tenant berbeda memanggil service dengan tenantId masing-masing, tidak pernah tercampur', async () => {
+    await controller.getCuti(managerReq(), 'NIK-A');
+    await controller.getCuti(adminReq(), 'NIK-B');
+    expect(service.getCutiBalance).toHaveBeenNthCalledWith(1, 'tenant-a', 'NIK-A');
+    expect(service.getCutiBalance).toHaveBeenNthCalledWith(2, 'tenant-b', 'NIK-B');
   });
 });

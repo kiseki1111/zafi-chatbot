@@ -2,36 +2,48 @@ import { Controller, ForbiddenException, Get, Param, Query, Req, UseGuards } fro
 import { HrisService } from './hris.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
-// Proxy ke SATU instance presensi-app eksternal (lihat hris.service.ts) -- belum per-tenant.
-// Dikunci superadmin saja supaya data karyawan/gaji/cuti perusahaan itu tidak terbuka ke tenant
-// lain atau publik, sampai integrasi HRIS multi-tenant yang benar (lewat Console) tersedia.
+/** Staf tenant (dikelola lewat halaman HRIS di dashboard chatbot) yang boleh memakai integrasi ini. */
+const HRIS_STAFF_ROLES = ['superadmin', 'manager', 'administrator'];
+
+// Proxy ke instance presensi-app milik tenant yang sedang login (resolusi per-tenant lewat SSO
+// Console, lihat HrisService.resolveTenantConfig) -- bukan config global, supaya tenant lain tidak
+// bisa melihat data karyawan/gaji/cuti tenant ini.
 @UseGuards(JwtAuthGuard)
 @Controller('api/v1/hris')
 export class HrisController {
   constructor(private readonly hrisService: HrisService) {}
 
+  private requireStaff(req: any): string | null {
+    const user = req?.user;
+    const roles: string[] = user?.roles ?? (user?.role ? [user.role] : []);
+    const isStaff = roles.some((r) => HRIS_STAFF_ROLES.includes(r?.toLowerCase()));
+    if (!isStaff) {
+      throw new ForbiddenException(
+        'Akses ditolak: integrasi HRIS hanya untuk manager/administrator perusahaan ini.',
+      );
+    }
+    return user?.tenantId ?? null;
+  }
+
   private ensureSuperadmin(req: any) {
     const user = req?.user;
-    const isSuper =
-      user?.roles?.some((r: string) => r?.toLowerCase() === 'superadmin') ||
-      user?.role?.toLowerCase() === 'superadmin';
+    const roles: string[] = user?.roles ?? (user?.role ? [user.role] : []);
+    const isSuper = roles.some((r) => r?.toLowerCase() === 'superadmin');
     if (!isSuper) {
-      throw new ForbiddenException(
-        'Akses ditolak: integrasi HRIS ini hanya untuk Superadmin.',
-      );
+      throw new ForbiddenException('Akses ditolak: hanya untuk Superadmin.');
     }
   }
 
   @Get('health')
   async health(@Req() req: any) {
-    this.ensureSuperadmin(req);
-    return this.hrisService.getHealth();
+    const tenantId = this.requireStaff(req);
+    return this.hrisService.getHealth(tenantId);
   }
 
   @Get('karyawan/list')
   async getEmployeesList(@Req() req: any) {
-    this.ensureSuperadmin(req);
-    return this.hrisService.getEmployeesList();
+    const tenantId = this.requireStaff(req);
+    return this.hrisService.getEmployeesList(tenantId);
   }
 
   @Get('karyawan/lookup')
@@ -40,40 +52,41 @@ export class HrisController {
     @Query('phone') phone?: string,
     @Query('nik') nik?: string,
   ) {
-    this.ensureSuperadmin(req);
-    return this.hrisService.lookupKaryawan(phone, nik);
+    const tenantId = this.requireStaff(req);
+    return this.hrisService.lookupKaryawan(tenantId, phone, nik);
   }
 
   @Get('karyawan/:nik/cuti')
   async getCuti(@Req() req: any, @Param('nik') nik: string) {
-    this.ensureSuperadmin(req);
-    return this.hrisService.getCutiBalance(nik);
+    const tenantId = this.requireStaff(req);
+    return this.hrisService.getCutiBalance(tenantId, nik);
   }
 
   @Get('karyawan/:nik/presensi')
   async getPresensi(@Req() req: any, @Param('nik') nik: string) {
-    this.ensureSuperadmin(req);
-    return this.hrisService.getPresensiSummary(nik);
+    const tenantId = this.requireStaff(req);
+    return this.hrisService.getPresensiSummary(tenantId, nik);
   }
 
   @Get('karyawan/:nik/slip-gaji')
   async getSlipGaji(@Req() req: any, @Param('nik') nik: string) {
-    this.ensureSuperadmin(req);
-    return this.hrisService.getSlipGaji(nik);
+    const tenantId = this.requireStaff(req);
+    return this.hrisService.getSlipGaji(tenantId, nik);
   }
 
   @Get('attendance/daily')
   async getDailyAttendance(@Req() req: any, @Query('date') date?: string) {
-    this.ensureSuperadmin(req);
-    return this.hrisService.getDailyAttendance(date);
+    const tenantId = this.requireStaff(req);
+    return this.hrisService.getDailyAttendance(tenantId, date);
   }
 
   @Get('requests/pending')
   async getPendingRequests(@Req() req: any) {
-    this.ensureSuperadmin(req);
-    return this.hrisService.getPendingRequests();
+    const tenantId = this.requireStaff(req);
+    return this.hrisService.getPendingRequests(tenantId);
   }
 
+  // Log audit platform ZAF lintas tenant -- tetap superadmin-only, berbeda dari data HRIS di atas.
   @Get('audit-logs')
   async getAuditLogs(@Req() req: any) {
     this.ensureSuperadmin(req);
@@ -82,7 +95,7 @@ export class HrisController {
 
   @Get('employees/summary')
   async getEmployeesSummary(@Req() req: any) {
-    this.ensureSuperadmin(req);
-    return this.hrisService.getEmployeesSummary();
+    const tenantId = this.requireStaff(req);
+    return this.hrisService.getEmployeesSummary(tenantId);
   }
 }
