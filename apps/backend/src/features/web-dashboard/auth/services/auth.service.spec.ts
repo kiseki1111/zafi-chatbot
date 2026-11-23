@@ -5,6 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import axios from 'axios';
+import * as bcrypt from 'bcrypt';
 
 jest.mock('axios');
 
@@ -312,5 +313,115 @@ describe('AuthService.login (Console adalah satu-satunya sumber kredensial, auto
         'jest-agent',
       ),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  describe('fallback password lokal (akun pra-SSO yang belum dikenal/ditautkan Console)', () => {
+    it('Console tidak mengenali email, tapi hash password lokal cocok -> login berhasil pakai tenant lama, TANPA sentuh Console/tenant SSO', async () => {
+      const hash = await bcrypt.hash('passwordLamaSaya', 10);
+      (axios.post as jest.Mock).mockResolvedValue({
+        data: { valid: false, entitled: false, customerId: null, customerName: null, chatbotTenantId: null },
+      });
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'legacy-user',
+        email: 'lama@tokoA.com',
+        name: 'Toko A',
+        role: 'manager',
+        password: hash,
+        tenantId: 'tenant-lama',
+        tenant: { id: 'tenant-lama', metadata: {} },
+      });
+      mockPrisma.refreshToken.create.mockResolvedValue({});
+
+      const result = await service.login(
+        { email: 'lama@tokoA.com', passwordPlain: 'passwordLamaSaya' },
+        '127.0.0.1',
+        'jest-agent',
+      );
+
+      expect(result.user.tenantId).toBe('tenant-lama');
+      expect(mockPrisma.user.upsert).not.toHaveBeenCalled();
+      expect(mockPrisma.tenant.create).not.toHaveBeenCalled();
+      // issueSession tetap mencatat AUTH_LOGIN_SUCCESS seperti login biasa; yang TIDAK boleh
+      // terjadi adalah panggilan ke Console link-tenant (hanya 1 panggilan axios -- verify saja).
+      expect(axios.post).toHaveBeenCalledTimes(1);
+    });
+
+    it('Console tidak mengenali email DAN password lokal salah -> tetap ditolak + audit log tercatat', async () => {
+      const hash = await bcrypt.hash('passwordLamaSaya', 10);
+      (axios.post as jest.Mock).mockResolvedValue({
+        data: { valid: false, entitled: false, customerId: null, customerName: null, chatbotTenantId: null },
+      });
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'legacy-user',
+        email: 'lama@tokoA.com',
+        name: 'Toko A',
+        role: 'manager',
+        password: hash,
+        tenantId: 'tenant-lama',
+        tenant: { id: 'tenant-lama', metadata: {} },
+      });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await expect(
+        service.login(
+          { email: 'lama@tokoA.com', passwordPlain: 'passwordSALAH' },
+          '127.0.0.1',
+          'jest-agent',
+        ),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(mockPrisma.auditLog.create).toHaveBeenCalled();
+    });
+
+    it('akun murni-SSO (password kosong ") tidak pernah dicoba fallback -- bcrypt.compare tidak dipanggil ke hash kosong', async () => {
+      (axios.post as jest.Mock).mockResolvedValue({
+        data: { valid: false, entitled: false, customerId: null, customerName: null, chatbotTenantId: null },
+      });
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'sso-user',
+        email: 'baru@tokoB.com',
+        name: 'Toko B',
+        role: 'manager',
+        password: '',
+        tenantId: 'tenant-baru',
+        tenant: { id: 'tenant-baru', metadata: {} },
+      });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await expect(
+        service.login(
+          { email: 'baru@tokoB.com', passwordPlain: 'apapun' },
+          '127.0.0.1',
+          'jest-agent',
+        ),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('fallback lokal tetap menghormati trial 14 hari kedaluwarsa -> ForbiddenException', async () => {
+      const hash = await bcrypt.hash('passwordLamaSaya', 10);
+      (axios.post as jest.Mock).mockResolvedValue({
+        data: { valid: false, entitled: false, customerId: null, customerName: null, chatbotTenantId: null },
+      });
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'legacy-trial-user',
+        email: 'trial@tokoC.com',
+        name: 'Toko C',
+        role: 'manager',
+        password: hash,
+        tenantId: 'tenant-trial',
+        tenant: {
+          id: 'tenant-trial',
+          metadata: { isTrial: true, trialExpiresAt: '2020-01-01T00:00:00.000Z' },
+        },
+      });
+
+      await expect(
+        service.login(
+          { email: 'trial@tokoC.com', passwordPlain: 'passwordLamaSaya' },
+          '127.0.0.1',
+          'jest-agent',
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
   });
 });

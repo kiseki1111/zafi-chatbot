@@ -38,6 +38,17 @@ export class AuthService {
     );
 
     if (!consoleResult?.valid || !consoleResult.entitled) {
+      // Fallback akun pra-SSO: Console belum/tidak mengenali email ini (atau tidak entitled), TAPI
+      // akun lokal lama (sebelum SSO dibangun) masih punya hash password sendiri -- cocokkan ke situ
+      // saja, tanpa membuat user baru atau mempercayai pihak luar apapun untuk identitas ini.
+      const fallbackSession = await this.tryLocalPasswordFallback(
+        dto.email,
+        dto.passwordPlain,
+        ipAddress,
+        userAgent,
+      );
+      if (fallbackSession) return fallbackSession;
+
       // Console: kredensial salah, tidak entitled (tidak subscribe Chatbot), atau tidak terjangkau
       await this.prisma.auditLog.create({
         data: {
@@ -135,6 +146,39 @@ export class AuthService {
     }
 
     return this.issueSession(user, ipAddress, userAgent, 'POST /auth/login');
+  }
+
+  /**
+   * Fallback khusus akun pra-SSO: dipanggil HANYA saat Console menolak/tidak mengenali email ini.
+   * Tidak pernah membuat/mengubah user atau tenant apapun -- murni bcrypt.compare ke hash yang
+   * sudah ada di DB chatbot sejak sebelum SSO dibangun. Kembalikan null (bukan throw) kalau tidak
+   * cocok, supaya caller lanjut ke jalur tolak + audit log Console seperti biasa.
+   */
+  private async tryLocalPasswordFallback(
+    email: string,
+    passwordPlain: string,
+    ipAddress: string,
+    userAgent: string,
+  ) {
+    const localUser = await this.prisma.user.findUnique({
+      where: { email },
+      include: { tenant: true },
+    });
+    if (!localUser?.password) return null; // user SSO (password '') tidak punya hash untuk dicocokkan
+
+    const matches = await bcrypt.compare(passwordPlain, localUser.password);
+    if (!matches) return null;
+
+    if (localUser.role !== 'superadmin' && localUser.tenant) {
+      const meta = (localUser.tenant.metadata as any) || {};
+      if (meta.isTrial && meta.trialExpiresAt && new Date(meta.trialExpiresAt).getTime() < Date.now()) {
+        throw new ForbiddenException(
+          'Masa trial 14 hari akun Anda telah berakhir. Silakan hubungi tim kami untuk memperpanjang atau upgrade ke paket berbayar.',
+        );
+      }
+    }
+
+    return this.issueSession(localUser, ipAddress, userAgent, 'POST /auth/login');
   }
 
   // Verifikasi kredensial ke Console: source of truth untuk semua login. Null = fitur federasi
