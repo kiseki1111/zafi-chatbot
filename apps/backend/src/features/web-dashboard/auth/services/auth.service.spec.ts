@@ -373,6 +373,26 @@ describe('AuthService.login (Console adalah satu-satunya sumber kredensial, auto
       expect(mockPrisma.auditLog.create).toHaveBeenCalled();
     });
 
+    it('INSIDEN (2026-11-23): skema DB belum sinkron (prisma db push gagal) -> query fallback lempar error, login tetap balas 401 bersih, bukan 500', async () => {
+      (axios.post as jest.Mock).mockResolvedValue({
+        data: { valid: false, entitled: false, customerId: null, customerName: null, chatbotTenantId: null },
+      });
+      mockPrisma.user.findUnique.mockRejectedValue(
+        new Error('The column `(not available)` does not exist in the current database.'),
+      );
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await expect(
+        service.login(
+          { email: 'zaftech@gmail.com', passwordPlain: 'apapun' },
+          '127.0.0.1',
+          'jest-agent',
+        ),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(mockPrisma.auditLog.create).toHaveBeenCalled();
+    });
+
     it('akun murni-SSO (password kosong ") tidak pernah dicoba fallback -- bcrypt.compare tidak dipanggil ke hash kosong', async () => {
       (axios.post as jest.Mock).mockResolvedValue({
         data: { valid: false, entitled: false, customerId: null, customerName: null, chatbotTenantId: null },

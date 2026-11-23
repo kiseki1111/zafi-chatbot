@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   UnauthorizedException,
   BadRequestException,
   ForbiddenException,
@@ -23,6 +24,8 @@ interface ConsoleSsoVerifyResult {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
@@ -160,10 +163,19 @@ export class AuthService {
     ipAddress: string,
     userAgent: string,
   ) {
-    const localUser = await this.prisma.user.findUnique({
-      where: { email },
-      include: { tenant: true },
-    });
+    let localUser;
+    try {
+      localUser = await this.prisma.user.findUnique({
+        where: { email },
+        include: { tenant: true },
+      });
+    } catch (err: any) {
+      // Gagal-aman: kalau skema DB belum tersinkron (mis. migrasi belum jalan di server ini),
+      // JANGAN sampai 500 ke pengguna -- cukup anggap fallback tidak tersedia, lanjut ke jalur
+      // tolak Console seperti biasa (perilaku sebelum fallback ini dibuat).
+      this.logger.error(`[AuthService] Fallback lokal gagal query user: ${err?.message || err}`);
+      return null;
+    }
     if (!localUser?.password) return null; // user SSO (password '') tidak punya hash untuk dicocokkan
 
     const matches = await bcrypt.compare(passwordPlain, localUser.password);
