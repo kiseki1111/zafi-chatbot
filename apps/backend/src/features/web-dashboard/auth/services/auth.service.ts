@@ -227,7 +227,12 @@ export class AuthService {
         },
       );
       return res.data;
-    } catch (error) {
+    } catch (error: any) {
+      const status = error?.response?.status;
+      const code = error?.code || error?.message || 'UNKNOWN';
+      this.logger.warn(
+        `[SSO] verifyWithConsole gagal (${consoleApiUrl}): status=${status ?? 'none'} err=${code}`,
+      );
       return null;
     }
   }

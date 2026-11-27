@@ -136,12 +136,8 @@ export class MetricsService {
         }
       }
 
-      // Alert jika perlu
-      if (percentUsed > this.MEMORY_THRESHOLD) {
-        this.logger.warn(
-          `⚠️ High memory usage: ${percentUsed.toFixed(1)}% (${heapUsedMB}MB / ${heapMaxMB}MB) - Trend: ${trend}`,
-        );
-
+      // Alert jika heap benar-benar tinggi (hindari false-alarm saat V8 heapTotal masih kecil ~60MB)
+      if (percentUsed > this.MEMORY_THRESHOLD && heapUsedMB >= 256) {
         this.alertService
           .alertMemoryIssue(
             percentUsed,
