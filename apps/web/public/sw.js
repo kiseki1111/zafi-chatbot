@@ -1,7 +1,6 @@
 // Service Worker for Chatbot Manager PWA
-const CACHE_NAME = 'chatbot-manager-v1';
+const CACHE_NAME = 'chatbot-manager-v2';
 const PRECACHE_ASSETS = [
-  '/',
   '/manifest.webmanifest',
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
@@ -31,8 +30,12 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Only handle GET requests, bypass all /api/ calls so dynamic database queries never get stale
-  if (event.request.method !== 'GET' || event.request.url.includes('/api/')) {
+  // Only handle GET requests; bypass /api/ and Next.js runtime/HMR assets
+  if (
+    event.request.method !== 'GET' ||
+    event.request.url.includes('/api/') ||
+    event.request.url.includes('/_next/')
+  ) {
     return;
   }
 
@@ -52,8 +55,9 @@ self.addEventListener('fetch', (event) => {
         }
         return response;
       })
-      .catch(() => {
-        return caches.match(event.request);
+      .catch(async () => {
+        const cached = await caches.match(event.request);
+        return cached || Response.error();
       })
   );
 });

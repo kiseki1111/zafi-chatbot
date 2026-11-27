@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/lib/auth-store";
 import { useAppStore } from "@/lib/app-store";
 import { Sidebar } from "./sidebar";
@@ -42,15 +41,12 @@ const SystemLogsPage = dynamic(() => import("@/components/modules/superadmin/sys
 
 
 import { canAccess, defaultViewForRole } from "@/lib/rbac";
-import type { ViewKey } from "@/lib/types";
+import type { Role, ViewKey } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export function DashboardShell() {
   const { user } = useAuthStore();
   const { view, setView, resetForRole, enabledMenus } = useAppStore();
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const viewParam = searchParams.get("view");
 
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [onboardingInitialData, setOnboardingInitialData] = useState<any>({});
@@ -109,35 +105,58 @@ export function DashboardShell() {
       });
   }, [user?.id, user?.tenantId]);
 
-  // 2. Pure URL Routing Sync: Navigasi instan 0ms tanpa request network sama sekali
+  // 2. Pure URL Routing Sync (tanpa Next.js router RSC fetch / hard reload)
   useEffect(() => {
     if (!user) return;
+    const safeRole = (user.role || "operator").toLowerCase() as Role;
+    const params = new URLSearchParams(window.location.search);
+    const urlView = params.get("view") as ViewKey | null;
 
-    if (viewParam) {
-      if (!canAccess(user.role, viewParam as ViewKey, enabledMenus, user)) {
-        const defaultView = defaultViewForRole(user.role);
-        router.replace(`?view=${defaultView}`);
-        setView(defaultView);
-      } else if (viewParam !== view) {
-        setView(viewParam as ViewKey);
-      }
-    } else {
-      router.replace(`?view=${view}`);
+    const targetView =
+      urlView && canAccess(safeRole, urlView, enabledMenus, user)
+        ? urlView
+        : canAccess(safeRole, view, enabledMenus, user)
+          ? view
+          : defaultViewForRole(safeRole);
+
+    if (targetView !== view) {
+      setView(targetView);
+    }
+    if (urlView !== targetView) {
+      params.set("view", targetView);
+      window.history.replaceState(window.history.state, "", `?${params.toString()}`);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewParam, user, enabledMenus]);
+  }, [user?.id, user?.role, enabledMenus]);
 
-  // 2. Sync State -> URL (On Menu Click)
+  // 3. Sync State -> URL (On Menu Click) & Browser Back/Forward (popstate)
   useEffect(() => {
-    if (view && view !== viewParam) {
-      router.push(`?view=${view}`);
+    if (!user || !view) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("view") !== view) {
+      params.set("view", view);
+      window.history.pushState(window.history.state, "", `?${params.toString()}`);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view]);
 
-  // 3. Reset internal state upon new login
   useEffect(() => {
-    if (user) resetForRole(user.role);
+    if (!user) return;
+    const onPopState = () => {
+      const safeRole = (user.role || "operator").toLowerCase() as Role;
+      const urlView = new URLSearchParams(window.location.search).get("view") as ViewKey | null;
+      if (urlView && canAccess(safeRole, urlView, enabledMenus, user)) {
+        setView(urlView);
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, user?.role, enabledMenus]);
+
+  // 4. Reset internal state upon new login
+  useEffect(() => {
+    if (user) resetForRole((user.role || "operator").toLowerCase() as Role);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 

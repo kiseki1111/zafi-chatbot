@@ -6,9 +6,10 @@ import { useAuthStore } from "@/lib/auth-store";
 import { LoginForm } from "@/components/auth/login-form";
 import { ForgotPasswordForm } from "@/components/auth/forgot-password-form";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
+import { NoSubscriptionModal } from "@/components/auth/no-subscription-modal";
 
 export default function Home() {
-  const { isAuthenticated, authView } = useAuthStore();
+  const { user, isAuthenticated, authView } = useAuthStore();
   const { theme } = useAppStore();
   const [mounted, setMounted] = useState(false);
 
@@ -39,5 +40,14 @@ export default function Home() {
     return <LoginForm />;
   }
 
-  return <DashboardShell />;
+  const isUnsubscribed = user?.hasSubscription === false;
+
+  return (
+    <>
+      <div className={isUnsubscribed ? "h-full w-full filter blur-sm pointer-events-none select-none transition-all duration-300" : "h-full w-full"}>
+        <DashboardShell />
+      </div>
+      {isUnsubscribed && <NoSubscriptionModal />}
+    </>
+  );
 }

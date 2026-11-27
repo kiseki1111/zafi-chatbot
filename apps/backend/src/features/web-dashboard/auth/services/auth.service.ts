@@ -40,8 +40,11 @@ export class AuthService {
       ipAddress,
     );
 
-    if (!consoleResult?.valid || !consoleResult.entitled) {
-      // Fallback akun pra-SSO: Console belum/tidak mengenali email ini (atau tidak entitled), TAPI
+    const hasConsoleAccount = consoleResult?.valid === true;
+    const isEntitled = hasConsoleAccount && consoleResult?.entitled === true;
+
+    if (!hasConsoleAccount) {
+      // Fallback akun pra-SSO: Console belum/tidak mengenali email ini, TAPI
       // akun lokal lama (sebelum SSO dibangun) masih punya hash password sendiri -- cocokkan ke situ
       // saja, tanpa membuat user baru atau mempercayai pihak luar apapun untuk identitas ini.
       const fallbackSession = await this.tryLocalPasswordFallback(
@@ -52,7 +55,7 @@ export class AuthService {
       );
       if (fallbackSession) return fallbackSession;
 
-      // Console: kredensial salah, tidak entitled (tidak subscribe Chatbot), atau tidak terjangkau
+      // Console: kredensial salah atau tidak terjangkau dan tidak cocok lokal
       await this.prisma.auditLog.create({
         data: {
           action: 'AUTH_LOGIN_FAILED',
@@ -63,9 +66,7 @@ export class AuthService {
           status: 'FAILED',
           details: {
             emailAttempt: dto.email,
-            reason: !consoleResult?.valid
-              ? 'Kredensial tidak valid di ZAF Console'
-              : 'Tidak sedang berlangganan ZAF Chatbot',
+            reason: 'Kredensial tidak valid di ZAF Console maupun database lokal',
           },
         },
       });
@@ -75,11 +76,18 @@ export class AuthService {
     // Anti-hijack: resolve user lokal SEBELUM membuat efek samping apapun (auto-provisioning tenant
     // baru + lapor ke Console) -- supaya percobaan yang akhirnya ditolak tidak sempat mengubah state
     // Console/chatbot sama sekali.
-    const existingUser = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+      include: { tenant: true },
+    });
 
     let tenantId = consoleResult.chatbotTenantId;
     if (!tenantId) {
-      if (existingUser) {
+      const sameConsoleCustomer =
+        Boolean(consoleResult.customerId) &&
+        existingUser?.tenant?.consoleCustomerId === consoleResult.customerId;
+
+      if (existingUser && !sameConsoleCustomer) {
         // Console belum pernah menautkan customer ini KE tenant chatbot apapun, TAPI email ini
         // sudah dipakai user lokal (tenant lain, atau tenant lama pra-SSO) -- auto-provisioning
         // tenant baru di sini pasti akan bertentangan dengan tenant yang sudah ada. Staf harus
@@ -101,12 +109,14 @@ export class AuthService {
         });
         throw new UnauthorizedException('Email ini sudah dipakai akun chatbot lain. Hubungi tim ZAF.');
       }
-      // Ala Google: begitu Console bilang entitled, tenant dibuat otomatis kalau ini login pertama
-      // kali -- tidak perlu staf menautkan manual (lihat linkTenant di Console).
-      tenantId = await this.autoProvisionTenant(
-        consoleResult.customerId!,
-        consoleResult.customerName,
-      );
+      // Ala Google: begitu Console bilang entitled (atau sudah punya tenant untuk customerId yang sama
+      // saat mode preview unsubscribed), pakai/buat tenant untuk customerId ini.
+      tenantId = sameConsoleCustomer && existingUser?.tenantId
+        ? existingUser.tenantId
+        : await this.autoProvisionTenant(
+            consoleResult.customerId!,
+            consoleResult.customerName,
+          );
     }
 
     const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
@@ -148,7 +158,7 @@ export class AuthService {
       }
     }
 
-    return this.issueSession(user, ipAddress, userAgent, 'POST /auth/login');
+    return this.issueSession(user, ipAddress, userAgent, 'POST /auth/login', isEntitled);
   }
 
   /**
@@ -190,7 +200,7 @@ export class AuthService {
       }
     }
 
-    return this.issueSession(localUser, ipAddress, userAgent, 'POST /auth/login');
+    return this.issueSession(localUser, ipAddress, userAgent, 'POST /auth/login', true);
   }
 
   // Verifikasi kredensial ke Console: source of truth untuk semua login. Null = fitur federasi
@@ -232,6 +242,11 @@ export class AuthService {
     customerId: string,
     customerName: string | null,
   ): Promise<string> {
+    if (!customerId) {
+      throw new ForbiddenException(
+        'Data pelanggan ZAF Console tidak lengkap untuk provisioning tenant.',
+      );
+    }
     let tenant = await this.prisma.tenant.findUnique({
       where: { consoleCustomerId: customerId },
     });
@@ -239,6 +254,11 @@ export class AuthService {
       tenant = await this.prisma.tenant.create({
         data: { name: customerName || 'Toko Baru', consoleCustomerId: customerId },
       });
+    }
+    if (!tenant?.id) {
+      throw new ForbiddenException(
+        'Gagal menyiapkan tenant untuk pelanggan ini.',
+      );
     }
     // Lapor ke Console supaya login berikutnya langsung dapat chatbotTenantId (tanpa auto-provision
     // ulang). Gagal lapor tidak boleh membatalkan login yang sudah berhasil -- percobaan berikutnya
@@ -267,6 +287,7 @@ export class AuthService {
     ipAddress: string,
     userAgent: string,
     endpoint: string,
+    hasSubscription: boolean = true,
   ) {
     const userRolesArray = [user.role];
     const jwtPayload = {
@@ -274,6 +295,7 @@ export class AuthService {
       email: user.email,
       roles: userRolesArray,
       tenantId: user.tenantId,
+      hasSubscription,
     };
 
     const accessToken = await this.jwtService.signAsync(jwtPayload, {
@@ -323,6 +345,7 @@ export class AuthService {
         roles: userRolesArray,
         division: null,
         tenantId: user.tenantId,
+        hasSubscription,
       },
     };
   }
@@ -414,6 +437,7 @@ export class AuthService {
         roles: userRolesArray,
         division: null,
         tenantId: user.tenantId,
+        hasSubscription: true,
       },
     };
   }

@@ -13,6 +13,7 @@ export interface User {
   lastLogin?: string;
   division?: string;
   tenantId?: string | null;
+  hasSubscription?: boolean;
 }
 
 export type ViewKey =

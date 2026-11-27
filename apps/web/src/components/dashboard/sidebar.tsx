@@ -48,7 +48,7 @@ export function Sidebar() {
         }
       })
       .catch(() => null);
-  }, [user, setEnabledMenus]);
+  }, [user?.id, user?.tenantId, user?.role, setEnabledMenus]);
 
   if (!user) return null;
   const safeRole = (user.role || "operator").toLowerCase() as any;

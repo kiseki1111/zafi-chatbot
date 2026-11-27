@@ -116,22 +116,22 @@ describe('Skenario SSO: federasi login Chatbot <-> ZAF Console', () => {
       expect(context.mockPrisma.user.upsert).not.toHaveBeenCalled();
     });
 
-    it('ditautkan tapi tenant itu tidak ada di database chatbot ini: tidak auto-provision, jatuh ke lokal lalu gagal (401)', async () => {
+    it('ditautkan tapi tenant itu tidak ada di database chatbot ini: tolak 403 (tenant belum disiapkan)', async () => {
       (axios.post as jest.Mock).mockResolvedValue({
-        data: { valid: true, chatbotTenantId: 'tenant-tidak-ada' },
+        data: { valid: true, entitled: true, chatbotTenantId: 'tenant-tidak-ada' },
       });
       context.mockPrisma.user.findUnique.mockResolvedValue(null);
       context.mockPrisma.tenant.findUnique.mockResolvedValue(null);
 
       const res = await login('baru@zafii.test', 'apapun');
 
-      expect(res.status).toBe(401);
+      expect(res.status).toBe(403);
       expect(context.mockPrisma.user.upsert).not.toHaveBeenCalled();
     });
 
     it('ditautkan DAN tenant ada: login berhasil, user dipasang (upsert) di tenant itu, cookie access_token terpasang', async () => {
       (axios.post as jest.Mock).mockResolvedValue({
-        data: { valid: true, chatbotTenantId: 'tenant-linked-001' },
+        data: { valid: true, entitled: true, chatbotTenantId: 'tenant-linked-001' },
       });
       context.mockPrisma.user.findUnique.mockResolvedValue(null); // belum pernah login lewat chatbot
       context.mockPrisma.tenant.findUnique.mockResolvedValue({ id: 'tenant-linked-001' });
@@ -188,23 +188,35 @@ describe('Skenario SSO: federasi login Chatbot <-> ZAF Console', () => {
      * Console yang BERUBAH (meniru staf menautkan + pelanggan subscribe di antara dua percobaan login)
      * harus langsung menghasilkan hasil yang berbeda, tanpa restart proses apa pun.
      */
-    it('SKENARIO UTAMA: login #1 sebelum subscription (gagal) -> login #2 setelah subscription aktif di Console (berhasil), tanpa restart apa pun', async () => {
-      // Login #1: pelanggan sudah daftar & ditautkan staf, TAPI belum subscribe Chatbot -- Console
-      // membalas chatbotTenantId: null (lihat SsoService.isEntitledToChatbot).
+    it('SKENARIO UTAMA: login #1 sebelum subscription (berhasil dengan hasSubscription=false) -> login #2 setelah subscription aktif di Console (hasSubscription=true)', async () => {
+      // Login #1: pelanggan sudah daftar & punya akun Console, valid=true, TAPI belum subscribe Chatbot (entitled=false).
+      // Sistem mengizinkan login dengan hasSubscription=false agar UI menampilkan blur & modal langganan.
       (axios.post as jest.Mock).mockResolvedValueOnce({
-        data: { valid: true, chatbotTenantId: null },
+        data: { valid: true, entitled: false, customerId: 'cust-progressif', customerName: 'Toko Progressif', chatbotTenantId: null },
       });
+      context.mockPrisma.tenant.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: 'tenant-auto-unsub', metadata: {} });
+      context.mockPrisma.tenant.create.mockResolvedValueOnce({ id: 'tenant-auto-unsub', name: 'Toko Progressif' });
       context.mockPrisma.user.findUnique.mockResolvedValueOnce(null);
+      context.mockPrisma.user.upsert.mockResolvedValueOnce({
+        id: 'u-unsub',
+        email: 'progressif@zafii.test',
+        name: 'progressif',
+        role: 'manager',
+        tenantId: 'tenant-auto-unsub',
+        tenant: { id: 'tenant-auto-unsub', metadata: {} },
+      });
 
       const first = await login('progressif@zafii.test', 'PasswordSama123');
-      expect(first.status).toBe(401);
-      expect(context.mockPrisma.user.upsert).not.toHaveBeenCalled();
+      expect(first.status).toBe(200);
+      expect(first.body.user.hasSubscription).toBe(false);
 
       // Pelanggan subscribe paket Chatbot di Console (status jadi ACTIVE) -- di sisi Console ini
       // sudah dibuktikan langsung tercermin di sso.e2e-spec.ts. Di sini: panggilan login BERIKUTNYA
       // (tanpa restart proses chatbot apa pun) langsung memakai jawaban baru itu.
       (axios.post as jest.Mock).mockResolvedValueOnce({
-        data: { valid: true, chatbotTenantId: 'tenant-progresif-001' },
+        data: { valid: true, entitled: true, customerId: 'cust-progressif', customerName: 'Toko Progressif', chatbotTenantId: 'tenant-progresif-001' },
       });
       context.mockPrisma.user.findUnique.mockResolvedValueOnce(null);
       context.mockPrisma.tenant.findUnique.mockResolvedValueOnce({
@@ -221,6 +233,7 @@ describe('Skenario SSO: federasi login Chatbot <-> ZAF Console', () => {
 
       const second = await login('progressif@zafii.test', 'PasswordSama123');
       expect(second.status).toBe(200);
+      expect(second.body.user.hasSubscription).toBe(true);
       expect(second.body.user.tenantId).toBe('tenant-progresif-001');
     });
   });

@@ -51,6 +51,7 @@ export const useAuthStore = create<AuthState>()(
             createdAt: new Date().toISOString().slice(0, 10),
             lastLogin: new Date().toISOString().slice(0, 16).replace("T", " "),
             tenantId: responseData.user.tenantId || null,
+            hasSubscription: responseData.user.hasSubscription !== false,
           };
           set({ user, isAuthenticated: true, authView: "login" });
           return { ok: true };

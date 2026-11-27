@@ -87,22 +87,71 @@ describe('AuthService.login (Console adalah satu-satunya sumber kredensial, auto
     expect(mockPrisma.user.upsert).not.toHaveBeenCalled();
   });
 
-  it('Console: valid tapi tidak entitled (belum subscribe) -> ditolak, tidak auto-provisioning apapun', async () => {
-    (axios.post as jest.Mock).mockResolvedValue({
-      data: { valid: true, entitled: false, customerId: 'cust-1', customerName: 'PT Belum Bayar', chatbotTenantId: null },
+  it('Console: valid tapi tidak entitled (belum subscribe) -> login berhasil dengan hasSubscription=false untuk testing & overlay modal', async () => {
+    (axios.post as jest.Mock)
+      .mockResolvedValueOnce({
+        data: { valid: true, entitled: false, customerId: 'cust-1', customerName: 'PT Belum Bayar', chatbotTenantId: null },
+      })
+      .mockResolvedValueOnce({}); // POST link-tenant
+
+    mockPrisma.tenant.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'tenant-demo', metadata: {} });
+    mockPrisma.tenant.create.mockResolvedValue({ id: 'tenant-demo', name: 'PT Belum Bayar' });
+    mockPrisma.user.findUnique.mockResolvedValue(null);
+    mockPrisma.user.upsert.mockResolvedValue({
+      id: 'u-unsub',
+      email: 'belum-bayar@example.com',
+      name: 'belum-bayar',
+      role: 'manager',
+      tenantId: 'tenant-demo',
+      tenant: { id: 'tenant-demo', metadata: {} },
     });
+    mockPrisma.refreshToken.create.mockResolvedValue({});
     mockPrisma.auditLog.create.mockResolvedValue({});
 
-    await expect(
-      service.login(
-        { email: 'belum-bayar@example.com', passwordPlain: 'apapun' },
-        '127.0.0.1',
-        'jest-agent',
-      ),
-    ).rejects.toThrow(UnauthorizedException);
+    const result = await service.login(
+      { email: 'belum-bayar@example.com', passwordPlain: 'apapun' },
+      '127.0.0.1',
+      'jest-agent',
+    );
 
-    expect(mockPrisma.tenant.create).not.toHaveBeenCalled();
-    expect(mockPrisma.user.upsert).not.toHaveBeenCalled();
+    expect(result.user.hasSubscription).toBe(false);
+    expect(result.accessToken).toBeDefined();
+  });
+
+  it('Console: login ke-2 dengan akun unsubscribed yang sama (consoleCustomerId cocok) -> tetap berhasil dengan hasSubscription=false', async () => {
+    (axios.post as jest.Mock).mockResolvedValueOnce({
+      data: { valid: true, entitled: false, customerId: 'cust-1', customerName: 'PT Belum Bayar', chatbotTenantId: null },
+    });
+    mockPrisma.user.findUnique.mockResolvedValueOnce({
+      id: 'u-unsub',
+      email: 'belum-bayar@example.com',
+      name: 'belum-bayar',
+      role: 'manager',
+      tenantId: 'tenant-demo',
+      tenant: { id: 'tenant-demo', consoleCustomerId: 'cust-1', metadata: {} },
+    });
+    mockPrisma.tenant.findUnique.mockResolvedValueOnce({ id: 'tenant-demo', metadata: {} });
+    mockPrisma.user.upsert.mockResolvedValueOnce({
+      id: 'u-unsub',
+      email: 'belum-bayar@example.com',
+      name: 'belum-bayar',
+      role: 'manager',
+      tenantId: 'tenant-demo',
+      tenant: { id: 'tenant-demo', metadata: {} },
+    });
+    mockPrisma.refreshToken.create.mockResolvedValue({});
+    mockPrisma.auditLog.create.mockResolvedValue({});
+
+    const result = await service.login(
+      { email: 'belum-bayar@example.com', passwordPlain: 'apapun' },
+      '127.0.0.1',
+      'jest-agent',
+    );
+
+    expect(result.user.hasSubscription).toBe(false);
+    expect(result.user.tenantId).toBe('tenant-demo');
   });
 
   it('Console tidak terjangkau (timeout/ECONNREFUSED) -> login gagal, TIDAK ADA fallback lokal', async () => {
