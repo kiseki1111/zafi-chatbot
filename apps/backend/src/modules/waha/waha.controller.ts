@@ -24,6 +24,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { WahaService } from './waha.service';
 import { HrisAssistantRelayService } from './hris-assistant-relay.service';
+import { HrisAssistantService } from '../../features/hris/hris-assistant.service';
 import { AvailabilityService } from '../availability/availability.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { OmnichannelQueueService } from '../../core/omnichannel/omnichannel-queue.service';
@@ -62,6 +63,7 @@ export class WahaController implements OnApplicationBootstrap {
     @Optional() private readonly availabilityService?: AvailabilityService,
     @Optional() private readonly configService?: ConfigService,
     @Optional() private readonly hrisAssistantRelay?: HrisAssistantRelayService,
+    @Optional() private readonly hrisAssistant?: HrisAssistantService,
   ) {}
 
   async onApplicationBootstrap() {
@@ -1893,13 +1895,37 @@ export class WahaController implements OnApplicationBootstrap {
             },
           };
 
-          // Nomor khusus Asisten HRD (lihat HrisAssistantRelayService): relay ke Console,
-          // jangan masuk antrean bot CS jualan sama sekali.
-          const hrdSession = this.hrisAssistantRelay?.dedicatedSession();
-          if (hrdSession && sessionName === hrdSession) {
-            await this.hrisAssistantRelay!.relay(sessionName, sender, text);
+          // Per-tenant session Asisten HRD (`asisten-<tenantShort>` dibuat oleh UI Bot Asisten)
+          // diproses oleh HrisAssistantService di chatbot memakai HRIS per-tenant via SSO Console.
+          if (sessionName.startsWith('asisten-') && this.hrisAssistant) {
+            if (!sessionTenantId) {
+              this.logger.warn(
+                `[WahaController] Session asisten "${sessionName}" tidak punya tenantId; pesan diabaikan.`,
+              );
+            } else {
+              const res = await this.hrisAssistant.handleMessage(
+                sessionTenantId,
+                sender,
+                text,
+              );
+              if (res.handled && res.reply) {
+                await this.wahaService
+                  .sendText(sessionName, sender, res.reply)
+                  .catch((err) =>
+                    this.logger.warn(
+                      `[WahaController] Gagal kirim balasan Asisten HRD ke WAHA: ${err?.message || err}`,
+                    ),
+                  );
+              }
+            }
           } else {
-            this.omnichannelQueue.enqueue(incomingMessage);
+            // Fallback legacy: 1 nomor khusus global HRIS_ASSISTANT_WAHA_SESSION -> relay ke Console
+            const hrdSession = this.hrisAssistantRelay?.dedicatedSession();
+            if (hrdSession && sessionName === hrdSession) {
+              await this.hrisAssistantRelay!.relay(sessionName, sender, text);
+            } else {
+              this.omnichannelQueue.enqueue(incomingMessage);
+            }
           }
         }
       }

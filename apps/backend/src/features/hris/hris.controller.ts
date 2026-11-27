@@ -1,5 +1,6 @@
-import { Controller, ForbiddenException, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Optional, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { HrisService } from './hris.service';
+import { HrisAssistantService } from './hris-assistant.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 /** Staf tenant (dikelola lewat halaman HRIS di dashboard chatbot) yang boleh memakai integrasi ini. */
@@ -11,7 +12,10 @@ const HRIS_STAFF_ROLES = ['superadmin', 'manager', 'administrator'];
 @UseGuards(JwtAuthGuard)
 @Controller('api/v1/hris')
 export class HrisController {
-  constructor(private readonly hrisService: HrisService) {}
+  constructor(
+    private readonly hrisService: HrisService,
+    @Optional() private readonly hrisAssistant?: HrisAssistantService,
+  ) {}
 
   private requireStaff(req: any): string | null {
     const user = req?.user;
@@ -97,5 +101,17 @@ export class HrisController {
   async getEmployeesSummary(@Req() req: any) {
     const tenantId = this.requireStaff(req);
     return this.hrisService.getEmployeesSummary(tenantId);
+  }
+
+  @Post('assistant/chat')
+  async assistantChat(
+    @Req() req: any,
+    @Body() body: { phone: string; text: string },
+  ) {
+    const tenantId = this.requireStaff(req);
+    if (!this.hrisAssistant) {
+      return { handled: false, reply: 'Layanan Asisten HRD tidak tersedia.' };
+    }
+    return this.hrisAssistant.handleMessage(tenantId, body?.phone || '', body?.text || '');
   }
 }
