@@ -982,6 +982,32 @@ describe('AuthService SSO Comprehensive Scenarios (A-J)', () => {
         service.login({ email: 'u@t1.com', passwordPlain: 'pw' }, '127.0.0.1', 'ua'),
       ).rejects.toThrow(ForbiddenException);
     });
+
+    it('E-08 (REGRESSI): Tenant paket developer/unlimited dengan sisa metadata isTrial expired -> tetap 200', async () => {
+      (axios.post as jest.Mock).mockResolvedValueOnce({
+        data: { valid: true, entitled: true, customerId: 'c-dev', customerName: 'Dev', chatbotTenantId: 't-dev' },
+      });
+      mockPrisma.user.findUnique.mockResolvedValueOnce(null);
+      mockPrisma.tenant.findUnique.mockResolvedValueOnce({
+        id: 't-dev',
+        metadata: { plan: 'developer', isTrial: true, trialExpiresAt: '2020-01-01T00:00:00Z' },
+      });
+      mockPrisma.user.upsert.mockResolvedValueOnce({
+        id: 'u-dev',
+        email: 'dev@t1.com',
+        name: 'dev',
+        role: 'manager',
+        tenantId: 't-dev',
+        tenant: {
+          id: 't-dev',
+          metadata: { plan: 'developer', isTrial: true, trialExpiresAt: '2020-01-01T00:00:00Z' },
+        },
+      });
+
+      const res = await service.login({ email: 'dev@t1.com', passwordPlain: 'pw' }, '127.0.0.1', 'ua');
+      expect(res.accessToken).toBeDefined();
+      expect(res.user.hasSubscription).toBe(true);
+    });
   });
 
   // =========================================================================

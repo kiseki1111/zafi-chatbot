@@ -145,10 +145,11 @@ export class AuthService {
       include: { tenant: true },
     });
 
-    // ponytail: validasi kedaluwarsa akun trial 14 hari
+    // ponytail: validasi kedaluwarsa akun trial 14 hari (paket developer/unlimited bebas dari blokir trial)
     if (user.role !== 'superadmin' && user.tenant) {
       const meta = (user.tenant.metadata as any) || {};
-      if (meta.isTrial && meta.trialExpiresAt) {
+      const isDeveloperPlan = String(meta.plan || '').toLowerCase() === 'developer';
+      if (!isDeveloperPlan && meta.isTrial && meta.trialExpiresAt) {
         const isExpired = new Date(meta.trialExpiresAt).getTime() < Date.now();
         if (isExpired) {
           throw new ForbiddenException(
@@ -193,7 +194,8 @@ export class AuthService {
 
     if (localUser.role !== 'superadmin' && localUser.tenant) {
       const meta = (localUser.tenant.metadata as any) || {};
-      if (meta.isTrial && meta.trialExpiresAt && new Date(meta.trialExpiresAt).getTime() < Date.now()) {
+      const isDeveloperPlan = String(meta.plan || '').toLowerCase() === 'developer';
+      if (!isDeveloperPlan && meta.isTrial && meta.trialExpiresAt && new Date(meta.trialExpiresAt).getTime() < Date.now()) {
         throw new ForbiddenException(
           'Masa trial 14 hari akun Anda telah berakhir. Silakan hubungi tim kami untuk memperpanjang atau upgrade ke paket berbayar.',
         );

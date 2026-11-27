@@ -417,12 +417,14 @@ export function resolveTenantCapacity(metadata: any) {
     extraUsers: extraUsers,
     extraProjects: extraProj,
     isDeveloper,
-    isTrial: Boolean(metadata?.isTrial),
-    isTrialExpired: Boolean(
-      metadata?.isTrial &&
-        metadata?.trialExpiresAt &&
-        new Date(metadata.trialExpiresAt).getTime() < Date.now(),
-    ),
+    isTrial: isDeveloper ? false : Boolean(metadata?.isTrial),
+    isTrialExpired: isDeveloper
+      ? false
+      : Boolean(
+          metadata?.isTrial &&
+            metadata?.trialExpiresAt &&
+            new Date(metadata.trialExpiresAt).getTime() < Date.now(),
+        ),
   };
 }
 
@@ -435,6 +437,9 @@ export function isFeatureAllowed(
     | 'customFollowUp'
     | 'manualFollowUp',
 ): boolean {
+  const raw = metadata?.plan ? String(metadata.plan).toLowerCase() : null;
+  if (raw === 'developer') return true;
+
   const isTrialExpired = Boolean(
     metadata?.isTrial &&
       metadata?.trialExpiresAt &&
@@ -442,7 +447,6 @@ export function isFeatureAllowed(
   );
   if (isTrialExpired) return false;
 
-  const raw = metadata?.plan ? String(metadata.plan).toLowerCase() : null;
   if (!raw) return false;
   if (
     raw === 'developer' ||
@@ -734,6 +738,9 @@ export class TenantService {
       data.planName ||
       (tierConfig ? tierConfig.name : meta.planName || 'Belum Ada Paket');
 
+    // ponytail: ketika admin mengganti/menetapkan paket berbayar atau developer, cabut status trial lama
+    const shouldClearTrial = Boolean(data.plan) || planKey === 'developer';
+
     const updated = await this.prisma.tenant.update({
       where: { id: tenantId },
       data: {
@@ -744,6 +751,7 @@ export class TenantService {
           planPrice,
           maxMau,
           maxAiResponses,
+          ...(shouldClearTrial ? { isTrial: false, trialExpiresAt: null } : {}),
         },
       },
     });
