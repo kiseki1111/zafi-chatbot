@@ -223,7 +223,7 @@ export class AuthService {
         { email, password: passwordPlain },
         {
           timeout: 3000,
-          headers: { Authorization: `Bearer ${ssoKey}`, 'CF-Connecting-IP': ipAddress },
+          headers: { Authorization: `Bearer ${ssoKey}`, 'X-Forwarded-For': ipAddress },
         },
       );
       return res.data;

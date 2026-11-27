@@ -738,7 +738,7 @@ describe('AuthService SSO Comprehensive Scenarios (A-J)', () => {
       expect(axios.post).not.toHaveBeenCalled();
     });
 
-    it('D-04: Verify dipanggil dengan header Authorization Bearer & CF-Connecting-IP', async () => {
+    it('D-04: Verify dipanggil dengan header Authorization Bearer & X-Forwarded-For', async () => {
       (axios.post as jest.Mock).mockResolvedValueOnce({
         data: { valid: false, entitled: false, customerId: null, customerName: null, chatbotTenantId: null },
       });
@@ -755,7 +755,7 @@ describe('AuthService SSO Comprehensive Scenarios (A-J)', () => {
           timeout: 3000,
           headers: {
             Authorization: `Bearer ${'k'.repeat(43)}`,
-            'CF-Connecting-IP': '10.0.0.1',
+            'X-Forwarded-For': '10.0.0.1',
           },
         },
       );
